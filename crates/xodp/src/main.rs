@@ -11,14 +11,14 @@
 
 mod view;
 
-use odox_ui::{Product, run};
+use odox_ui::{Product, mark, run};
 
 fn main() -> eframe::Result {
     run(
         Product {
             id: "xodp",
             extension: "odp",
-            format: "OpenDocument Presentation",
+            format: mark("OpenDocument Presentation"),
         },
         |_ctx| view::SlideView::default(),
     )

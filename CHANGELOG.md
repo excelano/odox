@@ -14,4 +14,7 @@ All notable changes to odox are recorded here. The format follows
   part of a document it was given, including the parts it has no opinion about.
 - `odox-ui`, which maps ODF styles onto what egui draws with and renders the
   content model the three formats share.
-- A Debian package per application, desktop entries and icons.
+- A Debian package per application, desktop entries, icons and man pages.
+- The translation mechanism: one `.po` catalogue for the suite, the extraction
+  and pseudolocale scripts, and a pseudolocale compiled into debug builds alone.
+  No translation ships yet.

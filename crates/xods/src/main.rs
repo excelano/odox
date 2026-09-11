@@ -12,14 +12,14 @@
 mod grid;
 mod view;
 
-use odox_ui::{Product, run};
+use odox_ui::{Product, mark, run};
 
 fn main() -> eframe::Result {
     run(
         Product {
             id: "xods",
             extension: "ods",
-            format: "OpenDocument Spreadsheet",
+            format: mark("OpenDocument Spreadsheet"),
         },
         |_ctx| view::SheetView::default(),
     )

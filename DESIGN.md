@@ -184,13 +184,37 @@ that repository, which is the same arrangement duckling's copy records.
 
 ## §8 Language
 
-Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`
-from the first commit, because retrofitting that onto strings already written is
-the expensive half and adding a language is the cheap one. There is one catalogue
-for the suite rather than one per application: an application contributes its own
-name, and a name is not translated. The catalogue lives inside the crate that
-reads it, which is the constraint `include_str!` imposes and the one flyleaf lost
-a release tag to.
+Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.
+There is one catalogue for the suite rather than one per application, because
+`potext::catalog!` gives the storage to the crate that invokes it and every
+message is invoked from `odox-ui`: a string written in `xodt` is looked up in
+`odox-ui`'s catalogue. So the extraction globs every crate and the catalogues
+live under `crates/odox-ui/po`, which is also what `include_str!` requires —
+reaching above a crate root compiles locally and fails in `cargo package`, and
+flyleaf lost a release tag to exactly that.
+
+An application contributes its own name, which is not translated, and the name of
+the format it opens, which is. That one is a literal in a `const` built before
+`run` puts a catalogue in force, so it is wrapped in `i18n::mark` — gettext's
+`N_` — and looked up through `t` where it is drawn.
+
+**The pseudolocale is a debugging tool and not a translation.** `en-x-pseudo`
+returns every message accented, bracketed and 40% longer, and running a window in
+it shows three things at a glance that no test reaches: a string that never went
+through `t`, a sentence the catalogue never saw, and a label built to the width of
+English. The third is what German hits, German running about a third longer, and
+this finds it without anybody reading German. It is compiled into debug builds
+alone. Its first run here found the whole mechanism inert — a catalogue was
+shipped and never chosen, which an English window is indistinguishable from — and
+that is now a unit test rather than something a person has to remember to look
+for.
+
+`po/update-po.sh` re-extracts and merges; `preflight.sh` refuses a release whose
+template is behind the source. `msgmerge` marks a reworded message `#, fuzzy` and
+`potext` refuses to load one, so the window falls back to English until somebody
+has read the new sentence: a translation is never silently wrong, it is current or
+visibly absent. That is the property a key-value catalogue cannot offer and the
+reason this speaks `.po`.
 
 ## §9 Size, speed and packaging
 

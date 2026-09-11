@@ -21,7 +21,11 @@ pub struct Product {
     pub id: &'static str,
     /// The file extension the application opens.
     pub extension: &'static str,
-    /// What the file dialog calls that kind of file.
+    /// What the file dialog and the empty window call that kind of file.
+    ///
+    /// The English, which is the message id: it is looked up through [`t`] where
+    /// it is shown, because a `Product` is built before `run` puts a catalogue in
+    /// force and a translation looked up here would be the English every time.
     pub format: &'static str,
 }
 
@@ -116,7 +120,7 @@ impl<V: Viewer> Shell<V> {
 
     fn ask_for_a_file(&mut self, ctx: &egui::Context) {
         let file = rfd::FileDialog::new()
-            .add_filter(self.product.format, &[self.product.extension])
+            .add_filter(t(self.product.format), &[self.product.extension])
             .pick_file();
         if let Some(path) = file {
             self.open(ctx, &path);
@@ -252,8 +256,11 @@ impl<V: Viewer> Shell<V> {
     fn nothing_open(&mut self, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
             ui.add_space(ui.available_height() * 0.3);
+            // The application's own name, which is not translated, and the name
+            // of the format, which is: Comma's German has said
+            // `OpenDocument-Tabellendokument` since it shipped.
             ui.heading(self.product.id);
-            ui.label(self.product.format);
+            ui.label(t(self.product.format));
             ui.add_space(12.0);
             if ui.button(t("Open a document…")).clicked() {
                 let ctx = ui.ctx().clone();

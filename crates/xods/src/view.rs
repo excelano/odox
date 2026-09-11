@@ -147,18 +147,24 @@ impl SheetView {
             .filter(|(_, sheet)| sheet.visible)
             .map(|(index, sheet)| (index, sheet.name.clone()))
             .collect();
-        egui::ScrollArea::horizontal().show(ui, |ui| {
-            ui.horizontal(|ui| {
-                for (index, name) in names {
-                    let picked = index == self.sheet;
-                    if ui.selectable_label(picked, name).clicked() {
-                        self.sheet = index;
-                        self.selected = (0, 0);
-                        self.metrics = None;
+        // `auto_shrink` vertically, or the scroll area claims every point the
+        // panel could give it and leaves a dead band between the grid and the
+        // tabs. It scrolls sideways because a workbook may have more sheets than
+        // fit; it never scrolls down.
+        egui::ScrollArea::horizontal()
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for (index, name) in names {
+                        let picked = index == self.sheet;
+                        if ui.selectable_label(picked, name).clicked() {
+                            self.sheet = index;
+                            self.selected = (0, 0);
+                            self.metrics = None;
+                        }
                     }
-                }
+                });
             });
-        });
     }
 
     /// The grid, painting the cells the window covers and no others.

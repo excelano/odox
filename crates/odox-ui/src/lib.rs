@@ -25,4 +25,5 @@ pub mod shell;
 pub mod system_theme;
 
 pub use flow::{Flow, Pictures};
+pub use i18n::mark;
 pub use shell::{Product, Shell, Viewer, run};

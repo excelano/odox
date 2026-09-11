@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the odox package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: odox\n"
+"Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
+"POT-Creation-Date: 2026-09-11 15:54-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: crates/odox-ui/src/i18n.rs:87 crates/odox-ui/src/i18n.rs:91
+#: crates/odox-ui/src/shell.rs:166
+msgid "File"
+msgstr ""
+
+#: crates/odox-ui/src/i18n.rs:94 crates/odox-ui/src/i18n.rs:95
+#: crates/xodp/src/view.rs:36 crates/xods/src/view.rs:32
+#: crates/xodt/src/view.rs:27
+msgid "{file} could not be opened: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:114
+msgid "{file} could not be read: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:167
+msgid "Open…"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:173
+msgid "Reload"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:180
+msgid "Close"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:187
+msgid "Quit"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:191
+msgid "View"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:192
+msgid "Zoom in"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:195
+msgid "Zoom out"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:198
+msgid "Actual size"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:202
+msgid "Show the side panel"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:208
+msgid "{percent}%"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:218
+msgid "Dismiss"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:265
+msgid "Open a document…"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:270
+msgid "or drop one on this window"
+msgstr ""
+
+#: crates/xodp/src/main.rs:21
+msgid "OpenDocument Presentation"
+msgstr ""
+
+#: crates/xodp/src/view.rs:78
+msgid "This presentation has no slides."
+msgstr ""
+
+#: crates/xodp/src/view.rs:104
+msgid "Notes"
+msgstr ""
+
+#: crates/xodp/src/view.rs:111
+msgid "This slide has no notes."
+msgstr ""
+
+#: crates/xodp/src/view.rs:153
+msgid "Slides"
+msgstr ""
+
+#: crates/xodp/src/view.rs:173
+msgid "Show the speaker's notes"
+msgstr ""
+
+#: crates/xods/src/main.rs:22
+msgid "OpenDocument Spreadsheet"
+msgstr ""
+
+#: crates/xods/src/view.rs:98
+msgid "Copy the sheet as tab-separated text"
+msgstr ""
+
+#: crates/xodt/src/main.rs:28
+msgid "OpenDocument Text"
+msgstr ""
+
+#: crates/xodt/src/view.rs:63
+msgid "This document has no text in it."
+msgstr ""
+
+#: crates/xodt/src/view.rs:101
+msgid "Outline"
+msgstr ""
+
+#: crates/xodt/src/view.rs:110
+msgid "(untitled)"
+msgstr ""
+
+#: crates/xodt/src/view.rs:134
+msgid "Copy the document as text"
+msgstr ""

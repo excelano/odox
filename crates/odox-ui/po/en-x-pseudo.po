@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the odox package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: odox\n"
+"Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
+"POT-Creation-Date: 2026-09-11 15:54-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: none\n"
+"Language: en-x-pseudo\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: crates/odox-ui/src/i18n.rs:87 crates/odox-ui/src/i18n.rs:91
+#: crates/odox-ui/src/shell.rs:166
+msgid "File"
+msgstr "[Fílé ··]"
+
+#: crates/odox-ui/src/i18n.rs:94 crates/odox-ui/src/i18n.rs:95
+#: crates/xodp/src/view.rs:36 crates/xods/src/view.rs:32
+#: crates/xodt/src/view.rs:27
+msgid "{file} could not be opened: {reason}"
+msgstr "[{file} cöüld ñöt bé öpéñéd: {reason} ···············]"
+
+#: crates/odox-ui/src/shell.rs:114
+msgid "{file} could not be read: {reason}"
+msgstr "[{file} cöüld ñöt bé réäd: {reason} ··············]"
+
+#: crates/odox-ui/src/shell.rs:167
+msgid "Open…"
+msgstr "[Öpéñ… ···]"
+
+#: crates/odox-ui/src/shell.rs:173
+msgid "Reload"
+msgstr "[Rélöäd ···]"
+
+#: crates/odox-ui/src/shell.rs:180
+msgid "Close"
+msgstr "[Clöšé ···]"
+
+#: crates/odox-ui/src/shell.rs:187
+msgid "Quit"
+msgstr "[Qüít ··]"
+
+#: crates/odox-ui/src/shell.rs:191
+msgid "View"
+msgstr "[Víéw ··]"
+
+#: crates/odox-ui/src/shell.rs:192
+msgid "Zoom in"
+msgstr "[Zööm íñ ···]"
+
+#: crates/odox-ui/src/shell.rs:195
+msgid "Zoom out"
+msgstr "[Zööm öüt ····]"
+
+#: crates/odox-ui/src/shell.rs:198
+msgid "Actual size"
+msgstr "[Åctüäl šízé ·····]"
+
+#: crates/odox-ui/src/shell.rs:202
+msgid "Show the side panel"
+msgstr "[Shöw thé šídé päñél ········]"
+
+#: crates/odox-ui/src/shell.rs:208
+msgid "{percent}%"
+msgstr "[{percent}% ·····]"
+
+#: crates/odox-ui/src/shell.rs:218
+msgid "Dismiss"
+msgstr "[Díšmíšš ···]"
+
+#: crates/odox-ui/src/shell.rs:265
+msgid "Open a document…"
+msgstr "[Öpéñ ä döcüméñt… ········]"
+
+#: crates/odox-ui/src/shell.rs:270
+msgid "or drop one on this window"
+msgstr "[ör dröp öñé öñ thíš wíñdöw ···········]"
+
+#: crates/xodp/src/main.rs:21
+msgid "OpenDocument Presentation"
+msgstr "[ÖpéñDöcüméñt Préšéñtätíöñ ···········]"
+
+#: crates/xodp/src/view.rs:78
+msgid "This presentation has no slides."
+msgstr "[Thíš préšéñtätíöñ häš ñö šlídéš. ·············]"
+
+#: crates/xodp/src/view.rs:104
+msgid "Notes"
+msgstr "[Nötéš ···]"
+
+#: crates/xodp/src/view.rs:111
+msgid "This slide has no notes."
+msgstr "[Thíš šlídé häš ñö ñötéš. ··········]"
+
+#: crates/xodp/src/view.rs:153
+msgid "Slides"
+msgstr "[Slídéš ···]"
+
+#: crates/xodp/src/view.rs:173
+msgid "Show the speaker's notes"
+msgstr "[Shöw thé špéäkér'š ñötéš ··········]"
+
+#: crates/xods/src/main.rs:22
+msgid "OpenDocument Spreadsheet"
+msgstr "[ÖpéñDöcüméñt Spréädšhéét ··········]"
+
+#: crates/xods/src/view.rs:98
+msgid "Copy the sheet as tab-separated text"
+msgstr "[Cöpy thé šhéét äš täb-šépärätéd téxt ···············]"
+
+#: crates/xodt/src/main.rs:28
+msgid "OpenDocument Text"
+msgstr "[ÖpéñDöcüméñt Téxt ·······]"
+
+#: crates/xodt/src/view.rs:63
+msgid "This document has no text in it."
+msgstr "[Thíš döcüméñt häš ñö téxt íñ ít. ·············]"
+
+#: crates/xodt/src/view.rs:101
+msgid "Outline"
+msgstr "[Öütlíñé ···]"
+
+#: crates/xodt/src/view.rs:110
+msgid "(untitled)"
+msgstr "[(üñtítléd) ·····]"
+
+#: crates/xodt/src/view.rs:134
+msgid "Copy the document as text"
+msgstr "[Cöpy thé döcüméñt äš téxt ···········]"

@@ -18,14 +18,14 @@
 
 mod view;
 
-use odox_ui::{Product, run};
+use odox_ui::{Product, mark, run};
 
 fn main() -> eframe::Result {
     run(
         Product {
             id: "xodt",
             extension: "odt",
-            format: "OpenDocument Text",
+            format: mark("OpenDocument Text"),
         },
         |_ctx| view::TextView::default(),
     )

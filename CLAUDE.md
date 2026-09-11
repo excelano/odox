@@ -85,6 +85,28 @@ kills that instead.
 
 ---
 
+## Strings
+
+Every sentence a person reads goes through `odox_ui::i18n::t`, and a message that
+has to be a literal where no catalogue is in force yet — a `const`, a `Product` —
+is wrapped in `i18n::mark` and looked up through `t` where it is drawn. There is
+one catalogue for the suite and it lives in `crates/odox-ui/po`, because
+`potext::catalog!` gives the storage to the crate that invokes it and
+`include_str!` cannot reach above a crate root.
+
+After changing any such sentence, run `crates/odox-ui/po/update-po.sh` and commit
+what it changes; `preflight.sh` refuses a release whose template is behind the
+source. Then look at the result:
+
+    crates/odox-ui/po/pseudo.sh
+    POTEXT_LANG=en-x-pseudo cargo run -p xods -- corpus/libreoffice/calc.ods
+
+The pseudolocale accents every message and pads it 40%, which is roughly what
+German costs. A string still in English never went through `t`; a label with its
+end cut off was built to the width of English. Neither is reachable by a test.
+
+---
+
 ## Stay inside your own platform's arm
 
 Linux is `packaging/linux` and `packaging/debian`, Windows is
