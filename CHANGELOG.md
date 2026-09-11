@@ -4,6 +4,15 @@ All notable changes to odox are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `odox`, a launcher: it takes a file, works out which of the three viewers
+  reads it, and becomes that one. The extension answers first and the package's
+  own media type answers where the extension cannot. `--which` names the viewer
+  and launches nothing. On crates.io; in no Debian package yet.
+
 ## [0.1.0] — 2026-09-11
 
 First release. Three viewers, no editing.

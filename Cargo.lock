@@ -1979,6 +1979,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "odox"
+version = "0.1.0"
+dependencies = [
+ "odox-core",
+]
+
+[[package]]
 name = "odox-core"
 version = "0.1.0"
 dependencies = [

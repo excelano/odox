@@ -8,6 +8,11 @@ presentations. Rust and egui, one binary each, nothing sent anywhere.
     xods accounts.ods
     xodp deck.odp
 
+There is a launcher too, for a shell or a script that has a file and does not
+want to know which kind it is:
+
+    odox anything.ods
+
 ## Why not just open it in LibreOffice
 
 LibreOffice is an office suite and these are viewers. The whole of `xodt` starts
@@ -36,6 +41,8 @@ From crates.io, which gives you the binary and nothing around it — no desktop
 entry, no icon, so a file manager will not offer it:
 
     cargo install xodt
+
+The `odox` launcher is on crates.io and in no package: `cargo install odox`.
 
 From a clone, which is the same package the apt repository serves:
 
@@ -77,7 +84,8 @@ the sibling that reads it.
 
 `crates/odox-core` reads and writes the format and has no window in it.
 `crates/odox-ui` is everything a person sees, shared by all three. `crates/xodt`,
-`crates/xods` and `crates/xodp` are one screen each over that. `corpus/` holds
+`crates/xods` and `crates/xodp` are one screen each over that. `crates/odox` is
+the launcher, which draws nothing and links no toolkit. `corpus/` holds
 the documents the tests read. `packaging/` turns a build into something
 installable, one directory per platform. `DESIGN.md` is where every decision and
 its reasoning live; `CLAUDE.md` is the short guide for a session working here.

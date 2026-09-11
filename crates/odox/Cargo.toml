@@ -1,0 +1,22 @@
+[package]
+name = "odox"
+description = "Open an OpenDocument file with whichever of the odox viewers reads it"
+keywords = ["opendocument", "odf", "odt", "ods", "odp"]
+categories = ["command-line-utilities"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "odox"
+path = "src/main.rs"
+
+[dependencies]
+# The reader, for the one question the file name cannot answer. Nothing else:
+# **this crate does not depend on `odox-ui` and must not.** It is a command that
+# runs for a few milliseconds and then replaces itself, and reaching the shared
+# window crate would link a graphics toolkit into it to reach three sentences.
+odox-core.workspace = true

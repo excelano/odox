@@ -30,6 +30,17 @@ a spreadsheet and a presentation through different doors: the desktop registers 
 handler per media type, and a file manager offers an application, not a mode.
 They share no bytes on disk and every line of source.
 
+There is a fourth binary and it is not an application. `odox` is a launcher: it
+takes a file, works out which of the three reads it, and on Unix replaces itself
+with that one. The extension answers first, because it is free and it is the same
+answer the desktop's association gives; the package's declared media type answers
+where the extension cannot, which is the file named `download` or named nothing.
+It links `odox-core` and deliberately not `odox-ui` — reaching the shared window
+crate would put a graphics toolkit inside a command that runs for a few
+milliseconds. **The applications are the product and the launcher is a
+convenience over them**: a desktop offers the three directly, one per media type,
+and nothing in them depends on it.
+
 The dependency between them runs one way and never back. `odox-core` does not
 depend on `odox-ui`, does not link egui, and does not open files: a document is
 made from a byte slice and turned back into a `Vec<u8>`. That is what lets the
@@ -197,6 +208,11 @@ An application contributes its own name, which is not translated, and the name o
 the format it opens, which is. That one is a literal in a `const` built before
 `run` puts a catalogue in force, so it is wrapped in `i18n::mark` — gettext's
 `N_` — and looked up through `t` where it is drawn.
+
+The launcher is the exception and says so here rather than in a comment nobody
+reads: it draws no window, links no `odox-ui`, and its three sentences are
+English. Reaching the catalogue would mean linking the toolkit that holds it,
+which is twelve megabytes to translate a usage message.
 
 **The pseudolocale is a debugging tool and not a translation.** `en-x-pseudo`
 returns every message accented, bracketed and 40% longer, and running a window in

@@ -9,7 +9,14 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/odox-core", "crates/odox-ui", "crates/xodt", "crates/xods", "crates/xodp"]
+members = [
+    "crates/odox-core",
+    "crates/odox-ui",
+    "crates/xodt",
+    "crates/xods",
+    "crates/xodp",
+    "crates/odox",
+]
 
 [workspace.package]
 version = "0.1.0"
