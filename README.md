@@ -23,14 +23,28 @@ network code in any of them.
 
 ## Install
 
-From a clone, on Debian or Ubuntu:
+On Debian or Ubuntu, from the Excelano apt repository, which is where updates
+come from:
+
+    curl -fsSL https://excelano.com/apt/setup.sh | sudo sh   # one-time
+    sudo apt install xodt xods xodp
+
+Take only the ones you want; each package is one application and none depends on
+the others. amd64 and arm64 both.
+
+From crates.io, which gives you the binary and nothing around it — no desktop
+entry, no icon, so a file manager will not offer it:
+
+    cargo install xodt
+
+From a clone, which is the same package the apt repository serves:
 
     cargo build --release
     ./packaging/debian/build-deb.sh
     sudo apt install ./dist/xodt_*.deb ./dist/xods_*.deb ./dist/xodp_*.deb
 
-Or without a package, which puts the binaries, the desktop entries and the icons
-under `~/.local` so a file manager offers them:
+Or from a clone without a package, which puts the binaries, the desktop entries
+and the icons under `~/.local` so a file manager offers them:
 
     cargo build --release
     ./packaging/linux/install.sh          # --default to open ODF files with them
@@ -38,6 +52,10 @@ under `~/.local` so a file manager offers them:
 A Rust toolchain builds all of it and nothing else is needed: no C compiler, no
 system libraries at build time, no code generator. `Cargo.toml` names the
 toolchain version the build needs.
+
+Windows and macOS are built and tested from this repository and have no
+installer yet; `packaging/windows/README.md` and `packaging/macos/README.md` say
+what each still needs.
 
 ## Using them
 
