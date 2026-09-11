@@ -15,6 +15,9 @@ All notable changes to odox are recorded here. The format follows
 - `odox-ui`, which maps ODF styles onto what egui draws with and renders the
   content model the three formats share.
 - A Debian package per application, desktop entries, icons and man pages.
+- The release machinery: the fleet's Rust CI, a workflow that builds the six
+  packages on a runner of each architecture and attaches them to the release,
+  and a workflow that publishes the five crates in dependency order.
 - The translation mechanism: one `.po` catalogue for the suite, the extraction
   and pseudolocale scripts, and a pseudolocale compiled into debug builds alone.
   No translation ships yet.

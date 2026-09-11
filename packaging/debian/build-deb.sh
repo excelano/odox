@@ -89,6 +89,13 @@ for app in xodt xods xodp; do
     ' "$staging/DEBIAN/control.head" > "$staging/DEBIAN/control"
     rm -f "$staging/DEBIAN/control.head" "$staging/DEBIAN/wrapped"
 
+    # `dpkg -V` verifies an installed package against this and reports nothing
+    # at all without it; lintian tags its absence. `dpkg-deb --build` does not
+    # write one, so it is written here, over everything but the control files.
+    ( cd "$staging" && find . -type f ! -path './DEBIAN/*' -printf '%P\0' |
+        sort -z | xargs -0 md5sum > DEBIAN/md5sums )
+    chmod 644 "$staging/DEBIAN/md5sums"
+
     dpkg-deb --root-owner-group --build "$staging" \
         "$out/${app}_${version}_${arch}.deb" >/dev/null
     echo "built $out/${app}_${version}_${arch}.deb"

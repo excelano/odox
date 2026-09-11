@@ -1,16 +1,58 @@
 #!/usr/bin/env bash
 # Everything that has to be true before a release, in the order that finds a
 # problem soonest.
+#
+#     ./packaging/preflight.sh          # everything it can settle locally
+#     ./packaging/preflight.sh --ci     # and whether GitHub is green on HEAD
+#
+# It refuses; it does not repair. A check that quietly fixed what it found would
+# be a release nobody looked at. `ship` runs it with `--ci`, which is the fleet's
+# spelling for *also ask the things that need the network*.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$here/.."
 cd "$root"
 
+ask_ci=no
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --ci) ask_ci=yes; shift ;;
+        -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "preflight.sh: unknown argument $1" >&2; exit 2 ;;
+    esac
+done
+
 step() { printf '\n== %s\n' "$1"; }
 
 step "version"
 "$here/version.sh"
+
+# Asked before the long build, because a red CI is a reason not to spend four
+# minutes linking. Three states and not two: a run still going is neither a pass
+# nor a failure, and a release cut while CI is mid-flight is one nobody checked.
+step "CI is green on HEAD"
+if [ "$ask_ci" = no ]; then
+    echo "skipped — pass --ci"
+elif ! command -v gh >/dev/null 2>&1; then
+    echo "no gh to ask with" >&2
+    exit 1
+else
+    sha=$(git rev-parse HEAD)
+    counts=$(gh run list --limit 20 --json headSha,status,conclusion \
+        --jq "[.[] | select(.headSha == \"${sha}\")]
+              | \"\(length) \(map(select(.status != \"completed\")) | length) \(map(select(.status == \"completed\" and .conclusion != \"success\")) | length)\"" \
+        2>/dev/null) || counts=""
+    read -r total running red <<<"${counts:-0 0 0}"
+    if [ "$total" -eq 0 ]; then
+        echo "no runs for ${sha}" >&2; exit 1
+    elif [ "$red" -gt 0 ]; then
+        echo "${red} of ${total} runs failed" >&2; exit 1
+    elif [ "$running" -gt 0 ]; then
+        echo "${running} of ${total} runs still going" >&2; exit 1
+    fi
+    echo "green (${total} runs)"
+fi
 
 step "format"
 cargo fmt --all --check

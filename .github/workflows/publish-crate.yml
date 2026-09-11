@@ -1,0 +1,46 @@
+name: Publish to crates.io
+
+# Fires on the version tag the hand-cut release loop pushes (RELEASE.md), and
+# can be run by hand. `cargo publish` compiles and uploads from source, so it is
+# independent of the `.deb` packages and runs beside them; the tag is pushed
+# before the GitHub release exists, so the crates land first.
+#
+# **Five crates, one command.** `--workspace` publishes `odox-core`, then
+# `odox-ui` on top of it, then the three applications, in dependency order and
+# waiting for the index between them. Proven locally before the first release
+# with `cargo package --workspace`, which resolves the siblings the same way.
+#
+# The step is token-gated: it skips cleanly, with no failed run, unless a
+# CRATES_IO_TOKEN secret is available. The excelano organisation carries one, so
+# in practice every tagged release keeps the crates in lockstep with the GitHub
+# release. Versions there are immutable: a bad one is yanked, never
+# re-published, and the fix is the next number.
+#
+# What `cargo install xodt` leaves out is real and is in README.md: a crate
+# carries no desktop entry, no icon and no Windows application manifest, so an
+# installed-from-crates.io copy is a binary and not an integrated application.
+
+on:
+  push:
+    tags:
+      - '**[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check for a crates.io token
+        id: token
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: echo "present=${CRATES_IO_TOKEN:+true}" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        if: steps.token.outputs.present == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --workspace

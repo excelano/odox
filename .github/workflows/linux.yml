@@ -1,0 +1,272 @@
+name: Linux
+
+# Build the three packages on a runner of each architecture, prove they hold up,
+# and attach them to the release.
+#
+# **This is what the apt step depends on.** `apt-ship` downloads every `.deb`
+# attached to a GitHub release, so a release with nothing attached is a release
+# apt cannot serve — and nothing downstream complains, which is why
+# `~/notes/releasing.md` marks the apt step as the one releases lose.
+#
+# Each architecture builds on a runner of that architecture rather than being
+# cross-compiled, which is what lets the checks below mean something about the
+# package they actually produced.
+#
+# Nothing headless reaches a window. Three applications drawing a document is
+# what `CHECKLIST.md` and a person's eyes are for; what a machine can settle is
+# whether the package is well formed, declares the architecture it carries,
+# installs, and produces an executable this machine's loader accepts.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Fires when a person publishes the release, which on this loop is what
+  # happens: nothing else creates it. A release created by a workflow using the
+  # default GITHUB_TOKEN fires no event at all — a GitHub safeguard with no
+  # opt-out — so the dispatch below is the fallback for that case.
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build packages for (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keyed by the tag when this is releasing and by the ref when it is checking,
+  # so the two never share a group. They did in the repositories this was
+  # cloned from, and a push to main cancelled the run building a release's
+  # packages: `github.ref` is refs/heads/main for a workflow_dispatch as much as
+  # for a push.
+  group: linux-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  # A superseded check is worth cancelling; a half-built release is not.
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+env:
+  # The applications, in one place: every step below iterates rather than naming
+  # them, so a fourth is a change to this line.
+  APPS: xodt xods xodp
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: What is installed
+        run: rustc -V && cargo -V && dpkg-deb --version | head -1
+
+      # The build needs no development packages, and that is measured rather
+      # than hoped for: everything a window opens is opened at run time rather
+      # than linked. DESIGN.md §2.
+      #
+      # `cargo tree -i cc` is not empty and never will be, because
+      # `wayland-backend` declares `cc` and only uses it under a feature nothing
+      # here turns on, so this checks the outcome the rule means: no object file
+      # under any build directory, and nothing linked at load time beyond libc,
+      # libgcc and libm.
+      - name: Build, and nothing compiled C
+        run: |
+          cargo build --release --workspace
+          target=$(cargo metadata --format-version 1 --no-deps |
+              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+          objects=$(find "${target}" -path '*/build/*' \( -name '*.o' -o -name '*.a' \) -print)
+          [ -z "$objects" ] || { echo "a build script produced object files:"; echo "$objects"; exit 1; }
+
+          # The dynamic loader is named for the architecture and lives in a
+          # different directory on each: /lib64/ld-linux-x86-64.so.2 on amd64,
+          # /lib/ld-linux-aarch64.so.1 on arm64. The allowlist in the repositories
+          # this was cloned from had the amd64 path alone, so their first arm64
+          # run reported the loader itself as an unexpected library.
+          for app in $APPS; do
+              echo "${app} links at load time:"
+              ldd "${target}/release/${app}" | sed 's/^/  /'
+              strange=$(ldd "${target}/release/${app}" | awk '{print $1}' |
+                  grep -vE '^(linux-vdso|libgcc_s|libm|libc|/lib(64)?/ld-linux)' || true)
+              [ -z "$strange" ] || { echo "unexpected shared libraries:"; echo "$strange"; exit 1; }
+          done
+
+      - name: Build the packages
+        run: ./packaging/debian/build-deb.sh
+
+      # Cheap, and the one thing that goes wrong silently when a package is built
+      # somewhere other than where it was compiled: a package labelled arm64
+      # carrying an x86-64 executable installs perfectly and then does not run.
+      - name: Each package is the architecture it claims
+        run: |
+          for deb in dist/*.deb; do
+              got=$(dpkg-deb -f "$deb" Architecture)
+              echo "${deb}: ${got}"
+              test "$got" = "${{ matrix.arch }}"
+          done
+
+      # A release carries one package per application per architecture, and a
+      # build that quietly produced fewer would attach fewer and apt would serve
+      # whatever arrived. `ship.conf` carries the same number for `ship` and
+      # `fleet`; this asserts it against what the build made.
+      - name: There are as many packages as there are applications
+        run: |
+          expected=$(sed -n 's/^deb_packages=//p' ship.conf)
+          found=$(ls dist/*.deb | wc -l)
+          echo "expected ${expected}, found ${found}"
+          test "$found" = "$expected"
+
+      # Everything `root/root` and nothing carrying a mode a package should not
+      # ship; `md5sums` present, which is what `dpkg -V` reads; and every
+      # recorded hash agreeing with the file it names.
+      - name: The packages hold up
+        run: |
+          for deb in dist/*.deb; do
+              echo "checking ${deb}"
+
+              strange=$(dpkg-deb --contents "$deb" | awk '$2 != "root/root"')
+              [ -z "$strange" ] || { echo "not root/root:"; echo "$strange"; exit 1; }
+
+              strange=$(dpkg-deb --contents "$deb" |
+                  awk '$1 !~ /^drwxr-xr-x/ && $1 !~ /^-rw-r--r--/ && $1 !~ /^-rwxr-xr-x/')
+              [ -z "$strange" ] || { echo "unexpected modes:"; echo "$strange"; exit 1; }
+
+              dpkg-deb --ctrl-tarfile "$deb" | tar t | grep -qx './md5sums' ||
+                  { echo "the package ships no md5sums" >&2; exit 1; }
+
+              tree="${RUNNER_TEMP}/tree-$(basename "$deb" .deb)"
+              dpkg-deb -x "$deb" "$tree"
+              dpkg-deb -e "$deb" "${tree}/DEBIAN"
+              ( cd "$tree" && md5sum -c DEBIAN/md5sums --quiet )
+          done
+
+      # `error,warning` rather than `error` alone: a warning left standing as a
+      # report forever is the state this step exists to get out of. `info` and
+      # `pedantic` are Debian's suggestions rather than its rules and a build
+      # should not fail on a suggestion nobody has read.
+      #
+      # There are no overrides and that is worth keeping true. An override is a
+      # permanent statement that a rule does not apply here.
+      - name: What lintian says
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lintian
+          lintian --info --tag-display-limit 0 --fail-on error,warning dist/*.deb
+
+      # The media types are not this repository's: shared-mime-info declares
+      # every OpenDocument type on every desktop, which is why no package here
+      # declares one. What the desktop entries claim is that these applications
+      # can open them, and that claim is what this asks the platform about.
+      #
+      # Asked through `gio` rather than `xdg-mime`. With no desktop session
+      # `xdg-mime` cannot identify a session to defer to and falls back to
+      # `file`, which reads magic bytes: an OpenDocument package is a zip and
+      # `file` says so. `gio` asks GLib for the content type, which is the path a
+      # GTK file manager takes, so what it reports is what a person would see.
+      - name: The handlers are ours
+        run: |
+          sudo apt-get install -y -qq \
+              shared-mime-info desktop-file-utils hicolor-icon-theme libglib2.0-bin
+
+          ./packaging/linux/install.sh --default
+
+          set -- "text:corpus/libreoffice/text.odt:xodt" \
+                 "spreadsheet:corpus/libreoffice/calc.ods:xods" \
+                 "presentation:corpus/libreoffice/deck.odp:xodp"
+          for case in "$@"; do
+              kind=${case%%:*}; rest=${case#*:}; file=${rest%%:*}; app=${rest##*:}
+              want="application/vnd.oasis.opendocument.${kind}"
+
+              type=$(gio info -a standard::content-type "$file" |
+                  sed -n 's/.*standard::content-type: //p')
+              echo "${file}: ${type}"
+              [ "$type" = "$want" ] || { echo "the type is not ${want}" >&2; exit 1; }
+
+              handler=$(gio mime "$want" | sed -n 's/^Default application for .*: //p')
+              echo "  default: ${handler}"
+              [ "$handler" = "${app}.desktop" ] ||
+                  { echo "the handler is not ${app}" >&2; exit 1; }
+          done
+
+      # Last, because it installs the packages system-wide and the step above
+      # asks which handler is registered — an installed copy in /usr/bin would
+      # change the question it is answering.
+      #
+      # Each application opens a window from `main`, so there is nothing here to
+      # run to completion. What can be asked without a display is whether the
+      # loader takes the executable on a machine of this architecture and whether
+      # everything it links resolves. Those are the two ways a cross-built or
+      # under-declared arm64 package fails, and the words that come back tell
+      # them apart from a missing window.
+      - name: They install, and what they installed loads
+        run: |
+          set -eu
+          sudo apt-get install -y ./dist/*.deb
+
+          for app in $APPS; do
+              command -v "$app"
+              file -L "$(command -v "$app")"
+
+              missing=$(ldd "$(command -v "$app")" | grep 'not found' || true)
+              [ -z "$missing" ] ||
+                  { echo "${app} installed but does not resolve:"; echo "$missing"; exit 1; }
+
+              out=$(timeout 20 "$app" 2>&1 || true)
+              printf '%s\n' "$out" | sed "s/^/  ${app}: /"
+              case "$out" in
+                  *'error while loading shared libraries'*)
+                      echo "the loader refused ${app}" >&2; exit 1 ;;
+                  *'cannot execute binary file'*|*'Exec format error'*)
+                      echo "${app} is not this machine's architecture" >&2; exit 1 ;;
+              esac
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-${{ matrix.arch }}
+          path: dist/*.deb
+
+  # Only on a release. A push builds the packages to check them and then throws
+  # them away, which is the point of building them on a push.
+  attach:
+    needs: package
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Attach the packages to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          ls -l packages
+          gh release upload \
+            "${{ github.event.release.tag_name || inputs.tag }}" \
+            packages/*.deb --clobber

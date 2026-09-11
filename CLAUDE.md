@@ -44,7 +44,12 @@ and hides the other two.
 
     ./packaging/linux/install.sh         # desktop integration, after a release build
     ./packaging/debian/build-deb.sh      # one .deb per application
-    ./packaging/preflight.sh             # everything above, before a release
+    ./packaging/preflight.sh --ci        # everything above, before a release
+
+**If you are here for a release, read `RELEASE.md`.** It is the live document and
+it holds the process rather than the history: what the next release costs, in the
+order it is done. `ship odox` reports where the current one stands and
+`ship odox <version>` runs it.
 
 The build target directory is shared across the fleet and fills the disk. Check
 `df -h /` before a long build; a debug tree of three eframe applications is
