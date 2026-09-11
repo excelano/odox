@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=xodp
+GenericName=OpenDocument Presentation Viewer
+Comment=Read OpenDocument presentations
+Exec=xodp %f
+# The basename of this file, the binary's name and the viewport's app id all say
+# the same word, which is how a Wayland compositor finds this window's icon.
+Icon=xodp
+StartupWMClass=xodp
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/vnd.oasis.opendocument.presentation;application/vnd.oasis.opendocument.presentation-template;
+Keywords=ODF;OpenDocument;

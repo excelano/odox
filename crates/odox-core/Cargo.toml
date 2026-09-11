@@ -1,0 +1,20 @@
+[package]
+name = "odox-core"
+description = "Read and write OpenDocument text, spreadsheet and presentation packages"
+keywords = ["opendocument", "odf", "odt", "ods", "odp"]
+categories = ["parser-implementations", "text-processing"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+quick-xml.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+# Building a package for a test means writing a zip, which the library does
+# through its own writer and a test should not borrow.
+zip.workspace = true

@@ -1,0 +1,94 @@
+# CLAUDE.md
+
+Guidance for Claude Code working in `odox`. It is short because `DESIGN.md` is
+where the reasoning lives; read that first and cite its sections rather than
+restating them.
+
+---
+
+## What this is
+
+Three OpenDocument viewers over one library. `xodt` reads text documents, `xods`
+spreadsheets, `xodp` presentations. They read and do not write.
+
+**The library has no window in it.** `odox-core` takes bytes and returns bytes,
+links no egui, and opens no files. Anything that needs a path, a dialog or a
+`Ui` belongs in `odox-ui` or in an application. If a format question comes up
+while working on a window, the answer goes into the library.
+
+**The document tree is faithful and stays that way.** DESIGN.md §3. A change that
+makes the reader drop an element, an attribute or a piece of whitespace it does
+not understand is a change that has to be argued, because the round-trip test is
+the only measure of compliance this repository has.
+
+**Drawing belongs to `odox-ui`.** ODF's content model is shared across the three
+formats, so a paragraph inside a spreadsheet cell and a paragraph inside a slide
+draw through the same renderer as a paragraph in a document. Adding a case to
+`flow.rs` fixes it in three places; adding it to an application fixes it in one
+and hides the other two.
+
+---
+
+## Commands
+
+    cargo build                          # debug
+    cargo build --release
+    cargo test --workspace               # the corpus is walked, not named
+    cargo clippy --workspace --all-targets   # must be silent
+    cargo fmt --all
+    cargo check --target x86_64-pc-windows-msvc   # cross-check, from Linux
+
+    cargo run -p xodt -- corpus/libreoffice/text.odt
+    cargo run -p xods -- corpus/libreoffice/calc.ods
+    cargo run -p xodp -- corpus/libreoffice/deck.odp
+
+    ./packaging/linux/install.sh         # desktop integration, after a release build
+    ./packaging/debian/build-deb.sh      # one .deb per application
+    ./packaging/preflight.sh             # everything above, before a release
+
+The build target directory is shared across the fleet and fills the disk. Check
+`df -h /` before a long build; a debug tree of three eframe applications is
+several gigabytes.
+
+---
+
+## The corpus
+
+`corpus/libreoffice/` is authored by LibreOffice and rebuilt from the plain-text
+sources beside it by `build.sh`, which needs `libreoffice-writer`,
+`libreoffice-calc`, `libreoffice-impress` and `pandoc`. Those are the documents
+to trust: a fixture written by hand agrees with whatever the person writing it
+believed, which is the belief under test.
+
+Adding a document to the corpus is enough to put it under test. Adding one that a
+real producer wrote is worth more than adding three that were not.
+
+---
+
+## Looking at the window
+
+**A renderer is verified by looking at it, and there is no substitute.** Every
+defect worth finding here so far — a list label drawn over its own text, a merged
+cell filled to one column of three, a slide title in dark ink on a dark ground —
+was invisible to the tests and obvious in a screenshot. Run the application on a
+corpus document and look before saying a drawing change works.
+
+On this machine that means X11, because the capture tool cannot see a Wayland
+window:
+
+    env -u WAYLAND_DISPLAY DISPLAY=:0 cargo run -p xodt -- corpus/libreoffice/text.odt &
+    import -window "$(xwininfo -root -tree | grep -i 'mutter-x11-frames' | grep -i xodt \
+        | grep -o '0x[0-9a-f]*' | head -1)" /tmp/shot.png
+
+`pkill -x xodt` to stop it; `pkill -f` matches the shell running the command and
+kills that instead.
+
+---
+
+## Stay inside your own platform's arm
+
+Linux is `packaging/linux` and `packaging/debian`, Windows is
+`packaging/windows/README.md`, macOS is `packaging/macos/README.md`. Reviewing
+another platform's arm is worth doing and is how the worst defects in the sibling
+repositories were found; changing one you cannot run is not. What cannot be
+settled from here goes to David rather than into a guess.

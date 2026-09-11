@@ -1,0 +1,14 @@
+Package: @APP@
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David M. Anderson <david.anderson@excelano.com>
+Depends: @DEPENDS@
+Recommends: fonts-liberation
+Section: text
+Priority: optional
+Homepage: https://github.com/excelano/odox
+Description: @SUMMARY@
+@DESCRIPTION@
+ .
+ The document is drawn from the file and nothing is sent anywhere. Nothing is
+ written either: this release reads OpenDocument and does not save it.

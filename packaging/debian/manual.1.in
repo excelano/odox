@@ -1,0 +1,38 @@
+.TH @APP@ 1 "@DATE@" "odox @VERSION@" "User Commands"
+.SH NAME
+@APP@ \- @SUMMARY@
+.SH SYNOPSIS
+.B @APP@
+.RI [ FILE ]
+.SH DESCRIPTION
+@DESCRIPTION@
+.PP
+The document is read from the file and nothing is sent anywhere. Nothing is
+written either: this release reads OpenDocument and does not save it.
+.SH OPTIONS
+There are none. A path given on the command line is opened at startup; a
+document may also be dropped on the window or chosen with Ctrl+O.
+.SH KEYS
+.TP
+.B Ctrl+O
+Open a document.
+.TP
+.B Ctrl+R
+Read the open document from disk again.
+.TP
+.B Ctrl+W
+Close it.
+.TP
+.B Ctrl+plus, Ctrl+minus, Ctrl+0
+Zoom in, zoom out, and back to actual size.
+.SH FILES
+None. @APP@ writes no configuration, no cache and no temporary copy.
+.SH SEE ALSO
+.BR xodt (1),
+.BR xods (1),
+.BR xodp (1)
+.PP
+Each reads one kind of OpenDocument file and names its sibling when handed
+another.
+.SH AUTHOR
+David M. Anderson.

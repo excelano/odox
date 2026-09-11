@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=xods
+GenericName=OpenDocument Spreadsheet Viewer
+Comment=Read OpenDocument spreadsheets
+Exec=xods %f
+# The basename of this file, the binary's name and the viewport's app id all say
+# the same word, which is how a Wayland compositor finds this window's icon.
+Icon=xods
+StartupWMClass=xods
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/vnd.oasis.opendocument.spreadsheet;application/vnd.oasis.opendocument.spreadsheet-template;
+Keywords=ODF;OpenDocument;

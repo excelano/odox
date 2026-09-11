@@ -1,0 +1,93 @@
+# The odox workspace: one OpenDocument library, one shared user interface, and
+# one binary per format.
+#
+# Three applications rather than one with three modes, because a person opens a
+# spreadsheet and a presentation through different doors and the desktop
+# registers a handler per media type. They share every line that reads a
+# document: the formats differ only in the body element, which is why the core
+# here is large and each application is thin. DESIGN.md §1.
+
+[workspace]
+resolver = "3"
+members = ["crates/odox-core", "crates/odox-ui", "crates/xodt", "crates/xods", "crates/xodp"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["David M. Anderson"]
+license = "MIT"
+repository = "https://github.com/excelano/odox"
+# eframe's number, not this code's. Nothing written here needs past edition
+# 2024's 1.85, and every other crate in the tree sits below eframe, so this
+# rises whenever egui raises its own. Measure rather than trust the line: the
+# msrv job builds at it. The same reasoning slipcase-desktop's manifest records.
+rust-version = "1.95"
+
+# No crate names a `readme`. There is one README and it is the repository's front
+# door, describing three applications; a crate cannot name a file above its own
+# directory and `cargo package` would not carry one. Each crate that is ever
+# published gets its own then, and not before.
+
+[workspace.dependencies]
+# The two shared crates. A version requirement cannot inherit
+# `workspace.package.version` and crates.io rejects a path-only dependency, so
+# the number is written twice by necessity; flyleaf's manifest says the same.
+odox-core = { path = "crates/odox-core", version = "0.1.0" }
+odox-ui = { path = "crates/odox-ui", version = "0.1.0" }
+
+# Reading XML. A pull parser rather than a DOM library, because the document
+# tree this crate keeps is its own and a second tree to copy out of would be
+# the whole file held twice. No features: an OpenDocument package is UTF-8 by
+# specification, `odox-core` decodes it once itself, and the `encoding` feature
+# would pull `encoding_rs` in to answer a question the format has already
+# answered.
+quick-xml = "0.41"
+# Package assembly. Defaults pull zstd, xz and bzip2; OpenDocument permits
+# stored and deflated entries and nothing else, and the zlib-rs backend is pure
+# Rust. Same line as waddle's, for the same reason.
+zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+# The window. Defaults carry accesskit, which stays on.
+eframe = { version = "0.36", default-features = false, features = [
+    "accesskit",
+    "default_fonts",
+    "glow",
+    "wayland",
+    "x11",
+] }
+# Defaults are `xdg-portal` and `wayland`, both pure Rust. The `gtk3` feature
+# links C through gtk-sys and stays off, which is what taking the defaults does.
+rfd = "0.17"
+# Which of the machine's fonts a document's named family resolves to. Pure
+# Rust, and it memory-maps rather than reading: only the faces a document asks
+# for are ever loaded. DESIGN.md §6 says what the fallback chain is and why
+# nothing is embedded.
+fontdb = { version = "0.23", default-features = false, features = ["fs", "memmap", "fontconfig"] }
+# The pictures inside a package. PNG and JPEG are what office applications
+# write; everything else draws as a placeholder frame rather than growing the
+# decoder set. Both decoders are pure Rust.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# The language the window draws in, and the reader for the `.po` catalogues.
+# Pure Rust, no build script; its two dependencies are platform-gated and are
+# the operating system's own answer to which language a person reads.
+potext = "0.1"
+
+# Size is a stated goal, so the release profile trades compile time for it:
+# fat LTO across one codegen unit drops the egui arms nothing here calls, and
+# the symbol table is of no use in a shipped desktop binary. Unwinding stays,
+# because a panic in a document reader should reach a dialog rather than kill
+# the window with no message. DESIGN.md §9 carries the measurements.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+# winit 0.30 declares a private CoreGraphics symbol whether or not it is
+# called, App Store review reads the symbol table rather than the call graph,
+# and slipcase-desktop lost a review cycle to it (Guideline 2.5.1). Upstream
+# gated it in winit#4541 behind a feature no published release carries yet, so
+# this is that change on the `v0.30.13` tag, pinned by revision. The same pin
+# as slipcase-desktop's, flyleaf's and duckling's, moved together.
+# **Delete it when a winit release carries the gate.**
+[patch.crates-io]
+winit = { git = "https://github.com/excelano/winit", rev = "3cfd905679da3ca241b97dea723211b580620a27" }

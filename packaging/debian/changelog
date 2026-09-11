@@ -1,0 +1,6 @@
+odox (0.1.0) unstable; urgency=low
+
+  * First release: xodt, xods and xodp read OpenDocument text documents,
+    spreadsheets and presentations.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 11 Sep 2026 12:00:00 +0000

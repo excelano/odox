@@ -1,0 +1,28 @@
+[package]
+name = "odox-ui"
+description = "The shared window of the odox OpenDocument viewers: style mapping, document rendering and chrome"
+keywords = ["opendocument", "egui", "gui", "odf", "viewer"]
+categories = ["gui"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+odox-core.workspace = true
+eframe.workspace = true
+rfd.workspace = true
+fontdb.workspace = true
+image.workspace = true
+potext.workspace = true
+
+# The desktop's light-or-dark setting, which `winit` answers on the other two
+# platforms and not on this one. zbus is pure Rust with no build script and is
+# already compiled on this target under `accesskit_unix`, which arrives through
+# `egui-winit`; `blocking-api` is a feature of that same crate and adds nothing
+# to the tree. `src/system_theme.rs` is slipcase-desktop's module and the
+# reasoning is in that repository, as duckling's copy also says.
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }

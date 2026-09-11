@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=xodt
+GenericName=OpenDocument Text Viewer
+Comment=Read OpenDocument text documents
+Exec=xodt %f
+# The basename of this file, the binary's name and the viewport's app id all say
+# the same word, which is how a Wayland compositor finds this window's icon.
+Icon=xodt
+StartupWMClass=xodt
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/vnd.oasis.opendocument.text;application/vnd.oasis.opendocument.text-template;application/vnd.oasis.opendocument.text-web;
+Keywords=ODF;OpenDocument;

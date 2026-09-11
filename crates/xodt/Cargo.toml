@@ -1,0 +1,20 @@
+[package]
+name = "xodt"
+description = "A small, fast viewer for OpenDocument text documents"
+keywords = ["opendocument", "odt", "viewer", "odf", "egui"]
+categories = ["gui", "text-processing"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "xodt"
+path = "src/main.rs"
+
+[dependencies]
+odox-core.workspace = true
+odox-ui.workspace = true
+eframe.workspace = true

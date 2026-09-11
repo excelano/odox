@@ -1,0 +1,13 @@
+# The Windows binaries link the C runtime statically.
+#
+# slipcase-desktop 0.1.1 passed every local check and failed Microsoft Store
+# certification under policy 10.2.4.1 because the MSVC target linked
+# `VCRUNTIME140.dll`, which every build machine has and a clean machine does not.
+# A dependency on the toolchain is invisible from inside the toolchain, so the
+# cure is this flag plus `packaging/windows/check-imports.ps1`, which refuses any
+# import that does not ship with Windows.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

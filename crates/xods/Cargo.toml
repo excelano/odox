@@ -1,0 +1,20 @@
+[package]
+name = "xods"
+description = "A small, fast viewer for OpenDocument spreadsheets"
+keywords = ["opendocument", "ods", "spreadsheet", "odf", "egui"]
+categories = ["gui"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "xods"
+path = "src/main.rs"
+
+[dependencies]
+odox-core.workspace = true
+odox-ui.workspace = true
+eframe.workspace = true
