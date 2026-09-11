@@ -185,8 +185,14 @@ jobs:
       # GTK file manager takes, so what it reports is what a person would see.
       - name: The handlers are ours
         run: |
+          # `xdg-utils` carries `xdg-mime`, which `install.sh --default` uses to
+          # set the association. It is in the amd64 runner image and not in the
+          # arm64 one, which is how the first run of this file failed on one
+          # architecture and passed on the other — so it is installed rather
+          # than assumed.
           sudo apt-get install -y -qq \
-              shared-mime-info desktop-file-utils hicolor-icon-theme libglib2.0-bin
+              shared-mime-info desktop-file-utils hicolor-icon-theme \
+              libglib2.0-bin xdg-utils
 
           ./packaging/linux/install.sh --default
 

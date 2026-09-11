@@ -37,6 +37,14 @@ update-desktop-database "$apps" 2>/dev/null || true
 gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 
 if $default; then
+    # `xdg-mime` comes from `xdg-utils`, which not every machine has — it is in
+    # one of GitHub's two runner images and not the other. Making the default
+    # association is a convenience on top of installing, so a machine without the
+    # tool is told and the install still stands.
+    if ! command -v xdg-mime >/dev/null 2>&1; then
+        echo "no xdg-mime — install xdg-utils to set the default association" >&2
+        exit 1
+    fi
     for app in xodt xods xodp; do
         # The entry already lists the types; this makes it the one that opens them.
         types=$(sed -n 's/^MimeType=//p' "$here/$app.desktop" | tr ';' ' ')
