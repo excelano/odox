@@ -26,6 +26,7 @@ fn main() -> eframe::Result {
             id: "xodt",
             extension: "odt",
             format: mark("OpenDocument Text"),
+            icon: include_bytes!(concat!(env!("OUT_DIR"), "/window.ico")),
         },
         |_ctx| view::TextView::default(),
     )

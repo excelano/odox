@@ -26,3 +26,11 @@ potext.workspace = true
 # reasoning is in that repository, as duckling's copy also says.
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+
+# The window's icon on Windows, which has no other way to get one: the shell
+# reads it from a resource compiled into the executable and this build compiles
+# no resource, so the icon directory travels in the binary and is decoded at
+# startup. Pure Rust, and off every other target, so it costs the Linux and
+# macOS binaries nothing.
+[target.'cfg(windows)'.dependencies]
+ico = "0.5"

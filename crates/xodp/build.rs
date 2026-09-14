@@ -1,10 +1,16 @@
-//! Embed the Windows application manifest, and do nothing else ever.
+//! Embed the Windows application manifest, and stage the window's icon.
 //!
 //! This is the crate's only build script and `DESIGN.md` §9 is why it is worth
-//! reading before adding a second thing to it. Nothing here compiles C: it
-//! prints two linker arguments and the linker that was already linking the
-//! binary embeds `packaging/windows/odox.manifest`. No resource compiler, no
-//! object file, nothing compiled that was not compiled before.
+//! reading before adding a third thing to it. Nothing here compiles C: it prints
+//! two linker arguments and the linker that was already linking the binary
+//! embeds `packaging/windows/odox.manifest`. No resource compiler, no object
+//! file, nothing compiled that was not compiled before.
+//!
+//! The icon is staged rather than included where it lies, because
+//! `include_bytes!` cannot reach above a crate root and `cargo package` copies
+//! only what is under one. flyleaf lost a release tag to that exact shape. A
+//! copy in `OUT_DIR` is always there to include, empty when the source is not,
+//! and an empty one is how the window says it has no icon.
 //!
 //! **The three applications carry this file byte for byte identically**, and
 //! `packaging/preflight.sh` refuses a release where they have drifted. It reads
@@ -33,6 +39,16 @@ fn main() {
     // machine doing the building. Cross-checking from Linux with
     // `--target x86_64-pc-windows-msvc` is a thing this repository does, and it
     // would take the wrong branch.
+    // Staged for every target, so that the include below compiles everywhere
+    // and the platform question is asked once, in the window rather than here.
+    let binary = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
+    let icon = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("../../packaging/windows/{binary}.ico"));
+    let out = Path::new(&std::env::var("OUT_DIR").expect("cargo sets OUT_DIR")).join("window.ico");
+    println!("cargo:rerun-if-changed={}", icon.display());
+    let staged = std::fs::read(&icon).unwrap_or_default();
+    std::fs::write(&out, staged).expect("OUT_DIR is writable");
+
     let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     if os != "windows" || env != "msvc" {
@@ -59,7 +75,6 @@ fn main() {
     // `/MANIFEST:EMBED` is MSVC's, which is why the guard above tests the
     // environment and not just the operating system: a `windows-gnu` target
     // links with something that would not understand it.
-    let binary = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
     for arg in [
         "/MANIFEST:EMBED".to_owned(),
         format!("/MANIFESTINPUT:{}", manifest.display()),

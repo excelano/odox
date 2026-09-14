@@ -27,6 +27,15 @@ pub struct Product {
     /// it is shown, because a `Product` is built before `run` puts a catalogue in
     /// force and a translation looked up here would be the English every time.
     pub format: &'static str,
+    /// The application's icon directory, for the one platform with no other way
+    /// to give a window its icon.
+    ///
+    /// Windows takes a window's icon from a resource compiled into the
+    /// executable, and there is no resource compiler in this build, so the file
+    /// travels in the binary instead. Empty everywhere else, and empty in a
+    /// build made from a published crate, where the file is not there to stage:
+    /// see each application's `build.rs`.
+    pub icon: &'static [u8],
 }
 
 /// What the shell needs from the view that draws a particular format.
@@ -364,6 +373,15 @@ pub fn run<V: Viewer + 'static>(
     #[cfg(target_os = "macos")]
     let viewport = viewport.with_icon(egui::IconData::default());
 
+    // Windows, which is the other half of the same question. Here an icon has
+    // to be given, because the shell reads one out of a resource and this build
+    // compiles no resource.
+    #[cfg(target_os = "windows")]
+    let viewport = match window_icon(product.icon) {
+        Some(icon) => viewport.with_icon(icon),
+        None => viewport,
+    };
+
     let options = eframe::NativeOptions {
         viewport,
         ..eframe::NativeOptions::default()
@@ -382,4 +400,30 @@ pub fn run<V: Viewer + 'static>(
             Ok(Box::new(shell))
         }),
     )
+}
+
+/// The 64-pixel entry of an icon directory, as a window icon.
+///
+/// 64 because it is the largest size no scaling has to enlarge, and every
+/// smaller one the shell wants is a reduction of it. `None` where the directory
+/// is empty, which is what a build from a published crate has, or where it does
+/// not decode, which is a broken artefact rather than a reason to refuse to
+/// open a window.
+#[cfg(target_os = "windows")]
+fn window_icon(bytes: &'static [u8]) -> Option<egui::IconData> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let directory = ico::IconDir::read(std::io::Cursor::new(bytes)).ok()?;
+    let entry = directory
+        .entries()
+        .iter()
+        .find(|entry| entry.width() == 64)
+        .or_else(|| directory.entries().last())?;
+    let image = entry.decode().ok()?;
+    Some(egui::IconData {
+        width: image.width(),
+        height: image.height(),
+        rgba: image.rgba_data().to_vec(),
+    })
 }

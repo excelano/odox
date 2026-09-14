@@ -20,6 +20,7 @@ fn main() -> eframe::Result {
             id: "xods",
             extension: "ods",
             format: mark("OpenDocument Spreadsheet"),
+            icon: include_bytes!(concat!(env!("OUT_DIR"), "/window.ico")),
         },
         |_ctx| view::SheetView::default(),
     )

@@ -19,6 +19,7 @@ fn main() -> eframe::Result {
             id: "xodp",
             extension: "odp",
             format: mark("OpenDocument Presentation"),
+            icon: include_bytes!(concat!(env!("OUT_DIR"), "/window.ico")),
         },
         |_ctx| view::SlideView::default(),
     )
