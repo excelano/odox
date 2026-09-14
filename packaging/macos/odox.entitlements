@@ -11,13 +11,17 @@
   that. This is why `build-app.sh` signs even for a development build, and why
   nothing about the sandbox can be settled from Linux.
 
-  `files.user-selected.read-write` rather than read-only, although these
-  applications write nothing today. The grant is what an open panel hands over,
-  and read-write is the grant the editing work will need for the save path. A
-  capability asked for and unused is a question at review with no good answer, so
-  this is the one place the rule is bent, and it is bent by one word rather than
-  by a whole key: a reader that asked only to read would have to re-ask, and
-  re-asking changes the sandbox container a person's grants live in.
+  `files.user-selected.read-only`, because these applications read and do not
+  write. A capability asked for and unused is a question at review with no good
+  answer, and a viewer asking permission to write is exactly that question.
+
+  The editing branch will widen this to `read-write`, which is one word in one
+  file. An earlier draft of this comment argued for asking now on the grounds
+  that widening later would move the sandbox container a person's grants live
+  in. That was wrong: the container is keyed by the bundle identifier and an
+  entitlement change does not move it. The wrong reason is recorded here rather
+  than quietly deleted, because it is the kind of claim that would otherwise be
+  repeated.
 
   Nothing else. No network, no broad filesystem access, no device, and no
   keychain group even though the provisioning profile grants one.
@@ -30,7 +34,7 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-write</key>
+	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
 </dict>
 </plist>
