@@ -108,9 +108,15 @@ jobs:
             if ($subsystem -ne 2) {
               throw "$app is subsystem $subsystem, and a shipped viewer must be 2 (Windows GUI)"
             }
+            # Case-insensitively, because Windows reads these values that way
+            # and this manifest writes them in lower case with a fallback for
+            # older releases, `permonitorv2,permonitor`, where the fleet's other
+            # manifests write the single mixed-case `PerMonitorV2`. A check
+            # copied from a sibling and left case-sensitive fails a binary whose
+            # manifest is embedded and correct, which is what it did here.
             $text = [System.Text.Encoding]::UTF8.GetString($bytes)
-            if (-not $text.Contains('PerMonitorV2')) {
-              throw "no PerMonitorV2 in $app - build.rs did not embed the application manifest"
+            if ($text -notmatch 'permonitorv2') {
+              throw "no per-monitor DPI declaration in $app - build.rs did not embed the application manifest"
             }
             Write-Host "$app : subsystem 2, and the application manifest is embedded"
           }
