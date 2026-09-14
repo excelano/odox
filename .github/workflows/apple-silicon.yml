@@ -145,12 +145,27 @@ jobs:
             app=$1 ; product=$2 ; document=$3
             echo "--- diagnosing ${app}"
 
+            # An `.ips` is two JSON documents: a one-line header and then the
+            # body. Everything worth reading is in the body, and the first forty
+            # lines of it are the machine's description of itself, so this asks
+            # for the three things that say what happened instead of printing
+            # from the top. The whole file is kept as an artefact either way.
             reports=$HOME/Library/Logs/DiagnosticReports
+            mkdir -p "${RUNNER_TEMP}/crashes"
             found=$(ls -t "$reports" 2>/dev/null | grep -i "^${app}" | head -2 || true)
             if [ -n "$found" ]; then
               for report in $found; do
                 echo "--- crash report ${report}"
-                head -40 "${reports}/${report}"
+                cp "${reports}/${report}" "${RUNNER_TEMP}/crashes/" || true
+                tail -n +2 "${reports}/${report}" | jq -r '
+                  "exception:   \(.exception // "none")",
+                  "termination: \(.termination // "none")",
+                  "asi:         \(.asi // "none")",
+                  "faulting thread \(.faultingThread // 0):",
+                  ( .usedImages as $images
+                    | .threads[.faultingThread // 0].frames[]?
+                    | "  \($images[.imageIndex].name // "?")  \(.symbol // .imageOffset)" )
+                ' || echo "    (jq could not read it; the artefact has the whole file)"
               done
             else
               echo "--- no crash report, so it did not die the way a crash is recorded"
@@ -241,4 +256,14 @@ jobs:
         with:
           name: arm64-window
           path: ${{ runner.temp }}/screen.png
+          if-no-files-found: ignore
+
+      # Whole files, because an extract is a guess about what mattered and a
+      # crash report is cheap to keep.
+      - name: Keep any crash reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-crashes
+          path: ${{ runner.temp }}/crashes
           if-no-files-found: ignore
