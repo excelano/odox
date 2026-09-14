@@ -174,6 +174,13 @@ jobs:
             # The panic message itself, which the crash report does not carry:
             # a bundled application's stderr goes to the unified log rather than
             # to the terminal that started it.
+            echo "--- what it said on standard error"
+            if [ -s "${RUNNER_TEMP}/${app}-open.err" ]; then
+              cat "${RUNNER_TEMP}/${app}-open.err"
+            else
+              echo "    (nothing)"
+            fi
+
             echo "--- what the unified log caught"
             log show --last 3m --predicate "process == \"${app}\"" --style compact 2>/dev/null \
               | grep -iE "panic|assert|borrow|already|unwind" | head -10 \
@@ -221,7 +228,12 @@ jobs:
             echo "== ${product} (${app}) with ${document}"
 
             "$lsregister" -f "$PWD/dist/${product}.app"
-            open -a "$PWD/dist/${product}.app" "$PWD/${document}"
+            # `--stderr` because a bundled application's standard error goes
+            # nowhere a shell can see it, and a Rust panic writes its message
+            # there and nowhere else. The crash report records that an abort
+            # happened and not what was said before it.
+            open --stderr "${RUNNER_TEMP}/${app}-open.err" \
+                 -a "$PWD/dist/${product}.app" "$PWD/${document}"
 
             # Cold launch, a window server, and a first frame. Polled rather
             # than slept at; 30 seconds is far past anything measured by hand.
