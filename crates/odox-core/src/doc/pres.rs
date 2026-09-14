@@ -103,7 +103,7 @@ impl Presentation {
         {
             return Fill::None;
         }
-        if let Some(fill) = own.map(|properties| properties.graphic.fill.clone())
+        if let Some(fill) = own.map(|properties| properties.graphic.fill())
             && fill != Fill::None
         {
             return fill;
@@ -111,7 +111,7 @@ impl Presentation {
         self.master(slide)
             .and_then(|master| master.attr(&Ns::Draw, "style-name"))
             .map(|name| self.document.styles.resolve(&Family::DrawingPage, name))
-            .map_or(Fill::None, |properties| properties.graphic.fill.clone())
+            .map_or(Fill::None, |properties| properties.graphic.fill())
     }
 
     /// The master page's decorations: what is drawn behind a slide before

@@ -198,16 +198,37 @@ from `left`, and honouring the difference needs a writing direction this release
 does not read.
 
 **Of ODF's shapes, what is drawn is what a fixture proves.** Rectangles,
-ellipses, polygons, polylines and lines are drawn from their own geometry, with
-a solid or a linear or axial gradient fill and an outline. A `draw:custom-shape`
-is a path built from formulas in `draw:enhanced-geometry`, and none of them are
-evaluated: the handful whose outline is a rectangle or near enough that the
-difference is a corner are filled as the box they occupy, and every other one is
-left undrawn rather than approximated into a block the document did not ask for.
-`draw:path`, connectors and measures are undrawn for the same reason. A radial,
+ellipses, polygons, polylines, lines and custom shapes are drawn from their own
+geometry, with a solid fill, a linear or axial gradient, or a stretched picture,
+and an outline. `draw:path`, connectors and measures are left undrawn rather
+than approximated into something the document does not say. A radial,
 ellipsoidal, square or rectangular gradient is filled with the flat average of
-its two colours, which is visibly an approximation rather than a wrong direction;
-no fixture uses one.
+its two colours, and a tiled picture with nothing: both are visibly
+approximations rather than wrong directions, and no fixture uses either.
+
+**A custom shape states a path and not points**, in `draw:enhanced-geometry`, in
+a coordinate space of its own, with numbers that may be references to named
+formulas over the space's edges and over adjustments a person dragged. `odox-core`'s
+`draw` module evaluates the formulas and flattens the path — curves and arcs
+included — into polylines, because how finely a curve must be broken depends on
+the size of that space and not on the size of the window. The whole command
+language is implemented; what is *measured* is the part that occurs across the
+twenty-three presentation templates LibreOffice ships, which is `M`, `L`, `C`,
+`Z`, `N`, `U`, `X`, `Y` and `V`, and formulas over the edge constants, `pi`,
+`if`, `sin`, `cos` and `abs`.
+
+**A fill is cut into triangles before it is painted**, by clipping ears. A
+graphics toolkit fills a closed path by triangulating it, and the cheap way — a
+fan from the first point, which is what `Shape::convex_polygon` does — is right
+only for a convex outline. An arrow, a callout and a puzzle piece are none of
+them convex, and a fan across one paints outside it.
+
+**The kind of fill and the value it uses are separate properties and inherit
+separately.** A style may set `draw:fill-color` and say nothing about
+`draw:fill`: that names the colour a solid fill *would* use and does not turn the
+fill on, so a shape whose parent style says `draw:fill="none"` stays empty.
+Reading the two as one put a white box over a template's photograph, which is
+what split them.
 
 ## §7 The window
 

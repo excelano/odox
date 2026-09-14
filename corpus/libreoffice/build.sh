@@ -83,7 +83,10 @@ printf '%s\n' deck.odp
 # measured against. The template is the source and is not committed: it lives
 # with the `libreoffice-impress` package, and a machine without it keeps the
 # fixture it has.
-for template in Blue_Curve Focus; do
+# Growing_Liberty carries a `left-arrow`, which is concave — the one shape kind
+# a fill cut into triangles the cheap way gets wrong, and the reason the
+# triangulation exists.
+for template in Blue_Curve Focus Growing_Liberty; do
 	source=/usr/lib/libreoffice/share/template/common/presnt/$template.otp
 	if [ ! -f "$source" ]; then
 		printf '%s: no %s, keeping the committed fixture\n' "$template" "$source" >&2

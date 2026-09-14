@@ -30,6 +30,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod doc;
+pub mod draw;
 mod error;
 mod meta;
 mod package;

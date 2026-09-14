@@ -275,6 +275,13 @@ pub enum Fill {
     Solid(Color),
     /// The gradient of this name.
     Gradient(String),
+    /// The picture of this name, stretched over the shape.
+    ///
+    /// Only stretched. ODF also tiles a fill image, at a size the style gives,
+    /// and a tiled fill is [`Fill::None`] here rather than a stretched
+    /// approximation — one tile blown up to the size of a slide is not a
+    /// smaller version of the same thing.
+    Image(String),
 }
 
 /// How a gradient runs, which is the part of it a renderer has to understand.
@@ -321,17 +328,56 @@ pub struct Gradient {
     pub center: (f32, f32),
 }
 
+/// Which of ODF's fill styles a shape uses, before the value it needs is found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FillKind {
+    None,
+    Solid,
+    Gradient,
+    /// A tiled or stretched picture.
+    Bitmap,
+    /// A pattern of lines, which nothing here draws.
+    Hatch,
+}
+
 /// How a shape is filled and outlined.
+///
+/// **The kind of fill and the value it uses are separate properties and inherit
+/// separately**, which is the whole reason they are separate fields here. A
+/// style may set `draw:fill-color` and say nothing about `draw:fill`: that names
+/// the colour a solid fill would use and does *not* turn the fill on, so a shape
+/// whose parent style says `draw:fill="none"` stays empty. Reading the colour as
+/// though it were the fill puts a white box over the slide, which is what a
+/// template's subtitle placeholder did until this was split.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct GraphicProperties {
-    /// What fills it.
-    pub fill: Fill,
+    kind: Option<FillKind>,
+    color: Option<Color>,
+    gradient: Option<String>,
+    image: Option<String>,
     /// Outline colour, absent when the stroke is `none`.
     pub stroke: Option<Color>,
     /// Outline width.
     pub stroke_width: Option<Length>,
     /// How opaque the fill is, from zero to one.
     pub opacity: Option<f32>,
+}
+
+impl GraphicProperties {
+    /// What actually fills the shape, once the kind and its value are put
+    /// together.
+    ///
+    /// A kind whose value the style never gave — `draw:fill="gradient"` with no
+    /// gradient named — fills nothing, which is the honest answer and not a
+    /// guess at which gradient was meant.
+    pub fn fill(&self) -> Fill {
+        match self.kind {
+            None | Some(FillKind::None | FillKind::Hatch) => Fill::None,
+            Some(FillKind::Solid) => self.color.map_or(Fill::None, Fill::Solid),
+            Some(FillKind::Gradient) => self.gradient.clone().map_or(Fill::None, Fill::Gradient),
+            Some(FillKind::Bitmap) => self.image.clone().map_or(Fill::None, Fill::Image),
+        }
+    }
 }
 
 /// Everything a resolved style says, across every family.
@@ -420,6 +466,7 @@ pub struct Styles {
     master_pages: HashMap<String, Element>,
     lists: HashMap<String, Element>,
     gradients: HashMap<String, Gradient>,
+    fill_images: HashMap<String, String>,
     font_faces: HashMap<String, String>,
     cache: RefCell<HashMap<(Family, String), Rc<Properties>>>,
 }
@@ -438,6 +485,7 @@ impl Styles {
             master_pages: HashMap::new(),
             lists: HashMap::new(),
             gradients: HashMap::new(),
+            fill_images: HashMap::new(),
             font_faces: HashMap::new(),
             cache: RefCell::new(HashMap::new()),
         };
@@ -515,6 +563,13 @@ impl Styles {
                 self.page_layouts
                     .insert(name.to_owned(), page_layout(element));
             }
+        } else if element.is(&Ns::Draw, "fill-image") {
+            if let (Some(name), Some(href)) = (
+                element.attr(&Ns::Draw, "name"),
+                element.attr(&Ns::Xlink, "href"),
+            ) {
+                self.fill_images.insert(name.to_owned(), href.to_owned());
+            }
         } else if element.is(&Ns::Draw, "gradient") {
             if let Some(name) = element.attr(&Ns::Draw, "name") {
                 self.gradients.insert(name.to_owned(), gradient(element));
@@ -534,6 +589,11 @@ impl Styles {
     /// A gradient by name, as a fill refers to one.
     pub fn gradient(&self, name: &str) -> Option<&Gradient> {
         self.gradients.get(name)
+    }
+
+    /// Where the picture of a named fill image lives inside the package.
+    pub fn fill_image(&self, name: &str) -> Option<&str> {
+        self.fill_images.get(name).map(String::as_str)
     }
 
     /// A list style by name, as the `text:list-style-name` of a list refers to
@@ -920,31 +980,33 @@ impl CellProperties {
 
 impl GraphicProperties {
     fn apply(&mut self, p: &Element) {
-        // `draw:fill` says which kind, and the value each kind needs is a
-        // separate attribute — so a style that switches a shape from a colour to
-        // a gradient carries both, and reading the colour without the kind gets
-        // the old answer.
-        match p.attr(&Ns::Draw, "fill") {
-            // Solid, and the case of no `draw:fill` at all: a colour on its own
-            // still sets one, which is how a style that only changes the shade
-            // of an already-solid shape is written. Neither states a colour
-            // every time, and the one it does not state is the one inherited.
-            Some("solid") | None => {
-                if let Some(color) = p.attr(&Ns::Draw, "fill-color").and_then(Color::parse) {
-                    self.fill = Fill::Solid(color);
-                }
-            }
-            Some("gradient") => {
-                if let Some(name) = p.attr(&Ns::Draw, "fill-gradient-name") {
-                    self.fill = Fill::Gradient(name.to_owned());
-                }
-            }
-            // `none`, and the bitmap and hatch fills this does not draw. They
-            // share an arm because they share an outcome: leaving an inherited
-            // colour in place would fill the shape with something the document
-            // did not ask for and call it the pattern.
-            Some(_) => self.fill = Fill::None,
+        // Each of these is its own property and each inherits on its own. A
+        // style that changes only the shade of an already-solid shape writes the
+        // colour and nothing else; one that turns the fill off writes the kind
+        // and nothing else.
+        if let Some(kind) = p.attr(&Ns::Draw, "fill") {
+            self.kind = Some(match kind {
+                "solid" => FillKind::Solid,
+                "gradient" => FillKind::Gradient,
+                "bitmap" => FillKind::Bitmap,
+                "hatch" => FillKind::Hatch,
+                _ => FillKind::None,
+            });
         }
+        if let Some(color) = p.attr(&Ns::Draw, "fill-color").and_then(Color::parse) {
+            self.color = Some(color);
+        }
+        if let Some(name) = p.attr(&Ns::Draw, "fill-gradient-name") {
+            self.gradient = Some(name.to_owned());
+        }
+        // Only a stretched picture: see `Fill::Image`. A tiled one leaves the
+        // name unset, so the fill resolves to nothing rather than to one tile
+        // blown up to the size of the shape.
+        if let Some(name) = p.attr(&Ns::Draw, "fill-image-name") {
+            self.image = (p.attr(&Ns::Style, "repeat").unwrap_or("stretch") == "stretch")
+                .then(|| name.to_owned());
+        }
+
         match p.attr(&Ns::Draw, "stroke") {
             Some("none") => self.stroke = None,
             _ => {

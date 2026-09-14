@@ -15,7 +15,10 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use eframe::egui::{Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, pos2, vec2};
+use eframe::egui::{
+    Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, epaint::Vertex, pos2, vec2,
+};
+use odox_core::draw::Geometry;
 use odox_core::{
     Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Properties,
 };
@@ -37,25 +40,9 @@ pub struct Canvas<'a> {
     pub palette: Palette,
 }
 
-/// The `draw:enhanced-geometry` types drawn as the rectangle they occupy.
-///
-/// A custom shape is a path built from formulas, and this draws none of them.
-/// What it does is fill the bounding box of the few whose outline is a rectangle
-/// or close enough to one that the difference is a corner — which is every type
-/// in the corpus. Anything else is left undrawn, because filling the box of a
-/// star or an arrow would put a block on the slide where the document asked for
-/// a shape.
-const BOXY: [&str; 5] = [
-    "rectangle",
-    "round-rectangle",
-    "flowchart-process",
-    "flowchart-alternate-process",
-    "flowchart-document",
-];
-
 impl Canvas<'_> {
     /// Fill the page.
-    pub fn background(&self, ui: &Ui, fill: &Fill) {
+    pub fn background(&mut self, ui: &Ui, fill: &Fill) {
         let page = self.page;
         self.fill(
             ui,
@@ -74,10 +61,10 @@ impl Canvas<'_> {
     /// One shape, at the place on the page the document puts it.
     ///
     /// Drawn: `draw:rect`, `draw:ellipse`, `draw:circle`, `draw:polygon`,
-    /// `draw:polyline`, `draw:line`, the boxy custom shapes, a `draw:frame`
-    /// holding a picture or a text box, and `draw:g`, which is a group and is
-    /// descended into. Left undrawn: `draw:path`, `draw:connector`, `draw:measure`
-    /// and every custom shape that is not a box.
+    /// `draw:polyline`, `draw:line`, `draw:custom-shape` — whose outline is
+    /// worked out by [`Geometry`] — a `draw:frame` holding a picture or a text
+    /// box, and `draw:g`, which is a group and is descended into. Left undrawn:
+    /// `draw:path`, `draw:connector` and `draw:measure`.
     pub fn shape(&mut self, ui: &mut Ui, shape: &Element) {
         if shape.is(&Ns::Draw, "g") {
             for child in shape.elements() {
@@ -109,7 +96,7 @@ impl Canvas<'_> {
                     self.fill(
                         ui,
                         rect,
-                        &properties.graphic.fill,
+                        &properties.graphic.fill(),
                         properties.graphic.opacity,
                         &points,
                     );
@@ -125,7 +112,8 @@ impl Canvas<'_> {
 
         if shape.is(&Ns::Draw, "ellipse") || shape.is(&Ns::Draw, "circle") {
             let (centre, radius) = (rect.center(), rect.size() / 2.0);
-            if let Some(colour) = self.flat(&properties.graphic.fill, properties.graphic.opacity) {
+            if let Some(colour) = self.flat(&properties.graphic.fill(), properties.graphic.opacity)
+            {
                 self.painter(ui)
                     .add(Shape::ellipse_filled(centre, radius, colour));
             }
@@ -136,14 +124,20 @@ impl Canvas<'_> {
             return;
         }
 
-        let boxy = shape.is(&Ns::Draw, "rect")
-            || shape.is(&Ns::Draw, "frame")
-            || (shape.is(&Ns::Draw, "custom-shape")
-                && shape
-                    .child(&Ns::Draw, "enhanced-geometry")
-                    .and_then(|geometry| geometry.attr(&Ns::Draw, "type"))
-                    .is_some_and(|kind| BOXY.contains(&kind)));
-        if !boxy {
+        if shape.is(&Ns::Draw, "custom-shape") {
+            // The outline is a path in a space of the shape's own, and the
+            // formulas in it have to be evaluated before there are any points.
+            if let Some(geometry) = shape
+                .child(&Ns::Draw, "enhanced-geometry")
+                .and_then(Geometry::read)
+            {
+                self.geometry(ui, &geometry, rect, &properties, outline);
+            }
+            self.text(ui, shape, rect);
+            return;
+        }
+
+        if !shape.is(&Ns::Draw, "rect") && !shape.is(&Ns::Draw, "frame") {
             return;
         }
 
@@ -156,7 +150,7 @@ impl Canvas<'_> {
         self.fill(
             ui,
             rect,
-            &properties.graphic.fill,
+            &properties.graphic.fill(),
             properties.graphic.opacity,
             &corners,
         );
@@ -167,13 +161,65 @@ impl Canvas<'_> {
         self.text(ui, shape, rect);
     }
 
+    /// A custom shape's outline, mapped from its own coordinate space onto the
+    /// rectangle it occupies.
+    fn geometry(
+        &mut self,
+        ui: &Ui,
+        geometry: &Geometry,
+        rect: Rect,
+        properties: &Properties,
+        outline: Option<Stroke>,
+    ) {
+        let view = geometry.view;
+        let place = |(x, y): (f32, f32)| {
+            pos2(
+                rect.left() + (x - view.x) / view.width * rect.width(),
+                rect.top() + (y - view.y) / view.height * rect.height(),
+            )
+        };
+        for stroke in &geometry.paths {
+            let points: Vec<Pos2> = stroke.points.iter().copied().map(place).collect();
+            if points.len() < 2 {
+                continue;
+            }
+            if stroke.fill {
+                self.fill(
+                    ui,
+                    rect,
+                    &properties.graphic.fill(),
+                    properties.graphic.opacity,
+                    &points,
+                );
+            }
+            if stroke.stroke
+                && let Some(pen) = outline
+            {
+                let shape = if stroke.closed {
+                    Shape::closed_line(points, pen)
+                } else {
+                    Shape::line(points, pen)
+                };
+                self.painter(ui).add(shape);
+            }
+        }
+    }
+
     /// The paragraphs a shape holds, or the picture it frames.
     fn text(&mut self, ui: &mut Ui, shape: &Element, rect: Rect) {
-        let content = shape
-            .child(&Ns::Draw, "text-box")
-            .or_else(|| shape.child(&Ns::Draw, "image").map(|_| shape));
-        let Some(content) = content else { return };
-        let content = content.clone();
+        // A frame around a picture is handed over whole, because the renderer
+        // finds a frame among a parent's children and here the shape is the
+        // frame itself. A text box is the ordinary case and its paragraphs are
+        // its children.
+        let picture = shape.child(&Ns::Draw, "image").is_some();
+        let content = if picture {
+            shape.clone()
+        } else {
+            match shape.child(&Ns::Draw, "text-box") {
+                Some(box_) => box_.clone(),
+                None => return,
+            }
+        };
         let (page, scale, palette) = (self.page, self.scale, self.palette);
         let document = self.document;
         let pictures = &mut *self.pictures;
@@ -181,7 +227,11 @@ impl Canvas<'_> {
             ui.set_clip_rect(rect.intersect(page));
             let mut flow = Flow::new(document, pictures, scale);
             flow.palette = palette;
-            flow.blocks(ui, &content, rect.width());
+            if picture {
+                flow.frame(ui, &content, rect.width());
+            } else {
+                flow.blocks(ui, &content, rect.width());
+            }
         });
     }
 
@@ -239,33 +289,86 @@ impl Canvas<'_> {
         Some(Stroke::new(width, format::color32(colour)))
     }
 
-    /// Paint a fill over a shape whose outline is the given points.
+    /// Paint a fill inside an outline.
     ///
-    /// A solid fill is one shape. A gradient is a mesh, because that is how a
-    /// colour varies across a triangle in a graphics toolkit: the corners carry
-    /// the colour the gradient has at each of them and the interpolation between
-    /// them is what draws it.
-    fn fill(&self, ui: &Ui, rect: Rect, fill: &Fill, opacity: Option<f32>, points: &[Pos2]) {
-        match fill {
-            Fill::None => {}
-            Fill::Solid(colour) => {
-                let colour = alpha(format::color32(*colour), opacity);
-                self.painter(ui)
-                    .add(Shape::convex_polygon(points.to_vec(), colour, Stroke::NONE));
+    /// Always a mesh, and always triangulated. A graphics toolkit fills a closed
+    /// path by cutting it into triangles, and the obvious way — a fan from the
+    /// first point, which is what `Shape::convex_polygon` does — is right only
+    /// for a convex outline. An arrow, a callout and a puzzle piece are none of
+    /// them convex, and a fan across one paints outside it. Colour varies over a
+    /// mesh by varying at its corners, so a gradient costs nothing more than
+    /// asking for the colour at each.
+    fn fill(&mut self, ui: &Ui, rect: Rect, fill: &Fill, opacity: Option<f32>, points: &[Pos2]) {
+        // The reference is copied out so that the picture cache can be filled
+        // while the document is being read from.
+        let document = self.document;
+
+        if let Fill::Image(name) = fill {
+            let Some(href) = document.styles.fill_image(name) else {
+                return;
+            };
+            let Some(texture) = self
+                .pictures
+                .get(ui.ctx(), document, href)
+                .map(eframe::egui::TextureHandle::id)
+            else {
+                return;
+            };
+            // Stretched over the shape's own rectangle: each corner takes the
+            // corner of the picture that the corner of the rectangle is at.
+            let tint = alpha(Color32::WHITE, opacity);
+            let mut mesh = Mesh::with_texture(texture);
+            for point in points {
+                mesh.vertices.push(Vertex {
+                    pos: *point,
+                    uv: pos2(
+                        (point.x - rect.left()) / rect.width().max(f32::EPSILON),
+                        (point.y - rect.top()) / rect.height().max(f32::EPSILON),
+                    ),
+                    color: tint,
+                });
             }
-            Fill::Gradient(name) => {
-                let Some(gradient) = self.document.styles.gradient(name) else {
-                    return;
-                };
-                self.painter(ui).add(gradient_mesh(rect, gradient, opacity));
+            for [a, b, c] in triangulate(points) {
+                mesh.add_triangle(a, b, c);
             }
+            self.painter(ui).add(Shape::mesh(mesh));
+            return;
         }
+
+        let gradient = match fill {
+            Fill::None | Fill::Image(_) => return,
+            Fill::Solid(_) => None,
+            Fill::Gradient(name) => match document.styles.gradient(name) {
+                Some(gradient) => Some(gradient),
+                None => return,
+            },
+        };
+        let flat = match fill {
+            Fill::Solid(colour) => Some(alpha(format::color32(*colour), opacity)),
+            _ => None,
+        };
+
+        let mut mesh = Mesh::default();
+        for point in points {
+            let colour = flat.unwrap_or_else(|| {
+                gradient.map_or(Color32::TRANSPARENT, |gradient| {
+                    alpha(gradient_colour(*point, rect, gradient), opacity)
+                })
+            });
+            mesh.colored_vertex(*point, colour);
+        }
+        for [a, b, c] in triangulate(points) {
+            mesh.add_triangle(a, b, c);
+        }
+        self.painter(ui).add(Shape::mesh(mesh));
     }
 
     /// One colour for a fill, where the shape being drawn cannot carry a mesh.
     fn flat(&self, fill: &Fill, opacity: Option<f32>) -> Option<Color32> {
         match fill {
-            Fill::None => None,
+            // Nothing to draw, and a picture that has no room in an ellipse,
+            // which is drawn as an ellipse rather than as a mesh.
+            Fill::None | Fill::Image(_) => None,
             Fill::Solid(colour) => Some(alpha(format::color32(*colour), opacity)),
             Fill::Gradient(name) => {
                 let gradient = self.document.styles.gradient(name)?;
@@ -330,64 +433,247 @@ fn blend(from: Color, to: Color, t: f32) -> Color32 {
     Color32::from_rgb(mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b))
 }
 
-/// A gradient across a rectangle, as two triangles with coloured corners.
+/// The colour a gradient has at one point of the rectangle it fills.
 ///
-/// **Linear and axial are drawn; the four that radiate from a point are not.**
-/// A radial gradient needs many more triangles than a rectangle has corners, and
-/// no fixture here uses one, so those get the flat average of the two colours —
-/// visibly an approximation and not a wrong direction.
-fn gradient_mesh(rect: Rect, gradient: &Gradient, opacity: Option<f32>) -> Shape {
+/// **Linear and axial run in the direction the document gives; the four that
+/// radiate from a point do not.** A radial gradient's colour depends on the
+/// distance from a centre, which this could compute — and no fixture uses one,
+/// so it would be a direction invented rather than measured. Those get the flat
+/// average of the two colours, which is visibly an approximation.
+fn gradient_colour(point: Pos2, rect: Rect, gradient: &Gradient) -> Color32 {
+    match gradient.style {
+        GradientStyle::Linear | GradientStyle::Axial => {}
+        _ => return blend(gradient.start, gradient.end, 0.5),
+    }
+
+    // ODF measures the angle counter-clockwise from the direction that runs
+    // bottom to top, and the screen's y grows downward, so the axis is the unit
+    // vector below. A point's place along the gradient is its projection onto
+    // it, rescaled so that the rectangle's own extent is nought to one.
+    let radians = gradient.angle.to_radians();
+    let axis = vec2(radians.sin(), -radians.cos());
     let corners = [
         rect.left_top(),
         rect.right_top(),
         rect.right_bottom(),
         rect.left_bottom(),
     ];
-    let mut mesh = Mesh::default();
+    let projections = corners.map(|corner| (corner - rect.center()).dot(axis));
+    let low = projections.iter().copied().fold(f32::MAX, f32::min);
+    let high = projections.iter().copied().fold(f32::MIN, f32::max);
+    let span = (high - low).max(f32::EPSILON);
 
-    match gradient.style {
-        GradientStyle::Linear | GradientStyle::Axial => {
-            // ODF measures the angle counter-clockwise from the direction that
-            // runs bottom to top, and the screen's y grows downward, so the axis
-            // is the unit vector below. A point's place along the gradient is its
-            // projection onto it, rescaled so that the rectangle's own extent is
-            // nought to one.
-            let radians = gradient.angle.to_radians();
-            let axis = vec2(radians.sin(), -radians.cos());
-            let projections: Vec<f32> = corners
-                .iter()
-                .map(|corner| (*corner - rect.center()).dot(axis))
-                .collect();
-            let low = projections.iter().copied().fold(f32::MAX, f32::min);
-            let high = projections.iter().copied().fold(f32::MIN, f32::max);
-            let span = (high - low).max(f32::EPSILON);
+    let mut t = ((point - rect.center()).dot(axis) - low) / span;
+    // The border is the fraction of the run that stays the start colour before
+    // the blend begins.
+    let border = gradient.border.clamp(0.0, 0.99);
+    t = ((t - border) / (1.0 - border)).clamp(0.0, 1.0);
+    // An axial gradient runs out from the middle to both edges, so each half of
+    // the rectangle takes the whole blend.
+    if gradient.style == GradientStyle::Axial {
+        t = (t - 0.5).abs() * 2.0;
+    }
+    blend(gradient.start, gradient.end, t)
+}
 
-            for (corner, projection) in corners.iter().zip(&projections) {
-                let mut t = (projection - low) / span;
-                // The border is the fraction of the run that stays the start
-                // colour before the blend begins.
-                let border = gradient.border.clamp(0.0, 0.99);
-                t = ((t - border) / (1.0 - border)).clamp(0.0, 1.0);
-                // An axial gradient runs out from the middle to both edges, so
-                // the two halves of the rectangle each take the whole blend.
-                if gradient.style == GradientStyle::Axial {
-                    t = (t - 0.5).abs() * 2.0;
-                }
-                mesh.colored_vertex(
-                    *corner,
-                    alpha(blend(gradient.start, gradient.end, t), opacity),
-                );
-            }
+/// Cut a closed outline into triangles, by clipping ears.
+///
+/// The standard method, and the reason for it is above [`Canvas::fill`]: the
+/// cheap alternative is right only for convex outlines and ODF's shapes are
+/// routinely not. An outline it cannot cut — one that crosses itself, which a
+/// hand-edited document can hold — falls back to the fan, which is wrong in the
+/// way the fan is always wrong rather than in a new way.
+fn triangulate(points: &[Pos2]) -> Vec<[u32; 3]> {
+    let count = points.len();
+    if count < 3 {
+        return Vec::new();
+    }
+    let fan = || -> Vec<[u32; 3]> {
+        (1..count - 1)
+            .map(|i| {
+                [
+                    0,
+                    u32::try_from(i).unwrap_or(0),
+                    u32::try_from(i + 1).unwrap_or(0),
+                ]
+            })
+            .collect()
+    };
+
+    // Twice the signed area, whose sign is which way round the outline goes.
+    let area: f32 = (0..count)
+        .map(|i| {
+            let (a, b) = (points[i], points[(i + 1) % count]);
+            a.x * b.y - b.x * a.y
+        })
+        .sum();
+    let winding = if area >= 0.0 { 1.0 } else { -1.0 };
+
+    let cross = |a: Pos2, b: Pos2, c: Pos2| (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    let inside = |a: Pos2, b: Pos2, c: Pos2, p: Pos2| {
+        cross(a, b, p) * winding >= 0.0
+            && cross(b, c, p) * winding >= 0.0
+            && cross(c, a, p) * winding >= 0.0
+    };
+
+    let mut remaining: Vec<usize> = (0..count).collect();
+    let mut triangles = Vec::with_capacity(count);
+    let mut stuck = 0;
+    while remaining.len() > 3 {
+        if stuck > remaining.len() {
+            return fan();
         }
-        _ => {
-            let flat = alpha(blend(gradient.start, gradient.end, 0.5), opacity);
-            for corner in corners {
-                mesh.colored_vertex(corner, flat);
+        let mut clipped = false;
+        for position in 0..remaining.len() {
+            let (i, j, k) = (
+                remaining[(position + remaining.len() - 1) % remaining.len()],
+                remaining[position],
+                remaining[(position + 1) % remaining.len()],
+            );
+            let (a, b, c) = (points[i], points[j], points[k]);
+            // A reflex corner is not an ear, and neither is one whose triangle
+            // has another corner of the outline inside it.
+            if cross(a, b, c) * winding <= 0.0 {
+                continue;
             }
+            if remaining
+                .iter()
+                .filter(|other| ![i, j, k].contains(other))
+                .any(|other| inside(a, b, c, points[*other]))
+            {
+                continue;
+            }
+            triangles.push([
+                u32::try_from(i).unwrap_or(0),
+                u32::try_from(j).unwrap_or(0),
+                u32::try_from(k).unwrap_or(0),
+            ]);
+            remaining.remove(position);
+            clipped = true;
+            stuck = 0;
+            break;
+        }
+        if !clipped {
+            stuck += 1;
         }
     }
+    if remaining.len() == 3 {
+        triangles.push([
+            u32::try_from(remaining[0]).unwrap_or(0),
+            u32::try_from(remaining[1]).unwrap_or(0),
+            u32::try_from(remaining[2]).unwrap_or(0),
+        ]);
+    }
+    triangles
+}
 
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    Shape::mesh(mesh)
+#[cfg(test)]
+mod tests {
+    use super::triangulate;
+    use eframe::egui::{Pos2, pos2};
+
+    /// Twice the area a run of triangles covers, and twice the area the outline
+    /// encloses. Equal means the triangles cover the shape and nothing else.
+    fn areas(points: &[Pos2]) -> (f32, f32) {
+        let cross =
+            |a: Pos2, b: Pos2, c: Pos2| (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        let triangles: f32 = triangulate(points)
+            .iter()
+            .map(|[a, b, c]| {
+                cross(
+                    points[*a as usize],
+                    points[*b as usize],
+                    points[*c as usize],
+                )
+                .abs()
+            })
+            .sum();
+        let outline: f32 = (0..points.len())
+            .map(|i| {
+                let (a, b) = (points[i], points[(i + 1) % points.len()]);
+                a.x * b.y - b.x * a.y
+            })
+            .sum::<f32>()
+            .abs();
+        (triangles, outline)
+    }
+
+    /// Would catch the fan: an L covers three quarters of its bounding box, and
+    /// a fan from the first corner covers the whole of it.
+    #[test]
+    fn a_concave_outline_is_cut_into_the_shape_and_not_its_hull() {
+        let l = [
+            pos2(0.0, 0.0),
+            pos2(2.0, 0.0),
+            pos2(2.0, 1.0),
+            pos2(1.0, 1.0),
+            pos2(1.0, 2.0),
+            pos2(0.0, 2.0),
+        ];
+        let (triangles, outline) = areas(&l);
+        assert!(
+            (triangles - outline).abs() < 1e-3,
+            "{triangles} against {outline}"
+        );
+        // Three of the four unit squares, twice over.
+        assert!((outline - 6.0).abs() < 1e-3, "{outline}");
+    }
+
+    /// A cross has four reflex corners and is where a careless ear test fails.
+    #[test]
+    fn a_cross_is_cut_correctly_too() {
+        let cross = [
+            pos2(1.0, 0.0),
+            pos2(2.0, 0.0),
+            pos2(2.0, 1.0),
+            pos2(3.0, 1.0),
+            pos2(3.0, 2.0),
+            pos2(2.0, 2.0),
+            pos2(2.0, 3.0),
+            pos2(1.0, 3.0),
+            pos2(1.0, 2.0),
+            pos2(0.0, 2.0),
+            pos2(0.0, 1.0),
+            pos2(1.0, 1.0),
+        ];
+        let (triangles, outline) = areas(&cross);
+        assert!(
+            (triangles - outline).abs() < 1e-3,
+            "{triangles} against {outline}"
+        );
+    }
+
+    /// The same outline the other way round: the winding must not decide whether
+    /// it works, because a mirrored shape arrives reversed.
+    #[test]
+    fn winding_does_not_matter() {
+        let mut l = vec![
+            pos2(0.0, 0.0),
+            pos2(2.0, 0.0),
+            pos2(2.0, 1.0),
+            pos2(1.0, 1.0),
+            pos2(1.0, 2.0),
+            pos2(0.0, 2.0),
+        ];
+        l.reverse();
+        let (triangles, outline) = areas(&l);
+        assert!(
+            (triangles - outline).abs() < 1e-3,
+            "{triangles} against {outline}"
+        );
+    }
+
+    /// A convex outline is the ordinary case and must still come out whole.
+    #[test]
+    fn a_square_is_two_triangles() {
+        let square = [
+            pos2(0.0, 0.0),
+            pos2(1.0, 0.0),
+            pos2(1.0, 1.0),
+            pos2(0.0, 1.0),
+        ];
+        assert_eq!(triangulate(&square).len(), 2);
+        let (triangles, outline) = areas(&square);
+        assert!((triangles - outline).abs() < 1e-4);
+    }
 }

@@ -76,14 +76,14 @@ fn a_template_contributes_its_decorations_and_nothing_it_only_prompts_with() {
         .document
         .styles
         .resolve(&odox_core::Family::Graphic, style);
-    let Fill::Gradient(name) = &properties.graphic.fill else {
-        panic!("expected a gradient, got {:?}", properties.graphic.fill);
+    let Fill::Gradient(name) = properties.graphic.fill() else {
+        panic!("expected a gradient, got {:?}", properties.graphic.fill());
     };
 
     let gradient = deck
         .document
         .styles
-        .gradient(name)
+        .gradient(&name)
         .expect("the gradient it names");
     assert_eq!(gradient.style, GradientStyle::Linear);
     assert_eq!(

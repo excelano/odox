@@ -676,7 +676,12 @@ impl Flow<'_> {
     }
 
     /// A frame: a box with a picture, a text box or an object in it.
-    fn frame(&mut self, ui: &mut Ui, frame: &Element, width: f32) {
+    ///
+    /// Public because a slide reaches it directly. Everywhere else a frame is
+    /// found among a parent's children by [`Self::blocks`], but a shape on a
+    /// slide *is* the frame, and asking `blocks` to draw it would look inside it
+    /// for blocks and find a `draw:image`, which is not one.
+    pub fn frame(&mut self, ui: &mut Ui, frame: &Element, width: f32) {
         let zoom = self.zoom;
         let declared = |local: &str| {
             frame

@@ -9,8 +9,11 @@ All notable changes to odox are recorded here. The format follows
 ### Added
 
 - A slide is drawn with its master page: the ground it fills, and the shapes a
-  template decorates every slide with. Rectangles, ellipses, polygons, polylines
-  and lines are drawn from their own geometry, with solid and gradient fills.
+  template decorates every slide with. Rectangles, ellipses, polygons, polylines,
+  lines and custom shapes are drawn from their own geometry, with solid,
+  gradient and stretched-picture fills.
+- `draw:enhanced-geometry`, which is how a custom shape states its outline: a
+  path in a coordinate space of its own, with numbers that may be formulas.
 - Text in the page can be selected and copied: drag, double-click a word,
   triple-click a line, Ctrl+C. A selection survives scrolling and spans
   paragraphs.
