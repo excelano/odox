@@ -81,6 +81,10 @@ pub struct Shell<V: Viewer> {
     product: Product,
     path: Option<PathBuf>,
     error: Option<String>,
+    /// Set when a document was opened during a frame, cleared at the end of it.
+    ///
+    /// See the comment where it is read in [`eframe::App::ui`].
+    settling: bool,
     zoom: f32,
     show_side: bool,
 }
@@ -98,6 +102,7 @@ impl<V: Viewer> Shell<V> {
             product,
             path: None,
             error: None,
+            settling: false,
             zoom: 1.0,
             show_side: true,
         }
@@ -111,6 +116,7 @@ impl<V: Viewer> Shell<V> {
                 Ok(()) => {
                     self.path = Some(path.to_path_buf());
                     self.error = None;
+                    self.settling = true;
                 }
                 Err(message) => {
                     self.view.close();
@@ -258,8 +264,36 @@ impl<V: Viewer> eframe::App for Shell<V> {
             }
         }
 
+        // **A document opened during this frame is not drawn until the next
+        // one.** Opening one registers the font families it names, and
+        // `Context::set_fonts` takes effect at the start of the following pass,
+        // so laying the document out now would ask for a family the definitions
+        // still in force do not carry. egui does not fall back for that: it
+        // panics, and a panic inside the macOS event callback cannot unwind, so
+        // the process aborts.
+        //
+        // Every way of opening a document but one goes through a frame: a drop,
+        // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
+        // command line, which is opened in eframe's creation closure before any
+        // pass has begun, and is why this went unnoticed until a runner opened a
+        // document through Launch Services. `tests/fonts_midframe.rs` pins the
+        // hazard.
+        //
+        // One frame, and the repaint is asked for rather than waited for, so
+        // the document appears immediately rather than when the pointer next
+        // moves.
+        let settling = self.settling;
+        if settling {
+            self.settling = false;
+            ctx.request_repaint();
+        }
+
         egui::CentralPanel::default_margins().show(ui, |ui| {
-            if self.view.is_open() {
+            if settling {
+                // Deliberately blank, and for one frame. Drawing the
+                // nothing-open message here instead would flash it between a
+                // double-click and the document.
+            } else if self.view.is_open() {
                 self.view.central(ui, self.zoom);
             } else {
                 self.nothing_open(ui);

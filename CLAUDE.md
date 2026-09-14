@@ -33,6 +33,18 @@ and hides the other two.
 
 ---
 
+## Committing
+
+**The trailer block is one line.** A `Co-Authored-By` naming the model, and
+nothing under it. Some harnesses append a `Claude-Session:` line carrying a URL.
+This repository is public, so that is a private identifier written into a
+permanent public record for no reader's benefit; slipcase-desktop has stripped it
+from pushed history twice, and this repository has 41 of them in its own pushed
+history from before the rule was written down. Read what you are about to commit
+rather than trusting what the harness composed.
+
+The `Co-Authored-By` names the model and not the context window it ran in.
+
 ## Commands
 
     cargo build                          # debug
