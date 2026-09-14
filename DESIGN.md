@@ -216,6 +216,22 @@ ellipsoidal, square or rectangular gradient is filled with the flat average of
 its two colours, and a tiled picture with nothing: both are visibly
 approximations rather than wrong directions, and no fixture uses either.
 
+**A shape that is turned states where it is and not what corner it has.**
+`svg:x` and a size describe a rectangle whose edges run along the page's, which
+is most shapes and not all of them, so ODF gives the rest a list of operations in
+`draw:transform` and writes no corner at all. A reader that insists on the corner
+drops those shapes without a trace: across the templates that is 137 of them in
+ten documents, and they are the decoration a template is recognised by. The
+operations apply to a point left to right, which is the opposite of the way SVG
+composes the same syntax, and the angle is in radians; both were settled against
+the templates rather than read out of the specification, and `odox-core`'s
+`place` module records which fixture settled which. Every shape is placed through
+the same map, so a turned rectangle is a quadrilateral, a turned ellipse is the
+polygon it has become, and a turned picture is its own four corners with the
+texture across them. A turned shape's *label* is left undrawn: a paragraph is a
+line breaker, a font and a selection, and drawing one upright inside a box that
+is not upright says something the document does not.
+
 **A shape's label is paragraphs of its own.** `draw:text-box` is how a frame
 says the same thing, and across the presentation templates it is the shapes that
 carry text and no frame that does. Where the label goes between the shape's top

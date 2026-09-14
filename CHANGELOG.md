@@ -6,9 +6,10 @@ All notable changes to odox are recorded here. The format follows
 
 ## [Unreleased]
 
-Four gaps in the slide renderer, found by comparing what it draws against what
-LibreOffice draws from the same file. Of `growing-liberty.odp`'s fourth slide it
-now paints 99.1% the same colour, from 97.3%.
+Five gaps in the slide renderer, found by comparing what it draws against what
+LibreOffice draws from the same file. Across the twelve slides of
+`growing-liberty.odp` it now paints 98.7% of each the same colour on average and
+97.1% at worst, where three of the twelve were under 93% and the worst was 82%.
 
 ### Added
 
@@ -22,6 +23,12 @@ now paints 99.1% the same colour, from 97.3%.
 - A shape's label, which is paragraphs of the shape's own rather than a
   `draw:text-box`. `draw:textarea-vertical-align` says where between the top and
   the bottom edge it sits, so the numeral in a circle is in the middle of it.
+- `draw:transform`, which is how a shape that is turned or leaned says where it
+  is. Such a shape gives no corner, so until now it was dropped without a trace:
+  137 shapes across ten of the templates, most of them the decoration a template
+  is recognised by. A turned rectangle draws as a quadrilateral, a turned ellipse
+  as a polygon, and a turned picture as its own four corners. A turned shape's
+  label is left undrawn.
 
 ### Fixed
 

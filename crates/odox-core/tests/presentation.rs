@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::doc::Presentation;
-use odox_core::{Anchor, Color, Family, Fill, GradientStyle, Ns};
+use odox_core::{Anchor, Color, Family, Fill, GradientStyle, Length, Ns, Transform};
 
 fn fixture(name: &str) -> Option<Presentation> {
     let path: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -187,4 +187,47 @@ fn a_decoration_offers_a_second_picture_where_the_first_is_a_format_nothing_read
         }
     }
     assert!(alternatives > 0, "the template offers no alternatives");
+}
+
+#[test]
+fn every_transform_in_the_corpus_places_the_shape_on_the_page() {
+    // A shape placed this way routinely gives no `svg:x` at all, so a reader
+    // that cannot read the list drops it. What is checked here is that the list
+    // parses and that the box it puts the shape in touches the page: a
+    // composition order the wrong way round sends the decoration off the far
+    // side, which is how the order was settled.
+    let Some(deck) = fixture("growing-liberty.odp") else {
+        return;
+    };
+    let mut found = 0;
+    for slide in &deck.slides() {
+        let page = deck.page_layout(slide);
+        let (wide, high) = (page.width.points(), page.height.points());
+        for shape in deck.background_objects(slide) {
+            let Some(text) = shape.attr(&Ns::Draw, "transform") else {
+                continue;
+            };
+            found += 1;
+            let placed = Transform::parse(text).expect("a readable transform");
+            let at = |name: &str| {
+                shape
+                    .attr(&Ns::Svg, name)
+                    .and_then(Length::parse)
+                    .map_or(0.0, |l| l.points())
+            };
+            let (width, height) = (at("width"), at("height"));
+            let corners = [(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)]
+                .map(|corner| placed.apply(corner));
+            let left = corners.iter().map(|c| c.0).fold(f32::MAX, f32::min);
+            let right = corners.iter().map(|c| c.0).fold(f32::MIN, f32::max);
+            let top = corners.iter().map(|c| c.1).fold(f32::MAX, f32::min);
+            let bottom = corners.iter().map(|c| c.1).fold(f32::MIN, f32::max);
+            assert!(
+                right > 0.0 && left < wide && bottom > 0.0 && top < high,
+                "a decoration landed at ({left}, {top})-({right}, {bottom}) \
+                 outside a page of {wide} by {high}"
+            );
+        }
+    }
+    assert!(found > 0, "no decoration in the corpus is placed this way");
 }

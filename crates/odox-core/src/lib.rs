@@ -34,6 +34,7 @@ pub mod draw;
 mod error;
 mod meta;
 mod package;
+pub mod place;
 mod style;
 mod value;
 pub mod xml;
@@ -42,6 +43,7 @@ pub use doc::Document;
 pub use error::Error;
 pub use meta::Meta;
 pub use package::{Package, Part};
+pub use place::Transform;
 pub use style::{
     Anchor, Border, Break, CellProperties, Edges, Family, Fill, Gradient, GradientStyle,
     GraphicProperties, PageLayout, ParagraphProperties, Position, Properties, Style, Styles,

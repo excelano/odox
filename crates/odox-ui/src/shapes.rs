@@ -16,12 +16,13 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use eframe::egui::{
-    Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, epaint::Vertex, pos2, vec2,
+    Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, Vec2, epaint::Vertex, pos2, vec2,
 };
 use odox_core::draw::Geometry;
 
 use odox_core::{
-    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Properties,
+    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns,
+    Properties, Transform,
 };
 
 use crate::flow::{Flow, Pictures};
@@ -39,6 +40,52 @@ pub struct Canvas<'a> {
     pub scale: f32,
     /// The colours to draw in where the document names none.
     pub palette: Palette,
+}
+
+/// Where a shape's own box lands on the screen.
+///
+/// A shape is drawn in a box of its own, and this is the map from that box onto
+/// the window. Ordinarily it is a corner and a size and the box's edges stay
+/// along the page's, but a shape placed by `draw:transform` is turned or leaned
+/// as well, so the map is the general one: a corner and the two vectors along
+/// the edges that meet there.
+#[derive(Clone, Copy)]
+struct Placement {
+    /// Where the box's top left corner lands.
+    origin: Pos2,
+    /// From that corner to the top right one.
+    x: Vec2,
+    /// From that corner to the bottom left one.
+    y: Vec2,
+}
+
+impl Placement {
+    /// A point of the box, in the fractions of it across and down.
+    fn across(self, u: f32, v: f32) -> Pos2 {
+        self.origin + self.x * u + self.y * v
+    }
+
+    /// The four corners, going round.
+    fn corners(self) -> [Pos2; 4] {
+        [
+            self.across(0.0, 0.0),
+            self.across(1.0, 0.0),
+            self.across(1.0, 1.0),
+            self.across(0.0, 1.0),
+        ]
+    }
+
+    /// The smallest upright rectangle the shape fits inside, which is what a
+    /// gradient runs across and where a label is laid out.
+    fn bounds(self) -> Rect {
+        Rect::from_points(&self.corners())
+    }
+
+    /// Whether the box is still square to the page, which is the case a
+    /// rectangle can stand in for.
+    fn is_upright(self) -> bool {
+        self.x.y.abs() < 0.01 && self.y.x.abs() < 0.01 && self.x.x >= 0.0 && self.y.y >= 0.0
+    }
 }
 
 /// Whether a shape has an area, which is a property of the kind of shape it is
@@ -103,10 +150,13 @@ impl Canvas<'_> {
             return;
         }
 
-        let Some(rect) = self.rect(shape) else { return };
+        let Some(place) = self.placement(shape) else {
+            return;
+        };
+        let rect = place.bounds();
 
         if shape.is(&Ns::Draw, "polygon") || shape.is(&Ns::Draw, "polyline") {
-            let points = points(shape, rect);
+            let points = points(shape, place);
             if points.len() >= 2 {
                 if shape.is(&Ns::Draw, "polygon") {
                     self.fill(
@@ -127,16 +177,8 @@ impl Canvas<'_> {
         }
 
         if shape.is(&Ns::Draw, "ellipse") || shape.is(&Ns::Draw, "circle") {
-            let (centre, radius) = (rect.center(), rect.size() / 2.0);
-            if let Some(colour) = self.flat(&properties.graphic.fill(), properties.graphic.opacity)
-            {
-                self.painter(ui)
-                    .add(Shape::ellipse_filled(centre, radius, colour));
-            }
-            if let Some(stroke) = outline {
-                self.painter(ui)
-                    .add(Shape::ellipse_stroke(centre, radius, stroke));
-            }
+            self.ellipse(ui, place, &properties, outline);
+            self.text(ui, shape, place);
             return;
         }
 
@@ -144,9 +186,9 @@ impl Canvas<'_> {
             // A different notation for the same thing: SVG path data rather than
             // ODF's own commands, and the same polylines out of it.
             if let Some(geometry) = Geometry::read_path(shape) {
-                self.geometry(ui, &geometry, rect, &properties, outline, Filled::Yes);
+                self.geometry(ui, &geometry, place, &properties, outline, Filled::Yes);
             }
-            self.text(ui, shape, rect);
+            self.text(ui, shape, place);
             return;
         }
 
@@ -157,9 +199,9 @@ impl Canvas<'_> {
                 .child(&Ns::Draw, "enhanced-geometry")
                 .and_then(Geometry::read)
             {
-                self.geometry(ui, &geometry, rect, &properties, outline, Filled::Yes);
+                self.geometry(ui, &geometry, place, &properties, outline, Filled::Yes);
             }
-            self.text(ui, shape, rect);
+            self.text(ui, shape, place);
             return;
         }
 
@@ -167,12 +209,7 @@ impl Canvas<'_> {
             return;
         }
 
-        let corners = [
-            rect.left_top(),
-            rect.right_top(),
-            rect.right_bottom(),
-            rect.left_bottom(),
-        ];
+        let corners = place.corners();
         self.fill(
             ui,
             rect,
@@ -184,7 +221,45 @@ impl Canvas<'_> {
             self.painter(ui)
                 .add(Shape::closed_line(corners.to_vec(), stroke));
         }
-        self.text(ui, shape, rect);
+        self.text(ui, shape, place);
+    }
+
+    /// An ellipse, however its box is placed.
+    fn ellipse(
+        &mut self,
+        ui: &Ui,
+        place: Placement,
+        properties: &Properties,
+        outline: Option<Stroke>,
+    ) {
+        let rect = place.bounds();
+        if place.is_upright() {
+            let (centre, radius) = (rect.center(), rect.size() / 2.0);
+            if let Some(colour) = self.flat(&properties.graphic.fill(), properties.graphic.opacity)
+            {
+                self.painter(ui)
+                    .add(Shape::ellipse_filled(centre, radius, colour));
+            }
+            if let Some(stroke) = outline {
+                self.painter(ui)
+                    .add(Shape::ellipse_stroke(centre, radius, stroke));
+            }
+        } else {
+            // A turned ellipse is no longer an ellipse of the window's, so
+            // it is drawn as the polygon it is: the same curve, in the
+            // shape's own box, mapped through the placement like any other.
+            let points = ellipse(place);
+            self.fill(
+                ui,
+                rect,
+                &properties.graphic.fill(),
+                properties.graphic.opacity,
+                &points,
+            );
+            if let Some(stroke) = outline {
+                self.painter(ui).add(Shape::closed_line(points, stroke));
+            }
+        }
     }
 
     /// A connector, and the label it may carry.
@@ -210,7 +285,12 @@ impl Canvas<'_> {
             // them says nothing useful, so the outline states its own space.
             Some(mut geometry) => {
                 geometry.refit();
-                self.geometry(ui, &geometry, rect, properties, outline, Filled::No);
+                let place = Placement {
+                    origin: rect.left_top(),
+                    x: vec2(rect.width(), 0.0),
+                    y: vec2(0.0, rect.height()),
+                };
+                self.geometry(ui, &geometry, place, properties, outline, Filled::No);
             }
             None => {
                 if let Some(stroke) = outline {
@@ -219,7 +299,15 @@ impl Canvas<'_> {
                 }
             }
         }
-        self.text(ui, shape, rect);
+        self.text(
+            ui,
+            shape,
+            Placement {
+                origin: rect.left_top(),
+                x: vec2(rect.width(), 0.0),
+                y: vec2(0.0, rect.height()),
+            },
+        );
     }
 
     /// A custom shape's outline, mapped from its own coordinate space onto the
@@ -233,17 +321,15 @@ impl Canvas<'_> {
         &mut self,
         ui: &Ui,
         geometry: &Geometry,
-        rect: Rect,
+        placement: Placement,
         properties: &Properties,
         outline: Option<Stroke>,
         filled: Filled,
     ) {
         let view = geometry.view;
+        let rect = placement.bounds();
         let place = |(x, y): (f32, f32)| {
-            pos2(
-                rect.left() + (x - view.x) / view.width * rect.width(),
-                rect.top() + (y - view.y) / view.height * rect.height(),
-            )
+            placement.across((x - view.x) / view.width, (y - view.y) / view.height)
         };
         for stroke in &geometry.paths {
             let points: Vec<Pos2> = stroke.points.iter().copied().map(place).collect();
@@ -273,11 +359,21 @@ impl Canvas<'_> {
     }
 
     /// The paragraphs a shape holds, or the picture it frames.
-    fn text(&mut self, ui: &mut Ui, shape: &Element, rect: Rect) {
+    ///
+    /// **A turned shape keeps its picture and loses its label.** A picture is
+    /// four corners and a texture and turns exactly; a paragraph is a line
+    /// breaker, a font and a selection, and drawing one upright inside a box
+    /// that is not upright says something the document does not. Across the
+    /// templates that is twenty-two text boxes, and they stay undrawn.
+    fn text(&mut self, ui: &mut Ui, shape: &Element, place: Placement) {
         // A frame around a picture is handed over whole, because the renderer
         // finds a frame among a parent's children and here the shape is the
         // frame itself.
         let picture = shape.child(&Ns::Draw, "image").is_some();
+        if picture && !place.is_upright() {
+            self.turned_picture(ui, shape, place);
+            return;
+        }
         let content = if picture {
             shape.clone()
         } else if let Some(box_) = shape.child(&Ns::Draw, "text-box") {
@@ -292,6 +388,10 @@ impl Canvas<'_> {
         } else {
             return;
         };
+        if !place.is_upright() {
+            return;
+        }
+        let rect = place.bounds();
 
         let anchor = if picture {
             Anchor::Top
@@ -313,6 +413,44 @@ impl Canvas<'_> {
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
         self.lay_out(ui, &content, placed, picture, false);
+    }
+
+    /// A picture in a frame that is turned, drawn as its own four corners.
+    ///
+    /// The window's own image widget draws into an upright rectangle, so this
+    /// builds the quadrilateral instead: the same texture, its corners at the
+    /// frame's. The alternatives are tried in the order the producer wrote them,
+    /// as they are for an upright frame.
+    fn turned_picture(&mut self, ui: &Ui, shape: &Element, place: Placement) {
+        let document = self.document;
+        let Some(texture) = shape
+            .elements()
+            .filter(|child| child.is(&Ns::Draw, "image"))
+            .find_map(|image| {
+                let href = image.attr(&Ns::Xlink, "href")?;
+                self.pictures
+                    .get(ui.ctx(), document, href)
+                    .map(eframe::egui::TextureHandle::id)
+            })
+        else {
+            return;
+        };
+        let mut mesh = Mesh::with_texture(texture);
+        for (corner, (u, v)) in
+            place
+                .corners()
+                .into_iter()
+                .zip([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+        {
+            mesh.vertices.push(Vertex {
+                pos: corner,
+                uv: pos2(u, v),
+                color: Color32::WHITE,
+            });
+        }
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        self.painter(ui).add(Shape::mesh(mesh));
     }
 
     /// Draw a shape's content into a rectangle, or measure how tall it is
@@ -368,19 +506,49 @@ impl Canvas<'_> {
             .with_clip_rect(self.page.intersect(ui.clip_rect()))
     }
 
-    /// Where a shape sits on screen, from its position and size on the page.
-    fn rect(&self, shape: &Element) -> Option<Rect> {
+    /// Where a shape's own box sits on screen.
+    ///
+    /// Ordinarily its corner and its size, which is a rectangle square to the
+    /// page. A shape that is turned or leaned states `draw:transform` instead
+    /// and routinely gives no corner at all, and a reader that insists on one
+    /// drops the shape: it is the templates' own decoration that is placed this
+    /// way. `odox_core::Transform` says how the list is read.
+    fn placement(&self, shape: &Element) -> Option<Placement> {
         let at = |local: &str| shape.attr(&Ns::Svg, local).and_then(Length::parse);
-        let (x, y) = (at("x")?, at("y")?);
-        let width = at("width").map_or(0.0, |w| w.points() * self.scale);
-        let height = at("height").map_or(0.0, |h| h.points() * self.scale);
-        Some(Rect::from_min_size(
+        let width = at("width").map_or(0.0, Length::points);
+        let height = at("height").map_or(0.0, Length::points);
+        let on_page = |x: f32, y: f32| {
             pos2(
-                self.page.left() + x.points() * self.scale,
-                self.page.top() + y.points() * self.scale,
-            ),
-            vec2(width, height),
-        ))
+                self.page.left() + x * self.scale,
+                self.page.top() + y * self.scale,
+            )
+        };
+
+        if let Some(transform) = shape
+            .attr(&Ns::Draw, "transform")
+            .and_then(Transform::parse)
+        {
+            // The box begins at the shape's corner where it has one, and at the
+            // page's origin where the transform is the whole of its placement.
+            let left = at("x").map_or(0.0, Length::points);
+            let top = at("y").map_or(0.0, Length::points);
+            let corner = |u: f32, v: f32| {
+                let (x, y) = transform.apply((width.mul_add(u, left), height.mul_add(v, top)));
+                on_page(x, y)
+            };
+            let origin = corner(0.0, 0.0);
+            return Some(Placement {
+                origin,
+                x: corner(1.0, 0.0) - origin,
+                y: corner(0.0, 1.0) - origin,
+            });
+        }
+
+        Some(Placement {
+            origin: on_page(at("x")?.points(), at("y")?.points()),
+            x: vec2(width * self.scale, 0.0),
+            y: vec2(0.0, height * self.scale),
+        })
     }
 
     fn point(&self, shape: &Element, x: &str, y: &str) -> Option<Pos2> {
@@ -497,7 +665,7 @@ impl Canvas<'_> {
 /// own and has nothing to do with the page's: a polygon 13.5cm wide states
 /// its points out of 13501. Without the mapping every polygon collapses into
 /// the top left corner.
-fn points(shape: &Element, rect: Rect) -> Vec<Pos2> {
+fn points(shape: &Element, placement: Placement) -> Vec<Pos2> {
     let view: Vec<f32> = shape
         .attr(&Ns::Svg, "viewBox")
         .unwrap_or_default()
@@ -518,10 +686,25 @@ fn points(shape: &Element, rect: Rect) -> Vec<Pos2> {
             let (x, y) = pair.split_once(',')?;
             let x: f32 = x.trim().parse().ok()?;
             let y: f32 = y.trim().parse().ok()?;
-            Some(pos2(
-                rect.left() + (x - left) / width * rect.width(),
-                rect.top() + (y - top) / height * rect.height(),
-            ))
+            Some(placement.across((x - left) / width, (y - top) / height))
+        })
+        .collect()
+}
+
+/// An ellipse inscribed in a shape's box, as points.
+///
+/// For the shape whose box is turned: the window draws an ellipse from a centre
+/// and two radii, which can only be square to the screen.
+fn ellipse(placement: Placement) -> Vec<Pos2> {
+    const SIDES: usize = 64;
+    (0..SIDES)
+        .map(|i| {
+            #[allow(clippy::cast_precision_loss)]
+            let angle = std::f32::consts::TAU * i as f32 / SIDES as f32;
+            placement.across(
+                0.5f32.mul_add(angle.cos(), 0.5),
+                0.5f32.mul_add(angle.sin(), 0.5),
+            )
         })
         .collect()
 }
