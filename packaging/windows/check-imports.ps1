@@ -146,8 +146,11 @@ function Read-Imports([string] $path) {
 # `[build] target-dir` moves the target directory and no environment variable
 # then says so, which is why this asks cargo rather than assuming.
 function Release-Directory {
-    $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $target = Join-Path $here '..\..\target'
+    # `$PSScriptRoot` and not `$MyInvocation.MyCommand.Path`: inside a function
+    # the latter describes the function, which has no Path, and under
+    # `Set-StrictMode` reading it is an error rather than an empty string. The
+    # fleet's copies get away with it by sitting at script scope.
+    $target = Join-Path $PSScriptRoot '..\..\target'
     $meta = cargo metadata --format-version 1 --no-deps 2>$null | ConvertFrom-Json
     if ($meta) { $target = $meta.target_directory }
     return (Join-Path $target 'release')

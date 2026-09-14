@@ -93,7 +93,7 @@ $ErrorActionPreference = 'Stop'
 $KNOWN_FINDINGS = @{
 }
 
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$here = $PSScriptRoot
 $root = Split-Path -Parent (Split-Path -Parent $here)
 if (-not $OutDir) { $OutDir = Join-Path $root 'dist' }
 

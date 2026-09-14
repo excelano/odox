@@ -134,6 +134,44 @@ jobs:
                  "xods:Odox Grid:corpus/libreoffice/calc.ods" \
                  "xodp:Odox Deck:corpus/libreoffice/growing-liberty.odp"
 
+          # A window that never appeared has two very different causes and the
+          # probe cannot tell them apart: the application died before it drew,
+          # or it drew nothing because the Apple Event never reached it. This
+          # separates them. Running the bundle's own executable with the
+          # document as an ordinary argument takes Launch Services out of the
+          # picture entirely, so a window here and none through `open` is the
+          # Apple Event, while no window either way is the application.
+          diagnose() {
+            app=$1 ; product=$2 ; document=$3
+            echo "--- diagnosing ${app}"
+
+            reports=$HOME/Library/Logs/DiagnosticReports
+            found=$(ls -t "$reports" 2>/dev/null | grep -i "^${app}" | head -2 || true)
+            if [ -n "$found" ]; then
+              for report in $found; do
+                echo "--- crash report ${report}"
+                head -40 "${reports}/${report}"
+              done
+            else
+              echo "--- no crash report, so it did not die the way a crash is recorded"
+            fi
+
+            echo "--- launching the executable directly, with the document as argv"
+            "dist/${product}.app/Contents/MacOS/${app}" "$PWD/${document}" \
+              >"${RUNNER_TEMP}/${app}-direct.log" 2>&1 &
+            direct=$!
+            sleep 8
+            if kill -0 "$direct" 2>/dev/null; then
+              "${RUNNER_TEMP}/window-probe" "$product" "$app" || true
+              kill "$direct" 2>/dev/null || true
+              echo "--- it stayed up when launched directly"
+            else
+              wait "$direct" 2>/dev/null
+              echo "--- it exited on its own; output follows"
+            fi
+            sed -n '1,40p' "${RUNNER_TEMP}/${app}-direct.log"
+          }
+
           failed=0
           for entry in "$@"; do
             app=${entry%%:*}
@@ -165,10 +203,10 @@ jobs:
                 # either: a check that can quietly not check is the thing this
                 # fleet keeps getting caught by.
                 echo "::error::The window server listed nothing, so this run answered nothing about ${app}."
-                failed=1 ; continue ;;
+                failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
               *)
                 echo "::error::No window appeared for a document opened through Launch Services on arm64 (${app}). This is odox-ui's opened_document, the only unsafe in the workspace."
-                failed=1 ; continue ;;
+                failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
             esac
 
             # A title that is exactly the application name means the event
