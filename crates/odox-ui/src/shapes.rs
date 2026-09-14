@@ -61,10 +61,11 @@ impl Canvas<'_> {
     /// One shape, at the place on the page the document puts it.
     ///
     /// Drawn: `draw:rect`, `draw:ellipse`, `draw:circle`, `draw:polygon`,
-    /// `draw:polyline`, `draw:line`, `draw:custom-shape` — whose outline is
-    /// worked out by [`Geometry`] — a `draw:frame` holding a picture or a text
-    /// box, and `draw:g`, which is a group and is descended into. Left undrawn:
-    /// `draw:path`, `draw:connector` and `draw:measure`.
+    /// `draw:polyline`, `draw:line`, `draw:custom-shape` and `draw:path` — the
+    /// last two have their outlines worked out by [`Geometry`], from ODF's own
+    /// command language and from SVG's respectively — a `draw:frame` holding a
+    /// picture or a text box, and `draw:g`, which is a group and is descended
+    /// into. Left undrawn: `draw:connector` and `draw:measure`.
     pub fn shape(&mut self, ui: &mut Ui, shape: &Element) {
         if shape.is(&Ns::Draw, "g") {
             for child in shape.elements() {
@@ -121,6 +122,16 @@ impl Canvas<'_> {
                 self.painter(ui)
                     .add(Shape::ellipse_stroke(centre, radius, stroke));
             }
+            return;
+        }
+
+        if shape.is(&Ns::Draw, "path") {
+            // A different notation for the same thing: SVG path data rather than
+            // ODF's own commands, and the same polylines out of it.
+            if let Some(geometry) = Geometry::read_path(shape) {
+                self.geometry(ui, &geometry, rect, &properties, outline);
+            }
+            self.text(ui, shape, rect);
             return;
         }
 

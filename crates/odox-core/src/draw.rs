@@ -13,6 +13,10 @@
 //! segments a curve needs depends on the size of the coordinate space and not on
 //! the size of the window, and this is where the space is known.
 //!
+//! A `draw:path` states its outline the other way, in SVG's path notation in
+//! `svg:d`, and comes out of here as the same [`Geometry`]. The two languages
+//! have the same shape — move, line, curve, close — and share the pen below.
+//!
 //! # What is implemented
 //!
 //! The whole command language except `Q`'s smooth variants, and the formula
@@ -95,6 +99,27 @@ const CURVE_SEGMENTS: usize = 16;
 const DEGREES_PER_SEGMENT: f32 = 6.0;
 
 impl Geometry {
+    /// Read a `draw:path` element, whose outline is SVG path data in `svg:d`.
+    ///
+    /// `None` where it states no path or no coordinate space.
+    ///
+    /// **Arcs are drawn as the straight line to where they end.** `A` and `a`
+    /// occur in none of the 352 paths across the presentation templates
+    /// `LibreOffice` ships, and turning an endpoint-parameterised elliptical arc
+    /// into a centre and a sweep is a page of trigonometry to serve nothing that
+    /// exists. A line keeps the outline closed and roughly where it belongs,
+    /// which is the failure worth having.
+    pub fn read_path(path: &Element) -> Option<Self> {
+        let view = ViewBox::parse(path.attr(&Ns::Svg, "viewBox")?)?;
+        let data = path.attr(&Ns::Svg, "d")?;
+        let mut pen = Pen::new();
+        pen.svg(data);
+        Some(Self {
+            view,
+            paths: pen.finish(),
+        })
+    }
+
     /// Read a `draw:enhanced-geometry` element.
     ///
     /// `None` where it states no path or no coordinate space, which is a shape
@@ -516,6 +541,140 @@ impl Pen {
         }
     }
 
+    /// The four curve commands, which differ only in where their two control
+    /// points come from. Returns where a `smooth` curve after this one
+    /// continues from, or `None` where the data ran out mid-command.
+    fn svg_curve(
+        &mut self,
+        lower: u8,
+        scan: &mut Numbers,
+        offset: impl Fn((f32, f32)) -> (f32, f32),
+        reflected: Option<(f32, f32)>,
+    ) -> Option<(f32, f32)> {
+        let here = self.at();
+        let (first, second, end) = match lower {
+            b'c' => {
+                let (a, b, e) = (scan.point()?, scan.point()?, scan.point()?);
+                (offset(a), offset(b), offset(e))
+            }
+            b's' => {
+                let (b, e) = (scan.point()?, scan.point()?);
+                // With no curve before it the first control sits on the current
+                // point, which is what SVG says.
+                (reflected.unwrap_or(here), offset(b), offset(e))
+            }
+            b'q' => {
+                let (c, e) = (scan.point()?, scan.point()?);
+                let (c, e) = (offset(c), offset(e));
+                (quadratic(here, c), quadratic(e, c), e)
+            }
+            // A smooth quadratic, whose one control point is the last one
+            // reflected.
+            _ => {
+                let e = offset(scan.point()?);
+                let c = reflected.unwrap_or(here);
+                (quadratic(here, c), quadratic(e, c), e)
+            }
+        };
+        self.cubic(first, second, end);
+        Some((2.0 * end.0 - second.0, 2.0 * end.1 - second.1))
+    }
+
+    /// Walk SVG path data.
+    ///
+    /// A command letter is followed by as many argument groups as are written,
+    /// and a lower-case letter means its numbers are offsets from where the pen
+    /// is. After a `moveto` the implied repeat is a `lineto`, which is SVG's one
+    /// irregularity and the reason `implied` exists.
+    fn svg(&mut self, data: &str) {
+        let mut scan = Numbers {
+            text: data.as_bytes(),
+            at: 0,
+        };
+        let mut command = b' ';
+        // Where the previous curve's second control point was, reflected, which
+        // is what a smooth curve continues from.
+        let mut reflected: Option<(f32, f32)> = None;
+        let mut start = (0.0, 0.0);
+
+        loop {
+            if let Some(letter) = scan.command() {
+                command = letter;
+            } else if scan.peek_number().is_none() {
+                return;
+            }
+            let lower = command.to_ascii_lowercase();
+            let relative = command.is_ascii_lowercase();
+            let here = self.at();
+            let offset = |point: (f32, f32)| {
+                if relative {
+                    (here.0 + point.0, here.1 + point.1)
+                } else {
+                    point
+                }
+            };
+
+            match lower {
+                b'm' => {
+                    let Some(to) = scan.point() else { return };
+                    let to = offset(to);
+                    self.brk();
+                    self.points.push(to);
+                    start = to;
+                    reflected = None;
+                    // The pairs after a moveto are lines, not more moves.
+                    command = if relative { b'l' } else { b'L' };
+                }
+                b'l' => {
+                    let Some(to) = scan.point() else { return };
+                    self.points.push(offset(to));
+                    reflected = None;
+                }
+                b'h' => {
+                    let Some(x) = scan.number() else { return };
+                    let x = if relative { here.0 + x } else { x };
+                    self.points.push((x, here.1));
+                    reflected = None;
+                }
+                b'v' => {
+                    let Some(y) = scan.number() else { return };
+                    let y = if relative { here.1 + y } else { y };
+                    self.points.push((here.0, y));
+                    reflected = None;
+                }
+                b'c' | b's' | b'q' | b't' => {
+                    let Some(next) = self.svg_curve(lower, &mut scan, offset, reflected) else {
+                        return;
+                    };
+                    reflected = Some(next);
+                }
+                b'a' => {
+                    // The flags and radii are read and dropped; see `read_path`.
+                    for _ in 0..3 {
+                        if scan.number().is_none() {
+                            return;
+                        }
+                    }
+                    let (Some(_), Some(_)) = (scan.number(), scan.number()) else {
+                        return;
+                    };
+                    let Some(to) = scan.point() else { return };
+                    self.points.push(offset(to));
+                    reflected = None;
+                }
+                b'z' => {
+                    self.closed = true;
+                    self.brk();
+                    // A path may carry on after closing, from where the last
+                    // sub-path began.
+                    self.points.push(start);
+                    reflected = None;
+                }
+                _ => return,
+            }
+        }
+    }
+
     fn cubic(&mut self, a: (f32, f32), b: (f32, f32), end: (f32, f32)) {
         let from = self.at();
         for step in 1..=CURVE_SEGMENTS {
@@ -642,6 +801,89 @@ impl Pen {
                 centre.1 + radii.1 * angle.sin(),
             ));
         }
+    }
+}
+
+/// A quadratic curve's single control point, as one of a cubic's two: two
+/// thirds of the way from the end towards it.
+fn quadratic(end: (f32, f32), control: (f32, f32)) -> (f32, f32) {
+    (
+        end.0 + 2.0 / 3.0 * (control.0 - end.0),
+        end.1 + 2.0 / 3.0 * (control.1 - end.1),
+    )
+}
+
+/// SVG path data, read one number or command at a time.
+///
+/// SVG separates numbers with whitespace, with a comma, or with nothing at all
+/// where the next one begins unambiguously: `0-571` is two numbers and so is
+/// `.5.5`. That is why this is a scanner and not a `split_whitespace`.
+struct Numbers<'a> {
+    text: &'a [u8],
+    at: usize,
+}
+
+impl Numbers<'_> {
+    fn skip(&mut self) {
+        while self
+            .text
+            .get(self.at)
+            .is_some_and(|b| b.is_ascii_whitespace() || *b == b',')
+        {
+            self.at += 1;
+        }
+    }
+
+    /// The next command letter, if one is there.
+    fn command(&mut self) -> Option<u8> {
+        self.skip();
+        let byte = *self.text.get(self.at)?;
+        if byte.is_ascii_alphabetic() && !matches!(byte, b'e' | b'E') {
+            self.at += 1;
+            return Some(byte);
+        }
+        None
+    }
+
+    fn peek_number(&mut self) -> Option<u8> {
+        self.skip();
+        self.text
+            .get(self.at)
+            .copied()
+            .filter(|b| b.is_ascii_digit() || matches!(b, b'-' | b'+' | b'.'))
+    }
+
+    fn number(&mut self) -> Option<f32> {
+        self.peek_number()?;
+        let start = self.at;
+        if matches!(self.text.get(self.at), Some(b'-' | b'+')) {
+            self.at += 1;
+        }
+        let mut seen_point = false;
+        while let Some(byte) = self.text.get(self.at) {
+            match byte {
+                b'0'..=b'9' => self.at += 1,
+                // A second point begins the next number: `.5.5` is two.
+                b'.' if !seen_point => {
+                    seen_point = true;
+                    self.at += 1;
+                }
+                b'e' | b'E' => {
+                    self.at += 1;
+                    if matches!(self.text.get(self.at), Some(b'-' | b'+')) {
+                        self.at += 1;
+                    }
+                }
+                _ => break,
+            }
+        }
+        String::from_utf8_lossy(&self.text[start..self.at])
+            .parse()
+            .ok()
+    }
+
+    fn point(&mut self) -> Option<(f32, f32)> {
+        Some((self.number()?, self.number()?))
     }
 }
 

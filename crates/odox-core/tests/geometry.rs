@@ -221,3 +221,140 @@ fn descendants(element: &odox_core::Element) -> Vec<&odox_core::Element> {
     }
     found
 }
+
+/// SVG path data, which is how a `draw:path` states its outline.
+mod svg {
+    use odox_core::draw::Geometry;
+    use odox_core::xml;
+
+    fn path(attrs: &str) -> Geometry {
+        let document = format!(
+            r#"<draw:path
+                 xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+                 xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+                 {attrs}/>"#
+        );
+        let element = xml::parse(document.as_bytes(), "test").expect("well-formed XML");
+        Geometry::read_path(&element).expect("a readable path")
+    }
+
+    #[test]
+    fn a_sign_separates_two_numbers_with_no_space_between_them() {
+        // `0-571` is two numbers, and every path in the corpus is written this
+        // way. Split on whitespace and the shape collapses.
+        let shape = path(r#"svg:viewBox="0 0 100 100" svg:d="M0 0h10v10-5-5z""#);
+        assert_eq!(
+            shape.paths[0].points,
+            vec![
+                (0.0, 0.0),
+                (10.0, 0.0),
+                (10.0, 10.0),
+                (10.0, 5.0),
+                (10.0, 0.0)
+            ]
+        );
+        assert!(shape.paths[0].closed);
+    }
+
+    #[test]
+    fn lower_case_is_relative_and_upper_case_is_not() {
+        let relative = path(r#"svg:viewBox="0 0 100 100" svg:d="M10 10 l5 5 l5 5""#);
+        assert_eq!(
+            relative.paths[0].points,
+            vec![(10.0, 10.0), (15.0, 15.0), (20.0, 20.0)]
+        );
+        let absolute = path(r#"svg:viewBox="0 0 100 100" svg:d="M10 10 L5 5 L5 5""#);
+        assert_eq!(
+            absolute.paths[0].points,
+            vec![(10.0, 10.0), (5.0, 5.0), (5.0, 5.0)]
+        );
+    }
+
+    #[test]
+    fn the_pairs_after_a_moveto_are_lines() {
+        // SVG's one irregularity: `M` repeated is `L`, not another move.
+        let shape = path(r#"svg:viewBox="0 0 100 100" svg:d="M0 0 10 0 10 10z""#);
+        assert_eq!(shape.paths.len(), 1);
+        assert_eq!(
+            shape.paths[0].points,
+            vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)]
+        );
+    }
+
+    #[test]
+    fn a_relative_cubic_is_flattened_and_ends_where_it_should() {
+        let shape = path(r#"svg:viewBox="0 0 100 100" svg:d="M0 0c10 0 20 10 20 20""#);
+        let points = &shape.paths[0].points;
+        assert_eq!(points[0], (0.0, 0.0));
+        let (x, y) = *points.last().expect("an end");
+        assert!(
+            (x - 20.0).abs() < 0.01 && (y - 20.0).abs() < 0.01,
+            "({x}, {y})"
+        );
+        assert!(points.len() > 8, "a curve is more than its ends");
+    }
+
+    #[test]
+    fn a_smooth_curve_continues_the_one_before_it() {
+        // `s` reflects the previous second control, so the join has no corner:
+        // the two segments either side of it run in the same direction.
+        let shape = path(r#"svg:viewBox="0 0 100 100" svg:d="M0 0c0 10 10 10 10 10s10 0 10-10""#);
+        let points = &shape.paths[0].points;
+        let join = points.len() / 2;
+        let before = (
+            points[join].0 - points[join - 1].0,
+            points[join].1 - points[join - 1].1,
+        );
+        let after = (
+            points[join + 1].0 - points[join].0,
+            points[join + 1].1 - points[join].1,
+        );
+        let angle = |v: (f32, f32)| v.1.atan2(v.0);
+        assert!(
+            (angle(before) - angle(after)).abs() < 0.3,
+            "the join turns a corner: {before:?} then {after:?}"
+        );
+    }
+
+    #[test]
+    fn every_path_in_the_corpus_yields_an_outline() {
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice");
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let mut found = 0;
+        for entry in entries.filter_map(Result::ok) {
+            let file = entry.path();
+            if file.extension().and_then(|e| e.to_str()) != Some("odp") {
+                continue;
+            }
+            let bytes = std::fs::read(&file).expect("the fixture");
+            let package = odox_core::Package::read(&bytes).expect("a readable package");
+            for part in ["content.xml", "styles.xml"] {
+                let Ok(Some(tree)) = package.optional_xml(part) else {
+                    continue;
+                };
+                for element in super::descendants(&tree) {
+                    if !element.is(&odox_core::Ns::Draw, "path") {
+                        continue;
+                    }
+                    found += 1;
+                    let geometry = Geometry::read_path(element)
+                        .unwrap_or_else(|| panic!("{} in {part}", file.display()));
+                    assert!(
+                        !geometry.paths.is_empty(),
+                        "{} drew nothing",
+                        file.display()
+                    );
+                    for stroke in &geometry.paths {
+                        for (x, y) in &stroke.points {
+                            assert!(x.is_finite() && y.is_finite(), "({x}, {y})");
+                        }
+                    }
+                }
+            }
+        }
+        assert!(found > 0, "the corpus has no draw:path to read");
+    }
+}

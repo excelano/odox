@@ -4,6 +4,15 @@ All notable changes to odox are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `draw:path`, which states a shape's outline as SVG path data rather than in
+  ODF's own commands. It flattens through the same pen the custom shapes use,
+  so a path fills, strokes and holds text the way every other shape does. An
+  elliptical arc inside one is drawn as the straight line to where it ends.
+
 ## [0.2.1] — 2026-09-14
 
 ### Changed

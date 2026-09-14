@@ -203,8 +203,10 @@ does not read.
 **Of ODF's shapes, what is drawn is what a fixture proves.** Rectangles,
 ellipses, polygons, polylines, lines and custom shapes are drawn from their own
 geometry, with a solid fill, a linear or axial gradient, or a stretched picture,
-and an outline. `draw:path`, connectors and measures are left undrawn rather
-than approximated into something the document does not say. A radial,
+and an outline. A `draw:path` states its outline as SVG path data rather than in
+ODF's own commands and flattens through the same pen, save for an elliptical arc,
+which is drawn as the straight line to where it ends. Connectors and measures are
+left undrawn rather than approximated into something the document does not say. A radial,
 ellipsoidal, square or rectangular gradient is filled with the flat average of
 its two colours, and a tiled picture with nothing: both are visibly
 approximations rather than wrong directions, and no fixture uses either.
