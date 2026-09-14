@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-09-11 16:27-0500\n"
+"POT-Creation-Date: 2026-09-14 11:29-0500\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -17,14 +17,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: crates/odox-ui/src/i18n.rs:87 crates/odox-ui/src/i18n.rs:91
-#: crates/odox-ui/src/shell.rs:166
+#: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
+#: crates/odox-ui/src/shell.rs:166 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr "Datei"
 
-#: crates/odox-ui/src/i18n.rs:94 crates/odox-ui/src/i18n.rs:95
-#: crates/xodp/src/view.rs:36 crates/xods/src/view.rs:32
-#: crates/xodt/src/view.rs:27
+#: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:35
+#: crates/xods/src/view.rs:32 crates/xodt/src/view.rs:27
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
@@ -32,11 +32,11 @@ msgstr "{file} konnte nicht geöffnet werden: {reason}"
 msgid "{file} could not be read: {reason}"
 msgstr "{file} konnte nicht gelesen werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:167
+#: crates/odox-ui/src/shell.rs:167 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr "Öffnen …"
 
-#: crates/odox-ui/src/shell.rs:173
+#: crates/odox-ui/src/shell.rs:173 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr "Neu einlesen"
 
@@ -84,33 +84,33 @@ msgstr "Ein Dokument öffnen …"
 msgid "or drop one on this window"
 msgstr "oder eines auf dieses Fenster ziehen"
 
+#: crates/odox-ui/tests/german.rs:28 crates/xods/src/main.rs:22
+msgid "OpenDocument Spreadsheet"
+msgstr "OpenDocument-Tabellendokument"
+
 #: crates/xodp/src/main.rs:21
 msgid "OpenDocument Presentation"
 msgstr "OpenDocument-Präsentation"
 
-#: crates/xodp/src/view.rs:78
+#: crates/xodp/src/view.rs:77
 msgid "This presentation has no slides."
 msgstr "Diese Präsentation hat keine Folien."
 
-#: crates/xodp/src/view.rs:104
+#: crates/xodp/src/view.rs:103
 msgid "Notes"
 msgstr "Notizen"
 
-#: crates/xodp/src/view.rs:111
+#: crates/xodp/src/view.rs:110
 msgid "This slide has no notes."
 msgstr "Diese Folie hat keine Notizen."
 
-#: crates/xodp/src/view.rs:153
+#: crates/xodp/src/view.rs:177
 msgid "Slides"
 msgstr "Folien"
 
-#: crates/xodp/src/view.rs:173
+#: crates/xodp/src/view.rs:197
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
-
-#: crates/xods/src/main.rs:22
-msgid "OpenDocument Spreadsheet"
-msgstr "OpenDocument-Tabellendokument"
 
 #: crates/xods/src/view.rs:98
 msgid "Copy the sheet as tab-separated text"

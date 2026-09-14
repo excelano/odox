@@ -296,10 +296,11 @@ reason this speaks `.po`.
 The release profile trades compile time for size: fat LTO across one codegen unit
 so that egui's unused arms are dropped between crates, and no symbol table.
 Unwinding stays, because a panic in a document reader should reach a dialog rather
-than kill the window with no message. A stripped binary is about 12 MB, and the
+than kill the window with no message. A stripped viewer is about 12 MB, and the
 overwhelming majority of that is egui and its dependencies rather than anything
 here — three viewers of a zipped XML format are a small program inside a graphics
-toolkit.
+toolkit. The launcher, which reads the same packages through the same library and
+links no toolkit at all, is 564 KB, which is the size of the argument.
 
 Each application carries a `build.rs` that embeds the Windows application manifest
 and does nothing else ever. The manifest declares DPI awareness before any of the

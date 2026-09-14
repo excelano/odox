@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-09-14 06:53-0500\n"
+"POT-Creation-Date: 2026-09-14 11:32-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,14 +17,14 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: crates/odox-ui/src/i18n.rs:87 crates/odox-ui/src/i18n.rs:91
-#: crates/odox-ui/src/shell.rs:166
+#: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
+#: crates/odox-ui/src/shell.rs:166 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr ""
 
-#: crates/odox-ui/src/i18n.rs:94 crates/odox-ui/src/i18n.rs:95
-#: crates/xodp/src/view.rs:36 crates/xods/src/view.rs:32
-#: crates/xodt/src/view.rs:27
+#: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:35
+#: crates/xods/src/view.rs:32 crates/xodt/src/view.rs:27
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
@@ -32,11 +32,11 @@ msgstr ""
 msgid "{file} could not be read: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:167
+#: crates/odox-ui/src/shell.rs:167 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:173
+#: crates/odox-ui/src/shell.rs:173 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr ""
 
@@ -84,32 +84,32 @@ msgstr ""
 msgid "or drop one on this window"
 msgstr ""
 
+#: crates/odox-ui/tests/german.rs:28 crates/xods/src/main.rs:22
+msgid "OpenDocument Spreadsheet"
+msgstr ""
+
 #: crates/xodp/src/main.rs:21
 msgid "OpenDocument Presentation"
 msgstr ""
 
-#: crates/xodp/src/view.rs:78
+#: crates/xodp/src/view.rs:77
 msgid "This presentation has no slides."
 msgstr ""
 
-#: crates/xodp/src/view.rs:104
+#: crates/xodp/src/view.rs:103
 msgid "Notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:111
+#: crates/xodp/src/view.rs:110
 msgid "This slide has no notes."
 msgstr ""
 
-#: crates/xodp/src/view.rs:153
+#: crates/xodp/src/view.rs:177
 msgid "Slides"
 msgstr ""
 
-#: crates/xodp/src/view.rs:173
+#: crates/xodp/src/view.rs:197
 msgid "Show the speaker's notes"
-msgstr ""
-
-#: crates/xods/src/main.rs:22
-msgid "OpenDocument Spreadsheet"
 msgstr ""
 
 #: crates/xods/src/view.rs:98

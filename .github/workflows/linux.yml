@@ -52,9 +52,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 env:
-  # The applications, in one place: every step below iterates rather than naming
-  # them, so a fourth is a change to this line.
-  APPS: xodt xods xodp
+  # The binaries, in one place: every step below iterates rather than naming
+  # them, so another is a change to this line. `odox` is the launcher and not an
+  # application — it draws nothing — but it links the same three libraries and
+  # installs the same way, which is what these steps ask about.
+  APPS: xodt xods xodp odox
 
 jobs:
   package:

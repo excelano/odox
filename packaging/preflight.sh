@@ -107,18 +107,25 @@ cargo build --release
 step "nothing compiled C"
 # The check is the artefact and never the manifest: `cargo tree -i cc` is not
 # empty in any eframe tree. DESIGN.md §2.
-for app in xodt xods xodp; do
+#
+# An allowlist and not an exact list. This compared the whole line against the
+# three the viewers link until 2026-09-14, when the launcher — which links two,
+# having no floating-point maths to want libm for — was reported as linking
+# something new. Fewer is not new; what matters is that nothing outside the set
+# appears.
+for app in xodt xods xodp odox; do
     binary="${CARGO_TARGET_DIR:-$root/target}/release/$app"
     needed=$(objdump -p "$binary" | awk '/NEEDED/ {print $2}' | sort | tr '\n' ' ')
     printf '%-6s %s\n' "$app" "$needed"
-    case "$needed" in
-        "libc.so.6 libgcc_s.so.1 libm.so.6 ") ;;
-        *) echo "$app links something new — DESIGN.md §2 and the Debian Depends both want re-measuring" >&2; exit 1 ;;
-    esac
+    strange=$(printf '%s\n' $needed | grep -vE '^(libc\.so\.6|libgcc_s\.so\.1|libm\.so\.6)$' || true)
+    if [ -n "$strange" ]; then
+        echo "$app links $strange — DESIGN.md §2 and the Debian Depends both want re-measuring" >&2
+        exit 1
+    fi
 done
 
 step "size"
-for app in xodt xods xodp; do
+for app in xodt xods xodp odox; do
     binary="${CARGO_TARGET_DIR:-$root/target}/release/$app"
     printf '%-6s %s\n' "$app" "$(du -h "$binary" | cut -f1)"
 done
