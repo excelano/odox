@@ -19,8 +19,9 @@ use eframe::egui::{
     Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, epaint::Vertex, pos2, vec2,
 };
 use odox_core::draw::Geometry;
+
 use odox_core::{
-    Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Properties,
+    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Properties,
 };
 
 use crate::flow::{Flow, Pictures};
@@ -38,6 +39,14 @@ pub struct Canvas<'a> {
     pub scale: f32,
     /// The colours to draw in where the document names none.
     pub palette: Palette,
+}
+
+/// Whether a shape has an area, which is a property of the kind of shape it is
+/// rather than of the style it names.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Filled {
+    Yes,
+    No,
 }
 
 impl Canvas<'_> {
@@ -64,8 +73,9 @@ impl Canvas<'_> {
     /// `draw:polyline`, `draw:line`, `draw:custom-shape` and `draw:path` — the
     /// last two have their outlines worked out by [`Geometry`], from ODF's own
     /// command language and from SVG's respectively — a `draw:frame` holding a
-    /// picture or a text box, and `draw:g`, which is a group and is descended
-    /// into. Left undrawn: `draw:connector` and `draw:measure`.
+    /// picture or a text box, `draw:connector`, whose route between the two
+    /// shapes it joins the producer has already worked out, and `draw:g`, which
+    /// is a group and is descended into. Left undrawn: `draw:measure`.
     pub fn shape(&mut self, ui: &mut Ui, shape: &Element) {
         if shape.is(&Ns::Draw, "g") {
             for child in shape.elements() {
@@ -85,6 +95,11 @@ impl Canvas<'_> {
                 self.painter(ui)
                     .add(Shape::line_segment([from, to], stroke));
             }
+            return;
+        }
+
+        if shape.is(&Ns::Draw, "connector") {
+            self.connector(ui, shape, &properties, outline);
             return;
         }
 
@@ -129,7 +144,7 @@ impl Canvas<'_> {
             // A different notation for the same thing: SVG path data rather than
             // ODF's own commands, and the same polylines out of it.
             if let Some(geometry) = Geometry::read_path(shape) {
-                self.geometry(ui, &geometry, rect, &properties, outline);
+                self.geometry(ui, &geometry, rect, &properties, outline, Filled::Yes);
             }
             self.text(ui, shape, rect);
             return;
@@ -142,7 +157,7 @@ impl Canvas<'_> {
                 .child(&Ns::Draw, "enhanced-geometry")
                 .and_then(Geometry::read)
             {
-                self.geometry(ui, &geometry, rect, &properties, outline);
+                self.geometry(ui, &geometry, rect, &properties, outline, Filled::Yes);
             }
             self.text(ui, shape, rect);
             return;
@@ -172,8 +187,48 @@ impl Canvas<'_> {
         self.text(ui, shape, rect);
     }
 
+    /// A connector, and the label it may carry.
+    ///
+    /// It is positioned by the two ends it joins and has no corner and no size
+    /// of its own. The route between them is the producer's to work out, and it
+    /// writes the result as SVG path data; where it wrote none, the straight
+    /// line between the ends is the whole shape.
+    fn connector(
+        &mut self,
+        ui: &mut Ui,
+        shape: &Element,
+        properties: &Properties,
+        outline: Option<Stroke>,
+    ) {
+        let (Some(from), Some(to)) = (self.point(shape, "x1", "y1"), self.point(shape, "x2", "y2"))
+        else {
+            return;
+        };
+        let rect = Rect::from_two_pos(from, to);
+        match Geometry::read_path(shape) {
+            // The route's coordinates are the page's and the view box beside
+            // them says nothing useful, so the outline states its own space.
+            Some(mut geometry) => {
+                geometry.refit();
+                self.geometry(ui, &geometry, rect, properties, outline, Filled::No);
+            }
+            None => {
+                if let Some(stroke) = outline {
+                    self.painter(ui)
+                        .add(Shape::line_segment([from, to], stroke));
+                }
+            }
+        }
+        self.text(ui, shape, rect);
+    }
+
     /// A custom shape's outline, mapped from its own coordinate space onto the
     /// rectangle it occupies.
+    ///
+    /// `filled` is the shape kind's answer and not the style's. A connector's
+    /// style routinely says `draw:fill="solid"` — `LibreOffice` writes it on
+    /// every one — and a connector has no area for a fill to go in, so the
+    /// route would be painted as a ribbon of whatever colour the style named.
     fn geometry(
         &mut self,
         ui: &Ui,
@@ -181,6 +236,7 @@ impl Canvas<'_> {
         rect: Rect,
         properties: &Properties,
         outline: Option<Stroke>,
+        filled: Filled,
     ) {
         let view = geometry.view;
         let place = |(x, y): (f32, f32)| {
@@ -194,7 +250,7 @@ impl Canvas<'_> {
             if points.len() < 2 {
                 continue;
             }
-            if stroke.fill {
+            if stroke.fill && filled == Filled::Yes {
                 self.fill(
                     ui,
                     rect,
@@ -220,30 +276,75 @@ impl Canvas<'_> {
     fn text(&mut self, ui: &mut Ui, shape: &Element, rect: Rect) {
         // A frame around a picture is handed over whole, because the renderer
         // finds a frame among a parent's children and here the shape is the
-        // frame itself. A text box is the ordinary case and its paragraphs are
-        // its children.
+        // frame itself.
         let picture = shape.child(&Ns::Draw, "image").is_some();
         let content = if picture {
             shape.clone()
+        } else if let Some(box_) = shape.child(&Ns::Draw, "text-box") {
+            box_.clone()
+        } else if shape.child(&Ns::Text, "p").is_some() || shape.child(&Ns::Text, "list").is_some()
+        {
+            // A drawing shape keeps its label as paragraphs of its own. The box
+            // is a frame's way of saying the same thing, and across the
+            // presentation templates it is the shapes that use it, not the
+            // frames.
+            shape.clone()
         } else {
-            match shape.child(&Ns::Draw, "text-box") {
-                Some(box_) => box_.clone(),
-                None => return,
-            }
+            return;
         };
+
+        let anchor = if picture {
+            Anchor::Top
+        } else {
+            self.style_of(shape)
+                .graphic
+                .text_anchor
+                .unwrap_or(Anchor::Top)
+        };
+        let mut top = rect.top();
+        if anchor != Anchor::Top {
+            // Where the label goes depends on how tall it turns out to be, and
+            // how tall it turns out to be depends on the fonts and the wrapping,
+            // so it is laid out twice: once into a ui that draws nothing, to
+            // measure, and then once for real at the offset that measurement
+            // gives.
+            let sized = self.lay_out(ui, &content, rect, picture, true);
+            top += (rect.height() - sized.min(rect.height())) * anchor.share();
+        }
+        let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
+        self.lay_out(ui, &content, placed, picture, false);
+    }
+
+    /// Draw a shape's content into a rectangle, or measure how tall it is
+    /// without drawing it. Returns the height it took.
+    fn lay_out(
+        &mut self,
+        ui: &mut Ui,
+        content: &Element,
+        rect: Rect,
+        picture: bool,
+        measuring: bool,
+    ) -> f32 {
         let (page, scale, palette) = (self.page, self.scale, self.palette);
         let document = self.document;
         let pictures = &mut *self.pictures;
-        ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+        let mut builder = UiBuilder::new().max_rect(rect);
+        if measuring {
+            builder = builder.sizing_pass().invisible();
+        }
+        ui.scope_builder(builder, |ui| {
             ui.set_clip_rect(rect.intersect(page));
             let mut flow = Flow::new(document, pictures, scale);
             flow.palette = palette;
             if picture {
-                flow.frame(ui, &content, rect.width());
+                flow.frame(ui, content, rect.width());
             } else {
-                flow.blocks(ui, &content, rect.width());
+                flow.blocks(ui, content, rect.width());
             }
-        });
+        })
+        .response
+        .rect
+        .height()
     }
 
     /// The style a shape names, resolved.

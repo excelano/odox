@@ -357,4 +357,69 @@ mod svg {
         }
         assert!(found > 0, "the corpus has no draw:path to read");
     }
+
+    #[test]
+    fn a_refit_box_holds_the_outline_it_was_measured_from() {
+        // What a connector writes: page coordinates in the path and an origin
+        // of zero in the view box, which do not describe the same space.
+        let mut shape =
+            path(r#"svg:viewBox="0 0 3947 2706" svg:d="M5280 8808c2959 0 987-2705 3946-2705""#);
+        shape.refit();
+        assert!((shape.view.x - 5280.0).abs() < 1.0, "{:?}", shape.view);
+        assert!((shape.view.y - 6103.0).abs() < 1.0, "{:?}", shape.view);
+        assert!((shape.view.width - 3946.0).abs() < 1.0, "{:?}", shape.view);
+        assert!((shape.view.height - 2705.0).abs() < 1.0, "{:?}", shape.view);
+        for (x, y) in shape.paths.iter().flat_map(|p| &p.points) {
+            assert!(
+                *x >= shape.view.x && *x <= shape.view.x + shape.view.width,
+                "({x}, {y}) is outside {:?}",
+                shape.view
+            );
+        }
+    }
+
+    #[test]
+    fn a_straight_run_still_refits_to_a_box_with_a_size() {
+        let mut shape = path(r#"svg:viewBox="0 0 10 10" svg:d="M0 40H100""#);
+        shape.refit();
+        assert!(shape.view.height > 0.0, "{:?}", shape.view);
+        assert!((shape.view.width - 100.0).abs() < 0.01, "{:?}", shape.view);
+    }
+
+    #[test]
+    fn every_connector_in_the_corpus_yields_a_route() {
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice");
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            return;
+        };
+        let mut found = 0;
+        for entry in entries.filter_map(Result::ok) {
+            let file = entry.path();
+            if file.extension().and_then(|e| e.to_str()) != Some("odp") {
+                continue;
+            }
+            let bytes = std::fs::read(&file).expect("the fixture");
+            let package = odox_core::Package::read(&bytes).expect("a readable package");
+            let Ok(Some(tree)) = package.optional_xml("content.xml") else {
+                continue;
+            };
+            for element in super::descendants(&tree) {
+                if !element.is(&odox_core::Ns::Draw, "connector") {
+                    continue;
+                }
+                found += 1;
+                let mut geometry =
+                    Geometry::read_path(element).expect("a connector states its route");
+                geometry.refit();
+                assert!(geometry.view.width > 0.0 && geometry.view.height > 0.0);
+                assert!(
+                    geometry.paths.iter().any(|p| p.points.len() > 2),
+                    "{} routed a bare line",
+                    file.display()
+                );
+            }
+        }
+        assert!(found > 0, "the corpus has no draw:connector to read");
+    }
 }

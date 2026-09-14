@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::doc::Presentation;
-use odox_core::{Color, Fill, GradientStyle, Ns};
+use odox_core::{Anchor, Color, Family, Fill, GradientStyle, Ns};
 
 fn fixture(name: &str) -> Option<Presentation> {
     let path: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -121,4 +121,70 @@ fn a_template_of_polygons_hands_over_all_of_them() {
         assert!(shape.attr(&Ns::Svg, "viewBox").is_some());
         assert!(shape.attr(&Ns::Draw, "points").is_some());
     }
+}
+
+#[test]
+fn a_numbered_circle_asks_for_its_numeral_in_the_middle() {
+    // The label is paragraphs of the shape's own, with no `draw:text-box`
+    // around them, and the style says where between the edges they go. Without
+    // both the numerals in this template's circles draw at the top or not at
+    // all.
+    let Some(deck) = fixture("growing-liberty.odp") else {
+        return;
+    };
+    let slides = deck.slides();
+    let mut anchored = 0;
+    for slide in &slides {
+        for shape in slide.element.elements() {
+            if !shape.is(&Ns::Draw, "custom-shape") {
+                continue;
+            }
+            if shape.child(&Ns::Text, "p").is_none() {
+                continue;
+            }
+            assert!(
+                shape.child(&Ns::Draw, "text-box").is_none(),
+                "a drawing shape put a box around its label"
+            );
+            let style = shape.attr(&Ns::Draw, "style-name").unwrap_or_default();
+            let properties = deck.document.styles.resolve(&Family::Graphic, style);
+            if properties.graphic.text_anchor == Some(Anchor::Middle) {
+                anchored += 1;
+            }
+        }
+    }
+    assert!(anchored > 0, "no labelled shape asked to be centred");
+}
+
+#[test]
+fn a_decoration_offers_a_second_picture_where_the_first_is_a_format_nothing_reads() {
+    // The template draws its right-hand bar as an SVG with a PNG of the same
+    // drawing after it. A reader that takes the first child and stops draws
+    // nothing there.
+    let Some(deck) = fixture("growing-liberty.odp") else {
+        return;
+    };
+    let slides = deck.slides();
+    let mut alternatives = 0;
+    for slide in &slides {
+        for shape in deck.background_objects(slide) {
+            let images: Vec<_> = shape
+                .elements()
+                .filter(|child| child.is(&Ns::Draw, "image"))
+                .collect();
+            if images.len() < 2 {
+                continue;
+            }
+            alternatives += 1;
+            let types: Vec<_> = images
+                .iter()
+                .filter_map(|image| image.attr(&Ns::Draw, "mime-type"))
+                .collect();
+            assert!(
+                types.contains(&"image/png"),
+                "no readable alternative among {types:?}"
+            );
+        }
+    }
+    assert!(alternatives > 0, "the template offers no alternatives");
 }

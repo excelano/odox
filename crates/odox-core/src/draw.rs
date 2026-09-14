@@ -120,6 +120,36 @@ impl Geometry {
         })
     }
 
+    /// Refit the view box to the outline inside it.
+    ///
+    /// A `draw:connector` is the shape that needs this. Its route is written in
+    /// the page's own coordinates while the `svg:viewBox` beside it states an
+    /// origin of zero, so the two do not agree and the declared box places the
+    /// points nowhere near the shape. The outline's own bounding box does place
+    /// them, and for a shape whose box was already right it says the same thing.
+    ///
+    /// An outline with no width or no height keeps a box one unit across, so
+    /// that a straight horizontal connector divides by something.
+    pub fn refit(&mut self) {
+        let points = || self.paths.iter().flat_map(|path| path.points.iter());
+        let Some(&(x, y)) = points().next() else {
+            return;
+        };
+        let (mut left, mut right, mut top, mut bottom) = (x, x, y, y);
+        for &(x, y) in points() {
+            left = left.min(x);
+            right = right.max(x);
+            top = top.min(y);
+            bottom = bottom.max(y);
+        }
+        self.view = ViewBox {
+            x: left,
+            y: top,
+            width: (right - left).max(f32::EPSILON),
+            height: (bottom - top).max(f32::EPSILON),
+        };
+    }
+
     /// Read a `draw:enhanced-geometry` element.
     ///
     /// `None` where it states no path or no coordinate space, which is a shape

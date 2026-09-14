@@ -43,9 +43,9 @@ pub use error::Error;
 pub use meta::Meta;
 pub use package::{Package, Part};
 pub use style::{
-    Border, Break, CellProperties, Edges, Family, Fill, Gradient, GradientStyle, GraphicProperties,
-    PageLayout, ParagraphProperties, Position, Properties, Style, Styles, TextAlign,
-    TextProperties, VerticalAlign,
+    Anchor, Border, Break, CellProperties, Edges, Family, Fill, Gradient, GradientStyle,
+    GraphicProperties, PageLayout, ParagraphProperties, Position, Properties, Style, Styles,
+    TextAlign, TextProperties, VerticalAlign,
 };
 pub use value::{Color, Length, Measure, Percent};
 pub use xml::{Element, Name, Node, Ns};

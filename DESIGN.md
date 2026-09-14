@@ -201,15 +201,33 @@ from `left`, and honouring the difference needs a writing direction this release
 does not read.
 
 **Of ODF's shapes, what is drawn is what a fixture proves.** Rectangles,
-ellipses, polygons, polylines, lines and custom shapes are drawn from their own
-geometry, with a solid fill, a linear or axial gradient, or a stretched picture,
-and an outline. A `draw:path` states its outline as SVG path data rather than in
-ODF's own commands and flattens through the same pen, save for an elliptical arc,
-which is drawn as the straight line to where it ends. Connectors and measures are
-left undrawn rather than approximated into something the document does not say. A radial,
+ellipses, polygons, polylines, lines, paths, connectors and custom shapes are
+drawn from their own geometry, with a solid fill, a linear or axial gradient, or
+a stretched picture, and an outline. A `draw:path` states its outline as SVG path
+data rather than in ODF's own commands and flattens through the same pen, save
+for an elliptical arc, which is drawn as the straight line to where it ends. A
+connector is positioned by the two ends it joins rather than by a corner and a
+size, and the route between them is the producer's: it writes the result beside
+the endpoints and this reads it, falling back to the straight line where it wrote
+none. A connector has no area whatever its style says about a fill, which the
+templates rely on: LibreOffice writes `draw:fill="solid"` on every one of them.
+A `draw:measure` is left undrawn. A radial,
 ellipsoidal, square or rectangular gradient is filled with the flat average of
 its two colours, and a tiled picture with nothing: both are visibly
 approximations rather than wrong directions, and no fixture uses either.
+
+**A shape's label is paragraphs of its own.** `draw:text-box` is how a frame
+says the same thing, and across the presentation templates it is the shapes that
+carry text and no frame that does. Where the label goes between the shape's top
+and bottom edges is `draw:textarea-vertical-align`, which cannot be ignored: a
+numeral in a circle is the ordinary case, and against the top it reads as a
+mistake. The height it needs is known only after the fonts and the wrapping are,
+so the label is laid out twice, once into a pass that draws nothing.
+
+**A frame may state its picture more than once.** The producer writes each
+rendering it has, best first: the templates draw their decorations as an SVG
+followed by a PNG of the same drawing. The first one that decodes is the answer,
+which is what lets a reader of two formats draw a template that prefers a third.
 
 **A custom shape states a path and not points**, in `draw:enhanced-geometry`, in
 a coordinate space of its own, with numbers that may be references to named

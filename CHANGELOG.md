@@ -6,12 +6,28 @@ All notable changes to odox are recorded here. The format follows
 
 ## [Unreleased]
 
+Four gaps in the slide renderer, found by comparing what it draws against what
+LibreOffice draws from the same file. Of `growing-liberty.odp`'s fourth slide it
+now paints 99.1% the same colour, from 97.3%.
+
 ### Added
 
 - `draw:path`, which states a shape's outline as SVG path data rather than in
   ODF's own commands. It flattens through the same pen the custom shapes use,
   so a path fills, strokes and holds text the way every other shape does. An
   elliptical arc inside one is drawn as the straight line to where it ends.
+- `draw:connector`, whose route between the two shapes it joins the producer
+  has already worked out and written beside the endpoints. Where it wrote none,
+  the straight line between them is the whole shape.
+- A shape's label, which is paragraphs of the shape's own rather than a
+  `draw:text-box`. `draw:textarea-vertical-align` says where between the top and
+  the bottom edge it sits, so the numeral in a circle is in the middle of it.
+
+### Fixed
+
+- A frame whose picture is stated more than once — an SVG and then a PNG of the
+  same drawing, which is how the templates carry their decorations — drew the
+  first child and nothing else. It now takes the first one that decodes.
 
 ## [0.2.1] — 2026-09-14
 

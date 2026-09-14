@@ -690,28 +690,33 @@ impl Flow<'_> {
                 .map(|l| l.points() * zoom)
         };
 
-        if let Some(image) = frame.child(&Ns::Draw, "image") {
-            let href = image
-                .attr(&Ns::Xlink, "href")
-                .unwrap_or_default()
-                .to_owned();
-            let found = self
-                .pictures
-                .get(ui.ctx(), self.document, &href)
-                .map(|texture| (texture.id(), texture.size()));
-            if let Some((id, [pixels_wide, pixels_high])) = found {
-                #[allow(clippy::cast_precision_loss)]
-                let aspect = if pixels_wide == 0 {
-                    1.0
-                } else {
-                    pixels_high as f32 / pixels_wide as f32
-                };
-                let w = declared("width").unwrap_or(width).min(width);
-                let h = declared("height").unwrap_or(w * aspect);
-                let size = vec2(w, h);
-                ui.add(eframe::egui::Image::new((id, size)).fit_to_exact_size(size));
-                return;
-            }
+        // A frame states its picture more than once where the producer had more
+        // than one rendering of it — an SVG and then a PNG of the same drawing,
+        // which is how the presentation templates carry their decorations — in
+        // the producer's order of preference. The first one that decodes is the
+        // answer, so a reader of two formats still draws a template that
+        // prefers a third.
+        let found = frame
+            .elements()
+            .filter(|child| child.is(&Ns::Draw, "image"))
+            .find_map(|image| {
+                let href = image.attr(&Ns::Xlink, "href")?.to_owned();
+                self.pictures
+                    .get(ui.ctx(), self.document, &href)
+                    .map(|texture| (texture.id(), texture.size()))
+            });
+        if let Some((id, [pixels_wide, pixels_high])) = found {
+            #[allow(clippy::cast_precision_loss)]
+            let aspect = if pixels_wide == 0 {
+                1.0
+            } else {
+                pixels_high as f32 / pixels_wide as f32
+            };
+            let w = declared("width").unwrap_or(width).min(width);
+            let h = declared("height").unwrap_or(w * aspect);
+            let size = vec2(w, h);
+            ui.add(eframe::egui::Image::new((id, size)).fit_to_exact_size(size));
+            return;
         }
 
         // A text box draws the blocks inside it; anything else — an embedded

@@ -361,6 +361,36 @@ pub struct GraphicProperties {
     pub stroke_width: Option<Length>,
     /// How opaque the fill is, from zero to one.
     pub opacity: Option<f32>,
+    /// Where the shape's own label sits between its top and bottom edges.
+    pub text_anchor: Option<Anchor>,
+}
+
+/// Where a shape's label sits between its top and bottom edges.
+///
+/// `draw:textarea-vertical-align`. A drawing shape is a box a label is centred
+/// in far more often than it is a box a label starts at the top of, so the two
+/// look nothing alike and the attribute cannot be ignored: the numeral in a
+/// circle is the ordinary case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Anchor {
+    /// Against the top edge.
+    Top,
+    /// Centred between the two.
+    Middle,
+    /// Against the bottom edge.
+    Bottom,
+}
+
+impl Anchor {
+    /// How much of the room left over above and below the label goes above it.
+    #[must_use]
+    pub fn share(self) -> f32 {
+        match self {
+            Self::Top => 0.0,
+            Self::Middle => 0.5,
+            Self::Bottom => 1.0,
+        }
+    }
 }
 
 impl GraphicProperties {
@@ -1020,6 +1050,16 @@ impl GraphicProperties {
         }
         if let Some(opacity) = p.attr(&Ns::Draw, "opacity").and_then(Percent::parse) {
             self.opacity = Some(opacity.fraction().clamp(0.0, 1.0));
+        }
+        // `justify` spreads the lines to fill the height, which needs a line
+        // box this renderer does not build; it reads as the top, which is where
+        // the first line goes either way.
+        if let Some(anchor) = p.attr(&Ns::Draw, "textarea-vertical-align") {
+            self.text_anchor = Some(match anchor {
+                "middle" => Anchor::Middle,
+                "bottom" => Anchor::Bottom,
+                _ => Anchor::Top,
+            });
         }
     }
 }
