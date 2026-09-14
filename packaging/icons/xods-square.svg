@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- The page. Drawn on the 64-unit grid every platform's build script
+       rasterizes from, with width and height on the root element because the
+       macOS script rewrites them to render each size natively. -->
+  <path d="M12 4h28l12 12v44a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z"
+        fill="#f7f7f5" stroke="#2e8b57" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M40 4l12 12H44a4 4 0 0 1-4-4z" fill="#2e8b57"/>
+  <g fill="none" stroke="#2e8b57" stroke-width="3">
+    <rect x="16" y="26" width="32" height="28" rx="2"/>
+    <path d="M16 36h32M16 45h32M27 26v28M37 26v28"/>
+  </g>
+  <rect x="16" y="26" width="32" height="10" fill="#2e8b57"/>
+</svg>

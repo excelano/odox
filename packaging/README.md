@@ -16,3 +16,11 @@ The icons are one SVG each, drawn on a 64-unit grid with `width` and `height` on
 the root element, because the macOS build script rewrites those to render each
 size natively and refuses when it cannot find them. Check a change to one at 16,
 24, 32, 48 and 128 pixels on light and dark grounds before committing it.
+
+`make-icons/` is the one generator: it reads the three SVGs in `linux/icons`
+and writes the `.ico` and package assets Windows wants, the `.icns` macOS wants,
+and the squares every store's listing form asks for. It is a standalone package
+so that nothing it depends on reaches a shipped binary, and it is at this level
+rather than inside a platform's arm because it writes into three of them.
+Rasterized artefacts are committed, because neither of those platforms has a
+step that rasterizes at install time the way a Linux desktop does.
