@@ -1,0 +1,206 @@
+# Build, test and open a document on Apple silicon, because nothing else can.
+#
+# This repository is developed on Linux and has no Mac. `cargo check` against
+# `aarch64-apple-darwin` runs in `preflight.sh` and catches a great deal, but it
+# never links and never runs, so without this file every Apple-specific line
+# here is code nobody has executed. That includes the one piece that cannot be
+# checked any other way: `odox-ui`'s `opened_document`, the only `unsafe` in the
+# workspace, which receives a double-clicked document as an Apple Event because
+# macOS does not pass one as an argument.
+#
+# `open` on a document goes through Launch Services and produces the same event
+# Finder does, so the last step opens one per application and asks the window
+# server whether a window appeared.
+#
+# It asks the window server rather than looking at a screenshot, and the
+# difference is the point: slipcase-desktop records `screencapture` returning
+# the desktop with every window omitted while reporting no error, so a job
+# asserting on pixels would go green against a build that drew nothing. A
+# screenshot is still uploaded, for a person to look at.
+#
+# **The title is the assertion that matters.** An odox window with no document
+# is titled with the bare application name; one with a document is titled
+# "<document> - <application>". A title that is exactly the application name is
+# therefore the signature of the failure this exists to catch, which is the
+# Apple Event launching the application without delivering the document.
+#
+# What it does not reach is a sandbox, which needs a signing identity no runner
+# has; a high-density display; the Dock icon; and Finder's own rendering of the
+# document types. `CHECKLIST.md` holds those and a green run here does not stand
+# in for them.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: Apple silicon
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-silicon-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The bundle declares 11.0 and `build-app.sh` refuses a binary built for a
+  # different floor, so the build has to agree with the plist rather than with
+  # cargo's default.
+  MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+jobs:
+  arm64:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The architecture is the whole reason this workflow exists, and a label
+      # is a promise rather than a fact: `macos-13` is Intel and `macos-14`
+      # onwards is Apple silicon, which is a mapping GitHub can change.
+      - name: The runner is Apple silicon
+        run: |
+          arch=$(uname -m)
+          echo "runner reports ${arch}"
+          [ "$arch" = arm64 ] || {
+            echo "this workflow exists to test arm64 and the runner is ${arch}" >&2
+            exit 1
+          }
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: What is installed
+        run: rustc -V && cargo -V && xcodebuild -version | head -1
+
+      # DESIGN.md 2 forbids compiling C, and `cargo tree -i cc` cannot answer
+      # that because a dependency may declare `cc` for a feature nothing turns
+      # on. This checks the outcome the rule means.
+      - name: Build, and nothing compiled C
+        run: |
+          cargo build --workspace --all-targets
+          target=$(cargo metadata --format-version 1 --no-deps |
+              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+          objects=$(find "${target}" -path '*/build/*' \( -name '*.o' -o -name '*.a' \) -print)
+          [ -z "$objects" ] || { echo "a build script produced object files:"; echo "$objects"; exit 1; }
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      # The bundle is the unit: a bare executable has no bundle identifier, so
+      # Launch Services files it as a nameless foreground process, nothing can
+      # be associated with it, and no Apple Event reaches it. Built from the
+      # debug binaries the steps above already produced, because a release build
+      # here would cost minutes to answer a question that does not depend on
+      # optimisation. `build-app.sh` also runs the private-symbol check on each
+      # slice, which is the check App Store review's Guideline 2.5.1 is.
+      - name: Assemble the three bundles
+        run: |
+          target=$(cargo metadata --format-version 1 --no-deps |
+              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+          for app in xodt xods xodp; do
+            ./packaging/macos/build-app.sh "$app" --binary "${target}/debug/${app}"
+          done
+          for bundle in dist/*.app; do
+            echo "== ${bundle}"
+            plutil -lint "${bundle}/Contents/Info.plist"
+            lipo -info "${bundle}/Contents/MacOS/"*
+            ls "${bundle}/Contents/Resources"
+          done
+
+      # `open` reaches Launch Services and delivers the Apple Event a
+      # double-click delivers, so this is `opened_document` running on arm64,
+      # once per application. Each opens a corpus document written by
+      # LibreOffice rather than by hand.
+      - name: A document opens, and a window appears
+        run: |
+          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          swiftc -O packaging/macos/window-probe.swift -o "${RUNNER_TEMP}/window-probe"
+
+          set -- "xodt:Odox Text:corpus/libreoffice/text.odt" \
+                 "xods:Odox Grid:corpus/libreoffice/calc.ods" \
+                 "xodp:Odox Deck:corpus/libreoffice/growing-liberty.odp"
+
+          failed=0
+          for entry in "$@"; do
+            app=${entry%%:*}
+            rest=${entry#*:}
+            product=${rest%%:*}
+            document=${rest#*:}
+            echo "== ${product} (${app}) with ${document}"
+
+            "$lsregister" -f "$PWD/dist/${product}.app"
+            open -a "$PWD/dist/${product}.app" "$PWD/${document}"
+
+            # Cold launch, a window server, and a first frame. Polled rather
+            # than slept at; 30 seconds is far past anything measured by hand.
+            for _ in $(seq 1 15); do
+              sleep 2
+              "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1 && break
+            done
+
+            set +e
+            report=$("${RUNNER_TEMP}/window-probe" "$product" "$app")
+            verdict=$?
+            set -e
+            echo "$report"
+
+            case "$verdict" in
+              0) echo "  ${app} drew a window for a document opened through Launch Services" ;;
+              2)
+                # Not a failure of the application, and deliberately not a pass
+                # either: a check that can quietly not check is the thing this
+                # fleet keeps getting caught by.
+                echo "::error::The window server listed nothing, so this run answered nothing about ${app}."
+                failed=1 ; continue ;;
+              *)
+                echo "::error::No window appeared for a document opened through Launch Services on arm64 (${app}). This is odox-ui's opened_document, the only unsafe in the workspace."
+                failed=1 ; continue ;;
+            esac
+
+            # A title that is exactly the application name means the event
+            # launched the application and did not hand over the document,
+            # which is the refusal this whole step exists to catch. Any other
+            # title names a document, because the window titles itself from the
+            # document's own title or its filename.
+            case "$report" in
+              *"titled \"${app}\""*)
+                echo "::error::${app} opened a window titled with nothing but its own name, so the Apple Event launched it without delivering the document."
+                failed=1 ;;
+              *'titled "'*)
+                echo "  and the window names a document, so the Apple Event delivered it" ;;
+              *)
+                echo "::warning::The window server withheld ${app}'s title, so whether the document was delivered rather than merely the application launched is not answered here." ;;
+            esac
+
+            osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
+          done
+          exit "$failed"
+
+      # For eyes, not for the verdict. The step above is what passes or fails.
+      - name: Photograph it, for a person
+        if: always()
+        run: |
+          screencapture -x "${RUNNER_TEMP}/screen.png" || true
+          ls -l "${RUNNER_TEMP}/screen.png" || true
+
+      - name: Keep the photograph
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-window
+          path: ${{ runner.temp }}/screen.png
+          if-no-files-found: ignore
