@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The sandbox, and the one grant it needs.
+
+  One file for three bundles, because nothing in it is per-application: each
+  opens the file a person chose and writes nothing at all.
+
+  **The entitlement does nothing until it is inside a signature.** An unsigned
+  bundle is not sandboxed, so every measurement of sandbox behaviour has to be
+  made against a signed one, and an Apple Development certificate is enough for
+  that. This is why `build-app.sh` signs even for a development build, and why
+  nothing about the sandbox can be settled from Linux.
+
+  `files.user-selected.read-write` rather than read-only, although these
+  applications write nothing today. The grant is what an open panel hands over,
+  and read-write is the grant the editing work will need for the save path. A
+  capability asked for and unused is a question at review with no good answer, so
+  this is the one place the rule is bent, and it is bent by one word rather than
+  by a whole key: a reader that asked only to read would have to re-ask, and
+  re-asking changes the sandbox container a person's grants live in.
+
+  Nothing else. No network, no broad filesystem access, no device, and no
+  keychain group even though the provisioning profile grants one.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The bundle's property list, templated the way `debian/control.in` and
+  `windows/AppxManifest.xml.in` are. `build-app.sh` substitutes the placeholders;
+  nothing here is meant to be edited per build.
+
+  ONE TEMPLATE, THREE BUNDLES
+
+  odox ships three applications and therefore three bundles and three store
+  records. One template substituted three ways rather than three files, for the
+  reason the package manifest gives: three files describing three formats in
+  three near-identical ways is three chances for one to drift with nothing to
+  notice.
+
+  The launcher gets no bundle. It hands off by replacing itself with the right
+  viewer, which macOS has no use for, and it ships only on apt.
+
+  TWO KINDS OF DECLARATION, WHICH ARE NOT THE SAME THING
+
+  `UTImportedTypeDeclarations` says what an OpenDocument file *is*.
+  `CFBundleDocumentTypes` says that this application handles it. A bundle
+  carrying only the second claims documents it never described; one carrying only
+  the first describes types nothing opens.
+
+  The declarations are **imported**, and the identifiers are OASIS's rather than
+  invented. This is where the bundle differs from the rest of the fleet's: segler
+  had to mint `com.excelano.*` identifiers because DocLang names no UTI, and
+  slipcase-desktop exports a type it owns. OpenDocument has registered
+  identifiers, `org.oasis-open.opendocument.*`, and macOS has declared them for
+  years, so importing them is both correct and the thing that makes these
+  applications agree with everything else on the machine. An imported declaration
+  yields to the system's own, which is the posture a reader of somebody else's
+  format should have.
+
+  `LSHandlerRank` is **Alternate** rather than Default or Owner. These read a
+  format this project does not own, on a machine where a full office suite may
+  also claim it, and Alternate is the value that says *I can open this* without
+  asking to be preferred. A person can still choose it in Get Info.
+
+  `CFBundleTypeRole` is **Viewer**, because these read and do not write. Editor
+  would be a claim to the platform that is not true, and it is the claim that
+  changes the day the editing branch lands rather than a value to set early.
+
+  WHAT THE UPLOAD REFUSES WITHOUT
+
+  `LSApplicationCategoryType` is required by App Store Connect and refused at
+  upload without one. Productivity is what the `.desktop` entries say with
+  `Office;Viewer;`.
+
+  `ITSAppUsesNonExemptEncryption` false is answered here so that it is not asked
+  once per upload. These applications contain no encryption: a package is
+  inflated and its XML parsed, and an encrypted OpenDocument package is refused
+  rather than decrypted.
+
+  `CFBundleVersion` is the commit count and not the release version, because App
+  Store Connect refuses a second upload carrying a build number it has seen,
+  including a rejected one resubmitted unchanged. `packaging/version.sh` prints
+  both spellings.
+
+  `LSMinimumSystemVersion` is 11.0. Nothing here calls anything newer than the
+  Apple Event manager, and 11.0 is where Apple silicon begins, so an arm64 slice
+  cannot claim lower whatever the floor says. The executable has to agree:
+  `build-app.sh` refuses a slice built for a different floor, and
+  `MACOSX_DEPLOYMENT_TARGET=11.0` is what sets it.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>@EXECUTABLE@</string>
+	<key>CFBundleIdentifier</key>
+	<string>@IDENTIFIER@</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<!--
+	  The product name rather than the binary's, which is the store record's
+	  name and what a person sees in the Dock, the menu bar and Finder. The
+	  binary stays lowercase; DESIGN.md 9 has the naming rule and the fleet
+	  makes the same split.
+	-->
+	<key>CFBundleName</key>
+	<string>@PRODUCT@</string>
+	<key>CFBundleDisplayName</key>
+	<string>@PRODUCT@</string>
+
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@BUILD@</string>
+
+	<key>CFBundleIconFile</key>
+	<string>@ICON@</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>@TYPE_NAME@</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>@UTI@</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>@ICON@</string>
+		</dict>
+	</array>
+
+	<!--
+	  Conformance is the macOS half of what `sub-class-of` does in a shared MIME
+	  database, and it is true of every OpenDocument file: the package is a ZIP,
+	  so an archive tool has something to offer. `public.data` is stated although
+	  `public.zip-archive` already conforms to it, so a reader does not have to
+	  walk Apple's conformance tree to learn that a document is a file of bytes.
+
+	  There is no magic-bytes tag. A ZIP signature identifies every OpenDocument
+	  package alike and every other ZIP besides; what distinguishes one is the
+	  `mimetype` entry inside it, which no tag specification can express and
+	  which `odox_core::Package` reads directly.
+	-->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>@UTI@</string>
+			<key>UTTypeDescription</key>
+			<string>@TYPE_NAME@</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeIconFile</key>
+			<string>@ICON@</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>@EXTENSION@</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>@CONTENT_TYPE@</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>
