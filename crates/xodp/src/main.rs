@@ -5,7 +5,7 @@
 
 // The reasoning for each of these three is in `xodt/src/main.rs`, which is where
 // the suite's first application wrote them down.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 

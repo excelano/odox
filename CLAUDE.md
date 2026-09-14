@@ -12,7 +12,11 @@ Three OpenDocument viewers over one library. `xodt` reads text documents, `xods`
 spreadsheets, `xodp` presentations. They read and do not write.
 
 **The library has no window in it.** `odox-core` takes bytes and returns bytes,
-links no egui, and opens no files. Anything that needs a path, a dialog or a
+links no egui, opens no files, and is the crate that keeps `forbid(unsafe_code)`.
+`odox-ui` is `deny` with one `allow`, on `opened_document`, which is the whole of
+the `unsafe` in the workspace: receiving a document from macOS needs one
+Objective-C method. It is there rather than in the applications because all three
+windows come through one `run`, and the three applications are `forbid`. Anything that needs a path, a dialog or a
 `Ui` belongs in `odox-ui` or in an application. If a format question comes up
 while working on a window, the answer goes into the library.
 

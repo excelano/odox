@@ -3,12 +3,11 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-// `deny` rather than `forbid`, and the difference is the exception this leaves
-// room for: receiving a document from macOS needs one Objective-C method that
-// cannot be written without `unsafe`, and `forbid` cannot be lifted beneath it.
-// `odox-core` and `odox-ui` both keep `forbid`. The same arrangement
-// slipcase-desktop's manifest records.
-#![deny(unsafe_code)]
+// `forbid`, which is stronger than the `deny` the fleet's single-application
+// repositories carry. The exception they leave room for is receiving a document
+// from macOS, and here that lives in `odox_ui::opened_document` rather than in
+// each application, because all three windows come through one `run`.
+#![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 // Windows creates a console for a console-subsystem process, and a file manager
 // launching this one is not attached to a terminal, so double-clicking a document

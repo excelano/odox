@@ -168,6 +168,14 @@ impl<V: Viewer> eframe::App for Shell<V> {
         self.keys(&ctx);
         self.dropped_files(&ctx);
 
+        // A document macOS asked for, which reaches here rather than through
+        // the command line. Taken rather than read, so one event opens one
+        // document instead of reopening it on every frame after.
+        #[cfg(target_os = "macos")]
+        if let Some(path) = crate::opened_document::taken() {
+            self.open(&ctx, &path);
+        }
+
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
 
         egui::Panel::top("menu").show(ui, |ui| {
@@ -387,12 +395,22 @@ pub fn run<V: Viewer + 'static>(
         ..eframe::NativeOptions::default()
     };
 
+    // Before `eframe`, because macOS dispatches the document that launched this
+    // process before the creation closure is reached and AppKit's own handler
+    // refuses it there. `opened_document` has the measurement.
+    #[cfg(target_os = "macos")]
+    crate::opened_document::watch();
+
     let first = std::env::args_os().nth(1).map(PathBuf::from);
     eframe::run_native(
         id,
         options,
         Box::new(move |cc| {
             crate::system_theme::follow(&cc.egui_ctx);
+            // Now that there is a context, a document that arrives has
+            // somewhere to wake.
+            #[cfg(target_os = "macos")]
+            crate::opened_document::wake_with(&cc.egui_ctx);
             let mut shell = Shell::new(product, build(&cc.egui_ctx));
             if let Some(path) = first {
                 shell.open(&cc.egui_ctx, &path);

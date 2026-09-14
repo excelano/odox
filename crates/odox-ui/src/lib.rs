@@ -13,7 +13,12 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-#![forbid(unsafe_code)]
+// `deny` rather than `forbid`, and `opened_document` is the exception it leaves
+// room for: receiving a document from macOS needs one Objective-C method that
+// cannot be written without `unsafe`, and `forbid` cannot be lifted beneath it.
+// That module is the only `unsafe` in the workspace and it is compiled on one
+// platform. `odox-core` keeps `forbid`, and so do the three applications.
+#![deny(unsafe_code)]
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 
@@ -21,6 +26,10 @@ pub mod flow;
 pub mod fonts;
 pub mod format;
 pub mod i18n;
+/// Receiving a document from macOS, which does not arrive as an argument.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+pub mod opened_document;
 pub mod shapes;
 pub mod shell;
 pub mod system_theme;

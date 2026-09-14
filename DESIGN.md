@@ -74,6 +74,14 @@ these applications use — OpenGL, X11, Wayland, xkbcommon — arrives through a
 `dlopen` at run time, which is why §9's Debian dependencies are written from a
 running process rather than from the linker.
 
+**One `unsafe` module, on one platform.** macOS delivers a double-clicked
+document as an Apple Event rather than as an argument, and receiving one needs a
+single Objective-C method. That is `odox-ui`'s `opened_document`, compiled only
+for that target, and it is why `odox-ui` is `deny(unsafe_code)` with one `allow`
+where every other crate here is `forbid`. It sits in the shared crate rather than
+in each application because all three windows come through one `run`, so the
+alternative was three byte-identical copies of it.
+
 ## §3 The document is kept, not summarized
 
 A document is held as the XML tree it was parsed from. An element nobody here has

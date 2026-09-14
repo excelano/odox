@@ -34,3 +34,32 @@ zbus = { version = "5", default-features = false, features = ["async-io", "block
 # macOS binaries nothing.
 [target.'cfg(windows)'.dependencies]
 ico = "0.5"
+
+# Receiving a document from macOS, which is `src/opened_document.rs` and nothing
+# else. Features are named rather than taken, and not for weight alone: `cargo
+# add` takes 176 features of `objc2-foundation`, and slipcase-desktop measured
+# rustc segfaulting in LLVM's debug-info emission while compiling that many. The
+# narrow set below is also what the rest of the tree already enables.
+#
+# All four are already in the tree on this target under `winit`, `rfd` and
+# `arboard`, so this adds nothing to a macOS build that was not being compiled
+# already, and nothing at all to the other two.
+[target.'cfg(target_os = "macos")'.dependencies]
+# The block the notification observer is given.
+block2 = "0.6"
+# `Retained`, which the other two return and neither re-exports.
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
+# The notification that says when to install the handler, which is the one
+# moment of three that catches both a cold launch and a document dropped on a
+# window that is already open.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
+# The Apple Event manager and the descriptor an event arrives in, plus the
+# strings and URLs they speak in. `NSURL` is what does the percent-decoding, so
+# a document with a space in its name arrives with the space.
+#
+# `objc2-core-services` is not optional despite looking it: the four-character
+# codes an Apple Event is addressed by are CoreServices types, and the two
+# methods that take one are gated behind it. Without it the crate compiles and
+# the two calls are simply not there, which is a missing-method error a long way
+# from anything that says why.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURL", "NSData", "NSAppleEventManager", "NSAppleEventDescriptor", "NSNotification", "NSOperation", "block2", "objc2-core-services"] }
