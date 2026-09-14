@@ -75,21 +75,9 @@ fi
 step "the catalogue template is current"
 # Catches a string added to the source and never extracted, which is invisible
 # otherwise: the window shows English, which is what a working English window
-# shows. Only the message set is compared, because the template's creation date
-# changes on every run.
+# shows. The script's own `--check` does it, writing nothing.
 if command -v xgettext >/dev/null; then
-    before=$(mktemp)
-    grep '^msgid ' crates/odox-ui/po/odox.pot | sort > "$before"
-    crates/odox-ui/po/update-po.sh >/dev/null 2>&1
-    after=$(mktemp)
-    grep '^msgid ' crates/odox-ui/po/odox.pot | sort > "$after"
-    if ! diff -q "$before" "$after" >/dev/null; then
-        echo "the template is behind the source — run crates/odox-ui/po/update-po.sh and commit" >&2
-        diff "$before" "$after" >&2 || true
-        rm -f "$before" "$after"
-        exit 1
-    fi
-    rm -f "$before" "$after"
+    crates/odox-ui/po/update-po.sh --check
 else
     echo "skipped: gettext is not installed"
 fi

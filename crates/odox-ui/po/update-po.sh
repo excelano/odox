@@ -31,13 +31,27 @@
 # cost nothing and they are also where a genuine miss would hide, so the way a
 # dropped string is found is not by reading them — it is `pseudo.sh`, where
 # anything still in English stands out on sight.
+#
+# `--check` extracts to a temporary file and compares the message set with the
+# committed template, writing nothing. `preflight.sh` runs that: a check that
+# rewrote the file it was checking would leave the tree dirty after every run,
+# which is what it did until 2026-09-14 — the template carries the moment it was
+# extracted, so re-running it always changes a line.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$here/../../.."
 
+check=no
+[ "${1:-}" = --check ] && check=yes
+
 domain=odox
-pot="crates/odox-ui/po/$domain.pot"
+committed="crates/odox-ui/po/$domain.pot"
+pot="$committed"
+if [ "$check" = yes ]; then
+    pot=$(mktemp)
+    trap 'rm -f "$pot"' EXIT
+fi
 
 # Sorted so that two runs on two machines produce the same file.
 sources=$(find crates -name '*.rs' -not -path '*/target/*' | sort)
@@ -70,6 +84,25 @@ xgettext \
     $sources
 
 sed -i "s/^\"Project-Id-Version: $domain VERSION/\"Project-Id-Version: $domain/" "$pot"
+
+# Only the message set is compared. The template records the moment it was
+# extracted, so the file differs on every run and the messages do not.
+if [ "$check" = yes ]; then
+    # Temporary files and not process substitution: this script is `sh`, and
+    # `<(...)` is bash.
+    before=$(mktemp)
+    after=$(mktemp)
+    grep '^msgid ' "$committed" | sort > "$before"
+    grep '^msgid ' "$pot" | sort > "$after"
+    if diff -u "$before" "$after"; then
+        rm -f "$before" "$after"
+        echo "the catalogue template is current"
+        exit 0
+    fi
+    rm -f "$before" "$after"
+    echo "the template is behind the source — run $0 and commit what it changes" >&2
+    exit 1
+fi
 
 # **`charset=CHARSET` is a trap when every message is ASCII.** `msginit` reads
 # the placeholder, sees nothing but ASCII, and writes `charset=ASCII` into the
