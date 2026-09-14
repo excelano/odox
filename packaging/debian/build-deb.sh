@@ -146,5 +146,9 @@ for app in xodt xods xodp odox; do
 done
 
 if command -v lintian >/dev/null; then
-    lintian --no-tag-display-limit "$out"/*_"${version}"_"${arch}".deb || true
+    # `--tag-display-limit 0` and not `--no-tag-display-limit`: lintian 2.122
+    # prints a deprecation for the second and takes it anyway, so this would
+    # start failing when the machine's lintian moves, for a reason that has
+    # nothing to do with the package. The workflow's own call already says this.
+    lintian --tag-display-limit 0 "$out"/*_"${version}"_"${arch}".deb || true
 fi
