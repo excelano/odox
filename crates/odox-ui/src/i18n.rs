@@ -19,9 +19,8 @@ potext::catalog!();
 /// Every language the suite ships, as a tag and that language's catalogue.
 ///
 /// A translation is added by putting its `.po` beside the others and naming it
-/// here. The mechanism is wired from the first release because retrofitting `t`
-/// onto strings already written is the expensive half, and this list is the
-/// cheap one.
+/// here. German was written against Comma's glossary, so the fleet says *Datei*,
+/// *Öffnen …* and *OpenDocument-Tabellendokument* the same way in every window.
 ///
 /// The catalogues live inside this crate because `include_str!` reaching above a
 /// crate root compiles locally and fails in `cargo package`, which copies only
@@ -29,7 +28,7 @@ potext::catalog!();
 /// the publish would die verifying a build that cannot compile. flyleaf lost a
 /// release tag to exactly that. `cargo package -p odox-ui --list` is the check.
 #[cfg(not(debug_assertions))]
-pub const LANGUAGES: &[(&str, &str)] = &[];
+pub const LANGUAGES: &[(&str, &str)] = &[("de", include_str!("../po/de.po"))];
 
 /// The same, plus the pseudolocale, which a release does not carry.
 ///
@@ -44,7 +43,10 @@ pub const LANGUAGES: &[(&str, &str)] = &[];
 /// POTEXT_LANG=en-x-pseudo cargo run -p xods -- corpus/libreoffice/calc.ods
 /// ```
 #[cfg(debug_assertions)]
-pub const LANGUAGES: &[(&str, &str)] = &[("en-x-pseudo", include_str!("../po/en-x-pseudo.po"))];
+pub const LANGUAGES: &[(&str, &str)] = &[
+    ("de", include_str!("../po/de.po")),
+    ("en-x-pseudo", include_str!("../po/en-x-pseudo.po")),
+];
 
 /// Mark a message for translation without looking it up here.
 ///

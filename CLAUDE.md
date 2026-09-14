@@ -88,6 +88,12 @@ window:
 `pkill -x xodt` to stop it; `pkill -f` matches the shell running the command and
 kills that instead.
 
+**`cargo test` and `cargo clippy` do not write `target/debug/<app>`.** Both were
+run, both were green, and the window that was then looked at was Friday's
+binary — twice now, once for the pseudolocale and once for German. `cargo build`
+before you look, and if a window shows the old behaviour after a change to
+strings or drawing, suspect the binary before the code.
+
 ---
 
 ## Strings

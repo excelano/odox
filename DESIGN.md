@@ -205,7 +205,9 @@ reaching above a crate root compiles locally and fails in `cargo package`, and
 flyleaf lost a release tag to exactly that.
 
 An application contributes its own name, which is not translated, and the name of
-the format it opens, which is. That one is a literal in a `const` built before
+the format it opens, which is. The desktop entries carry the same languages
+in `Comment[..]` and `GenericName[..]`, because a file manager reads those and
+never the catalogue. That one is a literal in a `const` built before
 `run` puts a catalogue in force, so it is wrapped in `i18n::mark` — gettext's
 `N_` — and looked up through `t` where it is drawn.
 
@@ -213,6 +215,12 @@ The launcher is the exception and says so here rather than in a comment nobody
 reads: it draws no window, links no `odox-ui`, and its three sentences are
 English. Reaching the catalogue would mean linking the toolkit that holds it,
 which is twelve megabytes to translate a usage message.
+
+German was written against Comma's `de.po`, which is the fleet's glossary: one
+set of words for *Datei*, *Öffnen …*, *Neu einlesen* and
+*OpenDocument-Tabellendokument* across every window that says them, and
+LibreOffice's own German for what Comma never needed — *Folien*, *Gliederung*,
+*Referentennotizen*.
 
 **The pseudolocale is a debugging tool and not a translation.** `en-x-pseudo`
 returns every message accented, bracketed and 40% longer, and running a window in

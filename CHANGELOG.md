@@ -8,6 +8,8 @@ All notable changes to odox are recorded here. The format follows
 
 ### Added
 
+- German. The window draws in the desktop's language, and the desktop entries
+  carry it too.
 - `odox`, a launcher: it takes a file, works out which of the three viewers
   reads it, and becomes that one. The extension answers first and the package's
   own media type answers where the extension cannot. `--which` names the viewer

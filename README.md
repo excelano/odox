@@ -80,6 +80,9 @@ under it.
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.
 
+The window draws in the desktop's language where it has one. German is there;
+`crates/odox-ui/po` is where another goes.
+
 ## Where things are
 
 `crates/odox-core` reads and writes the format and has no window in it.

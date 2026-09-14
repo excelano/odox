@@ -3,7 +3,9 @@ Type=Application
 Version=1.5
 Name=xodt
 GenericName=OpenDocument Text Viewer
+GenericName[de]=Betrachter für OpenDocument-Textdokumente
 Comment=Read OpenDocument text documents
+Comment[de]=OpenDocument-Textdokumente lesen
 Exec=xodt %f
 # The basename of this file, the binary's name and the viewport's app id all say
 # the same word, which is how a Wayland compositor finds this window's icon.
