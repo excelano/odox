@@ -171,6 +171,31 @@ jobs:
               echo "--- no crash report, so it did not die the way a crash is recorded"
             fi
 
+            # The panic message itself, which the crash report does not carry:
+            # a bundled application's stderr goes to the unified log rather than
+            # to the terminal that started it.
+            echo "--- what the unified log caught"
+            log show --last 3m --predicate "process == \"${app}\"" --style compact 2>/dev/null \
+              | grep -iE "panic|assert|borrow|already|unwind" | head -10 \
+              || echo "    (nothing in the log)"
+
+            # The control, and the question it settles: is the Apple Event
+            # involved at all? Launch Services with no document to deliver runs
+            # every line of the launch path except the event. A crash here too
+            # means the handler is not implicated and the fault is in the launch;
+            # a clean run here and a crash with a document means it is.
+            echo "--- the same launch, with no document to deliver"
+            open -a "$PWD/dist/${product}.app"
+            sleep 6
+            if "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1; then
+              echo "    a window appeared with no document, so the launch path is fine"
+              echo "    and the Apple Event is what this crash is about"
+            else
+              echo "    no window even with no document, so this is the launch and"
+              echo "    not the Apple Event"
+            fi
+            osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
+
             echo "--- launching the executable directly, with the document as argv"
             "dist/${product}.app/Contents/MacOS/${app}" "$PWD/${document}" \
               >"${RUNNER_TEMP}/${app}-direct.log" 2>&1 &
