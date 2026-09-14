@@ -21,9 +21,11 @@ pub mod flow;
 pub mod fonts;
 pub mod format;
 pub mod i18n;
+pub mod shapes;
 pub mod shell;
 pub mod system_theme;
 
 pub use flow::{Flow, Pictures};
 pub use i18n::mark;
+pub use shapes::Canvas;
 pub use shell::{Product, Shell, Viewer, run};

@@ -88,6 +88,17 @@ window:
 `pkill -x xodt` to stop it; `pkill -f` matches the shell running the command and
 kills that instead.
 
+**A drawing can be checked against LibreOffice rather than against an opinion.**
+It renders a slide to an image without a display, so a change to the slide
+renderer has a reference to be measured against:
+
+    soffice --headless --convert-to png --outdir /tmp corpus/libreoffice/focus.odp
+
+Comparing the two by eye finds the gross errors. Comparing the proportion of
+each colour, over the slide area of the window shot and the whole of
+LibreOffice's, finds the rest and gives a number: the polygons of `focus.odp`
+agree to within about one per cent, and a shape in the wrong place moves several.
+
 **`cargo test` and `cargo clippy` do not write `target/debug/<app>`.** Both were
 run, both were green, and the window that was then looked at was Friday's
 binary — twice now, once for the pseudolocale and once for German. `cargo build`

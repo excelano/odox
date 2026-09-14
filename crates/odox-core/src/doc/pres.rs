@@ -11,10 +11,9 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::Document;
-use crate::Error;
-use crate::media_type;
-use crate::style::PageLayout;
+use crate::style::{Family, Fill, PageLayout};
 use crate::xml::{Element, Ns};
+use crate::{Error, media_type};
 
 /// An `OpenDocument` presentation.
 pub struct Presentation {
@@ -34,6 +33,12 @@ pub struct Slide<'a> {
 }
 
 impl Slide<'_> {
+    /// The drawing-page style the slide names, which carries its background and
+    /// the switches over what its master gives it.
+    pub fn style_name(&self) -> Option<&str> {
+        self.element.attr(&Ns::Draw, "style-name")
+    }
+
     /// The speaker's notes, which ODF keeps in a `presentation:notes` element on
     /// the page rather than in a part of its own.
     pub fn notes(&self) -> Option<&Element> {
@@ -74,6 +79,71 @@ impl Presentation {
                 name: element.attr(&Ns::Draw, "name"),
                 master_page: element.attr(&Ns::Draw, "master-page-name"),
             })
+            .collect()
+    }
+
+    /// The master page a slide names.
+    pub fn master(&self, slide: &Slide<'_>) -> Option<&Element> {
+        self.document.styles.master_page(slide.master_page?)
+    }
+
+    /// What fills the ground behind a slide.
+    ///
+    /// The slide's own drawing-page style first, then its master's, which is
+    /// where a template puts the colour or gradient every slide shares. A slide
+    /// that turns `presentation:background-visible` off gets neither.
+    pub fn background(&self, slide: &Slide<'_>) -> Fill {
+        let own = slide
+            .style_name()
+            .map(|name| self.document.styles.resolve(&Family::DrawingPage, name));
+        if own
+            .as_ref()
+            .and_then(|properties| properties.background_visible)
+            == Some(false)
+        {
+            return Fill::None;
+        }
+        if let Some(fill) = own.map(|properties| properties.graphic.fill.clone())
+            && fill != Fill::None
+        {
+            return fill;
+        }
+        self.master(slide)
+            .and_then(|master| master.attr(&Ns::Draw, "style-name"))
+            .map(|name| self.document.styles.resolve(&Family::DrawingPage, name))
+            .map_or(Fill::None, |properties| properties.graphic.fill.clone())
+    }
+
+    /// The master page's decorations: what is drawn behind a slide before
+    /// anything on the slide itself.
+    ///
+    /// **A child carrying a `presentation:class` is left out**, because that
+    /// attribute is what makes a frame a slot rather than a decoration: the
+    /// slide's own frame of that class takes its place, and what the master
+    /// holds is either a prompt or a field. Left in, a slide gains the words
+    /// *Click to edit Master title style* and a literal `<number>`.
+    ///
+    /// The class and not `presentation:placeholder`, which would be the obvious
+    /// test and is not written reliably: the title frame on `deck.odp`'s master
+    /// carries the prompt text and no such attribute. Measured, not read.
+    ///
+    /// Empty for a slide whose style turns `presentation:background-objects-visible`
+    /// off, which is how a template offers a plain slide.
+    pub fn background_objects(&self, slide: &Slide<'_>) -> Vec<&Element> {
+        let shown = slide
+            .style_name()
+            .map(|name| self.document.styles.resolve(&Family::DrawingPage, name))
+            .and_then(|properties| properties.background_objects_visible);
+        if shown == Some(false) {
+            return Vec::new();
+        }
+        let Some(master) = self.master(slide) else {
+            return Vec::new();
+        };
+        master
+            .elements()
+            .filter(|e| e.attr(&Ns::Draw, "layer") == Some("backgroundobjects"))
+            .filter(|e| e.attr(&Ns::Presentation, "class").is_none())
             .collect()
     }
 

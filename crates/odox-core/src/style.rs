@@ -260,15 +260,78 @@ pub struct CellProperties {
     pub wrap: Option<bool>,
 }
 
+/// What fills a shape or the ground behind a slide.
+///
+/// A named gradient rather than the gradient itself, because ODF defines each
+/// one once in `office:styles` and refers to it by name from every style that
+/// uses it — resolving it here would copy it per style. [`Styles::gradient`]
+/// looks it up.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum Fill {
+    /// Nothing is drawn: whatever is behind shows through.
+    #[default]
+    None,
+    /// One colour.
+    Solid(Color),
+    /// The gradient of this name.
+    Gradient(String),
+}
+
+/// How a gradient runs, which is the part of it a renderer has to understand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GradientStyle {
+    /// Along an axis, from one edge to the other.
+    Linear,
+    /// Along an axis, from the middle outwards to both edges.
+    Axial,
+    /// Out from a point, in circles.
+    Radial,
+    /// Out from a point, in ellipses.
+    Ellipsoidal,
+    /// Out from a point, in squares.
+    Square,
+    /// Out from a point, in rectangles.
+    Rectangular,
+}
+
+/// One of a document's named gradients.
+///
+/// ODF 1.3 also permits a list of `loext:gradient-stop` children, which
+/// `LibreOffice` writes alongside the two colour attributes and which say the same
+/// thing for a two-stop gradient. The attributes are read and the stops are not:
+/// every gradient in the corpus has exactly two stops that repeat what
+/// `draw:start-color` and `draw:end-color` already say, and a renderer that
+/// interpolated more of them would be drawing something no fixture can check.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Gradient {
+    /// How it runs.
+    pub style: GradientStyle,
+    /// The colour it begins at.
+    pub start: Color,
+    /// The colour it ends at.
+    pub end: Color,
+    /// The direction, in degrees. ODF measures it counter-clockwise from the
+    /// direction that runs bottom to top, so 0 is upward and 90 points left.
+    pub angle: f32,
+    /// How much of each end is the flat colour before the blend begins, as a
+    /// proportion of the whole.
+    pub border: f32,
+    /// Where the centre is, for the styles that have one, as a proportion of the
+    /// shape's width and height.
+    pub center: (f32, f32),
+}
+
 /// How a shape is filled and outlined.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct GraphicProperties {
-    /// Fill colour, absent when the fill is `none`.
-    pub fill: Option<Color>,
-    /// Outline colour.
+    /// What fills it.
+    pub fill: Fill,
+    /// Outline colour, absent when the stroke is `none`.
     pub stroke: Option<Color>,
     /// Outline width.
     pub stroke_width: Option<Length>,
+    /// How opaque the fill is, from zero to one.
+    pub opacity: Option<f32>,
 }
 
 /// Everything a resolved style says, across every family.
@@ -287,6 +350,11 @@ pub struct Properties {
     pub cell: CellProperties,
     /// Shape formatting.
     pub graphic: GraphicProperties,
+    /// Whether the master page's own background shows through, from a
+    /// `drawing-page` style. A presentation's, and `None` where nothing said.
+    pub background_visible: Option<bool>,
+    /// Whether the master page's decorations are drawn.
+    pub background_objects_visible: Option<bool>,
     /// A column's width, from a `table-column` style.
     pub column_width: Option<Length>,
     /// A row's height, from a `table-row` style.
@@ -351,6 +419,7 @@ pub struct Styles {
     page_layouts: HashMap<String, PageLayout>,
     master_pages: HashMap<String, Element>,
     lists: HashMap<String, Element>,
+    gradients: HashMap<String, Gradient>,
     font_faces: HashMap<String, String>,
     cache: RefCell<HashMap<(Family, String), Rc<Properties>>>,
 }
@@ -368,6 +437,7 @@ impl Styles {
             page_layouts: HashMap::new(),
             master_pages: HashMap::new(),
             lists: HashMap::new(),
+            gradients: HashMap::new(),
             font_faces: HashMap::new(),
             cache: RefCell::new(HashMap::new()),
         };
@@ -445,6 +515,10 @@ impl Styles {
                 self.page_layouts
                     .insert(name.to_owned(), page_layout(element));
             }
+        } else if element.is(&Ns::Draw, "gradient") {
+            if let Some(name) = element.attr(&Ns::Draw, "name") {
+                self.gradients.insert(name.to_owned(), gradient(element));
+            }
         } else if element.is(&Ns::Text, "list-style")
             && let Some(name) = element.attr(&Ns::Style, "name")
         {
@@ -455,6 +529,11 @@ impl Styles {
     /// A style by family and name.
     pub fn style(&self, family: &Family, name: &str) -> Option<&Style> {
         self.by_name.get(&(family.clone(), name.to_owned()))
+    }
+
+    /// A gradient by name, as a fill refers to one.
+    pub fn gradient(&self, name: &str) -> Option<&Gradient> {
+        self.gradients.get(name)
     }
 
     /// A list style by name, as the `text:list-style-name` of a list refers to
@@ -529,6 +608,58 @@ impl Styles {
             .get(declared)
             .cloned()
             .unwrap_or_else(|| declared.to_owned())
+    }
+}
+
+fn gradient(element: &Element) -> Gradient {
+    let color = |local: &str, fallback: Color| {
+        element
+            .attr(&Ns::Draw, local)
+            .and_then(Color::parse)
+            .unwrap_or(fallback)
+    };
+    let proportion = |local: &str| {
+        element
+            .attr(&Ns::Draw, local)
+            .and_then(Percent::parse)
+            .map_or(0.0, Percent::fraction)
+    };
+    Gradient {
+        style: match element.attr(&Ns::Draw, "style") {
+            Some("axial") => GradientStyle::Axial,
+            Some("radial") => GradientStyle::Radial,
+            Some("ellipsoid") => GradientStyle::Ellipsoidal,
+            Some("square") => GradientStyle::Square,
+            Some("rectangular") => GradientStyle::Rectangular,
+            _ => GradientStyle::Linear,
+        },
+        start: color("start-color", Color { r: 0, g: 0, b: 0 }),
+        end: color(
+            "end-color",
+            Color {
+                r: 0xff,
+                g: 0xff,
+                b: 0xff,
+            },
+        ),
+        // Written as `270deg`, and occasionally as a bare tenth of a degree by
+        // producers older than the unit.
+        angle: element.attr(&Ns::Draw, "angle").map_or(0.0, parse_angle),
+        border: proportion("border"),
+        center: (proportion("cx"), proportion("cy")),
+    }
+}
+
+/// An ODF angle in degrees.
+///
+/// `270deg` is the spelling ODF 1.2 introduced. Before it the attribute was a
+/// plain number in tenths of a degree, which some producers still write, so a
+/// value with no unit is read that way.
+fn parse_angle(text: &str) -> f32 {
+    let text = text.trim();
+    match text.strip_suffix("deg") {
+        Some(degrees) => degrees.trim().parse().unwrap_or(0.0),
+        None => text.parse::<f32>().unwrap_or(0.0) / 10.0,
     }
 }
 
@@ -620,6 +751,21 @@ impl Properties {
                 || properties.is(&Ns::Style, "drawing-page-properties")
             {
                 self.graphic.apply(properties);
+                // Two of a slide's own switches over what its master gives it.
+                // They live on the same element as the fill and are read here so
+                // that they inherit through the style chain like everything else.
+                if let Some(visible) = properties
+                    .attr(&Ns::Presentation, "background-visible")
+                    .and_then(crate::value::boolean)
+                {
+                    self.background_visible = Some(visible);
+                }
+                if let Some(visible) = properties
+                    .attr(&Ns::Presentation, "background-objects-visible")
+                    .and_then(crate::value::boolean)
+                {
+                    self.background_objects_visible = Some(visible);
+                }
             } else if properties.is(&Ns::Style, "table-column-properties") {
                 if let Some(width) = properties
                     .attr(&Ns::Style, "column-width")
@@ -774,24 +920,44 @@ impl CellProperties {
 
 impl GraphicProperties {
     fn apply(&mut self, p: &Element) {
+        // `draw:fill` says which kind, and the value each kind needs is a
+        // separate attribute — so a style that switches a shape from a colour to
+        // a gradient carries both, and reading the colour without the kind gets
+        // the old answer.
         match p.attr(&Ns::Draw, "fill") {
-            Some("none") => self.fill = None,
-            _ => {
-                if let Some(color) = p.attr(&Ns::Draw, "fill-color") {
-                    self.fill = Color::parse(color);
+            // Solid, and the case of no `draw:fill` at all: a colour on its own
+            // still sets one, which is how a style that only changes the shade
+            // of an already-solid shape is written. Neither states a colour
+            // every time, and the one it does not state is the one inherited.
+            Some("solid") | None => {
+                if let Some(color) = p.attr(&Ns::Draw, "fill-color").and_then(Color::parse) {
+                    self.fill = Fill::Solid(color);
                 }
             }
+            Some("gradient") => {
+                if let Some(name) = p.attr(&Ns::Draw, "fill-gradient-name") {
+                    self.fill = Fill::Gradient(name.to_owned());
+                }
+            }
+            // `none`, and the bitmap and hatch fills this does not draw. They
+            // share an arm because they share an outcome: leaving an inherited
+            // colour in place would fill the shape with something the document
+            // did not ask for and call it the pattern.
+            Some(_) => self.fill = Fill::None,
         }
         match p.attr(&Ns::Draw, "stroke") {
             Some("none") => self.stroke = None,
             _ => {
-                if let Some(color) = p.attr(&Ns::Svg, "stroke-color") {
-                    self.stroke = Color::parse(color);
+                if let Some(color) = p.attr(&Ns::Svg, "stroke-color").and_then(Color::parse) {
+                    self.stroke = Some(color);
                 }
             }
         }
         if let Some(width) = p.attr(&Ns::Svg, "stroke-width").and_then(Length::parse) {
             self.stroke_width = Some(width);
+        }
+        if let Some(opacity) = p.attr(&Ns::Draw, "opacity").and_then(Percent::parse) {
+            self.opacity = Some(opacity.fraction().clamp(0.0, 1.0));
         }
     }
 }

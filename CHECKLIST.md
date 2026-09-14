@@ -31,7 +31,9 @@ Open `corpus/libreoffice/text.odt`, `calc.ods` and `deck.odp`.
    against the right edge, its header band shaded, and the formula behind a
    picked cell in the bar.
 7. The presentation draws each slide at the document's own shape, with its text
-   where the document puts it.
+   where the document puts it. Open one made from a template: the background and
+   the template's decorations are there, behind the slide's own text, and the
+   master's prompts are not — no slide says *Click to edit Master title style*.
 8. The page is paper in a dark desktop as much as a light one, and the chrome
    around it follows the desktop.
 9. Zoom in and out and back to actual size; the page keeps its proportions.

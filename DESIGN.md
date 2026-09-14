@@ -140,6 +140,19 @@ and size in the page's coordinate space. That is what makes a slide drawable
 without laying anything out: the page is scaled to the space the window has and
 each shape is put where the document says.
 
+A slide is drawn in three passes, back to front: the ground, then what its
+master page contributes, then the slide's own shapes. The master is where a
+template keeps its identity — a gradient band, six polygons — and a slide names
+one rather than copying it.
+
+**A child of a master page carrying a `presentation:class` is a slot and not a
+decoration.** The slide's own frame of that class takes its place, and what the
+master holds is a prompt or a field: drawn as it stands, every slide gains the
+words *Click to edit Master title style* and a literal `<number>`. The class is
+the test and `presentation:placeholder` is not, which would be the obvious one
+and is not written reliably — the title frame on the corpus deck's master carries
+the prompt and no such attribute. Measured, not read.
+
 ## §6 Drawing
 
 **Fonts are the machine's.** Nothing is embedded. A document names a family and
@@ -182,9 +195,19 @@ than reading. Tab stops advance by a fixed amount rather than to the paragraph's
 stops, so a document whose layout depends on tabs is laid out approximately.
 Right-to-left text is drawn left to right: `fo:text-align` distinguishes `start`
 from `left`, and honouring the difference needs a writing direction this release
-does not read. In a presentation, shapes that are
-not text or a picture are drawn as the outline of the space they occupy, and a
-master page contributes neither its background nor its placeholder geometry.
+does not read.
+
+**Of ODF's shapes, what is drawn is what a fixture proves.** Rectangles,
+ellipses, polygons, polylines and lines are drawn from their own geometry, with
+a solid or a linear or axial gradient fill and an outline. A `draw:custom-shape`
+is a path built from formulas in `draw:enhanced-geometry`, and none of them are
+evaluated: the handful whose outline is a rectangle or near enough that the
+difference is a corner are filled as the box they occupy, and every other one is
+left undrawn rather than approximated into a block the document did not ask for.
+`draw:path`, connectors and measures are undrawn for the same reason. A radial,
+ellipsoidal, square or rectangular gradient is filled with the flat average of
+its two colours, which is visibly an approximation rather than a wrong direction;
+no fixture uses one.
 
 ## §7 The window
 

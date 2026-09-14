@@ -14,11 +14,10 @@
 
 use std::path::Path;
 
-use eframe::egui::{self, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, pos2, vec2};
+use eframe::egui::{self, Sense, Stroke, StrokeKind, Ui, vec2};
 use odox_core::doc::Presentation;
-use odox_core::{Element, Length, Ns};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Flow, Pictures, Viewer, fonts};
+use odox_ui::{Canvas, Flow, Pictures, Viewer, fonts};
 
 /// A presentation, open or not.
 #[derive(Default)]
@@ -124,20 +123,45 @@ impl Viewer for SlideView {
             * zoom;
         let size = vec2(layout.width.points() * fit, layout.height.points() * fit);
 
+        // Both resolved before the closure, which borrows the document again.
+        let background = document.background(slide);
+        let decorations = document.background_objects(slide);
+
         egui::ScrollArea::both().show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 let (page, _) = ui.allocate_exact_size(size, Sense::hover());
                 let palette = odox_ui::format::Palette::default();
+                // Paper under everything. A slide whose background is `none` —
+                // which is what a template says when its identity is the shapes
+                // rather than the ground — is drawn on paper and not on the
+                // window's own colour. `odox_ui::format::Palette` says why.
                 ui.painter().rect_filled(page, 2.0, palette.paper);
+
+                let mut canvas = Canvas {
+                    document: &document.document,
+                    pictures,
+                    page,
+                    scale: fit,
+                    palette,
+                };
+                // Back to front: the ground, then what the master page draws on
+                // every slide, then the slide's own.
+                canvas.background(ui, &background);
+                for shape in &decorations {
+                    canvas.shape(ui, shape);
+                }
+                for shape in slide.shapes() {
+                    canvas.shape(ui, shape);
+                }
+
+                // The page's edge last, so a decoration running to the bleed
+                // does not paint over it.
                 ui.painter().rect_stroke(
                     page,
                     2.0,
                     Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
                     StrokeKind::Inside,
                 );
-                for shape in slide.shapes() {
-                    draw_shape(ui, document, pictures, shape, page, fit);
-                }
             });
         });
     }
@@ -172,54 +196,6 @@ impl Viewer for SlideView {
         ui.separator();
         ui.checkbox(&mut self.show_notes, t("Show the speaker's notes"));
     }
-}
-
-/// One shape, at the place on the page the document puts it.
-fn draw_shape(
-    ui: &mut Ui,
-    document: &Presentation,
-    pictures: &mut Pictures,
-    shape: &Element,
-    page: Rect,
-    scale: f32,
-) {
-    let at = |local: &str| shape.attr(&Ns::Svg, local).and_then(Length::parse);
-    let (Some(x), Some(y)) = (at("x"), at("y")) else {
-        // A shape with no position of its own is one a master page places, which
-        // is what the next release adds.
-        return;
-    };
-    let width = at("width").map_or(page.width() / 2.0, |w| w.points() * scale);
-    let height = at("height").map_or(page.height() / 4.0, |h| h.points() * scale);
-    let rect = Rect::from_min_size(
-        pos2(
-            page.left() + x.points() * scale,
-            page.top() + y.points() * scale,
-        ),
-        vec2(width, height),
-    );
-
-    // A text box holds paragraphs; a frame around a picture holds the picture.
-    // Both are drawn by the shared renderer, which already knows how.
-    let content = shape
-        .child(&Ns::Draw, "text-box")
-        .or_else(|| shape.child(&Ns::Draw, "image").map(|_| shape));
-    if let Some(content) = content {
-        ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
-            ui.set_clip_rect(rect.intersect(page));
-            Flow::new(&document.document, pictures, scale).blocks(ui, content, rect.width());
-        });
-        return;
-    }
-
-    // Something this release does not draw. The outline says the slide carries
-    // more than its text, which is more use than an empty space.
-    ui.painter().rect_stroke(
-        rect,
-        0.0,
-        Stroke::new(1.0, ui.visuals().weak_text_color().gamma_multiply(0.5)),
-        StrokeKind::Inside,
-    );
 }
 
 impl SlideView {

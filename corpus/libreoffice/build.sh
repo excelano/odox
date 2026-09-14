@@ -74,3 +74,27 @@ soffice -env:UserInstallation="file://$profile" --headless \
 mv "$profile/deck.odp" "$out/deck.odp"
 rm -rf "$profile"
 printf '%s\n' deck.odp
+
+# Two of the presentation templates LibreOffice ships, as documents. A deck
+# built from text has a white background and no shapes, which is the corpus
+# deck above; these are what a person's deck actually looks like — a gradient
+# behind the slide, decorations on the master page, custom shapes with their
+# own fills, polygons — and they are the fixtures the slide renderer is
+# measured against. The template is the source and is not committed: it lives
+# with the `libreoffice-impress` package, and a machine without it keeps the
+# fixture it has.
+for template in Blue_Curve Focus; do
+	source=/usr/lib/libreoffice/share/template/common/presnt/$template.otp
+	if [ ! -f "$source" ]; then
+		printf '%s: no %s, keeping the committed fixture\n' "$template" "$source" >&2
+		continue
+	fi
+	profile=$(mktemp -d)
+	soffice -env:UserInstallation="file://$profile" --headless \
+		--convert-to odp --outdir "$profile" "$source" >/dev/null 2>&1
+	target=$(printf '%s' "$template" | tr 'A-Z_' 'a-z-').odp
+	mv "$profile/$template.odp" "$out/$target"
+	rm -rf "$profile"
+	printf '%s\n' "$target"
+done
+
