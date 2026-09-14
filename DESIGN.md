@@ -167,15 +167,22 @@ Impress deck opened here. So the page keeps its own ground and the window's
 chrome follows the desktop, which is what every office application and every PDF
 viewer does with a page.
 
+**Text in the page can be selected and copied**, by dragging, double-clicking
+a word or triple-clicking a line, and Ctrl+C. The paragraph hands its laid-out
+galley and the anchor it was laid out around to egui's own label-selection
+plugin, which paints the galley at that anchor — so alignment is untouched — and
+keeps the selection across paragraphs and across scrolling, because every
+paragraph reports to it whether or not it is on screen. The one thing that had
+to be found by measuring: the plugin begins a selection only on a response that
+senses drag, which `Label` adds to its own and a bare allocation does not.
+
 **What this release does not draw.** Nothing paginates: a page layout gives a
 width, and page boxes, widows, floats and multiple columns are typesetting rather
 than reading. Tab stops advance by a fixed amount rather than to the paragraph's
 stops, so a document whose layout depends on tabs is laid out approximately.
 Right-to-left text is drawn left to right: `fo:text-align` distinguishes `start`
 from `left`, and honouring the difference needs a writing direction this release
-does not read. Text cannot be selected in the page — alignment is done by
-anchoring a laid-out galley, which egui's selectable label cannot do — so the
-View menu copies the document as text instead. In a presentation, shapes that are
+does not read. In a presentation, shapes that are
 not text or a picture are drawn as the outline of the space they occupy, and a
 master page contributes neither its background nor its placeholder geometry.
 

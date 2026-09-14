@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use eframe::egui::{
     Align, ColorImage, Context, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, TextureHandle,
-    TextureOptions, Ui, pos2, text::LayoutJob, vec2,
+    TextureOptions, Ui, pos2, text::LayoutJob, text_selection::LabelSelectionState, vec2,
 };
 use odox_core::{
     Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties,
@@ -286,7 +286,13 @@ impl Flow<'_> {
 
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
         let height = galley.size().y;
-        let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
+        // Click and drag, and not merely hover: the selection plugin begins a
+        // selection only on a response whose sense includes drag, which is what
+        // `Label` adds to its own when it is selectable, and the click half is
+        // what lets a double-click take a word and a triple-click a line.
+        // Without the drag the pointer reaches the scroll area instead and
+        // nothing is selected — measured, not read.
+        let (rect, response) = ui.allocate_exact_size(vec2(width, height), Sense::click_and_drag());
 
         if element.is(&Ns::Text, "h") {
             if self.scroll_to_heading == Some(self.headings_seen) {
@@ -308,8 +314,21 @@ impl Flow<'_> {
             TextAlign::End => rect.left() + left + indent.max(0.0) + wrap,
             _ => rect.left() + left + indent.max(0.0),
         };
-        ui.painter()
-            .galley(pos2(anchor, rect.top()), galley, base.color);
+        // Through egui's selection plugin rather than the painter, which is what
+        // lets a person drag across the page and press Ctrl+C. The hook paints
+        // the galley itself, at the same anchor the painter would have taken,
+        // so alignment is untouched. It is called for every paragraph and not
+        // only the visible ones: the plugin drops a selection whose ends it did
+        // not see this frame, so a paragraph skipped for being scrolled off
+        // would end a selection the moment it left the window.
+        LabelSelectionState::label_text_selection(
+            ui,
+            &response,
+            pos2(anchor, rect.top()),
+            galley,
+            base.color,
+            Stroke::NONE,
+        );
 
         if let Some(label) = label {
             let mut label_job = LayoutJob::default();

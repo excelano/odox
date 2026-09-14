@@ -35,17 +35,20 @@ Open `corpus/libreoffice/text.odt`, `calc.ods` and `deck.odp`.
 8. The page is paper in a dark desktop as much as a light one, and the chrome
    around it follows the desktop.
 9. Zoom in and out and back to actual size; the page keeps its proportions.
+10. Drag across two paragraphs, press Ctrl+C, paste elsewhere: the selection
+    highlights as it grows, survives scrolling the page, and the paste is the
+    text in order. A double-click takes a word.
 
 ## Language
 
-10. `POTEXT_LANG=en-x-pseudo` on a debug build: every sentence a person reads is
+11. `POTEXT_LANG=en-x-pseudo` on a debug build: every sentence a person reads is
     bracketed and accented, and nothing but an application's own name is still
     in English. No label has its end cut off.
 
 ## Behaviour
 
-11. Dropping a document on the window opens it; so does Ctrl+O; so does a path
+12. Dropping a document on the window opens it; so does Ctrl+O; so does a path
     on the command line.
-12. Handing an application the wrong kind of document names the sibling that
+13. Handing an application the wrong kind of document names the sibling that
     reads it rather than failing silently.
-13. Ctrl+R re-reads a document that changed on disk.
+14. Ctrl+R re-reads a document that changed on disk.

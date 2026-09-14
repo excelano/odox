@@ -8,6 +8,9 @@ All notable changes to odox are recorded here. The format follows
 
 ### Added
 
+- Text in the page can be selected and copied: drag, double-click a word,
+  triple-click a line, Ctrl+C. A selection survives scrolling and spans
+  paragraphs.
 - German. The window draws in the desktop's language, and the desktop entries
   carry it too.
 - `odox`, a launcher: it takes a file, works out which of the three viewers
