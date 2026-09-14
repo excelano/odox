@@ -4,6 +4,15 @@ All notable changes to odox are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The `odox` package depends on the three viewers rather than recommending
+  them, so `apt install odox` installs the suite. Recommending them installed
+  them on a default Debian and not on one with `APT::Install-Recommends` off,
+  and a launcher whose viewers are absent can only apologise.
+
 ## [0.2.0] — 2026-09-14
 
 The presentation viewer draws slides rather than listing their text, the page

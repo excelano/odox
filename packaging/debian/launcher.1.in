@@ -52,6 +52,12 @@ No file was given, the file is not there, or nothing here reads it.
 The viewer that reads the file is not installed.
 .SH FILES
 None. odox writes no configuration, no cache and no temporary copy.
+.SH NOTES
+The Debian package depends on all three viewers, so
+.B apt install odox
+installs the whole suite. Installed any other way — from crates.io, say — the
+viewers are separate, and a file whose viewer is absent is reported as such
+rather than opened.
 .SH SEE ALSO
 .BR xodt (1),
 .BR xods (1),

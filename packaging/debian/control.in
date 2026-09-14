@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: David M. Anderson <david.anderson@excelano.com>
 Depends: @DEPENDS@
-Recommends: @RECOMMENDS@
+@RECOMMENDS_LINE@
 Section: text
 Priority: optional
 Homepage: https://github.com/excelano/odox

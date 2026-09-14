@@ -9,10 +9,15 @@
 #
 # The fourth is `odox`, the launcher, and it is the odd one: a command rather
 # than an application, so it has no desktop entry, no icon and a manual page of
-# its own. It depends on nothing — it draws nothing and links libc — and it
-# recommends the three rather than depending on them, because a person who only
-# ever opens spreadsheets should not be made to install two viewers to get the
-# convenience of one command.
+# its own. **It depends on the three viewers, which makes it the way to install
+# the suite**: `apt install odox` brings the whole of odox. It recommended them
+# until 2026-09-14, which installs them on a default Debian and not on one with
+# `APT::Install-Recommends` off or an `apt install --no-install-recommends` — and
+# a launcher whose viewers are absent is a command that can only apologise.
+#
+# Unversioned, because there is no coupling to version: the launcher finds a
+# viewer by name and hands the file over, so any version of one works with any
+# version of the other.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -71,8 +76,8 @@ for app in xodt xods xodp odox; do
     # The launcher draws nothing, so it needs none of the window libraries, and
     # it suggests the viewers rather than requiring them.
     if [ "$app" = odox ]; then
-        app_depends="libc6, libgcc-s1"
-        recommends="xodt, xods, xodp"
+        app_depends="libc6, libgcc-s1, xodt, xods, xodp"
+        recommends=""
         closing="It draws nothing itself: it becomes the viewer that reads the file. Nothing is sent anywhere and nothing is written."
     else
         app_depends="$depends"
@@ -104,9 +109,17 @@ for app in xodt xods xodp odox; do
         -e "s|@VERSION@|$version|" \
         -e "s|@ARCH@|$arch|" \
         -e "s|@DEPENDS@|$app_depends|" \
-        -e "s|@RECOMMENDS@|$recommends|" \
         -e "s|@SUMMARY@|$summary|" \
-        "$here/control.in" > "$staging/DEBIAN/control.head"
+        "$here/control.in" > "$staging/DEBIAN/control.raw"
+    # An empty `Recommends:` is malformed, so the line goes rather than emptying.
+    if [ -n "$recommends" ]; then
+        sed "s|@RECOMMENDS_LINE@|Recommends: $recommends|" \
+            "$staging/DEBIAN/control.raw" > "$staging/DEBIAN/control.head"
+    else
+        sed '/@RECOMMENDS_LINE@/d' \
+            "$staging/DEBIAN/control.raw" > "$staging/DEBIAN/control.head"
+    fi
+    rm -f "$staging/DEBIAN/control.raw"
     # The description is substituted separately because it is several lines and
     # sed's replacement is one.
     awk -v body="$staging/DEBIAN/wrapped" -v tail="$staging/DEBIAN/closing" '

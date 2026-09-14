@@ -32,23 +32,26 @@ On Debian or Ubuntu, from the Excelano apt repository, which is where updates
 come from:
 
     curl -fsSL https://excelano.com/apt/setup.sh | sudo sh   # one-time
-    sudo apt install xodt xods xodp
+    sudo apt install odox
 
-Take only the ones you want; each package is one application and none depends on
-the others. amd64 and arm64 both.
+`odox` is the launcher and it depends on the three viewers, so that installs the
+whole suite. To take only the ones you want, name them instead — `sudo apt
+install xods`, say, and no viewer depends on another. amd64 and arm64 both.
 
 From crates.io, which gives you the binary and nothing around it — no desktop
 entry, no icon, so a file manager will not offer it:
 
     cargo install xodt
 
-The `odox` launcher is on crates.io and in no package: `cargo install odox`.
+The launcher on its own is `cargo install odox`, and there it really is on its
+own: a crate cannot depend on a Debian package, so the viewers are a separate
+`cargo install` each.
 
 From a clone, which is the same package the apt repository serves:
 
     cargo build --release
     ./packaging/debian/build-deb.sh
-    sudo apt install ./dist/xodt_*.deb ./dist/xods_*.deb ./dist/xodp_*.deb
+    sudo apt install ./dist/*.deb
 
 Or from a clone without a package, which puts the binaries, the desktop entries
 and the icons under `~/.local` so a file manager offers them:

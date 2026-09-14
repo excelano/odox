@@ -39,7 +39,10 @@ It links `odox-core` and deliberately not `odox-ui` — reaching the shared wind
 crate would put a graphics toolkit inside a command that runs for a few
 milliseconds. **The applications are the product and the launcher is a
 convenience over them**: a desktop offers the three directly, one per media type,
-and nothing in them depends on it.
+and nothing in them depends on it. Its Debian package depends on all three the
+other way round, which makes `apt install odox` the way to install the suite —
+unversioned, because the launcher finds a viewer by name and hands the file over,
+so there is no coupling to a version.
 
 The dependency between them runs one way and never back. `odox-core` does not
 depend on `odox-ui`, does not link egui, and does not open files: a document is
