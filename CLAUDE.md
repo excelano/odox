@@ -34,7 +34,7 @@ and hides the other two.
     cargo build                          # debug
     cargo build --release
     cargo test --workspace               # the corpus is walked, not named
-    cargo clippy --workspace --all-targets   # must be silent
+    cargo clippy --workspace --all-targets -- -D warnings   # what CI runs
     cargo fmt --all
     cargo check --target x86_64-pc-windows-msvc   # cross-check, from Linux
 
@@ -98,6 +98,12 @@ Comparing the two by eye finds the gross errors. Comparing the proportion of
 each colour, over the slide area of the window shot and the whole of
 LibreOffice's, finds the rest and gives a number: the polygons of `focus.odp`
 agree to within about one per cent, and a shape in the wrong place moves several.
+
+**Run clippy with `-D warnings`, which is what CI runs.** Without it a pedantic
+lint is a warning that scrolls past, and grepping the output for `^warning: [a-z]`
+misses the ones whose message opens with a number — which is how
+`many_single_char_names` reached `main` and turned CI red on a tree that looked
+clean.
 
 **`cargo test` and `cargo clippy` do not write `target/debug/<app>`.** Both were
 run, both were green, and the window that was then looked at was Friday's

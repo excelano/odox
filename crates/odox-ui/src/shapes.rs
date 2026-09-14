@@ -525,29 +525,25 @@ fn triangulate(points: &[Pos2]) -> Vec<[u32; 3]> {
         }
         let mut clipped = false;
         for position in 0..remaining.len() {
-            let (i, j, k) = (
+            let corner = [
                 remaining[(position + remaining.len() - 1) % remaining.len()],
                 remaining[position],
                 remaining[(position + 1) % remaining.len()],
-            );
-            let (a, b, c) = (points[i], points[j], points[k]);
+            ];
+            let ear = corner.map(|index| points[index]);
             // A reflex corner is not an ear, and neither is one whose triangle
             // has another corner of the outline inside it.
-            if cross(a, b, c) * winding <= 0.0 {
+            if cross(ear[0], ear[1], ear[2]) * winding <= 0.0 {
                 continue;
             }
             if remaining
                 .iter()
-                .filter(|other| ![i, j, k].contains(other))
-                .any(|other| inside(a, b, c, points[*other]))
+                .filter(|other| !corner.contains(other))
+                .any(|other| inside(ear[0], ear[1], ear[2], points[*other]))
             {
                 continue;
             }
-            triangles.push([
-                u32::try_from(i).unwrap_or(0),
-                u32::try_from(j).unwrap_or(0),
-                u32::try_from(k).unwrap_or(0),
-            ]);
+            triangles.push(corner.map(|index| u32::try_from(index).unwrap_or(0)));
             remaining.remove(position);
             clipped = true;
             stuck = 0;
