@@ -26,6 +26,16 @@
 # — so write every message as one literal. A raw string inside `t(…)` extracts
 # wrongly for the same reason; neither shape appears in this tree.
 #
+# **One literal also means one line.** A string continued with a backslash at
+# the end of a line is the same trap wearing a different hat: C keeps the
+# indentation that follows the continuation and Rust drops it, so the extracted
+# msgid carries a run of spaces the runtime string will never have, and the
+# translation silently never loads. `msgfmt` sees nothing wrong, because both
+# files are valid. Keep the literal on one line however long it gets; `rustfmt`
+# will not break a string anyway. The Duckling session hit this on a tooltip on
+# 2026-09-14 and found it only by reading the generated `.pot`; no message in
+# this tree is wrapped, which was checked rather than assumed.
+#
 # **It prints a screen of warnings and they are noise.** `unterminated character
 # constant` is a Rust lifetime read as the start of a C character literal. They
 # cost nothing and they are also where a genuine miss would hide, so the way a

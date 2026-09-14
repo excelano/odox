@@ -71,6 +71,33 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+
+	<!--
+	  The languages the bundle claims, which is a separate thing from the
+	  languages the window speaks. `crates/odox-ui/po/de.po` is the window's
+	  words; this is the package's claim about them, and translating the
+	  application does not reach it.
+
+	  It bites twice if it is missing. App Store Connect lists English alone,
+	  and macOS builds its per-application language picker in System Settings
+	  from this key, so nobody can set one of these to German on an English
+	  machine. The Windows side never had the hole, because the package
+	  manifest declares `en-us` and `de-de` and `makepri` joins them, which is
+	  how it stayed hidden: only the Mac bundle was silent.
+
+	  The array matches `odox_ui::i18n::LANGUAGES` in a release build: English,
+	  which is the source language, and German. The pseudolocale beside them is
+	  `cfg(debug_assertions)` and never ships.
+
+	  Found by the Duckling session on 2026-09-14, against its own bundle, and
+	  neither segler nor slipcase-desktop had it either. A fleet miss rather
+	  than anything this repository dropped.
+	-->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>de</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>@EXECUTABLE@</string>
 	<key>CFBundleIdentifier</key>
