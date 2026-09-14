@@ -28,9 +28,9 @@
   a package whose manifest publisher and whose certificate subject differ.
 
   @VERSION_APPX@ is what `packaging/version.sh` prints when asked for the appx
-  spelling: four parts with the fourth always 0, which the Store requires. It is a different shape from the
-  crate version and from what macOS wants, which is why one script answers all
-  three.
+  spelling: four parts with the fourth always 0, which the Store requires. It is
+  a different shape from the crate version and from what macOS wants, which is
+  why one script answers all three.
 
   WHAT IS DECIDED HERE
 
