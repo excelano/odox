@@ -36,7 +36,7 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
 use std::ptr::NonNull;
 
-use objc2::{define_class, msg_send, sel, AnyThread};
+use objc2::{AnyThread, define_class, msg_send, sel};
 use objc2_app_kit::NSApplicationWillFinishLaunchingNotification;
 use objc2_foundation::{
     NSAppleEventDescriptor, NSAppleEventManager, NSNotification, NSNotificationCenter, NSString,

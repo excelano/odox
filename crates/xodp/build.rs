@@ -42,8 +42,8 @@ fn main() {
     // Staged for every target, so that the include below compiles everywhere
     // and the platform question is asked once, in the window rather than here.
     let binary = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
-    let icon = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(format!("../../packaging/windows/{binary}.ico"));
+    let icon =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../packaging/windows/{binary}.ico"));
     let out = Path::new(&std::env::var("OUT_DIR").expect("cargo sets OUT_DIR")).join("window.ico");
     println!("cargo:rerun-if-changed={}", icon.display());
     let staged = std::fs::read(&icon).unwrap_or_default();
