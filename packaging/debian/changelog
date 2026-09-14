@@ -1,3 +1,10 @@
+odox (0.2.1) unstable; urgency=low
+
+  * The odox package depends on the three viewers rather than recommending
+    them, so apt install odox installs the whole suite.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 14 Sep 2026 12:04:54 -0500
+
 odox (0.2.0) unstable; urgency=low
 
   * xodp draws each slide with its master page: the ground it fills and the
