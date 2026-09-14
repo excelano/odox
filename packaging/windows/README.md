@@ -14,6 +14,24 @@ each release binary. It pairs with `+crt-static` in `.cargo/config.toml`, and th
 two together are what answers the certification failure recorded in the script's
 own header.
 
+## Claiming a file type, and how far
+
+**These applications never write `UserChoice`.** An install adds each one to
+`OpenWithProgids` for its extension, so it appears in Open With and a person can
+choose it, and it stops there. It does not make itself the default for `.odt`.
+
+That is the same posture the macOS bundle takes with `LSHandlerRank` set to
+`Alternate`, and for the same reason: OpenDocument is a format this suite reads
+and does not own, on a machine that may well have a full office suite already
+claiming it. Taking the default without being asked is a thing a person then has
+to undo.
+
+It also removes a failure the fleet has already had. A script that writes
+`UserChoice` has to delete it on the way out, slipcase-desktop's did not, and the
+extension was left pointing at a program that was no longer there; flyleaf's
+uninstaller deletes the key by name from its parent because `DeleteSubKeyTree`
+was not enough. None of that applies to a key nobody writes.
+
 ## What is left to do here
 
 A window icon: Windows takes one from a resource compiled into the executable,
