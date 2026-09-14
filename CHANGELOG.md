@@ -4,7 +4,10 @@ All notable changes to odox are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] — 2026-09-14
+
+The presentation viewer draws slides rather than listing their text, the page
+can be selected and copied from, and the window speaks German.
 
 ### Added
 
@@ -19,6 +22,9 @@ All notable changes to odox are recorded here. The format follows
   paragraphs.
 - German. The window draws in the desktop's language, and the desktop entries
   carry it too.
+- A Debian package for the `odox` launcher, which until now was on crates.io
+  and in no package. It depends on neither the window libraries nor the viewers:
+  it draws nothing, and it recommends the three rather than requiring them.
 - `odox`, a launcher: it takes a file, works out which of the three viewers
   reads it, and becomes that one. The extension answers first and the package's
   own media type answers where the extension cannot. `--which` names the viewer

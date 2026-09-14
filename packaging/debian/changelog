@@ -1,3 +1,14 @@
+odox (0.2.0) unstable; urgency=low
+
+  * xodp draws each slide with its master page: the ground it fills and the
+    shapes a template decorates it with, custom shapes worked out from
+    draw:enhanced-geometry, and solid, gradient and picture fills.
+  * Text in the page can be selected and copied.
+  * German.
+  * The odox launcher is packaged.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 14 Sep 2026 11:28:59 -0500
+
 odox (0.1.0) unstable; urgency=low
 
   * First release: xodt, xods and xodp read OpenDocument text documents,

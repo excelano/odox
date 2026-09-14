@@ -1,0 +1,60 @@
+.TH ODOX 1 "@DATE@" "odox @VERSION@" "User Commands"
+.SH NAME
+odox \- @SUMMARY@
+.SH SYNOPSIS
+.B odox
+.I FILE
+.RI [ ARGUMENT ...]
+.br
+.B odox
+.B \-\-which
+.I FILE
+.SH DESCRIPTION
+@DESCRIPTION@
+.PP
+The file decides. A text document opens in
+.BR xodt (1),
+a spreadsheet in
+.BR xods (1),
+a presentation in
+.BR xodp (1).
+The extension answers first, because it is free and it is the same answer the
+desktop's own association gives; the package's declared media type answers where
+the extension cannot, so a file named
+.I download
+or named nothing still opens in the right place.
+.PP
+The viewer is looked for beside this command and then on PATH, so a set
+installed together finds its own siblings. Any further arguments are passed to
+it. On this platform the command replaces itself with the viewer rather than
+waiting for it.
+.SH OPTIONS
+.TP
+.BI \-\-which " FILE"
+Print the name of the viewer that would open the file, and launch nothing.
+.TP
+.B \-h ", " \-\-help
+A summary of this.
+.TP
+.B \-V ", " \-\-version
+The version.
+.SH EXIT STATUS
+.TP
+.B 0
+The viewer was started, or
+.B \-\-which
+answered.
+.TP
+.B 2
+No file was given, the file is not there, or nothing here reads it.
+.TP
+.B 127
+The viewer that reads the file is not installed.
+.SH FILES
+None. odox writes no configuration, no cache and no temporary copy.
+.SH SEE ALSO
+.BR xodt (1),
+.BR xods (1),
+.BR xodp (1)
+.SH AUTHOR
+David M. Anderson.
