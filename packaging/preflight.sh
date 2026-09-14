@@ -89,6 +89,19 @@ else
     echo "skipped: the msvc target is not installed"
 fi
 
+# The Apple target type-checks from here, linker and all skipped: `cargo check`
+# never links, and the objc2 and CoreGraphics crates eframe pulls in on that
+# platform are compiled like any other. So a change that breaks the macOS build
+# is caught on this machine rather than on the next one with a Mac in front of
+# it. It is not a substitute for building there; it is the half that does not
+# need to wait.
+step "the macOS cross-check"
+if rustup target list --installed | grep -q aarch64-apple-darwin; then
+    cargo check --workspace --target aarch64-apple-darwin
+else
+    echo "skipped: the aarch64-apple-darwin target is not installed"
+fi
+
 step "release build"
 cargo build --release
 

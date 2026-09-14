@@ -36,7 +36,8 @@ and hides the other two.
     cargo test --workspace               # the corpus is walked, not named
     cargo clippy --workspace --all-targets -- -D warnings   # what CI runs
     cargo fmt --all
-    cargo check --target x86_64-pc-windows-msvc   # cross-check, from Linux
+    cargo check --target x86_64-pc-windows-msvc    # cross-check, from Linux
+    cargo check --target aarch64-apple-darwin     # and the other one
 
     cargo run -p xodt -- corpus/libreoffice/text.odt
     cargo run -p xods -- corpus/libreoffice/calc.ods
