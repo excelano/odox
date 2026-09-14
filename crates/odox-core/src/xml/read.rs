@@ -67,46 +67,24 @@ pub fn parse(bytes: &[u8], part: &str) -> Result<Element, Error> {
                 push_node(&mut stack, &mut root, Node::Element(done), part)?;
             }
             Event::Text(ref t) => {
-                let decoded = t.xml10_content().map_err(|e| Error::Xml {
-                    part: part.to_owned(),
-                    detail: e.to_string(),
-                })?;
-                push_text(&mut stack, &decoded);
+                push_text(&mut stack, &t.xml10_content());
             }
             Event::GeneralRef(ref r) => {
                 let text = reference(r, part)?;
                 push_text(&mut stack, &text);
             }
             Event::CData(ref c) => {
-                let decoded = c.decode().map_err(|e| Error::Xml {
-                    part: part.to_owned(),
-                    detail: e.to_string(),
-                })?;
-                push_node(
-                    &mut stack,
-                    &mut root,
-                    Node::CData(decoded.into_owned()),
-                    part,
-                )?;
+                let node = Node::CData(c.xml10_content().into_owned());
+                push_node(&mut stack, &mut root, node, part)?;
             }
             Event::Comment(ref c) => {
-                let decoded = c.decode().map_err(|e| Error::Xml {
-                    part: part.to_owned(),
-                    detail: e.to_string(),
-                })?;
-                push_node(
-                    &mut stack,
-                    &mut root,
-                    Node::Comment(decoded.into_owned()),
-                    part,
-                )?;
+                let node = Node::Comment(c.xml10_content().into_owned());
+                push_node(&mut stack, &mut root, node, part)?;
             }
-            Event::PI(ref p) => {
-                let decoded = std::str::from_utf8(p.as_ref()).map_err(|e| Error::Xml {
-                    part: part.to_owned(),
-                    detail: e.to_string(),
-                })?;
-                let node = Node::ProcessingInstruction(decoded.to_owned());
+            Event::PI(p) => {
+                // The target and its content together, as written, so that the
+                // writer can put back the whitespace between them.
+                let node = Node::ProcessingInstruction(p.into_inner().into_owned());
                 push_node(&mut stack, &mut root, node, part)?;
             }
             // The declaration is not kept: the writer emits the one every part
@@ -135,12 +113,9 @@ pub fn parse(bytes: &[u8], part: &str) -> Result<Element, Error> {
 ///
 /// # Errors
 ///
-/// The reference could not be decoded.
+/// A character reference names no character: `&#0;`, or a number past Unicode.
 fn reference(r: &quick_xml::events::BytesRef<'_>, part: &str) -> Result<String, Error> {
-    let name = r.decode().map_err(|e| Error::Xml {
-        part: part.to_owned(),
-        detail: e.to_string(),
-    })?;
+    let name = r.xml10_content();
     let resolved = if r.is_char_ref() {
         r.resolve_char_ref().map_err(|e| Error::Xml {
             part: part.to_owned(),
@@ -228,14 +203,8 @@ fn element_of(start: &BytesStart<'_>, reader: &NsReader<&[u8]>, self_closing: bo
 }
 
 fn resolved_name(reader: &NsReader<&[u8]>, qname: QName<'_>, is_attribute: bool) -> Name {
-    let prefix = qname.prefix().map(|p| {
-        String::from_utf8_lossy(p.as_ref())
-            .into_owned()
-            .into_boxed_str()
-    });
-    let local = String::from_utf8_lossy(qname.local_name().as_ref())
-        .into_owned()
-        .into_boxed_str();
+    let prefix = qname.prefix().map(|p| p.as_ref().into());
+    let local: Box<str> = qname.local_name().as_ref().into();
 
     // A namespace declaration is an attribute whose own prefix is `xmlns`, or
     // whose whole name is. The resolver will not place it in a namespace, and
@@ -262,7 +231,7 @@ fn resolved_name(reader: &NsReader<&[u8]>, qname: QName<'_>, is_attribute: bool)
         reader.resolver().resolve_element(qname)
     };
     let ns = match resolved {
-        ResolveResult::Bound(uri) => Ns::from_uri(&String::from_utf8_lossy(uri.as_ref())),
+        ResolveResult::Bound(uri) => Ns::from_uri(uri.as_ref()),
         // An unprefixed attribute is in no namespace by definition, and a
         // prefix with nothing in scope to bind it is a broken document that is
         // still worth showing.
