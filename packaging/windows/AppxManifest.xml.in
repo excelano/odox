@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The MSIX package manifest, templated the way `control.in` and the manual pages
+  are. `build-msix.ps1` substitutes the placeholders below; nothing here is meant
+  to be edited per build.
+
+  ONE TEMPLATE, THREE PACKAGES
+
+  odox ships three store packages rather than one, because a person opens a
+  spreadsheet and a presentation through different doors and each door is its own
+  listing. One template substituted three ways rather than three templates,
+  because three files claiming three extensions in three near-identical ways is
+  three chances for one of them to drift and no way to notice. `build-msix.ps1`
+  holds the table of what each application substitutes, and the identities come
+  from `identity.psd1`, which is not committed.
+
+  The launcher is not here. It has no window, no file association and no store
+  package, and it ships only on apt.
+
+  WHAT MUST COME FROM PARTNER CENTER, AND WHY IT CANNOT BE GUESSED
+
+  @IDENTITY_NAME@, @PUBLISHER@ and @PUBLISHER_DISPLAY_NAME@ are assigned when the
+  name is reserved. A package whose identity disagrees with the reservation is
+  rejected at upload rather than at review, so there is no way to find out you
+  guessed wrong except by trying. @PUBLISHER@ in particular is a full X.500
+  string, `CN=` with a GUID, and not the display name; it is also the subject a
+  test-signing certificate must carry exactly, because `signtool` refuses to sign
+  a package whose manifest publisher and whose certificate subject differ.
+
+  @VERSION_APPX@ is what `packaging/version.sh` prints when asked for the appx
+  spelling: four parts with the fourth always 0, which the Store requires. It is a different shape from the
+  crate version and from what macOS wants, which is why one script answers all
+  three.
+
+  WHAT IS DECIDED HERE
+
+  One file-type association per package, and the content types are not chosen
+  here: they are OASIS's, they are what `odox_core::media_type` matches a package
+  against, and they are the same strings the `.desktop` entries carry. A Windows
+  install and a Linux one claim the same extensions under the same content types,
+  so a person with both sees one application rather than two that disagree.
+
+  A text document has a second media type, `...text-web`, which LibreOffice
+  writes for a document converted from HTML. It is deliberately not registered:
+  the extension is still `.odt`, an association is keyed by extension, and naming
+  a second content type for the same extension gains nothing the reader does not
+  already do by looking inside the package.
+
+  `LSHandlerRank` has no Windows equivalent. An association here does not claim
+  to be the default handler; it adds the application to `OpenWithProgids` and
+  lets a person choose, which is the right posture for a format this suite reads
+  and does not own.
+
+  Each association carries a logo, which is the application's own drawing, and
+  `make-icons` builds all three from the SVGs the Linux icons ship.
+
+  No capabilities beyond `runFullTrust`. These applications make no network call,
+  need no broad filesystem access - each opens the file it was launched with and
+  writes nothing at all - and ask for no device. A capability requested and
+  unused is a question at certification with no good answer, and it is what a
+  person reads on the store page before installing.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="@IDENTITY_NAME@"
+    Publisher="@PUBLISHER@"
+    Version="@VERSION_APPX@"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>@PRODUCT@</DisplayName>
+    <PublisherDisplayName>@PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>@DESCRIPTION@</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- 10.0.17763 is the oldest Windows 10 that supports the packaging
+         features used here. Raising it excludes machines for nothing; lowering
+         it is not possible. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <!-- The package's languages. `en-us` because the applications are written in
+         US English, `de-de` because they speak German. Both show in Partner
+         Center's Packages panel, and both must match `build-msix.ps1`'s makepri
+         `/dq`, which spells the pair `en-US_de-DE`, or the index has no default
+         language and fails silently.
+
+         Each is also a tag Partner Center opens a *new* submission's store
+         listing under, which is how a package language becomes a listing
+         language. It cannot rename a listing that already exists: that one is
+         deleted and a new one added on the Store listings page. The fleet
+         learned this on duckling and slipcase-desktop. -->
+    <Resource Language="en-us" />
+    <Resource Language="de-de" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="@APPLICATION_ID@"
+      Executable="@EXECUTABLE@"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="@PRODUCT@"
+        Description="@TILE_DESCRIPTION@"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- One `uap:Extension` holding one `uap:FileTypeAssociation`: the
+             schema allows only a single association child per extension, and a
+             manifest with two is rejected by makeappx rather than by anything
+             that would say why. The `Name` is the shell's key for the
+             registration, lowercase with no dot, and it is what an upgrade
+             matches on, so it is as fixed as the extension it stands for. -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="@TYPE_NAME@">
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="@CONTENT_TYPE@">@EXTENSION@</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>@TYPE_DISPLAY_NAME@</uap:DisplayName>
+            <uap:Logo>Assets\FileTypeLogo.png</uap:Logo>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A packaged desktop application needs this and nothing else. See the
+         comment at the top of this file. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
