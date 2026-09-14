@@ -54,3 +54,17 @@ Open `corpus/libreoffice/text.odt`, `calc.ods` and `deck.odp`.
 13. Handing an application the wrong kind of document names the sibling that
     reads it rather than failing silently.
 14. Ctrl+R re-reads a document that changed on disk.
+
+## What no machine here can answer
+
+These are written down because the code for them exists and compiles, and
+nothing on Linux can tell whether it works. Each belongs to the session on the
+platform named.
+
+15. **macOS, the Dock.** Look at it. eframe substitutes its own logo for a
+    viewport that names no icon and hands it to `setApplicationIconImage:`,
+    which outranks the bundle's `.icns`. `odox_ui::run` declines the icon on
+    that platform to prevent it. Finder, Launch Services and every API resolve
+    the right drawing whether or not the fix works, so the Dock is the only
+    place the answer is visible, and two sibling applications shipped the defect
+    before anybody looked.

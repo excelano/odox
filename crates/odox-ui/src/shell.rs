@@ -334,14 +334,38 @@ pub fn run<V: Viewer + 'static>(
     crate::i18n::start();
 
     let id = product.id;
+    let viewport = egui::ViewportBuilder::default()
+        // How a Wayland compositor finds the window's icon and its name: it
+        // matches this against the basename of the `.desktop` entry.
+        .with_app_id(id)
+        .with_title(id)
+        .with_inner_size([1000.0, 760.0])
+        .with_min_inner_size([420.0, 320.0]);
+
+    // **Naming no icon is not neutral on macOS, and it costs the Dock.** The
+    // bundle carries the `.icns` and `CFBundleIconFile` points at it, which is
+    // where a macOS application's icon comes from, so this looks like an arm
+    // with nothing to do. It has something to do: eframe substitutes its own
+    // logo for a viewport that names no icon and hands that to
+    // `setApplicationIconImage:`, which outranks the bundle. Finder, Launch
+    // Services and every API still resolve the right drawing, so nothing short
+    // of a person looking at the Dock finds it, and it caught two of the
+    // sibling applications before it was written down.
+    //
+    // An empty `IconData` declines the icon rather than replacing it:
+    // eframe turns one into `None` and the macOS arm only calls the selector
+    // where there is an image. Handing the drawing over again would also work
+    // and would carry a second copy of it in the binary to overwrite the
+    // bundle's with a worse-scaled equal.
+    //
+    // One line for three windows, because all three come through here.
+    // **Unverified from Linux**: it compiles for the target and nothing else
+    // about it can be checked without looking at a Dock. `CHECKLIST.md` asks.
+    #[cfg(target_os = "macos")]
+    let viewport = viewport.with_icon(egui::IconData::default());
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            // How a Wayland compositor finds the window's icon and its name: it
-            // matches this against the basename of the `.desktop` entry.
-            .with_app_id(id)
-            .with_title(id)
-            .with_inner_size([1000.0, 760.0])
-            .with_min_inner_size([420.0, 320.0]),
+        viewport,
         ..eframe::NativeOptions::default()
     };
 
