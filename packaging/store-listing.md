@@ -6,7 +6,7 @@ shorter limit. Nothing here is submitted yet; the Windows and Mac lanes copy
 from this file into their forms and record in their `SUBMITTING.local.md` what
 the form did with it.
 
-This is written from `CHANGELOG.md`, not beside it. Every claim below appears
+This is written from the release notes, not beside it. Every claim below appears
 there first, checked against the built applications. If the two disagree, the
 changelog is right and this is stale.
 
@@ -82,7 +82,7 @@ lands, by switches at the top of its source.
 ## Release notes
 
 *What's new in this version* on the Microsoft Store and *What's New* on the Mac
-App Store, one version's text each, written from `CHANGELOG.md` and kept latest
+App Store, one version's text each, written from the release notes and kept latest
 first. Only the version being submitted needs a subsection. Everything before
 0.3.0 has none, because neither store has ever served Odox and there is nobody
 upgrading from those to tell.

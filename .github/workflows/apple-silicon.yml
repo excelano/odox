@@ -1,7 +1,7 @@
 # Build, test and open a document on Apple silicon, because nothing else can.
 #
 # This repository is developed on Linux and has no Mac. `cargo check` against
-# `aarch64-apple-darwin` runs in `preflight.sh` and catches a great deal, but it
+# `aarch64-apple-darwin` can run on Linux and catches a great deal, but it
 # never links and never runs, so without this file every Apple-specific line
 # here is code nobody has executed. That includes the one piece that cannot be
 # checked any other way: `odox-ui`'s `opened_document`, the only `unsafe` in the

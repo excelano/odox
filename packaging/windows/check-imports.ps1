@@ -13,7 +13,7 @@
     The defect is invisible from inside the toolchain that causes it: every
     machine that builds has Visual Studio on it. So the check is about the
     artefact and not about whether it runs here, which is the same rule as the
-    `ldd` check `packaging/preflight.sh` runs on the Linux binaries.
+    `ldd` check `linux.yml` runs on the Linux binaries.
 
     It parses the PE import table itself rather than shelling out to dumpbin,
     because dumpbin comes with Visual C++ and a check that needs the toolchain

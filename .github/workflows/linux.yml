@@ -83,6 +83,14 @@ jobs:
       - name: What is installed
         run: rustc -V && cargo -V && dpkg-deb --version | head -1
 
+      - name: The three build scripts still agree
+        run: test "$(md5sum crates/*/build.rs | awk '{print $1}' | sort -u | wc -l)" = 1
+
+      - name: The catalogue template is current
+        run: |
+          sudo apt-get install -y -q gettext >/dev/null
+          crates/odox-ui/po/update-po.sh --check
+
       # The build needs no development packages, and that is measured rather
       # than hoped for: everything a window opens is opened at run time rather
       # than linked. DESIGN.md §2.

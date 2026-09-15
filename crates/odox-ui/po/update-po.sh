@@ -43,7 +43,7 @@
 # anything still in English stands out on sight.
 #
 # `--check` extracts to a temporary file and compares the message set with the
-# committed template, writing nothing. `preflight.sh` runs that: a check that
+# committed template, writing nothing. CI runs that: a check that
 # rewrote the file it was checking would leave the tree dirty after every run,
 # which is what it did until 2026-09-14 — the template carries the moment it was
 # extracted, so re-running it always changes a line.

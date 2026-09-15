@@ -2,7 +2,7 @@
 
 One directory per platform, and each platform's decisions live in its own
 directory. What is here is shared by all three: `version.sh`, which is the only
-thing that reads the version, and `preflight.sh`, which runs everything that has
+thing that reads the version; `ship` runs everything that has
 to be true before a release.
 
 `linux/` holds the desktop entries, the icons and the scripts that install them

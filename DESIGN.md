@@ -331,7 +331,7 @@ shipped and never chosen, which an English window is indistinguishable from — 
 that is now a unit test rather than something a person has to remember to look
 for.
 
-`po/update-po.sh` re-extracts and merges; `preflight.sh` refuses a release whose
+`po/update-po.sh` re-extracts and merges; CI refuses a push whose
 template is behind the source. `msgmerge` marks a reworded message `#, fuzzy` and
 `potext` refuses to load one, so the window falls back to English until somebody
 has read the new sentence: a translation is never silently wrong, it is current or
@@ -355,7 +355,7 @@ program's code runs, which is what the Windows App Certification Kit reads;
 slipcase-desktop failed `DPIAwarenessValidation` until the file existed. It is two
 linker arguments and no resource compiler. The three copies are byte identical and
 read the binary's name from the environment, so there is nothing in them to
-diverge over, and `packaging/preflight.sh` refuses a release where they have
+diverge over, and CI refuses a push where they have
 drifted. The manifest is above each crate's own directory, which `cargo package`
 would not carry, so a build that cannot find it skips it with a warning rather
 than failing — a Store build is made from this repository, where it is there.

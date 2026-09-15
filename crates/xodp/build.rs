@@ -13,7 +13,7 @@
 //! and an empty one is how the window says it has no icon.
 //!
 //! **The three applications carry this file byte for byte identically**, and
-//! `packaging/preflight.sh` refuses a release where they have drifted. It reads
+//! CI refuses a push where they have drifted. It reads
 //! the binary's name from the environment rather than naming one, so the copies
 //! have nothing in them to diverge over. A shared build-dependency crate would
 //! be the other answer and would cost a crate to hold thirty lines.

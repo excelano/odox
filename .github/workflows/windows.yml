@@ -7,7 +7,7 @@
 # they are repeated here because `ci.yml` runs on Linux and three things in this
 # repository are compiled only for this target: `build.rs`'s manifest arm, the
 # `ico` dependency, and the window icon the `include_bytes!` in each application
-# reaches. `preflight.sh`'s `cargo check --target` compiles those; it does not
+# reaches. a `cargo check --target` on Linux compiles those; it does not
 # link them, run them, or read an import table.
 #
 # **Four binaries, not one.** The three viewers and the launcher, which draws no

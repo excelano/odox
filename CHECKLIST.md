@@ -2,7 +2,7 @@
 
 Run against the **packaged** applications, never a developer build, one report
 per item. Everything a machine can settle is in `.github/workflows/linux.yml`
-and `packaging/preflight.sh`; what is here is what needs eyes and a session.
+and `ship`; what is here is what needs eyes and a session.
 
 Install what the release built, rather than what is in `target/`:
 

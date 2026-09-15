@@ -61,7 +61,7 @@ The `Co-Authored-By` names the model and not the context window it ran in.
 
     ./packaging/linux/install.sh         # desktop integration, after a release build
     ./packaging/debian/build-deb.sh      # one .deb per application
-    ./packaging/preflight.sh --ci        # everything above, before a release
+    ship odox                            # the release, from here to every target
 
 **If you are here for a release, run `ship odox`.** There is no release
 document: `ship` is the procedure, and it reports where the current release
@@ -139,7 +139,7 @@ one catalogue for the suite and it lives in `crates/odox-ui/po`, because
 `include_str!` cannot reach above a crate root.
 
 After changing any such sentence, run `crates/odox-ui/po/update-po.sh` and commit
-what it changes; `preflight.sh` refuses a release whose template is behind the
+what it changes; CI refuses a push whose template is behind the
 source. Then look at the result:
 
     crates/odox-ui/po/pseudo.sh
