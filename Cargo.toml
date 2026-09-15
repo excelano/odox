@@ -54,14 +54,13 @@ quick-xml = "0.42"
 # Rust. Same line as waddle's, for the same reason.
 zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
-# The window. Defaults carry accesskit, which stays on.
-eframe = { version = "0.36", default-features = false, features = [
-    "accesskit",
-    "default_fonts",
-    "glow",
-    "wayland",
-    "x11",
-] }
+# The window. Defaults carry accesskit, which stays on, and wgpu, which is the
+# renderer: on Windows that is Direct3D, which every machine has and which has a
+# software path when no driver does, and on macOS it is Metal. The alternative
+# eframe offers is `glow`, over OpenGL, which on Windows arrives with the
+# graphics vendor's driver and is Microsoft's OpenGL 1.1 stand-in without one,
+# below what egui accepts; and which Apple deprecated in 2018.
+eframe = "0.36"
 # Defaults are `xdg-portal` and `wayland`, both pure Rust. The `gtk3` feature
 # links C through gtk-sys and stays off, which is what taking the defaults does.
 rfd = "0.17"
