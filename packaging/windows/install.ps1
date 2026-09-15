@@ -212,10 +212,19 @@ foreach ($app in $Applications) {
 
     # The Open With list, so the shell has a name for the executable itself and
     # a person can reach it from a file it was never registered for.
-    $applications = "$classes\Applications\$($app.Exe)"
-    Set-RegistryValue $applications 'FriendlyAppName' $app.Product
-    Set-RegistryValue "$applications\shell\open\command" '' "`"$installedExe`" `"%1`""
-    Set-RegistryValue "$applications\SupportedTypes" $app.Extension ''
+    #
+    # `$openWith` and not `$applications`, which is what this said until CI
+    # caught it: **PowerShell variable names are case-insensitive**, so
+    # `$applications` and the `$Applications` table above are one variable, and
+    # the first turn of this loop replaced the table with a registry path. The
+    # loop itself finished, because `foreach` had already taken the collection;
+    # the summary at the end of the file then iterated over a string. Under
+    # `Set-StrictMode` that throws. Without it, it prints a blank name and looks
+    # like a typo in a format string.
+    $openWith = "$classes\Applications\$($app.Exe)"
+    Set-RegistryValue $openWith 'FriendlyAppName' $app.Product
+    Set-RegistryValue "$openWith\shell\open\command" '' "`"$installedExe`" `"%1`""
+    Set-RegistryValue "$openWith\SupportedTypes" $app.Extension ''
 }
 
 # --- the Start menu ----------------------------------------------------------
