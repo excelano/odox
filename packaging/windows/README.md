@@ -14,7 +14,8 @@ product. From the repository root:
     ...\uninstall.ps1
     # install, uninstall and what is left is `windows.yml`'s, through
     # excelano/.github's windows-install-check: it registers the real ProgIDs
-    ...\screenshot.ps1 xodt -Out C:\shots\xodt-01-page.png
+    ...\shots.ps1                                # the listing's frames, all three
+    ...\shots.ps1 -Only xodt                     # one application's
 
 `build-msix.ps1` produces one package per application from the release
 executable, the manifest with the identity and version substituted, and the

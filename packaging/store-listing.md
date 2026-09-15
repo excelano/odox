@@ -111,10 +111,13 @@ and `odf`, and none carries the name of another office suite.
 
 ## Screenshots
 
-Each lane takes its own with its platform's script (`packaging/windows/screenshot.ps1`,
+Each lane takes its own with its platform's script (`packaging/windows/shots.ps1`,
 `packaging/macos/screenshot.sh`), against the packaged application, light theme
 first, with the pointer parked off the window and the window photographed by its
-handle. Something is open in every shot: a screenshot of an empty window is what
+handle. The Windows lane names the executable rather than shelling out to the
+document, because an install here adds each application to `OpenWithProgids`
+and never writes `UserChoice`, so on a machine with a full office suite the
+shell opens the office suite. Something is open in every shot: a screenshot of an empty window is what
 guideline 2.3.3 sends back. Each lane records its set here with the version, the
 commit and the resolution.
 
