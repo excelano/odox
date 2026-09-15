@@ -105,7 +105,11 @@ foreach ($app in $Applications) {
 # scripts, which is deliberate: they should survive being called from something
 # stricter than themselves. Swallowing the output of a script that then fails
 # leaves only the line that invoked it, which is the least useful line there is.
-function Run([string] $script, [string[]] $arguments) {
+# A hashtable and not an array, because splatting an array passes its elements
+# *positionally*: `@('-NoBinary')` bound the literal string to `-Prefix`, the
+# first positional parameter, left the switch false, and sent the installer down
+# the arm that copies executables. A hashtable splat binds by name.
+function Run([string] $script, [hashtable] $arguments) {
     try {
         & (Join-Path $here $script) @arguments | Out-Null
     } catch {
@@ -116,7 +120,7 @@ function Run([string] $script, [string[]] $arguments) {
 }
 
 Write-Host 'installing the integration, without executables'
-Run 'install.ps1' @('-NoBinary')
+Run 'install.ps1' @{ NoBinary = $true }
 
 Write-Host 'after install:'
 foreach ($app in $Applications) {
@@ -156,7 +160,7 @@ foreach ($app in $Applications) {
 }
 
 Write-Host 'uninstalling'
-Run 'uninstall.ps1' @()
+Run 'uninstall.ps1' @{}
 
 Write-Host 'after uninstall:'
 foreach ($app in $Applications) {

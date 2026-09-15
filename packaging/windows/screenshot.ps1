@@ -140,8 +140,7 @@ $spec = $APPLICATIONS[$App]
 # the second one describes the function rather than the file, and under
 # Set-StrictMode it is an error rather than a wrong answer. It cost a CI run in
 # this repository once already.
-$here = $PSScriptRoot
-$root = Split-Path -Parent (Split-Path -Parent $here)
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 if (-not $Document) { $Document = Join-Path $root $spec.Sample }
 if (-not (Test-Path $Document)) { Refuse "no document at $Document" }
@@ -205,7 +204,11 @@ Start-Sleep -Seconds 1
 if ($Association) {
     Start-Process $Document
 } else {
-    Start-Process -FilePath $Binary -ArgumentList $Document
+    # Quoted here rather than left to Start-Process, which joins its argument
+    # list with spaces and quotes nothing: an unquoted path with a space in it
+    # arrives as two arguments, and the application reports that it cannot find
+    # the first half of its own corpus directory.
+    Start-Process -FilePath $Binary -ArgumentList "`"$Document`""
 }
 Start-Sleep -Seconds 6
 

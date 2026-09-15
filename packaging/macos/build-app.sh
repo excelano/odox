@@ -135,7 +135,7 @@ table() {
             uti="org.oasis-open.opendocument.presentation"
             type_name="OpenDocument Presentation"
             content_type="application/vnd.oasis.opendocument.presentation"
-            sample="corpus/libreoffice/deck.odp"
+            sample="corpus/libreoffice/growing-liberty.odp"
             ;;
         *)
             echo "build-app.sh: no such application: $1" >&2
@@ -563,6 +563,14 @@ build_store() {
     # `odox.entitlements` with two keys added, and that file says why the sandbox
     # grant is read-write.
     #
+    # **The file grant is read-only, and it has to match `odox.entitlements`.**
+    # This block came in from slipcase-desktop, which edits documents, and asked
+    # for read-write; the development build beside it asks for read-only because
+    # these applications write nothing. That would have shipped a write grant to
+    # review while `packaging/store-listing.md` told the reviewer in writing that
+    # there is "no write entitlement of any kind". Two files stating a capability
+    # is two places for them to disagree, and this is the one that reaches Apple.
+    #
     # `keychain-access-groups` is deliberately absent. The profile grants it and
     # these applications touch no keychain, and a capability asked for and unused
     # is a question at review with no good answer, the same rule
@@ -575,7 +583,7 @@ build_store() {
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-write</key>
+	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
 	<key>com.apple.application-identifier</key>
 	<string>${store_app_id}</string>

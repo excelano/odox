@@ -307,7 +307,7 @@ if args.contains("--park") {
 // The window belonging to a process id. Layer 0 is an ordinary window: a menu,
 // a tooltip and the Dock's own surfaces are all above it, and one of those
 // would otherwise be photographed as though it were the application.
-let wanted = args.count > 1 ? Int(args[1]) ?? -1 : -1
+let wanted = args.count > 1 ? (Int(args[1]) ?? -1) : -1
 guard
     let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)
         as? [[String: Any]]
@@ -316,7 +316,7 @@ else {
     exit(2)
 }
 for w in windows {
-    guard w[kCGWindowOwnerPID as String] as? Int == wanted,
+    guard (w[kCGWindowOwnerPID as String] as? Int) == wanted,
           (w[kCGWindowLayer as String] as? Int ?? -1) == 0,
           let number = w[kCGWindowNumber as String] as? Int
     else { continue }
