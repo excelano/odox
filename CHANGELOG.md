@@ -4,9 +4,12 @@ All notable changes to odox are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] — 2026-09-14
 
-Five gaps in the slide renderer, found by comparing what it draws against what
+Five gaps in the slide renderer, a crash a drag-and-drop away on every platform,
+and the groundwork for Windows and macOS.
+
+The renderer gaps were found by comparing what odox draws against what
 LibreOffice draws from the same file. Across the twelve slides of
 `growing-liberty.odp` it now paints 98.7% of each the same colour on average and
 97.1% at worst, where three of the twelve were under 93% and the worst was 82%.
@@ -30,8 +33,20 @@ LibreOffice draws from the same file. Across the twelve slides of
   as a polygon, and a turned picture as its own four corners. A turned shape's
   label is left undrawn.
 
+- The window's icon on Windows, and the document macOS sends instead of an
+  argument. Neither platform ships yet: the packaging for both is built and the
+  part that needs each machine is not. Both are exercised on every push by a
+  runner, which is how the crash below was found.
+
 ### Fixed
 
+- **Opening a document could abort the process.** A document names font
+  families, registering them takes effect at the start of the next frame, and
+  the document was being drawn in the frame that opened it, so it asked for a
+  family the definitions in force did not carry. egui does not fall back for
+  that. Every way of opening a document but one goes through a frame: a drop,
+  Ctrl+O, Reload. The exception is the path on the command line, which is why
+  this survived every screenshot taken of it.
 - A frame whose picture is stated more than once — an SVG and then a PNG of the
   same drawing, which is how the templates carry their decorations — drew the
   first child and nothing else. It now takes the first one that decodes.

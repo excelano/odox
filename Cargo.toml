@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 authors = ["David M. Anderson"]
 license = "MIT"
@@ -39,8 +39,8 @@ rust-version = "1.95"
 # The two shared crates. A version requirement cannot inherit
 # `workspace.package.version` and crates.io rejects a path-only dependency, so
 # the number is written twice by necessity; flyleaf's manifest says the same.
-odox-core = { path = "crates/odox-core", version = "0.2.1" }
-odox-ui = { path = "crates/odox-ui", version = "0.2.1" }
+odox-core = { path = "crates/odox-core", version = "0.3.0" }
+odox-ui = { path = "crates/odox-ui", version = "0.3.0" }
 
 # Reading XML. A pull parser rather than a DOM library, because the document
 # tree this crate keeps is its own and a second tree to copy out of would be

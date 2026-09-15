@@ -12,9 +12,9 @@ hand-cut loop in the fleet's `~/notes/releasing.md`, and `ship` runs it.
 | Loop | hand-cut |
 | Version lives in | `Cargo.toml` |
 | `apt-ship` argument | `odox` |
-| Packages per release | 6, three applications on amd64 and arm64 |
-| crates | `odox-core` `odox-ui` `xodt` `xods` `xodp`, in that order |
-| Store lanes | none yet |
+| Packages per release | 8, three applications and the launcher on amd64 and arm64 |
+| crates | `odox-core` `odox-ui` `xodt` `xods` `xodp` `odox`, in that order |
+| Store lanes | reserved on both, neither submitted |
 
 ## The loop
 
@@ -29,12 +29,17 @@ to be done by hand.
 
 ## The order
 
-**Debian first, then crates.io, then a store lane when one exists.** Linux needs
-no other machine, apt is our own repository — publishing is one command and
-unpublishing is a prune — and nothing sits in anybody's review queue. Neither
-Windows nor macOS has a lane yet; `packaging/windows/README.md` and
-`packaging/macos/README.md` say what each still needs, and apt being ahead of a
-store is a stated fact rather than an exception.
+**Debian first, then crates.io, then a store lane.** Linux needs no other
+machine, apt is our own repository — publishing is one command and unpublishing
+is a prune — and nothing sits in anybody's review queue.
+
+Both store lanes now have reserved names, built packaging and a workflow that
+exercises them on every push, and neither has been submitted: what is left in
+each is the part that needs that machine, which is signing, the certification
+kit, the screenshots and a person looking at a Dock or a taskbar.
+`packaging/windows/README.md` and `packaging/macos/README.md` say what each
+still needs, and `CHECKLIST.md` holds the items no machine here can answer. apt
+being ahead of a store is a stated fact rather than an exception.
 
 ## Step 1 — Verify and bump
 
