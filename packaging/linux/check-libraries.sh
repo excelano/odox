@@ -10,7 +10,15 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$here/../.."
-target="${CARGO_TARGET_DIR:-$root/target}"
+# Where cargo actually puts things, asked rather than assumed. `[build]
+# target-dir` in a Cargo configuration file moves the target directory and
+# `CARGO_TARGET_DIR` is not set when it does, so the fallback below is only
+# right on a machine that has not moved it. The Windows and macOS scripts have
+# always asked; the Linux ones guessed until 2026-09-14, when a release build
+# and the check that reads it disagreed about where the binaries were.
+target=$(cargo metadata --format-version 1 --no-deps 2>/dev/null |
+    sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+[ -n "$target" ] || target="${CARGO_TARGET_DIR:-$root/target}"
 app="${1:-xodt}"
 document="${2:-$root/corpus/libreoffice/text.odt}"
 binary="$target/release/$app"

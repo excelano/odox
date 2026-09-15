@@ -105,6 +105,21 @@ fi
 step "release build"
 cargo build --release
 
+# Where cargo actually puts things, asked rather than assumed.
+#
+# `[build] target-dir` in a Cargo configuration file moves the target directory,
+# and `CARGO_TARGET_DIR` is not set when it does: the fallback below is only
+# right on a machine that has not moved it. This one has, in
+# `~/.cargo/config.toml`, so every step after this looked in a directory with
+# nothing in it and the first of them reported the release binaries missing
+# immediately after building them. The Windows and macOS scripts already ask
+# cargo, with a comment saying the Linux side learned it the hard way; it had
+# not, until now.
+release=$(cargo metadata --format-version 1 --no-deps 2>/dev/null |
+    sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+[ -n "$release" ] || release="${CARGO_TARGET_DIR:-$root/target}"
+release="$release/release"
+
 step "nothing compiled C"
 # The check is the artefact and never the manifest: `cargo tree -i cc` is not
 # empty in any eframe tree. DESIGN.md §2.
@@ -115,7 +130,7 @@ step "nothing compiled C"
 # something new. Fewer is not new; what matters is that nothing outside the set
 # appears.
 for app in xodt xods xodp odox; do
-    binary="${CARGO_TARGET_DIR:-$root/target}/release/$app"
+    binary="$release/$app"
     needed=$(objdump -p "$binary" | awk '/NEEDED/ {print $2}' | sort | tr '\n' ' ')
     printf '%-6s %s\n' "$app" "$needed"
     strange=$(printf '%s\n' $needed | grep -vE '^(libc\.so\.6|libgcc_s\.so\.1|libm\.so\.6)$' || true)
@@ -127,7 +142,7 @@ done
 
 step "size"
 for app in xodt xods xodp odox; do
-    binary="${CARGO_TARGET_DIR:-$root/target}/release/$app"
+    binary="$release/$app"
     printf '%-6s %s\n' "$app" "$(du -h "$binary" | cut -f1)"
 done
 
