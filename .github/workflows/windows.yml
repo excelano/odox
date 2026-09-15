@@ -21,10 +21,22 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
+      # Optional, because a screenshots run has no tag to give. With one the
+      # package is attached to that release; without one it is built and kept
+      # as an artefact.
       tag:
         description: 'Tag to package for (e.g. v0.3.1)'
-        required: true
+        required: false
         type: string
+      # A choice rather than a boolean, because there is a third thing to ask
+      # for: `reference` takes the one plain frame a coordinate gets measured
+      # off, and `full` takes the set.
+      screenshots:
+        description: 'Store screenshots'
+        required: false
+        default: 'no'
+        type: choice
+        options: ['no', 'reference', 'full']
 
 permissions:
   contents: write
@@ -34,7 +46,7 @@ concurrency:
   # so the two never share a group. `github.ref` is refs/heads/main for a
   # workflow_dispatch as much as for a push, so keying on it alone lets a push
   # to main cancel the dispatched run that is building a release's package.
-  group: windows-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  group: windows-${{ github.event.release.tag_name || inputs.tag || format('{0}-{1}', github.event_name, github.ref) }}
   # A superseded check is worth cancelling; a half-built release is not.
   cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
@@ -168,3 +180,18 @@ jobs:
           tag: ${{ github.event.release.tag_name || inputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -All
+
+      # Off unless asked for. A bug fix should not pay for a set of Store
+      # screenshots, and a set nobody asked for is a set nobody looks at.
+      # `shots.ps1` carries the recipes and is the same command that retakes
+      # them by hand on the Windows machine.
+      #
+      # No install step: this repository's frames launch the release
+      # executables by name with the document as an argument, because an
+      # install here never writes `UserChoice` and on a machine with an office
+      # suite the shell would open the office suite.
+      - name: The Store screenshots
+        if: inputs.screenshots && inputs.screenshots != 'no'
+        uses: excelano/.github/.github/actions/store-screenshots@main
+        with:
+          mode: ${{ inputs.screenshots }}
