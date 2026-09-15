@@ -1,9 +1,9 @@
 # Windows
 
 The lane needs a Windows machine with a Rust toolchain, the Windows SDK for
-`makeappx` and `signtool`, and `identity.psd1` copied from
-`identity.psd1.example` with the values Partner Center assigned; that copy is
-not committed. From the repository root:
+`makeappx` and `signtool`, and `$env:STORE_PUBLISHER` set to Partner Center's
+Package/Identity/Publisher, which is the same X.500 string for every Excelano
+product. From the repository root:
 
     cargo build --release
     powershell -ExecutionPolicy Bypass -File packaging\windows\check-imports.ps1

@@ -248,24 +248,23 @@ if ($All -and $Binary) {
 
 # --- the identity, from one place -------------------------------------------
 
-# `identity.psd1` holds what Partner Center assigned. The manifest keeps its
-# placeholders, so that nothing has to be edited per build and so that the one
-# file a person might mistype lives beside a comment saying where its values came
-# from.
-#
-# It is not committed - `.gitignore` says why - so a fresh checkout does not have
-# one, and the refusal names the template rather than just the missing path. A
-# build script whose first failure is "no such file" teaches nothing.
+# `identity.psd1` beside this holds what is public: the reserved name, the
+# publisher display name, and the calculated forms. `Publisher` is the X.500
+# string Partner Center assigns per account, the same for every Excelano
+# product, and it comes from the environment so that a public repository does
+# not carry an account identifier: `windows.yml` passes the organisation
+# variable STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
+# own environment before running this.
 $identityFile = Join-Path $here 'identity.psd1'
 if (-not (Test-Path $identityFile)) {
-    Refuse "no identity at $identityFile - copy identity.psd1.example beside it and fill in what Partner Center shows under Product management, Product identity"
+    Refuse "no identity at $identityFile - it is committed beside this script and should not be missing"
 }
 $identity = Import-PowerShellDataFile $identityFile
-foreach ($field in 'Publisher', 'PublisherDisplayName') {
+foreach ($field in 'PublisherDisplayName') {
     if (-not $identity.$field) { Refuse "identity.psd1 has no $field" }
 }
 if (-not $identity.Applications) {
-    Refuse "identity.psd1 has no Applications table - it holds one identity per application now, keyed by binary, and identity.psd1.example shows the shape"
+    Refuse "identity.psd1 has no Applications table - it holds one identity per application, keyed by binary"
 }
 # Only the names about to be used are required, so that a half-filled file can
 # still build the application whose name has been reserved. Three reservations
@@ -278,13 +277,16 @@ foreach ($name in $names) {
         Refuse "identity.psd1's $name entry has no Name, which is what Partner Center calls Package/Identity/Name"
     }
 }
+$publisher = $env:STORE_PUBLISHER
+if (-not $publisher) {
+    Refuse 'no STORE_PUBLISHER in the environment - it is the X.500 string Partner Center shows under Product management, Product identity, as Package/Identity/Publisher, and it is the excelano organisation variable of that name'
+}
 # The one value with a shape worth checking. `Publisher` is an X.500 string and
 # the display name is what gets put there by mistake; a package whose Publisher
 # does not match the reservation is rejected at upload, which is the most
-# expensive place to find out. It is per-account, so checking it once covers all
-# three packages.
-if ($identity.Publisher -notmatch '^CN=') {
-    Refuse "identity.psd1's Publisher is '$($identity.Publisher)', which is not an X.500 string - Partner Center's Package/Identity/Publisher begins CN="
+# expensive place to find out.
+if ($publisher -notmatch '^CN=') {
+    Refuse "STORE_PUBLISHER is '$publisher', which is not an X.500 string - Partner Center's Package/Identity/Publisher begins CN="
 }
 
 # --- the version, from the one parser ---------------------------------------
@@ -451,7 +453,7 @@ function Build-Package([string] $name) {
     $manifest = Get-Content (Join-Path $here 'AppxManifest.xml.in') -Raw
     $manifest = $manifest.
         Replace('@IDENTITY_NAME@', $identityName).
-        Replace('@PUBLISHER@', $identity.Publisher).
+        Replace('@PUBLISHER@', $publisher).
         Replace('@PUBLISHER_DISPLAY_NAME@', $identity.PublisherDisplayName).
         Replace('@VERSION_APPX@', $version).
         Replace('@PRODUCT@', $spec.Product).
@@ -550,7 +552,7 @@ function Build-Package([string] $name) {
     Write-Host ''
     Write-Host "built $package"
     Write-Host "  identity  $identityName"
-    Write-Host "  publisher $($identity.Publisher)"
+    Write-Host "  publisher $($publisher)"
     Write-Host "  version   $version"
     Write-Host "  from      $exe"
     # Said out loud because the package name is deterministic, so a plain run
@@ -578,13 +580,13 @@ function Build-Package([string] $name) {
         # against: the subject is what signtool checks, the packages are all this
         # account's, and the certificate is a throwaway either way.
         $cert = Get-ChildItem Cert:\CurrentUser\My |
-            Where-Object { $_.Subject -eq $identity.Publisher -and $_.HasPrivateKey } |
+            Where-Object { $_.Subject -eq $publisher -and $_.HasPrivateKey } |
             Sort-Object NotAfter -Descending |
             Select-Object -First 1
         if (-not $cert) {
-            Write-Host "making a throwaway signing certificate for $($identity.Publisher)"
+            Write-Host "making a throwaway signing certificate for $($publisher)"
             $cert = New-SelfSignedCertificate -Type CodeSigningCert `
-                -Subject $identity.Publisher `
+                -Subject $publisher `
                 -KeyUsage DigitalSignature `
                 -FriendlyName 'Excelano MSIX test signing (throwaway)' `
                 -CertStoreLocation Cert:\CurrentUser\My `
