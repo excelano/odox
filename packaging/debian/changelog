@@ -1,3 +1,20 @@
+odox (0.3.0) unstable; urgency=low
+
+  * xodp draws five more of what a slide is made of: draw:path outlines,
+    connectors routed between the shapes they join, the labels a shape carries
+    directly, and shapes placed by draw:transform, which are the turned
+    decorations a template is recognised by and which were dropped entirely
+    before this.
+  * A frame offering its picture twice, as an SVG and then a PNG, now takes the
+    first one that can be decoded rather than the first one listed.
+  * Opening a document no longer aborts. A document names font families,
+    registering them takes effect on the next frame, and the document was drawn
+    in the frame that opened it. Reachable by dropping a document on the window
+    or with Ctrl+O.
+  * Groundwork for Windows and macOS, neither of which ships yet.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 14 Sep 2026 21:45:55 -0500
+
 odox (0.2.1) unstable; urgency=low
 
   * The odox package depends on the three viewers rather than recommending
