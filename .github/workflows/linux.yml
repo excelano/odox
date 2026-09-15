@@ -110,10 +110,11 @@ jobs:
               test "$got" = "${{ matrix.arch }}"
           done
 
-      # One package per application per architecture; `ship.conf` carries the number.
+      # One package per application per architecture; `commands` in `ship.conf`
+      # is the list of applications.
       - name: There are as many packages as there are applications
         run: |
-          expected=$(sed -n 's/^deb_packages=//p' ship.conf)
+          expected=$(sed -n 's/^commands=//p' ship.conf | wc -w)
           found=$(ls dist/*.deb | wc -l)
           echo "expected ${expected}, found ${found}"
           test "$found" = "$expected"
