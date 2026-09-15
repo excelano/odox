@@ -130,11 +130,6 @@ jobs:
             Write-Host "$app : the icon directory is in the binary"
           }
 
-      # Nothing else reaches the installer and its uninstaller. This registers real
-      # entries under HKCU and takes them away, so it belongs on a build agent.
-      - name: The integration installs, uninstalls, and leaves nothing behind
-        run: powershell -ExecutionPolicy Bypass -File packaging/windows/check-install.ps1
-
       # The `.ico` files, the package assets and the `.icns` files are committed
       # artefacts, so the generator is run and its output compared with the tree,
       # over whole directories rather than named files.
@@ -142,6 +137,17 @@ jobs:
         run: |
           cargo run --manifest-path packaging/make-icons/Cargo.toml
           git diff --exit-code -- packaging/windows packaging/macos packaging/icons
+
+      # The install scripts against the registry, read back. The steps are
+      # excelano/.github's: it was the same script in three repositories and
+      # absent from three more, and the absent ones included the repository
+      # whose uninstall reported success while leaving the association dead.
+      - name: The integration goes on and comes off cleanly
+        uses: excelano/.github/.github/actions/windows-install-check@main
+        with:
+          associations: '[{"extension": ".odt", "progId": "Excelano.Odox.Text", "contentType": "application/vnd.oasis.opendocument.text"}, {"extension": ".ods", "progId": "Excelano.Odox.Grid", "contentType": "application/vnd.oasis.opendocument.spreadsheet"}, {"extension": ".odp", "progId": "Excelano.Odox.Deck", "contentType": "application/vnd.oasis.opendocument.presentation"}]'
+          owns-extension: 'false'
+          install-args: '-NoBinary'
 
       # The Store takes the package unsigned, and the runner assembles the one that
       # is uploaded. The steps are excelano/.github's, because they were the same in

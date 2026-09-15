@@ -12,7 +12,8 @@ product. From the repository root:
     ...\build-msix.ps1 xodt -SelfSign -Certify    # and the certification kit, elevated
     ...\install.ps1                               # per-user integration, under HKCU
     ...\uninstall.ps1
-    ...\check-install.ps1                         # install, uninstall, nothing left
+    # install, uninstall and what is left is `windows.yml`'s, through
+    # excelano/.github's windows-install-check: it registers the real ProgIDs
     ...\screenshot.ps1 xodt -Out C:\shots\xodt-01-page.png
 
 `build-msix.ps1` produces one package per application from the release
