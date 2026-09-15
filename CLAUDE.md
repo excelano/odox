@@ -63,10 +63,9 @@ The `Co-Authored-By` names the model and not the context window it ran in.
     ./packaging/debian/build-deb.sh      # one .deb per application
     ./packaging/preflight.sh --ci        # everything above, before a release
 
-**If you are here for a release, read `RELEASE.md`.** It is the live document and
-it holds the process rather than the history: what the next release costs, in the
-order it is done. `ship odox` reports where the current one stands and
-`ship odox <version>` runs it.
+**If you are here for a release, run `ship odox`.** There is no release
+document: `ship` is the procedure, and it reports where the current release
+stands before it changes anything.
 
 The build target directory is shared across the fleet and fills the disk. Check
 `df -h /` before a long build; a debug tree of three eframe applications is
