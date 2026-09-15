@@ -5,16 +5,20 @@
 # a message about a missing file rather than the dialog that would have let a
 # person pick something else.
 #
-# **This one has less to undo than the fleet's, and that is by design.**
-# `install.ps1` never writes the default value of an extension key and never
-# writes `UserChoice`, so there is no default handler here to strand. The
-# failure those keys cause is well recorded: slipcase-desktop's uninstaller left
-# `UserChoice` behind and an extension pointed at a program that was gone, and
-# flyleaf's had to learn to delete that key by name from its parent because
-# removing the tree was not enough. Neither applies to a key nobody wrote. The
-# `OpenWithProgids` value is removed by name below, which is the one thing here
-# that does have to be surgical: the key belongs to the extension and to every
-# other application that has ever offered to open one, so the tree must not go.
+# **`install.ps1` never writes the default value of an extension key**, so
+# there is no default handler here to take over or to strand, and the
+# `OpenWithProgids` value is removed by name: that key belongs to the extension
+# and to every other application that has ever offered to open one, so the tree
+# must not go.
+#
+# **`UserChoice` is Explorer's to write, not this installer's, and it still has
+# to be removed.** Choosing "always open with" writes one naming our ProgID,
+# and an uninstall that leaves it points the extension at a program that is
+# gone — which Windows treats as no association at all rather than falling back
+# to the machine-wide one. This file argued the key could not exist because
+# nothing here writes it; that conflates who writes it with whether it is
+# there. Removed by name from the parent, because Explorer writes a Deny
+# SetValue rule on it and a tree delete fails against that silently.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -76,6 +80,23 @@ foreach ($app in $Applications) {
     Remove-Key "$classes\Applications\$($app.Exe)"
     Remove-Key "$classes\MIME\Database\Content Type\$($app.ContentType)"
     Remove-Value "$classes\$($app.Extension)\OpenWithProgids" $app.ProgId
+
+    # Only when it names this application: on a shared extension it may well
+    # name somebody else's, and that choice is theirs to keep.
+    $exts = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$($app.Extension)"
+    $choice = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("$exts\UserChoice", $false)
+    if ($choice) {
+        $chosen = $choice.GetValue('ProgId', $null)
+        $choice.Close()
+        if ($chosen -eq $app.ProgId) {
+            # DELETE on the child and nothing else, which the rule beside the
+            # deny allows, unelevated.
+            $parent = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($exts, $true)
+            if ($parent) {
+                try { $parent.DeleteSubKey('UserChoice', $false) } finally { $parent.Close() }
+            }
+        }
+    }
 }
 
 Remove-Key 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Odox'
