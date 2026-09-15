@@ -101,8 +101,22 @@ foreach ($app in $Applications) {
     $before[$app.Extension] = Get-Value "$classes\$($app.Extension)" ''
 }
 
+# Run, and say where if it throws. `Set-StrictMode` above is inherited by both
+# scripts, which is deliberate: they should survive being called from something
+# stricter than themselves. Swallowing the output of a script that then fails
+# leaves only the line that invoked it, which is the least useful line there is.
+function Run([string] $script, [string[]] $arguments) {
+    try {
+        & (Join-Path $here $script) @arguments | Out-Null
+    } catch {
+        Write-Host "  FAIL  $script threw: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host $_.ScriptStackTrace
+        exit 1
+    }
+}
+
 Write-Host 'installing the integration, without executables'
-& (Join-Path $here 'install.ps1') -NoBinary | Out-Null
+Run 'install.ps1' @('-NoBinary')
 
 Write-Host 'after install:'
 foreach ($app in $Applications) {
@@ -142,7 +156,7 @@ foreach ($app in $Applications) {
 }
 
 Write-Host 'uninstalling'
-& (Join-Path $here 'uninstall.ps1') | Out-Null
+Run 'uninstall.ps1' @()
 
 Write-Host 'after uninstall:'
 foreach ($app in $Applications) {
