@@ -10,10 +10,10 @@
 # The fourth is `odox`, the launcher, and it is the odd one: a command rather
 # than an application, so it has no desktop entry, no icon and a manual page of
 # its own. **It depends on the three viewers, which makes it the way to install
-# the suite**: `apt install odox` brings the whole of odox. It recommended them
-# until 2026-09-14, which installs them on a default Debian and not on one with
-# `APT::Install-Recommends` off or an `apt install --no-install-recommends` — and
-# a launcher whose viewers are absent is a command that can only apologise.
+# the suite**: `apt install odox` brings the whole of odox. Depends rather than
+# Recommends, because a recommendation is skipped with `APT::Install-Recommends`
+# off or under `apt install --no-install-recommends`, and a launcher whose
+# viewers are absent is a command that can only apologise.
 #
 # Unversioned, because there is no coupling to version: the launcher finds a
 # viewer by name and hands the file over, so any version of one works with any
@@ -25,9 +25,7 @@ root="$here/../.."
 # Where cargo actually puts things, asked rather than assumed. `[build]
 # target-dir` in a Cargo configuration file moves the target directory and
 # `CARGO_TARGET_DIR` is not set when it does, so the fallback below is only
-# right on a machine that has not moved it. The Windows and macOS scripts have
-# always asked; the Linux ones guessed until 2026-09-14, when a release build
-# and the check that reads it disagreed about where the binaries were.
+# right on a machine that has not moved it.
 target=$(cargo metadata --format-version 1 --no-deps 2>/dev/null |
     sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
 [ -n "$target" ] || target="${CARGO_TARGET_DIR:-$root/target}"

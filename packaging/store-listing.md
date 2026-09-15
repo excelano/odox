@@ -1,25 +1,10 @@
 # Store listing text
 
-One draft, used six times: three applications on two stores. Both stores want
-the same things at different lengths, so everything here is written to the
-shorter limit. Nothing here is submitted yet; the Windows and Mac lanes copy
-from this file into their forms and record in their `SUBMITTING.local.md` what
-the form did with it.
-
-This is written from the release notes, not beside it. Every claim below appears
-there first, checked against the built applications. If the two disagree, the
-changelog is right and this is stale.
-
-**Three listings and not one.** A person opens a spreadsheet and a presentation
-through different doors, which is why these are three applications, and it is
-why each has its own store record. What is shared sits at the top of this file
-and is written once; what differs sits in a section per application. A sentence
-that appears in all three is written in the shared part and referred to, rather
-than copied and left to drift.
-
-Limits, so a later edit does not overrun them. **Count them rather than
-estimating**, in both languages, after any edit to either: German ran four
-fields over on its first draft and every one was a sentence that reads fine.
+One draft for three applications on two stores, written to the shorter of each
+pair of limits. What is shared sits at the top; what differs sits in a section
+per application. `store-listing.de-de.md` is the German half, under the same
+headings. Count the limits rather than estimating, in both languages, after any
+edit:
 
     python3 - <<'EOF'
     import re
@@ -40,7 +25,6 @@ fields over on its first draft and every one was a sentence that reads fine.
                     print(f'{path} {app} {head}: {len(body)} over {cap}')
     EOF
 
-
 | Field | Microsoft Store | Mac App Store |
 | --- | --- | --- |
 | App name | unmeasured | 30 |
@@ -50,13 +34,9 @@ fields over on its first draft and every one was a sentence that reads fine.
 | Promotional text | — | 170 |
 | Keywords | 7 terms | 100 characters |
 
-**The API's limit is not the form's, and the API's is the one that binds.**
-Partner Center's form takes 1,000 characters of short description. The
-submission API refuses anything over 500, and it refuses it while copying the
-*published* listing into the new draft, so a listing that went up through the
-form over 500 blocks the next upload before the new text is ever sent. The fleet
-measured that on Duckling. Nothing of Odox's has been submitted, so writing to
-500 from the start is what keeps that wall from being built here.
+The short description is written to 500 although Partner Center's form takes
+1,000: the submission API refuses more, and it refuses while copying the
+published listing into the next draft, so a longer one blocks every later upload.
 
 ---
 
@@ -64,8 +44,7 @@ measured that on Duckling. Nothing of Odox's has been submitted, so writing to
 
 ## URLs
 
-Both forms ask for the same three, all three listings carry the same values, and
-both lanes take them from here:
+All three listings carry the same values:
 
 | Field | URL |
 | --- | --- |
@@ -73,19 +52,10 @@ both lanes take them from here:
 | Support | https://excelano.com/odox/#support |
 | Marketing / website | https://excelano.com/odox/ |
 
-The page at `excelano.com/odox/` is the support and marketing URL both, the way
-every other application's is. It is a suite page rather than an application
-page, because all three listings point at it and a visitor arrives knowing about
-one of three. The store badges and the apt install block appear on it as each
-lands, by switches at the top of its source.
-
 ## Release notes
 
 *What's new in this version* on the Microsoft Store and *What's New* on the Mac
-App Store, one version's text each, written from the release notes and kept latest
-first. Only the version being submitted needs a subsection. Everything before
-0.3.0 has none, because neither store has ever served Odox and there is nobody
-upgrading from those to tell.
+App Store, one version's text each, latest first.
 
 ### 0.3.0
 
@@ -137,20 +107,16 @@ complete source is at https://github.com/excelano/odox.
 ## Keywords, shared terms
 
 Each application's own list is in its section. All three carry `opendocument`
-and `odf`, because that is what a person searching for any of them types, and
-none carries the name of another office suite.
+and `odf`, and none carries the name of another office suite.
 
 ## Screenshots
 
-Each lane takes its own with its platform's script, against the packaged
-application, light theme first because both platforms ship light by default,
-with the pointer parked off the window and the window photographed by its
-handle. **Something is open in every shot**, because a screenshot of an empty
-window is what guideline 2.3.3 sends back, and because these applications show
-nothing until a document is in them.
-
-None taken yet. Each lane records its own set here when it does, with the
-version, the commit and the resolution, the way the sibling repositories do.
+Each lane takes its own with its platform's script (`packaging/windows/screenshot.ps1`,
+`packaging/macos/screenshot.sh`), against the packaged application, light theme
+first, with the pointer parked off the window and the window photographed by its
+handle. Something is open in every shot: a screenshot of an empty window is what
+guideline 2.3.3 sends back. Each lane records its set here with the version, the
+commit and the resolution.
 
 ---
 
@@ -161,9 +127,9 @@ version, the commit and the resolution, the way the sibling repositories do.
     Microsoft Store   Odox Text
     Mac App Store     Odox Text
 
-Reserved on both, 2026-09-14. The binary is `xodt` and stays lowercase; the five
-places carrying the product name agree: Partner Center, App Store Connect,
-`Package/Properties/DisplayName`, `CFBundleDisplayName`, and the product page.
+The binary is `xodt` and stays lowercase. Partner Center, App Store Connect,
+`Package/Properties/DisplayName`, `CFBundleDisplayName` and the product page all
+carry the name above.
 
 ## Subtitle (Mac App Store, 30)
 
@@ -229,7 +195,7 @@ Written in Rust, free, and open source under the MIT licence, at https://github.
     Microsoft Store   Odox Grid
     Mac App Store     Odox Grid
 
-Reserved on both, 2026-09-14. The binary is `xods`.
+The binary is `xods`.
 
 ## Subtitle (Mac App Store, 30)
 
@@ -298,7 +264,7 @@ Written in Rust, free, and open source under the MIT licence, at https://github.
     Microsoft Store   Odox Deck
     Mac App Store     Odox Deck
 
-Reserved on both, 2026-09-14. The binary is `xodp`.
+The binary is `xodp`.
 
 ## Subtitle (Mac App Store, 30)
 

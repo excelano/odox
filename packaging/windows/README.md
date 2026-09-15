@@ -1,45 +1,42 @@
 # Windows
 
-Nothing here has been built yet. What is in place is the part that is expensive
-to add later and cheap to add now, and the reasoning for each is in `DESIGN.md`
-§9.
+The lane needs a Windows machine with a Rust toolchain, the Windows SDK for
+`makeappx` and `signtool`, and `identity.psd1` copied from
+`identity.psd1.example` with the values Partner Center assigned; that copy is
+not committed. From the repository root:
 
-`odox.manifest` is embedded in all three binaries by each crate's `build.rs`,
-through two linker arguments and no resource compiler. It declares per-monitor
-DPI awareness, which the Windows App Certification Kit reads out of the manifest
-rather than out of the running process, and UTF-8 as the active code page.
+    cargo build --release
+    powershell -ExecutionPolicy Bypass -File packaging\windows\check-imports.ps1
+    powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -All
+    ...\build-msix.ps1 xodt -SelfSign             # installable here, to look at
+    ...\build-msix.ps1 xodt -SelfSign -Certify    # and the certification kit, elevated
+    ...\install.ps1                               # per-user integration, under HKCU
+    ...\uninstall.ps1
+    ...\check-install.ps1                         # install, uninstall, nothing left
+    ...\screenshot.ps1 xodt -Out C:\shots\xodt-01-page.png
 
-`check-imports.ps1` refuses any import that does not ship with Windows. Run it on
-each release binary. It pairs with `+crt-static` in `.cargo/config.toml`, and the
-two together are what answers the certification failure recorded in the script's
-own header.
+`build-msix.ps1` produces one package per application from the release
+executable, the manifest with the identity and version substituted, and the
+assets under `assets\`. The Store signs what it distributes; `-SelfSign` makes a
+throwaway certificate so a package can be installed and looked at here, and
+`-Certify` runs the Windows App Certification Kit against it. `windows.yml`
+runs on every push the checks that need no identity; the package build, the kit
+and the screenshots need this machine.
 
-## Claiming a file type, and how far
+`odox.manifest` is embedded in all three viewers by each crate's `build.rs`,
+through two linker arguments and no resource compiler; it declares per-monitor
+DPI awareness and UTF-8 as the active code page. The window icon travels the
+same way: `build.rs` stages the `.ico` into `OUT_DIR` and the application
+includes it. `check-imports.ps1` refuses any import that does not ship with
+Windows, which together with `+crt-static` in `.cargo/config.toml` keeps the
+Visual C++ runtime out of a shipped binary.
 
-**These applications never write `UserChoice`.** An install adds each one to
-`OpenWithProgids` for its extension, so it appears in Open With and a person can
-choose it, and it stops there. It does not make itself the default for `.odt`.
+## Claiming a file type
 
-That is the same posture the macOS bundle takes with `LSHandlerRank` set to
-`Alternate`, and for the same reason: OpenDocument is a format this suite reads
-and does not own, on a machine that may well have a full office suite already
-claiming it. Taking the default without being asked is a thing a person then has
-to undo.
-
-It also removes a failure the fleet has already had. A script that writes
-`UserChoice` has to delete it on the way out, slipcase-desktop's did not, and the
-extension was left pointing at a program that was no longer there; flyleaf's
-uninstaller deletes the key by name from its parent because `DeleteSubKeyTree`
-was not enough. None of that applies to a key nobody writes.
-
-## What is left to do here
-
-A window icon: Windows takes one from a resource compiled into the executable,
-and there is no resource compiler in this build, so the `.ico` travels as
-`include_bytes!` and is decoded into `IconData` at startup — the arrangement
-slipcase-desktop, segler and duckling all use, each with an `ico` dependency
-gated to this target. An `.ico` per application, rendered from
-`packaging/linux/icons/`. Then the installer or the MSIX package, one
-`uap:FileTypeAssociation` per application with its own icon assets, the
-`BackgroundColor` transparent with `altform-unplated` assets present, and a
-certification baseline left empty until a kit run fills it.
+An install adds each application to `OpenWithProgids` for its extension and
+never writes `UserChoice` or the extension's default value, so it appears in
+Open With and a double-click keeps going wherever it went before. OpenDocument
+is a format this suite reads and does not own, on a machine that may have an
+office suite claiming it; the macOS bundle takes the same posture with
+`LSHandlerRank` set to `Alternate`. A key nobody writes is a key no uninstaller
+can strand.

@@ -1,34 +1,11 @@
-# Build, test and open a document on Apple silicon, because nothing else can.
-#
-# This repository is developed on Linux and has no Mac. `cargo check` against
-# `aarch64-apple-darwin` can run on Linux and catches a great deal, but it
-# never links and never runs, so without this file every Apple-specific line
-# here is code nobody has executed. That includes the one piece that cannot be
-# checked any other way: `odox-ui`'s `opened_document`, the only `unsafe` in the
-# workspace, which receives a double-clicked document as an Apple Event because
-# macOS does not pass one as an argument.
-#
-# `open` on a document goes through Launch Services and produces the same event
-# Finder does, so the last step opens one per application and asks the window
-# server whether a window appeared.
-#
-# It asks the window server rather than looking at a screenshot, and the
-# difference is the point: slipcase-desktop records `screencapture` returning
-# the desktop with every window omitted while reporting no error, so a job
-# asserting on pixels would go green against a build that drew nothing. A
-# screenshot is still uploaded, for a person to look at.
-#
-# **The title is the assertion that matters.** An odox window with no document
-# is titled with the bare application name; one with a document is titled
-# "<document> - <application>". A title that is exactly the application name is
-# therefore the signature of the failure this exists to catch, which is the
-# Apple Event launching the application without delivering the document.
-#
-# What it does not reach is a sandbox, which needs a signing identity no runner
-# has; a high-density display; the Dock icon; and Finder's own rendering of the
-# document types. `CHECKLIST.md` holds those and a green run here does not stand
-# in for them.
-#
+# Build, test and open a document on Apple silicon. `cargo check` on Linux never
+# links or runs the Apple-specific code, so this is where `odox-ui`'s
+# `opened_document`, the only `unsafe` in the workspace, is exercised: `open`
+# delivers the Apple Event Finder does, and the window server is asked whether a
+# window appeared and what it is titled. A title that is the bare application
+# name means the event launched the application without the document.
+# Not reached: the sandbox, a high-density display, the Dock icon and Finder's
+# rendering of the types.
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
@@ -48,9 +25,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # The bundle declares 11.0 and `build-app.sh` refuses a binary built for a
-  # different floor, so the build has to agree with the plist rather than with
-  # cargo's default.
+  # The bundle declares 11.0 and `build-app.sh` refuses a binary built for another floor.
   MACOSX_DEPLOYMENT_TARGET: "11.0"
 
 jobs:
@@ -60,9 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The architecture is the whole reason this workflow exists, and a label
-      # is a promise rather than a fact: `macos-13` is Intel and `macos-14`
-      # onwards is Apple silicon, which is a mapping GitHub can change.
+      # A runner label is a promise rather than a fact, so the architecture is checked.
       - name: The runner is Apple silicon
         run: |
           arch=$(uname -m)
@@ -80,9 +53,8 @@ jobs:
       - name: What is installed
         run: rustc -V && cargo -V && xcodebuild -version | head -1
 
-      # DESIGN.md 2 forbids compiling C, and `cargo tree -i cc` cannot answer
-      # that because a dependency may declare `cc` for a feature nothing turns
-      # on. This checks the outcome the rule means.
+      # DESIGN.md §2 forbids compiling C; `cargo tree -i cc` cannot answer that,
+      # so this checks the outcome.
       - name: Build, and nothing compiled C
         run: |
           cargo build --workspace --all-targets
@@ -100,13 +72,9 @@ jobs:
       - name: Format
         run: cargo fmt --all --check
 
-      # The bundle is the unit: a bare executable has no bundle identifier, so
-      # Launch Services files it as a nameless foreground process, nothing can
-      # be associated with it, and no Apple Event reaches it. Built from the
-      # debug binaries the steps above already produced, because a release build
-      # here would cost minutes to answer a question that does not depend on
-      # optimisation. `build-app.sh` also runs the private-symbol check on each
-      # slice, which is the check App Store review's Guideline 2.5.1 is.
+      # The bundle is the unit: a bare executable has no bundle identifier and no
+      # Apple Event reaches it. Debug binaries, because the question does not
+      # depend on optimisation; `build-app.sh` also runs the private-symbol check.
       - name: Assemble the three bundles
         run: |
           target=$(cargo metadata --format-version 1 --no-deps |
@@ -121,10 +89,7 @@ jobs:
             ls "${bundle}/Contents/Resources"
           done
 
-      # `open` reaches Launch Services and delivers the Apple Event a
-      # double-click delivers, so this is `opened_document` running on arm64,
-      # once per application. Each opens a corpus document written by
-      # LibreOffice rather than by hand.
+      # `open` delivers the Apple Event a double-click does, once per application.
       - name: A document opens, and a window appears
         run: |
           lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
@@ -295,8 +260,7 @@ jobs:
           path: ${{ runner.temp }}/screen.png
           if-no-files-found: ignore
 
-      # Whole files, because an extract is a guess about what mattered and a
-      # crash report is cheap to keep.
+      # Whole files, because a crash report is cheap to keep.
       - name: Keep any crash reports
         if: always()
         uses: actions/upload-artifact@v4

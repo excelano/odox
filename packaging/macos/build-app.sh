@@ -229,21 +229,19 @@ fi
 target_dir=$(cd "$root" && cargo metadata --format-version 1 --no-deps |
     sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
 
-# **A private symbol in the binary is a rejection, and one cost slipcase-desktop
-# a review cycle.** Its 0.1.1 was refused on 2026-08-31 for referencing
-# `_CGSSetWindowBackgroundBlurRadius`, which arrived through `winit` and which
-# none of these applications calls. Review scans the symbol table rather than the
-# call graph, so *unreachable* is not *absent*: the same build with fat LTO and
-# `-Wl,-dead_strip` still carried it. The workspace manifest's `[patch.crates-io]`
-# is what removes it, and this is what notices if it or anything like it comes
-# back.
+# **A private symbol in the binary is a rejection.** Review scans the symbol
+# table rather than the call graph, so *unreachable* is not *absent*: `winit`
+# references `_CGSSetWindowBackgroundBlurRadius`, which none of these
+# applications calls, and fat LTO with `-Wl,-dead_strip` still carries it. The
+# workspace manifest's `[patch.crates-io]` is what removes it, and this is what
+# notices if it or anything like it comes back.
 #
 # **The question it asks is a real one rather than a list of names.** A denylist
 # of symbols Apple has already rejected somebody for would have caught nothing
 # until after the rejection. So: for every undefined symbol the executable
 # imports from a system *framework*, does that framework's own public headers
 # declare it? That is exactly the line Apple draws, and it was measured against
-# the refused binary: `CGShieldingWindowLevel` is in `CGDirectDisplay.h` and is
+# a refused binary: `CGShieldingWindowLevel` is in `CGDirectDisplay.h` and is
 # fine, while the two `CGS` symbols appear in no header and only in
 # `CoreGraphics.tbd`.
 #
@@ -258,9 +256,7 @@ target_dir=$(cd "$root" && cargo metadata --format-version 1 --no-deps |
 # real directories: `winit` links `CGDisplayCreateUUIDFromDisplayID` through
 # ApplicationServices, the public header declaring it is ColorSync's, and in
 # every SDK on the Mac that framework is a symlink up to the top-level one, which
-# a plain `find` does not enter. Measured in flyleaf on 2026-09-08: without `-L`
-# the umbrella yields 59 headers and no `ColorSyncDevice.h`; with `-L`, 1281
-# headers and the declaration.
+# a plain `find` does not enter and `find -L` does.
 private_symbols() {
     exe="$1"
     sdk=$(xcrun --sdk macosx --show-sdk-path 2>/dev/null) || sdk=""
@@ -550,8 +546,8 @@ build_store() {
     # extended attributes, so the mark rides into the bundle, through the
     # signature, through `productbuild`, and past `altool --validate-app`. The
     # upload is then accepted, ingestion rejects it hours later by email, and
-    # nothing appears in App Store Connect at all. slipcase-desktop measured it on
-    # 2026-08-29. The profile also carries `kMDItemWhereFroms`, holding the portal
+    # nothing appears in App Store Connect at all. The profile also carries
+    # `kMDItemWhereFroms`, holding the portal
     # URL with the team and profile identifiers in it, which would otherwise ship
     # inside the application, so clearing all of them rather than the quarantine
     # one alone is the fix and not merely the convenient spelling of it.
@@ -654,9 +650,8 @@ ENTITLEMENTS
     # and a Store profile covers none (README.md). Launch Services does not ask
     # whether a bundle can launch before choosing it, and among copies of one
     # identifier it prefers the newer version, so a submission build sitting here
-    # is a handler candidate. slipcase-desktop measured it on 2026-09-04: every
-    # double-click launched the Store build and the kernel killed it, one crash
-    # report per attempt and no window. What registers a bundle is a hand-off,
+    # is a handler candidate that the kernel kills on every double-click, one
+    # crash report per attempt and no window. What registers a bundle is a hand-off,
     # `lsregister -f` on a development build at this same path being the usual
     # one, and the claim survives `rm -rf` and a rebuild. This withdraws it.
     #

@@ -1,44 +1,44 @@
 # macOS
 
-Nothing here has been built yet. Two things this platform needs are code rather
-than files, so they cannot arrive with a packaging script, and both are recorded
-in `~/notes/desktop_app_from_the_start.md` from the repositories that learned
-them.
+The lane needs a Mac with Xcode's command line tools and a Rust toolchain.
+`build-app.sh` assembles a bundle per application from the release build: the
+executable, `Info.plist.in` with the version and the per-application strings
+substituted, the `.icns`, and the entitlements. From the repository root:
 
-**Opening a document.** macOS delivers a double-clicked document as an Apple
-Event and never as `argv[1]`. Without a handler AppKit refuses it and Finder
-blames the application. The handler is one Objective-C method and therefore the
-one module in an application crate that will need `#[allow(unsafe_code)]`, which
-is why those crates are `deny` and not `forbid`; `odox-core` and `odox-ui` stay
-`forbid` either way. slipcase-desktop's `opened_document.rs` is the module to
-copy, installed at `applicationWillFinishLaunching:` through a notification
-observer, which it measured as the only one of three moments that catches both a
-cold launch and a document dropped on a running window.
+    MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release
+    ./packaging/macos/build-app.sh --all
+    ./packaging/macos/build-app.sh xodt --sign "Apple Development: ..."
+    ./packaging/macos/build-app.sh --all --universal     # after both --target builds
+    ./packaging/macos/build-app.sh xodt \
+        --store ~/Downloads/Odox_Text_Mac_App_Store.provisionprofile
+    ./packaging/macos/check-install.sh --all             # what an installed bundle is
+    ./packaging/macos/screenshot.sh xodt --out shots/xodt-01-page.png
 
-**Saving.** Not yet: these applications do not write. When one does, the sandbox
-grant a person gives by choosing a file covers the file and not its directory, so
-a temporary file beside the target fails with *Operation not permitted*. The
-rewrite waits in `NSItemReplacementDirectory` asked for with the target's URL and
-lands with `replaceItemAtURL:`.
+The sandbox entitlement does nothing until it is inside a signature, so a
+bundle to test is signed with an Apple Development identity. `--store` signs
+with Apple Distribution, wraps the bundle with `productbuild` under a 3rd Party
+Mac Developer Installer identity, and produces the `.pkg` that `altool`
+validates and uploads; `security find-identity -v -p codesigning` lists what
+the machine holds. A provisioning profile covers one bundle identifier, so
+`--store` takes one application at a time. A Store build cannot run on the
+machine that made it, because its entitlements need a profile covering the Mac
+and a Store profile covers none, which is why the script unregisters the bundle
+from Launch Services after building it.
 
-**The winit patch** in the workspace manifest is here for this platform: review
-reads the symbol table rather than the call graph, and winit 0.30 declares a
-private CoreGraphics symbol whether or not anything calls it. Delete the patch
-when a winit release carries the upstream gate.
+`CFBundleTypeRole` is `Viewer` and `LSHandlerRank` is `Alternate`, because the
+applications read a format they do not own; the OpenDocument types are declared
+as imported. `LSMinimumSystemVersion` is 11.0 and the build's
+`MACOSX_DEPLOYMENT_TARGET` has to agree with it, which `build-app.sh` checks.
+The sandbox grant is `files.user-selected.read-only` and nothing else.
+`CFBundleVersion` is the first-parent commit count. `lsregister` is under
+`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`
+and not on `PATH`.
 
-## What is left to do here
+`build-app.sh` refuses a binary that imports a symbol no public framework header
+declares, which is what App Store review rejects. The workspace manifest patches
+`winit` to drop one such symbol; delete the patch when a winit release carries
+the upstream gate.
 
-An `.icns` per application rendered from `packaging/linux/icons/`, an
-`Info.plist.in` per application with `LSApplicationCategoryType`,
-`ITSAppUsesNonExemptEncryption` false, `LSMinimumSystemVersion` agreeing with
-`MACOSX_DEPLOYMENT_TARGET`, `CFBundleVersion` from the commit count, and the
-OpenDocument types declared as imported rather than exported, since this suite
-does not own the format. Then `build-app.sh`, which signs with an Apple
-Development identity from the first bundle — the sandbox is inert until the
-entitlement is inside a signature — and refuses any binary importing a symbol no
-public framework header declares.
-
-Hand the viewport an **empty** `IconData` on this platform: eframe substitutes
-its own egui logo for a viewport that names no icon and passes it to
-`setApplicationIconImage:`, which outranks the bundle's `.icns`. Nothing short of
-a person looking at the Dock finds that.
+`odox_ui::run` hands the viewport an empty `IconData` on this platform, because
+eframe otherwise substitutes its own logo and that outranks the bundle's
+`.icns`. Only the Dock shows whether it works.

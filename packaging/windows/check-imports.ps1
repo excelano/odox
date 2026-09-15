@@ -71,9 +71,8 @@ $InBoxPrefixes = @('api-ms-win-', 'ext-ms-win-')
 
 # An allowlist and never an exact list. The launcher draws nothing and links no
 # toolkit, so it imports a fraction of what the three viewers do, and a check
-# that compared whole lists would call the smaller one a change. The Linux side
-# learned this on 2026-09-14 and the reasoning is the same here: fewer is not
-# new, and what matters is that nothing outside the set appears.
+# that compared whole lists would call the smaller one a change. Fewer is not
+# new; what matters is that nothing outside the set appears.
 $Applications = @('xodt', 'xods', 'xodp', 'odox')
 
 function Read-Imports([string] $path) {

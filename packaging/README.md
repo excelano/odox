@@ -1,26 +1,27 @@
 # packaging
 
-One directory per platform, and each platform's decisions live in its own
-directory. What is here is shared by all three: `version.sh`, which is the only
-thing that reads the version; `ship` runs everything that has
-to be true before a release.
+One directory per platform. `linux/` holds the desktop entries, the icon SVGs
+and the scripts that install them under `~/.local`, plus `check-libraries.sh`,
+which is where `debian/`'s `Depends` line comes from. `debian/` builds one
+`.deb` per application from a release build. `windows/` and `macos/` each carry
+their platform's manifest, build script, install check and screenshot script,
+with a README saying how to run that lane. `store-listing.md` and its German
+half are the text both stores take. Releases are `ship odox`.
 
-`linux/` holds the desktop entries, the icons and the scripts that install them
-under `~/.local`, plus `check-libraries.sh`, which is where `debian/`'s `Depends`
-line comes from. `debian/` builds one `.deb` per application from a release
-build. `windows/` holds the application manifest every binary embeds and the
-import check that keeps a build off the Visual C++ runtime. `macos/` holds what
-that platform needs and has not been built yet.
+`version.sh` is the only thing that reads the version, from the workspace
+`Cargo.toml`, in whichever spelling a caller needs: plain, `--appx` for the
+four-part Store form, `--short` for `CFBundleShortVersionString`, and `--build`
+for `CFBundleVersion`, which is the first-parent commit count.
 
-The icons are one SVG each, drawn on a 64-unit grid with `width` and `height` on
-the root element, because the macOS build script rewrites those to render each
-size natively and refuses when it cannot find them. Check a change to one at 16,
-24, 32, 48 and 128 pixels on light and dark grounds before committing it.
+The icons are one SVG each in `linux/icons`, drawn on a 64-unit grid. Check a
+change at 16, 24, 32, 48 and 128 pixels on light and dark grounds, then rerun
+the generator:
 
-`make-icons/` is the one generator: it reads the three SVGs in `linux/icons`
-and writes the `.ico` and package assets Windows wants, the `.icns` macOS wants,
-and the squares every store's listing form asks for. It is a standalone package
-so that nothing it depends on reaches a shipped binary, and it is at this level
-rather than inside a platform's arm because it writes into three of them.
-Rasterized artefacts are committed, because neither of those platforms has a
-step that rasterizes at install time the way a Linux desktop does.
+    cargo run --manifest-path packaging/make-icons/Cargo.toml
+
+`make-icons/` reads the three SVGs and writes the `.ico` files and package
+assets under `windows/`, the `.icns` files under `macos/`, and the squares
+under `icons/` that the store listing forms ask for. It is a standalone package
+so that nothing it depends on reaches a shipped binary. Its output is committed,
+because neither Windows nor macOS rasterizes at install time, and CI refuses a
+push where the committed files differ from what the generator writes.

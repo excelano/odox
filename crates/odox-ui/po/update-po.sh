@@ -32,9 +32,7 @@
 # msgid carries a run of spaces the runtime string will never have, and the
 # translation silently never loads. `msgfmt` sees nothing wrong, because both
 # files are valid. Keep the literal on one line however long it gets; `rustfmt`
-# will not break a string anyway. The Duckling session hit this on a tooltip on
-# 2026-09-14 and found it only by reading the generated `.pot`; no message in
-# this tree is wrapped, which was checked rather than assumed.
+# will not break a string anyway.
 #
 # **It prints a screen of warnings and they are noise.** `unterminated character
 # constant` is a Rust lifetime read as the start of a C character literal. They
@@ -43,10 +41,9 @@
 # anything still in English stands out on sight.
 #
 # `--check` extracts to a temporary file and compares the message set with the
-# committed template, writing nothing. CI runs that: a check that
-# rewrote the file it was checking would leave the tree dirty after every run,
-# which is what it did until 2026-09-14 — the template carries the moment it was
-# extracted, so re-running it always changes a line.
+# committed template, writing nothing. CI runs that: the template carries the
+# moment it was extracted, so a check that rewrote the file it was checking
+# would leave the tree dirty after every run.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

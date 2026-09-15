@@ -411,7 +411,7 @@ pub fn run<V: Viewer + 'static>(
     //
     // One line for three windows, because all three come through here.
     // **Unverified from Linux**: it compiles for the target and nothing else
-    // about it can be checked without looking at a Dock. `CHECKLIST.md` asks.
+    // about it can be checked without looking at a Dock.
     #[cfg(target_os = "macos")]
     let viewport = viewport.with_icon(egui::IconData::default());
 

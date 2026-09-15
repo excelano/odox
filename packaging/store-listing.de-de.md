@@ -1,22 +1,14 @@
 # Store listing text, German
 
-The German half of `store-listing.md`, one file per language. The headings are
-that file's headings and stay in English, so that both files can be read the
-same way; only what sits under them is German. Only the fields a store shows a
-reader are here: the URLs, the review notes and the screenshot log are not
-localised and live in the English file alone.
-
-**Terminology is the applications' own, out of `crates/odox-ui/po/de.po` and the
-`.desktop` entries.** A listing that calls a thing something the window does not
-teaches the customer a word the product has no use for. Where the catalogue has a
-term, it wins: *Gliederung* for the outline, *Folien* for slides, *Notizen* for
-the notes, *Tabellenblatt* for a sheet, and *OpenDocument-Textdokument*,
-*OpenDocument-Tabellendokument* and *OpenDocument-Präsentation* for the three
-kinds of file, which is what the desktop entries have said since 0.2.0.
-
-**German runs longer than English**, and the subtitle at 30 characters is where
-that bites. Each one below is counted rather than estimated; the check in
-`store-listing.md`'s own section is run against both files after any edit.
+The German half of `store-listing.md`, under that file's headings, which stay in
+English so both files read the same way. Only the fields a store shows a reader
+are here; the URLs, the review notes and the screenshot log live in the English
+file alone. Terminology is the applications' own, out of `crates/odox-ui/po/de.po`
+and the `.desktop` entries: *Gliederung*, *Folien*, *Notizen*, *Tabellenblatt*,
+and *OpenDocument-Textdokument*, *OpenDocument-Tabellendokument* and
+*OpenDocument-Präsentation* for the three kinds of file. Run the count in
+`store-listing.md` against both files after any edit; the 30-character subtitle
+is where German bites.
 
 ---
 

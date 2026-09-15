@@ -1,31 +1,15 @@
 name: Publish to crates.io
 
-# Fires on the version tag `ship` pushes, and
-# can be run by hand. `cargo publish` compiles and uploads from source, so it is
-# independent of the `.deb` packages and runs beside them; the tag is pushed
-# before the GitHub release exists, so the crates land first.
+# Fires on the version tag `ship` pushes, and can be run by hand. `cargo publish`
+# compiles and uploads from source, so it is independent of the `.deb` packages.
 #
-# **Five crates, published one at a time and in order.** `cargo publish
-# --workspace` is the shorter spelling and it cannot be resumed: it refuses the
-# whole run when any member's version is already on the index, so a partial
-# publish can only be finished by hand. That is not a hypothetical — odox 0.1.0
-# published `odox-core` and `odox-ui`, then cargo's sixty-second wait for the
-# index expired before the three applications, and the retry refused with
-# *odox-core@0.1.0 already exists*. So each crate is asked for separately, one
-# already on the index is skipped, and the index is waited for rather than
-# assumed.
+# The crates are published one at a time in `ship.conf` order, skipping one
+# already on the index and waiting for the index between them, because
+# `cargo publish --workspace` cannot be resumed after a partial run.
 #
-# The order comes from `ship.conf`, which is where it already lives and is read
-# by `ship` and `fleet` too. Naming it here as well would be one fact in two
-# files.
-#
-# The step is token-gated: it skips cleanly, with no failed run, unless a
-# CRATES_IO_TOKEN secret is available. The excelano organisation carries one.
-# Versions on crates.io are immutable: a bad one is yanked, never re-published,
-# and the fix is the next number.
-#
-# What `cargo install xodt` leaves out is real and is in README.md: a crate
-# carries no desktop entry, no icon and no Windows application manifest.
+# The step is token-gated: it skips cleanly unless CRATES_IO_TOKEN is set.
+# Versions on crates.io are immutable: a bad one is yanked and the fix is the
+# next number. A crate carries no desktop entry, icon or Windows manifest.
 
 on:
   push:
@@ -47,9 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # A dispatch runs this file from the branch it was started on and
-          # publishes the tree named here, so a fix to the workflow can finish a
-          # release cut before the fix existed.
+          # A dispatch runs this file from its branch and publishes the tree named here.
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Check for a crates.io token

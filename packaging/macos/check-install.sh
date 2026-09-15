@@ -15,7 +15,7 @@
 # run. Its exit status is 0 whatever it finds, for the same reason: the findings
 # are for a person to weigh against what the bundle was built for, and a script
 # that gated on them would be one more thing to argue with at the end of a
-# release. What no command can settle is in `CHECKLIST.md` and needs eyes.
+# release. What no command can settle needs eyes.
 #
 # THREE BUNDLES, ONE SCRIPT
 #
@@ -443,10 +443,9 @@ echo
 if [ "$findings" -eq 0 ]; then
     echo "Nothing mechanical is wrong with this install."
 else
-    echo "${findings} thing(s) to write down — in the commit, and in CHECKLIST.md"
-    echo "only if the next person would run the list differently."
+    echo "${findings} thing(s) to write down in the commit."
 fi
-echo "The rest needs eyes, and CHECKLIST.md has it: the icon in the Dock, which is"
+echo "The rest needs eyes: the icon in the Dock, which is"
 echo "the one place the .icns can be seen to have won; the layout at 2x; a merged"
 echo "cell and a slide's own shape; and the window in German."
 exit 0

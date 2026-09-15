@@ -13,8 +13,7 @@
 //! render their `.icns` with `sips` and `iconutil` inside `build-app.sh`, and
 //! both of those exist only on a Mac, so none of them can produce one until it
 //! reaches that machine. `icns` is pure Rust and renders here, which takes the
-//! icon off the platform session's critical path. Measured on 2026-09-14 and
-//! written up in `~/notes/mac_icons_on_linux.md`.
+//! icon off the platform session's critical path.
 //!
 //! **Three drawings, and all three are applications.** Where segler has one
 //! application icon and two document icons, odox has three applications, and
@@ -77,7 +76,6 @@ const TARGET_SIZES: &[u32] = &[16, 24, 32, 48, 256];
 /// *plated* icon it fills the plate with the person's accent colour, and the
 /// drawing lands on a coloured square while the side-loaded install draws the
 /// same icon unplated out of the `.ico`. One application with two faces.
-/// slipcase-desktop measured that on a taskbar on 2026-08-28.
 ///
 /// An `altform-unplated` asset is what tells the shell not to plate. The light
 /// variant is the same pixels, because these drawings are coloured rather than

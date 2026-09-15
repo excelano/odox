@@ -1,28 +1,10 @@
-# The Windows checks a machine can run: that the tree builds and passes on this
-# platform, that each shipped binary imports nothing Windows does not have, and
-# that the committed icons still match the drawings they were generated from.
+# The Windows checks a machine can run: build, test, clippy and format on this
+# target; each shipped binary imports nothing Windows does not ship; the viewers
+# are GUI subsystem with the DPI manifest and the icon embedded; the integration
+# installs and uninstalls cleanly; the committed icons match their generator.
 #
-# The shape is segler's `windows.yml`, and `linux.yml` beside this is its
-# counterpart. The suite, clippy and formatting are also the fleet's `ci.yml`;
-# they are repeated here because `ci.yml` runs on Linux and three things in this
-# repository are compiled only for this target: `build.rs`'s manifest arm, the
-# `ico` dependency, and the window icon the `include_bytes!` in each application
-# reaches. a `cargo check --target` on Linux compiles those; it does not
-# link them, run them, or read an import table.
-#
-# **Four binaries, not one.** The three viewers and the launcher, which draws no
-# window and links no toolkit and therefore imports fewer libraries than they do.
-# `check-imports.ps1` takes them all and works from an allowlist rather than an
-# exact list, so fewer is not reported as a change.
-#
-# What this reaches and what it does not, stated because a green tick invites
-# more faith than it has earned.
-#
-# Nothing here reaches the window, the installer scripts, an MSIX package, a
-# file association, the certification kit, or the icon as a person sees it at
-# any size. `CHECKLIST.md` holds those and a green run here does not stand in for
-# one. `build-msix.ps1` is not run either: it needs the Windows SDK and the
-# package identity, and the identity is not committed.
+# Not reached: the window, an MSIX package, a file association, the certification
+# kit, `build-msix.ps1`, and the icon as a person sees it.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -69,33 +51,17 @@ jobs:
       - name: Format
         run: cargo fmt --all --check
 
-      # The defect this exists for was invisible to everything else: slipcase
-      # 0.1.1 passed every local check and failed Store certification because
-      # the MSVC target linked a Visual C++ runtime DLL that every build machine
-      # has and a clean machine does not. `+crt-static` is the cure and this is
-      # the guard on it.
-      #
-      # The release binaries rather than the debug ones, because the release
-      # binaries are what ship and are the only ones whose import tables are the
-      # artefact's.
+      # `+crt-static` keeps the Visual C++ runtime out of the MSVC build, and this
+      # is the guard on it, over the release binaries because those are what ship.
       - name: Every DLL the shipped binaries import comes with Windows
         run: |
           cargo build --release
           powershell -ExecutionPolicy Bypass -File packaging/windows/check-imports.ps1
 
-      # The release binaries are also the only place two other properties exist.
       # The GUI subsystem comes from an attribute that is off under
-      # `debug_assertions`, and a console-subsystem build puts a console window
-      # behind the application when a file manager launches it. The DPI
-      # declaration comes from `build.rs` handing the linker a manifest, and the
-      # certification kit reads it out of the binary rather than out of the
-      # running process. `build-msix.ps1` refuses on the first and the kit
-      # reports the second, and neither runs here, so both are read straight out
-      # of the artefact instead.
-      #
-      # The launcher is exempt from both. It is a console program on purpose,
-      # because it is run from a shell and its `--which` answer is text, and it
-      # embeds no manifest for the same reason.
+      # `debug_assertions`, and the DPI declaration from the manifest `build.rs`
+      # hands the linker; both are read out of the release artefact. The launcher
+      # is a console program on purpose and embeds no manifest, so it is exempt.
       - name: The shipped viewers are GUI subsystem and declare their DPI awareness
         shell: pwsh
         run: |
@@ -121,13 +87,9 @@ jobs:
             Write-Host "$app : subsystem 2, and the application manifest is embedded"
           }
 
-      # The window icon travels in the binary because Windows takes one from a
-      # resource and this build compiles no resource. `build.rs` stages the
-      # `.ico` into OUT_DIR and writes an empty file when the source is absent,
-      # which is what a build from a published crate gets, so a staging mistake
-      # here would show as a window with no icon and nothing else. The icon
-      # directory's own bytes appear in the binary, so its signature is what says
-      # the staging worked.
+      # Windows takes a window's icon from a resource and this build compiles none,
+      # so `build.rs` stages the `.ico` into OUT_DIR; the icon directory's own
+      # bytes in the binary say the staging worked.
       - name: The window icon reached the binaries
         shell: pwsh
         run: |
@@ -152,29 +114,14 @@ jobs:
             Write-Host "$app : the icon directory is in the binary"
           }
 
-      # The installer and its uninstaller, which nothing else reaches. A green
-      # tick on the steps above says the binaries are sound and says nothing
-      # about whether installing them leaves a machine the way it was found.
-      # That gap is where the fleet's uninstall defects have lived: flyleaf
-      # measured one on a real machine where the uninstaller reported success
-      # and left an extension pointing at a program it had just deleted.
-      #
-      # This registers the real entries under HKCU and takes them away again, so
-      # it belongs on a build agent rather than on a machine whose OpenDocument
-      # associations are precious.
+      # Nothing else reaches the installer and its uninstaller. This registers real
+      # entries under HKCU and takes them away, so it belongs on a build agent.
       - name: The integration installs, uninstalls, and leaves nothing behind
         run: powershell -ExecutionPolicy Bypass -File packaging/windows/check-install.ps1
 
       # The `.ico` files, the package assets and the `.icns` files are committed
-      # artefacts rather than build products, because nothing on Windows or macOS
-      # rasterizes an SVG at build time and no resource compiler is in this
-      # build. A committed artefact can fall out of step with the source it was
-      # generated from and nothing would say so, so the generator is run and its
-      # output compared against what is in the tree.
-      #
-      # The comparison is over whole directories rather than named files, because
-      # an asset that drifted from its drawing would otherwise reach a store
-      # listing with nothing having looked at it.
+      # artefacts, so the generator is run and its output compared with the tree,
+      # over whole directories rather than named files.
       - name: The committed icons and Store assets still match their generator
         run: |
           cargo run --manifest-path packaging/make-icons/Cargo.toml

@@ -40,12 +40,8 @@
 # is advisory: Windows refuses it from a process that does not own the
 # foreground, and it returns false rather than raising. The capture is
 # `CopyFromScreen` over the window's rectangle, so a window that stayed behind is
-# photographed as whatever is on top of it. That is not a hypothetical - segler's
-# `03-picture.png` of 2026-09-05 went to the store folder as a picture of a
-# terminal, an Explorer ribbon and a sliver of the application, and it got there
-# because that script called `SetForegroundWindow` and did not look. This one
-# sends the ALT tap that releases the foreground lock, retries, and refuses if
-# the window is still not in front.
+# photographed as whatever is on top of it. This sends the ALT tap that releases
+# the foreground lock, retries, and refuses if the window is still not in front.
 #
 # **And it polls the geometry until it stops moving.** A cold start is still
 # positioning itself seconds in, and a rect read during that produced a window
@@ -294,11 +290,7 @@ if ($Click.Count -gt 0) {
 }
 
 # The pointer goes somewhere the window is not, because egui draws hover state
-# and the capture keeps it. Measured on slipcase-desktop 2026-08-29: a retake
-# landed with the mouse resting over a field, which came out highlighted and
-# focus-ringed in a picture meant to show the application at rest, and with the
-# scroll bar drawn because the pointer was inside the scroll area. Neither is
-# wrong and both are noise a shopper reads as an interface doing something.
+# and the scroll bar while the pointer is inside, and the capture keeps both.
 #
 # Bottom right of the virtual screen rather than a constant: the window is
 # placed near the top left, and a fixed 1900x1200 is off-screen on a smaller
