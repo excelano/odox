@@ -152,6 +152,19 @@ jobs:
             Write-Host "$app : the icon directory is in the binary"
           }
 
+      # The installer and its uninstaller, which nothing else reaches. A green
+      # tick on the steps above says the binaries are sound and says nothing
+      # about whether installing them leaves a machine the way it was found.
+      # That gap is where the fleet's uninstall defects have lived: flyleaf
+      # measured one on a real machine where the uninstaller reported success
+      # and left an extension pointing at a program it had just deleted.
+      #
+      # This registers the real entries under HKCU and takes them away again, so
+      # it belongs on a build agent rather than on a machine whose OpenDocument
+      # associations are precious.
+      - name: The integration installs, uninstalls, and leaves nothing behind
+        run: powershell -ExecutionPolicy Bypass -File packaging/windows/check-install.ps1
+
       # The `.ico` files, the package assets and the `.icns` files are committed
       # artefacts rather than build products, because nothing on Windows or macOS
       # rasterizes an SVG at build time and no resource compiler is in this
