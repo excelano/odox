@@ -153,7 +153,7 @@ jobs:
           } else {
             Copy-Item packaging\windows\identity.psd1.example packaging\windows\identity.psd1
           }
-          powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -OutDir dist
+          powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -All -OutDir dist
           Get-ChildItem dist\*.msix | ForEach-Object { "$($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }
 
       - name: Keep the package
