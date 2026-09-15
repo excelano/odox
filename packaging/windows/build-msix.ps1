@@ -86,8 +86,8 @@ $ErrorActionPreference = 'Stop'
 # `egui-winit`, which these three link as well; likely is not measured.
 #
 # **A record of what is known is not a claim that it is acceptable.** Whether to
-# submit with a test failing is a decision, it is David's, and the release record
-# carries it. Recording a finding here does not take it.
+# submit with a test failing is a decision and it is David's. Recording a
+# finding here does not take it.
 #
 # Shrink this list when a finding goes away; the run says so when one does.
 $KNOWN_FINDINGS = @{
