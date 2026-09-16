@@ -39,9 +39,19 @@ the manifest, because `cargo tree -i cc` is not empty in any eframe tree
 
     objdump -p target/release/xodt | grep NEEDED
 
-answers `libgcc_s`, `libm` and `libc` and nothing else. OpenGL, X11, Wayland and
+answers `libgcc_s`, `libm` and `libc` and nothing else. Vulkan, X11, Wayland and
 xkbcommon arrive through `dlopen` at run time, which is why §9's Debian
 dependencies come from a running process rather than from the linker.
+
+The renderer is wgpu, which is eframe's default and the rest of the fleet's:
+Direct3D on Windows, Metal on macOS, Vulkan here. The alternative eframe offers
+is `glow`, over OpenGL, and it is the wrong one on two platforms — on Windows
+OpenGL arrives with the graphics vendor's driver and is Microsoft's 1.1 stand-in
+without one, below what egui accepts, so the application exits rather than
+opening a window; and Apple deprecated OpenGL in 2018 and runs it as a
+translation layer over Metal. Switching cost nothing this section claims: the
+`NEEDED` list above is the same either way, because wgpu reaches Vulkan through
+the same `dlopen` glow used for OpenGL.
 
 One `unsafe` module, on one platform. macOS delivers a double-clicked document as
 an Apple Event, and receiving one needs a single Objective-C method: `odox-ui`'s

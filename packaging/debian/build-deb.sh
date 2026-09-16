@@ -37,13 +37,30 @@ out="$root/dist"
 # once on each display backend. The binary links three libraries at build time —
 # `objdump -p` says libgcc_s, libm and libc, which is the pure-Rust property
 # DESIGN.md §2 keeps — and every other library arrives through a dlopen that no
-# manifest and no linker can see. Both backends are compiled in, so both sets are
-# declared: a machine has one or the other and the package cannot know which.
+# manifest and no linker can see. Both display backends are compiled in, so both
+# sets are declared: a machine has one or the other and the package cannot know
+# which.
+#
+# `libvulkan1` and not `libgl1`, because the renderer is wgpu and Vulkan is the
+# backend it takes on Linux. A running window opens `libvulkan.so.1` and no
+# libGL under either display backend. `libwayland-egl1` went with `libgl1`,
+# since EGL was there to serve GL.
+#
+# `libEGL.so.1` is open in a running window on both display backends and is
+# still not declared, because it carries a fallback rather than the path this
+# is built for. Measured by making each library unreadable in turn and starting
+# the window again: without `libEGL.so.1` it draws through Vulkan and the frame
+# is unchanged; without `libvulkan.so.1` it drops to GLES over EGL and draws;
+# without either it refuses to start, saying
+# `FailedToCreateSurfaceForAnyBackend`. A package naming both would claim a
+# dependency the application does not have.
 #
 # Measured on Debian 13 with Mesa. Libraries the closure pulls in behind these
-# are not named: libgl1 depends on its own drivers and naming them here would be
-# transcribing another package'"'"'s dependencies. **Re-measure when eframe moves.**
-depends="libc6, libgcc-s1, libgl1, libx11-6, libx11-xcb1, libxcb1, libxcursor1, libxext6, libxi6, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0, libwayland-egl1"
+# are not named: `libvulkan1` recommends `mesa-vulkan-drivers | vulkan-icd`
+# itself, and naming a driver here would be transcribing another package's
+# dependencies and wrong on a machine whose driver is NVIDIA's.
+# **Re-measure when eframe moves.**
+depends="libc6, libgcc-s1, libvulkan1, libx11-6, libx11-xcb1, libxcb1, libxcursor1, libxext6, libxi6, libxkbcommon0, libxkbcommon-x11-0, libwayland-client0"
 
 mkdir -p "$out"
 
