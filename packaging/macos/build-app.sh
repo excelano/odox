@@ -517,16 +517,27 @@ build_store() {
     # one keychain is an ordinary state, an expiring one beside its replacement,
     # and picking whichever `grep` found first is how a package gets signed with
     # the wrong one.
+    #
+    # One certificate can be reported several times over. `find-identity`
+    # searches every keychain in the search list, and the signing keychain
+    # `mac-signing-keychain.sh` makes holds a copy of what the login keychain
+    # already had, so a Mac set up to sign over ssh lists each identity at least
+    # twice. That is one identity seen twice and not two identities, and the
+    # SHA-1 each is listed under is what tells them apart. Counting lines
+    # refused every machine that had a signing keychain at all.
     find_identity() {
         matches=$(security find-identity -v 2>/dev/null |
-            grep "$1: .*(${store_team})" | sed 's/.*"\(.*\)"/\1/')
+            grep "$1: .*(${store_team})" |
+            sed 's/^ *[0-9]*) *\([0-9A-F]*\) *"\(.*\)"$/\1 \2/' |
+            sort -u)
         count=$(printf '%s' "$matches" | grep -c . || true)
         [ "$count" = 1 ] || {
             echo "build-app.sh: expected one \"$1\" identity for team ${store_team}, found ${count}" >&2
             [ "$count" = 0 ] || echo "$matches" | sed 's/^/  /' >&2
             return 1
         }
-        printf '%s' "$matches"
+        # The hash was for telling them apart; what signs is the name.
+        printf '%s' "${matches#* }"
     }
     app_identity=$(find_identity "Apple Distribution") || exit 1
     # Apple's portal calls this Mac Installer Distribution; the certificate calls
