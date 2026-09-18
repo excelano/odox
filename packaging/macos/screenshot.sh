@@ -14,10 +14,23 @@
 #       --out shots/xods-02-sheet.png
 #   ./packaging/macos/screenshot.sh xodp --app dist/'Odox Deck'.app \
 #       --document corpus/libreoffice/focus.odp --out shots/xodp-01.png
+#   ./packaging/macos/screenshot.sh xodt --lang de --out shots/de-DE/xodt-01.png
 #
 # The bundle defaults to `dist/<Product>.app`, which is where `build-app.sh`
 # puts it, and the document to the corpus file `packaging/store-listing.md`
 # names for that application. Only `--out` has no sensible default.
+#
+# `--lang` photographs the window in that language. A listing in two languages
+# wants a set in each, and a German listing showing an English window is the
+# inaccurate metadata guideline 2.3.3 is about. It is passed through
+# `open --env` as POTEXT_LANG, which every application in this fleet reads
+# before it asks the platform. It has to go through `--env` and cannot be
+# exported here: `open` hands the process to launchd, and launchd does not pass
+# this shell's environment on.
+#
+# `--settle` waits longer before the shutter. A deck whose slides carry pictures
+# is still decoding them when a document of a few pages has settled, which is
+# why `shots.sh` gives xodp more than the other two.
 #
 # FOUR ACTIONS, IN THE ORDER GIVEN
 #
@@ -94,6 +107,10 @@ name=""
 bundle=""
 document=""
 out=""
+lang=""
+# Seconds between the window being sized and the capture. Five is enough for a
+# text document and not for a deck; `--settle` is how a caller says so.
+settle=5
 # 1440x900 is one of the four sizes App Store Connect accepts for macOS, and the
 # largest reachable without a Retina display. The other two — 2560x1600 and
 # 2880x1800 — need a backing scale of 2, which is why they are not the default.
@@ -142,6 +159,8 @@ while [ $# -gt 0 ]; do
         --double) echo "double ${2:?--double needs X,Y}" >> "$actions"; shift 2 ;;
         --type) echo "type ${2?--type needs text}" >> "$actions"; shift 2 ;;
         --key) echo "key ${2:?--key needs a name}" >> "$actions"; shift 2 ;;
+        --lang) lang="${2:?--lang needs a language tag}"; shift 2 ;;
+        --settle) settle="${2:?--settle needs seconds}"; shift 2 ;;
         --width) width="${2:?}"; shift 2 ;;
         --height) height="${2:?}"; shift 2 ;;
         --x) x="${2:?}"; shift 2 ;;
@@ -336,8 +355,12 @@ swiftc -O -o "$helper" "$source" || refuse "the helper did not compile"
 pkill -f "${bundle}/Contents/MacOS/" 2>/dev/null || true
 sleep 1
 
-open -a "$bundle" "$document"
-sleep 5
+if [ -n "$lang" ]; then
+    open -a "$bundle" --env "POTEXT_LANG=${lang}" "$document"
+else
+    open -a "$bundle" "$document"
+fi
+sleep "$settle"
 
 # Found once, by the path of the executable inside this bundle, and used by id
 # everywhere below. The header says why not by name.
