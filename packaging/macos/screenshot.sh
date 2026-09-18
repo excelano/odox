@@ -387,8 +387,21 @@ screencapture -x -o -l "$id" "$out"
 
 got_w=$(sips -g pixelWidth "$out" | sed -n 's/.*pixelWidth: *//p')
 got_h=$(sips -g pixelHeight "$out" | sed -n 's/.*pixelHeight: *//p')
-if [ "$got_w" != "$width" ] || [ "$got_h" != "$height" ]; then
-    refuse "asked for ${width}x${height} and got ${got_w}x${got_h} — App Store Connect refuses anything but its own sizes"
+# The window is sized in points and the capture is written in pixels, so a
+# display with a backing scale of 2 returns twice what was asked for. Both are
+# right: App Store Connect takes 1280x800, 1440x900, 2560x1600 and 2880x1800,
+# and the larger pair is the smaller pair doubled. Comparing the file against
+# the number asked for called a correct Retina capture wrong and refused it.
+case "${got_w}x${got_h}" in
+    1280x800|1440x900|2560x1600|2880x1800) ;;
+    *)
+        refuse "got ${got_w}x${got_h}, and App Store Connect takes 1280x800, 1440x900, 2560x1600 or 2880x1800 and nothing else"
+        ;;
+esac
+# Still the window that was asked for, at one scale or the other. A capture
+# that is an accepted size but not this one is some other window.
+if [ "$got_w" != "$width" ] && [ "$got_w" != "$((width * 2))" ]; then
+    refuse "asked for ${width}x${height} and got ${got_w}x${got_h}, which is neither that nor that at a backing scale of 2"
 fi
 
 echo "${out}: ${got_w}x${got_h}, window ${id} of ${product}"
