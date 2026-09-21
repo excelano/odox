@@ -114,8 +114,8 @@ pub struct Shell<V: View> {
 
 /// Something that would throw away unsaved changes, held until the person
 /// says whether to save them, discard them, or not do it after all.
+#[derive(Clone, Copy)]
 enum Pending {
-    Open(PathBuf),
     AskForAFile,
     Reload,
     Close,
@@ -191,7 +191,6 @@ impl<V: View> Shell<V> {
 
     fn perform(&mut self, ctx: &egui::Context, action: Pending) {
         match action {
-            Pending::Open(path) => self.open(ctx, &path),
             Pending::AskForAFile => self.ask_for_a_file(ctx),
             Pending::Reload => {
                 if let Some(path) = self.path.clone() {
@@ -381,9 +380,6 @@ impl<V: View> eframe::App for Shell<V> {
         if self.pending.is_none() && !ctx.egui_wants_keyboard_input() {
             self.keys(&ctx);
         }
-        if self.pending.is_none() {
-            self.dropped_files(&ctx);
-        }
 
         // A document macOS asked for, which reaches here rather than through
         // the command line. Taken rather than read, so one event opens one
@@ -436,7 +432,7 @@ impl<V: View> eframe::App for Shell<V> {
         // panics, and a panic inside the macOS event callback cannot unwind, so
         // the process aborts.
         //
-        // Every way of opening a document but one goes through a frame: a drop,
+        // Every way of opening a document but one goes through a frame:
         // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
         // command line, which is opened in eframe's creation closure before any
         // pass has begun, and is why this went unnoticed until a runner opened a
@@ -588,8 +584,6 @@ impl<V: View> Shell<V> {
                 let ctx = ui.ctx().clone();
                 self.ask_for_a_file(&ctx);
             }
-            ui.add_space(8.0);
-            ui.weak(t("or drop one on this window"));
         });
     }
 
@@ -642,19 +636,6 @@ impl<V: View> Shell<V> {
         }
         if pressed(Key::Num0) {
             self.zoom = 1.0;
-        }
-    }
-
-    fn dropped_files(&mut self, ctx: &egui::Context) {
-        let dropped = ctx.input(|input| {
-            input
-                .raw
-                .dropped_files
-                .first()
-                .map(|file| file.path().to_path_buf())
-        });
-        if let Some(path) = dropped {
-            self.request(ctx, Pending::Open(path));
         }
     }
 }

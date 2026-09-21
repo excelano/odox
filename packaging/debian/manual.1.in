@@ -18,7 +18,7 @@ opened or the one named; before it is, what is about to be written is read back
 and compared with the document in the window, and a difference refuses the save.
 .SH OPTIONS
 There are none. A path given on the command line is opened at startup; a
-document may also be dropped on the window or chosen with Ctrl+O.
+document may also be chosen with Ctrl+O.
 .SH KEYS
 .TP
 .B Ctrl+O
