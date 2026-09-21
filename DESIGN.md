@@ -248,6 +248,29 @@ target and are renamed over it, carrying the target's permissions, so the file
 is either what it was or what was written. macOS writes in place, because the
 sandbox grant covers the file and not its directory.
 
+**An edit changes one subtree and nothing beside it**, and the tests say so by
+mutating a corpus document and comparing everything else. A name written into
+the tree takes the prefix the document declares for its namespace on the
+content root, so a document that spells `text:` as `t:` is written its own way.
+A cell in a run the document wrote once with a repeat count is split into the
+run before, the one, and the run after, with the counts fixed, so the cell
+changes and its neighbours in the run keep what they had; a cell or row past
+what the document wrote is created, with one repeated empty run filling the
+gap. A cell that holds a formula is refused, and so is one under a neighbour's
+span. A shape's `svg:x`, `svg:y`, `svg:width` and `svg:height` are written in
+the unit each was read in.
+
+**A paragraph is edited through its flat text**, built from the tree and not
+from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
+`text:line-break` a newline, a span's or a link's contents the paragraph's own
+characters, and everything else in the paragraph — a bookmark, a frame, a
+field, a note — contributes nothing and stays where it was. Replacing a range
+deletes the characters from the nodes that hold them, puts the new text into
+the text node at the start of the range, then writes whitespace the way ODF
+requires. A split carries a zero-length element at the split point to the
+first half. `crates/odox-core/src/edit.rs` is the map; `tests/edit.rs`
+measures it over every paragraph of the corpus.
+
 **Undo is a stack of snapshots** of the content tree, bounded at a hundred.
 Every edit records the tree as it stands and then mutates; the document is
 modified when the stack is not at the depth it had when the file was last read

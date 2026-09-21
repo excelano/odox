@@ -99,6 +99,35 @@ impl Ns {
     }
 }
 
+impl Ns {
+    /// The prefix ODF spells a namespace with, for a name written into a
+    /// document that does not declare one of its own.
+    pub fn conventional_prefix(&self) -> &str {
+        match self {
+            Self::Office => "office",
+            Self::Text => "text",
+            Self::Style => "style",
+            Self::Table => "table",
+            Self::Draw => "draw",
+            Self::Presentation => "presentation",
+            Self::Chart => "chart",
+            Self::Fo => "fo",
+            Self::Svg => "svg",
+            Self::Number => "number",
+            Self::Meta => "meta",
+            Self::Manifest => "manifest",
+            Self::Config => "config",
+            Self::Of => "of",
+            Self::Xlink => "xlink",
+            Self::Dc => "dc",
+            Self::Loext => "loext",
+            Self::Calcext => "calcext",
+            Self::Xmlns => "xmlns",
+            Self::Other(_) | Self::None => "",
+        }
+    }
+}
+
 /// A name as it appeared, and the namespace it resolved to.
 ///
 /// The prefix is kept alongside the resolved namespace because writing is a
@@ -115,6 +144,19 @@ pub struct Name {
 }
 
 impl Name {
+    /// A name with a prefix, or unprefixed where the prefix is empty.
+    pub fn new(prefix: &str, local: &str, ns: Ns) -> Self {
+        Self {
+            prefix: if prefix.is_empty() {
+                None
+            } else {
+                Some(prefix.into())
+            },
+            local: local.into(),
+            ns,
+        }
+    }
+
     /// Whether this is the given ODF name.
     pub fn is(&self, ns: &Ns, local: &str) -> bool {
         self.ns == *ns && &*self.local == local
@@ -166,15 +208,7 @@ impl Element {
     /// A new element with no attributes and no children.
     pub fn new(prefix: &str, local: &str, ns: Ns) -> Self {
         Self {
-            name: Name {
-                prefix: if prefix.is_empty() {
-                    None
-                } else {
-                    Some(prefix.into())
-                },
-                local: local.into(),
-                ns,
-            },
+            name: Name::new(prefix, local, ns),
             attrs: Vec::new(),
             children: Vec::new(),
             self_closing: true,
@@ -208,6 +242,67 @@ impl Element {
             Node::Element(e) => Some(e),
             _ => None,
         })
+    }
+
+    /// Every child element with its index among the children, which is the
+    /// step a path through the tree takes to reach it.
+    pub fn elements_indexed(&self) -> impl Iterator<Item = (usize, &Element)> {
+        self.children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, n)| match n {
+                Node::Element(e) => Some((i, e)),
+                _ => None,
+            })
+    }
+
+    /// The element a path of child indices leads to, counting every node and
+    /// not only the elements. An empty path is this element.
+    pub fn at(&self, path: &[usize]) -> Option<&Element> {
+        let mut element = self;
+        for &step in path {
+            let Node::Element(child) = element.children.get(step)? else {
+                return None;
+            };
+            element = child;
+        }
+        Some(element)
+    }
+
+    /// The first child element with the given name, for changing it.
+    pub fn child_mut(&mut self, ns: &Ns, local: &str) -> Option<&mut Element> {
+        self.children.iter_mut().find_map(|n| match n {
+            Node::Element(e) if e.is(ns, local) => Some(e),
+            _ => None,
+        })
+    }
+
+    /// The same, for changing what is there.
+    pub fn at_mut(&mut self, path: &[usize]) -> Option<&mut Element> {
+        let mut element = self;
+        for &step in path {
+            let Node::Element(child) = element.children.get_mut(step)? else {
+                return None;
+            };
+            element = child;
+        }
+        Some(element)
+    }
+
+    /// Set an attribute: the value replaced where the attribute is there, the
+    /// attribute appended where it is not.
+    pub fn set_attr(&mut self, name: Name, value: impl Into<String>) {
+        let value = value.into();
+        match self.attrs.iter_mut().find(|a| a.name == name) {
+            Some(attr) => attr.value = value,
+            None => self.attrs.push(Attribute { name, value }),
+        }
+    }
+
+    /// Remove an attribute, answering the value it had.
+    pub fn remove_attr(&mut self, ns: &Ns, local: &str) -> Option<String> {
+        let at = self.attrs.iter().position(|a| a.name.is(ns, local))?;
+        Some(self.attrs.remove(at).value)
     }
 
     /// The first child element with the given name.

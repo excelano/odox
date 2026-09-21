@@ -11,7 +11,9 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::Document;
+use crate::edit::Refused;
 use crate::style::{Family, Fill, PageLayout};
+use crate::value::Length;
 use crate::xml::{Element, Ns};
 use crate::{Error, media_type};
 
@@ -30,6 +32,9 @@ pub struct Slide<'a> {
     pub name: Option<&'a str>,
     /// The master page it takes its background and placeholders from.
     pub master_page: Option<&'a str>,
+    /// Where the `draw:page` sits among the body's children, so that the
+    /// slide can be reached again for changing without holding a reference.
+    pub position: usize,
 }
 
 impl Slide<'_> {
@@ -50,9 +55,15 @@ impl Slide<'_> {
     /// Order is drawing order, back to front, which is the order ODF writes them
     /// in and the order they have to be drawn in.
     pub fn shapes(&self) -> impl Iterator<Item = &Element> {
+        self.shapes_indexed().map(|(_, shape)| shape)
+    }
+
+    /// The shapes with their index among the page's children, which is what
+    /// [`Presentation::set_geometry`] takes.
+    pub fn shapes_indexed(&self) -> impl Iterator<Item = (usize, &Element)> {
         self.element
-            .elements()
-            .filter(|e| !e.is(&Ns::Presentation, "notes") && !e.is(&Ns::Office, "forms"))
+            .elements_indexed()
+            .filter(|(_, e)| !e.is(&Ns::Presentation, "notes") && !e.is(&Ns::Office, "forms"))
     }
 }
 
@@ -72,14 +83,62 @@ impl Presentation {
         let Some(body) = self.document.body_of("presentation") else {
             return Vec::new();
         };
-        body.elements()
-            .filter(|e| e.is(&Ns::Draw, "page"))
-            .map(|element| Slide {
+        body.elements_indexed()
+            .filter(|(_, e)| e.is(&Ns::Draw, "page"))
+            .map(|(position, element)| Slide {
                 element,
                 name: element.attr(&Ns::Draw, "name"),
                 master_page: element.attr(&Ns::Draw, "master-page-name"),
+                position,
             })
             .collect()
+    }
+
+    /// Move and size a shape: `svg:x`, `svg:y`, `svg:width` and `svg:height`,
+    /// each written in the unit it was read in, in centimetres where it was
+    /// absent. The shape is named by its slide's position among the body's
+    /// children and its own among the page's, as [`Slide::shapes_indexed`]
+    /// gives them.
+    ///
+    /// A shape placed by `draw:transform` states no corner and is not moved
+    /// this way; asking is refused rather than answered wrongly.
+    ///
+    /// # Errors
+    ///
+    /// There is no such slide or shape, or the shape is placed by a transform.
+    pub fn set_geometry(
+        &mut self,
+        slide: usize,
+        shape: usize,
+        x: Length,
+        y: Length,
+        width: Length,
+        height: Length,
+    ) -> Result<(), Refused> {
+        let names = [
+            (self.document.name(&Ns::Svg, "x"), x),
+            (self.document.name(&Ns::Svg, "y"), y),
+            (self.document.name(&Ns::Svg, "width"), width),
+            (self.document.name(&Ns::Svg, "height"), height),
+        ];
+        let element = self
+            .document
+            .content
+            .child_mut(&Ns::Office, "body")
+            .and_then(|body| body.child_mut(&Ns::Office, "presentation"))
+            .and_then(|body| body.at_mut(&[slide, shape]))
+            .ok_or(Refused::NotFound)?;
+        if element.attr(&Ns::Draw, "transform").is_some() {
+            return Err(Refused::NotFound);
+        }
+        for (name, length) in names {
+            let unit = element
+                .attr(&name.ns, &name.local)
+                .map_or("cm", Length::unit_of)
+                .to_owned();
+            element.set_attr(name, length.write(&unit));
+        }
+        Ok(())
     }
 
     /// The master page a slide names.

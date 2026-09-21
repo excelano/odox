@@ -11,9 +11,10 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::Document;
+use crate::edit::Refused;
 use crate::media_type;
 use crate::value::Length;
-use crate::xml::{Element, Ns};
+use crate::xml::{Element, Name, Node, Ns};
 use crate::{Error, Family, Properties};
 
 /// An `OpenDocument` spreadsheet.
@@ -104,6 +105,48 @@ pub enum Value {
 }
 
 impl Value {
+    /// What a person typed into a cell, read the way a spreadsheet reads it: a
+    /// number is a number, `true` and `false` are booleans, nothing is empty,
+    /// and anything else is text.
+    ///
+    /// A formula is not recognised here, because nothing in this version
+    /// evaluates one; text beginning with `=` is text. Percentages, currencies
+    /// and dates need the document's number formats to read and are text too.
+    pub fn from_input(input: &str) -> Self {
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            return Self::Empty;
+        }
+        if trimmed.eq_ignore_ascii_case("true") {
+            return Self::Boolean(true);
+        }
+        if trimmed.eq_ignore_ascii_case("false") {
+            return Self::Boolean(false);
+        }
+        if let Ok(number) = trimmed.parse::<f64>()
+            && number.is_finite()
+            && !trimmed.contains(['i', 'n', 'I', 'N'])
+        {
+            return Self::Number(number);
+        }
+        Self::Text(input.to_owned())
+    }
+
+    /// The text a cell shows for the value, as this crate formats it: the
+    /// shortest spelling of a number, `TRUE` and `FALSE`, the text itself. A
+    /// document's own number format is not applied; a spreadsheet application
+    /// reformats the cell from the value when it next opens the file.
+    pub fn cached_text(&self) -> String {
+        match self {
+            Self::Empty => String::new(),
+            Self::Number(n) | Self::Currency(n, _) => n.to_string(),
+            Self::Percentage(n) => format!("{}%", n * 100.0),
+            Self::Date(s) | Self::Time(s) | Self::Text(s) => s.clone(),
+            Self::Boolean(true) => "TRUE".to_owned(),
+            Self::Boolean(false) => "FALSE".to_owned(),
+        }
+    }
+
     /// Whether the value is one a spreadsheet puts against the right edge of its
     /// cell: every type but text, which is ODF's own rule and every
     /// application's default.
@@ -272,6 +315,60 @@ impl SheetDocument {
         self.sheets = index_sheets(&self.document);
     }
 
+    /// Put a value in a cell, by sheet, row and column, all counting from zero.
+    ///
+    /// A row or a cell the document wrote once with a repeat count is split
+    /// into the run before, the one, and the run after, with the counts fixed,
+    /// so that the one cell changes and its neighbours in the run keep what
+    /// they had. A row or cell past what the document wrote is created, with a
+    /// repeated empty run filling the gap. The cell's own attributes and
+    /// paragraphs are replaced; its style, and anything else in it, stay.
+    ///
+    /// # Errors
+    ///
+    /// The cell is under a neighbour's span, holds a formula, or the sheet does
+    /// not exist. Nothing is changed in any of those cases.
+    pub fn set_cell(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+        value: &Value,
+    ) -> Result<(), Refused> {
+        let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
+        if let Some(cell) = self.cell(index, row, column) {
+            if cell.covered {
+                return Err(Refused::Covered);
+            }
+            if cell.formula().is_some() {
+                return Err(Refused::Formula);
+            }
+        }
+        let table_position = index.table;
+        let range = index
+            .row_range(row)
+            .map(|r| (r.path.steps().to_vec(), r.first, r.count));
+        let rows_written = index.rows.last().map_or(0, |r| r.first + r.count);
+
+        let names = CellNames::of(&self.document);
+        let calcext = self.document.declares(&Ns::Calcext);
+
+        let table = self
+            .document
+            .content
+            .child_mut(&Ns::Office, "body")
+            .and_then(|body| body.child_mut(&Ns::Office, "spreadsheet"))
+            .and_then(|sheet| sheet.at_mut(&[table_position]))
+            .ok_or(Refused::NotFound)?;
+
+        let row_element = reach_row(table, range.as_ref(), row, rows_written, &names)?;
+        let cell_index = reach_cell(row_element, column, &names);
+        let cell = row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)?;
+        write_value(cell, value, &names, calcext);
+        self.reindex();
+        Ok(())
+    }
+
     /// The `table:table` element of a sheet.
     fn table(&self, sheet: &Sheet) -> Option<&Element> {
         let body = self.document.body_of("spreadsheet")?;
@@ -354,6 +451,249 @@ impl Sheet {
     /// The width of a column, where its column style gives one.
     pub fn column_width(&self, column: usize) -> Option<Length> {
         self.columns.get(column).and_then(|c| c.width)
+    }
+}
+
+/// The names a cell write spells, in the document's own prefixes.
+struct CellNames {
+    row: Name,
+    cell: Name,
+    rows_repeated: Name,
+    columns_repeated: Name,
+    value_type: Name,
+    value: Name,
+    boolean_value: Name,
+    date_value: Name,
+    time_value: Name,
+    currency: Name,
+    calcext_value_type: Name,
+    paragraph: Name,
+}
+
+impl CellNames {
+    fn of(document: &Document) -> Self {
+        Self {
+            row: document.name(&Ns::Table, "table-row"),
+            cell: document.name(&Ns::Table, "table-cell"),
+            rows_repeated: document.name(&Ns::Table, "number-rows-repeated"),
+            columns_repeated: document.name(&Ns::Table, "number-columns-repeated"),
+            value_type: document.name(&Ns::Office, "value-type"),
+            value: document.name(&Ns::Office, "value"),
+            boolean_value: document.name(&Ns::Office, "boolean-value"),
+            date_value: document.name(&Ns::Office, "date-value"),
+            time_value: document.name(&Ns::Office, "time-value"),
+            currency: document.name(&Ns::Office, "currency"),
+            calcext_value_type: document.name(&Ns::Calcext, "value-type"),
+            paragraph: document.name(&Ns::Text, "p"),
+        }
+    }
+}
+
+fn empty_cell(names: &CellNames) -> Element {
+    let mut cell = Element::new("", "table-cell", Ns::Table);
+    cell.name = names.cell.clone();
+    cell
+}
+
+/// The row element for a row number, standing alone: split out of the run it
+/// was written in, or created past the end of the table with a repeated empty
+/// row filling the gap.
+fn reach_row<'a>(
+    table: &'a mut Element,
+    range: Option<&(Vec<usize>, usize, usize)>,
+    row: usize,
+    rows_written: usize,
+    names: &CellNames,
+) -> Result<&'a mut Element, Refused> {
+    let Some((steps, first, count)) = range else {
+        let gap = row - rows_written;
+        if gap > 0 {
+            let mut filler = empty_row(names);
+            if gap > 1 {
+                filler.set_attr(names.rows_repeated.clone(), gap.to_string());
+            }
+            table.children.push(Node::Element(filler));
+        }
+        table.children.push(Node::Element(empty_row(names)));
+        let last = table.children.len() - 1;
+        return table.at_mut(&[last]).ok_or(Refused::NotFound);
+    };
+    let (last, above) = steps.split_last().ok_or(Refused::NotFound)?;
+    let parent = table.at_mut(above).ok_or(Refused::NotFound)?;
+    let at = split_run(parent, *last, row - first, *count, &names.rows_repeated);
+    parent.at_mut(&[at]).ok_or(Refused::NotFound)
+}
+
+/// The index in a row of the cell element for a column, standing alone: split
+/// out of its run, or appended with a repeated empty cell filling the gap.
+fn reach_cell(row: &mut Element, column: usize, names: &CellNames) -> usize {
+    // Found first and split after, because the split borrows the row.
+    let mut at = 0usize;
+    let mut found = None;
+    for (index, child) in row.elements_indexed() {
+        if !child.is(&Ns::Table, "table-cell") && !child.is(&Ns::Table, "covered-table-cell") {
+            continue;
+        }
+        let repeat = child
+            .attr_usize(&Ns::Table, "number-columns-repeated")
+            .unwrap_or(1)
+            .max(1);
+        if column < at + repeat {
+            found = Some((index, column - at, repeat));
+            break;
+        }
+        at += repeat;
+    }
+    if let Some((index, offset, repeat)) = found {
+        return split_run(row, index, offset, repeat, &names.columns_repeated);
+    }
+    let gap = column - at;
+    if gap > 0 {
+        let mut filler = empty_cell(names);
+        if gap > 1 {
+            filler.set_attr(names.columns_repeated.clone(), gap.to_string());
+        }
+        row.children.push(Node::Element(filler));
+    }
+    row.children.push(Node::Element(empty_cell(names)));
+    row.self_closing = false;
+    row.children.len() - 1
+}
+
+/// A row holding one empty cell, which is the least a row may hold.
+fn empty_row(names: &CellNames) -> Element {
+    let mut row = Element::new("", "table-row", Ns::Table);
+    row.name = names.row.clone();
+    row.children.push(Node::Element(empty_cell(names)));
+    row.self_closing = false;
+    row
+}
+
+/// Split the repeated element at `index` in `parent` so that the `offset`th of
+/// its `repeat` copies stands alone, and answer where it now is.
+///
+/// The copies before and after keep the element's attributes and children
+/// with their counts fixed, so the run reads the same as before at every
+/// position but the one.
+fn split_run(
+    parent: &mut Element,
+    index: usize,
+    offset: usize,
+    repeat: usize,
+    repeated: &Name,
+) -> usize {
+    if repeat <= 1 {
+        return index;
+    }
+    let Some(Node::Element(original)) = parent.children.get(index) else {
+        return index;
+    };
+    let one = {
+        let mut one = original.clone();
+        one.remove_attr(&repeated.ns, &repeated.local);
+        one
+    };
+    let mut replacement = Vec::with_capacity(3);
+    let before = offset;
+    let after = repeat - offset - 1;
+    if before > 0 {
+        replacement.push(Node::Element(with_count(
+            original.clone(),
+            before,
+            repeated,
+        )));
+    }
+    replacement.push(Node::Element(one));
+    if after > 0 {
+        replacement.push(Node::Element(with_count(original.clone(), after, repeated)));
+    }
+    parent.children.splice(index..=index, replacement);
+    index + usize::from(before > 0)
+}
+
+fn with_count(mut element: Element, count: usize, repeated: &Name) -> Element {
+    if count > 1 {
+        element.set_attr(repeated.clone(), count.to_string());
+    } else {
+        element.remove_attr(&repeated.ns, &repeated.local);
+    }
+    element
+}
+
+/// Put a value into a cell element: the typed attributes and the displayed
+/// paragraphs replaced, the style and everything else kept.
+fn write_value(cell: &mut Element, value: &Value, names: &CellNames, calcext: bool) {
+    for local in [
+        "value-type",
+        "value",
+        "boolean-value",
+        "date-value",
+        "time-value",
+        "string-value",
+        "currency",
+    ] {
+        cell.remove_attr(&Ns::Office, local);
+    }
+    cell.remove_attr(&Ns::Calcext, "value-type");
+    cell.remove_attr(&Ns::Table, "formula");
+    cell.children
+        .retain(|node| !matches!(node, Node::Element(e) if e.is(&Ns::Text, "p")));
+
+    let value_type = match value {
+        Value::Empty => None,
+        Value::Number(_) => Some("float"),
+        Value::Percentage(_) => Some("percentage"),
+        Value::Currency(..) => Some("currency"),
+        Value::Date(_) => Some("date"),
+        Value::Time(_) => Some("time"),
+        Value::Boolean(_) => Some("boolean"),
+        Value::Text(_) => Some("string"),
+    };
+    if let Some(value_type) = value_type {
+        cell.set_attr(names.value_type.clone(), value_type);
+        // LibreOffice writes its own copy of the type in every cell and reads
+        // a cell without one fine; it is written where the document declares
+        // the namespace, and a document that never heard of it is left alone.
+        if calcext {
+            cell.set_attr(names.calcext_value_type.clone(), value_type);
+        }
+    }
+    match value {
+        Value::Empty | Value::Text(_) => {}
+        Value::Number(n) | Value::Percentage(n) => {
+            cell.set_attr(names.value.clone(), n.to_string());
+        }
+        Value::Currency(n, code) => {
+            cell.set_attr(names.value.clone(), n.to_string());
+            if let Some(code) = code {
+                cell.set_attr(names.currency.clone(), code.clone());
+            }
+        }
+        Value::Date(s) => cell.set_attr(names.date_value.clone(), s.clone()),
+        Value::Time(s) => cell.set_attr(names.time_value.clone(), s.clone()),
+        Value::Boolean(b) => cell.set_attr(names.boolean_value.clone(), b.to_string()),
+    }
+    let text = value.cached_text();
+    if !text.is_empty() {
+        for line in text.split('\n') {
+            let mut paragraph = Element::new("", "p", Ns::Text);
+            paragraph.name = names.paragraph.clone();
+            if !line.is_empty() {
+                paragraph.children.push(Node::Text(line.to_owned()));
+                paragraph.self_closing = false;
+            }
+            cell.children.push(Node::Element(paragraph));
+        }
+    }
+    cell.self_closing = cell.children.is_empty();
+    // A paragraph that is inserted plain may hold runs of spaces or a tab; it
+    // is written the way ODF requires like any other.
+    for node in &mut cell.children {
+        if let Node::Element(e) = node
+            && e.is(&Ns::Text, "p")
+        {
+            crate::edit::replace(e, 0..0, "");
+        }
     }
 }
 
