@@ -16,19 +16,17 @@ is where German bites.
 
 ## Subtitle (Mac App Store, 30)
 
-Textdokumente lesen
+Textdokumente bearbeiten
 
 ## Promotional text (Mac App Store, 170)
 
-Öffnen Sie ein OpenDocument-Textdokument und lesen Sie es wie geschrieben: Überschriften, Listen, Tabellen und Bilder an ihrem Platz, mit einer Gliederung daneben.
+Öffnen Sie ein OpenDocument-Textdokument, lesen Sie es wie geschrieben, ändern Sie, was zu ändern ist, und speichern Sie es als das Dokument, das es war.
 
 ## Short description (Microsoft Store, 500)
 
-Ein kleiner, schneller Betrachter für OpenDocument-Textdokumente, also die ODT-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+Ein kleiner, schneller Editor für OpenDocument-Textdokumente, also die ODT-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
 
-Die Seite wird in der Breite gezeichnet, die das Dokument verlangt, mit Überschriften, Listen, Tabellen und Bildern an ihrem Platz und einer Gliederung daneben, die beim Klick auf eine Überschrift dorthin springt. Markieren und kopieren lässt sich alles.
-
-Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
+Die Seite wird in der Breite gezeichnet, die das Dokument verlangt, mit Überschriften, Listen, Tabellen und Bildern an ihrem Platz und einer Gliederung daneben. Klicken Sie auf einen Absatz, um ihn zu ändern, nehmen Sie es zurück und speichern Sie: Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde.
 
 ## App features (Microsoft Store, up to 20 bullets of 200 characters)
 
@@ -37,7 +35,10 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 - Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und die Bilder im Dokument, jedes an seinem Platz
 - Eine Gliederung neben der Seite, die beim Klick auf eine Überschrift dorthin springt
 - Über Absätze hinweg markieren und kopieren, oder das ganze Dokument als reinen Text übernehmen
-- Liest und schreibt nie: kein Speichern, keine temporäre Datei neben Ihrem Dokument, nichts wird angelegt
+- Auf einen Absatz klicken und ihn ändern, mit Enter teilen oder mit der Rücktaste zusammenfügen, und alles mit Rückgängig zurücknehmen
+- Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde
+- Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, auch das, wovon Odox nie gehört hat
+- Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern
 - Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie
 - Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung
 - Spricht Deutsch und Englisch
@@ -45,17 +46,17 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 
 ## Description (both, written to 4,000)
 
-Odox Text öffnet ein OpenDocument-Textdokument und zeigt Ihnen, was darin steht.
+Odox Text öffnet ein OpenDocument-Textdokument, lässt Sie ändern, was darin steht, und speichert es als das Dokument zurück, das es war.
 
-Mehr nicht. Es gibt kein Speichern, kein Speichern unter und keinen Export; das Menü Datei bietet Öffnen, Neu einlesen, Schließen und Beenden. Die Datei, die Sie öffnen, wird zum Lesen geöffnet und bleibt genau so, wie sie war: keine temporäre Datei daneben, keine Sicherungskopie. Es wird nichts auf Ihre Festplatte geschrieben, auch nicht von Odox Text selbst: keine Einstellungsdatei, keine Liste zuletzt geöffneter Dokumente, kein Zwischenspeicher.
+Es ist ein leichter Editor und keine Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie auf einen Absatz klicken und seinen Text an Ort und Stelle ändern, mit Enter einen neuen Absatz beginnen, mit der Rücktaste zwei zusammenfügen, alles mit Rückgängig zurücknehmen und speichern. Formatieren, eine Tabelle oder ein Bild einfügen, suchen und ersetzen: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
 Die Seite wird in der Breite gezeichnet, die das Dokument verlangt. Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und Rahmen sowie die Bilder im Dokument erscheinen dort, wo das Dokument sie hinsetzt, in den Schriften, die es verlangt, aufgelöst gegen die auf Ihrem Rechner installierten. Neben der Seite steht eine Gliederung, die beim Klick auf eine Überschrift dorthin springt. Sie können über Absätze hinweg markieren und kopieren oder das ganze Dokument mit einem Befehl als reinen Text übernehmen.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst“, weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Text ist eines von dreien. Odox Grid liest Tabellendokumente und Odox Deck liest Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Text ist eines von dreien. Odox Grid bearbeitet Tabellendokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
 
-Was ein Betrachter nicht tun müsste und dieser tut: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und bei jeder Änderung wird geprüft, dass eine wieder hinausgeschriebene Datei dasselbe ergibt. Einem Betrachter kostet das nichts. Es ist da, weil ein Betrachter, der wegwirft, was er nicht versteht, im Fenster genauso aussieht und zu einem Editor wird, der Dokumente still zerstört, sobald jemand zum ersten Mal speichert. Dorthin geht die Reise.
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 
@@ -63,11 +64,11 @@ In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://git
 
 **Mac App Store** (100 characters, comma-separated, no spaces after commas):
 
-    opendocument,odf,odt,textdokument,betrachter,lesen,dokument,oasis,büro
+    opendocument,odf,odt,textdokument,editor,bearbeiten,dokument,oasis,büro
 
 **Microsoft Store** (seven terms):
 
-    OpenDocument, ODF, ODT, Textdokument, Betrachter, Dokument lesen, OASIS
+    OpenDocument, ODF, ODT, Textdokument, Editor, Dokument bearbeiten, OASIS
 
 ---
 
@@ -75,19 +76,17 @@ In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://git
 
 ## Subtitle (Mac App Store, 30)
 
-Tabellendokumente lesen
+Tabellendokumente bearbeiten
 
 ## Promotional text (Mac App Store, 170)
 
-Öffnen Sie ein OpenDocument-Tabellendokument mit seinen eigenen Spaltenbreiten und Zellformaten, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle.
+Öffnen Sie ein OpenDocument-Tabellendokument mit seinen eigenen Spaltenbreiten und Zellformaten, ändern Sie Zellen und speichern Sie es als das Dokument, das es war.
 
 ## Short description (Microsoft Store, 500)
 
-Ein kleiner, schneller Betrachter für OpenDocument-Tabellendokumente, also die ODS-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+Ein kleiner, schneller Editor für OpenDocument-Tabellendokumente, also die ODS-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
 
-Das Blatt wird mit den Spaltenbreiten und Zellformaten des Dokuments gezeichnet, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle. Ein Blatt mit zehntausend leeren Zeilen dazwischen öffnet so schnell wie eines ohne.
-
-Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
+Das Blatt wird mit den Spaltenbreiten und Zellformaten des Dokuments gezeichnet, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle. Tippen Sie in eine Zelle, um sie zu ändern, nehmen Sie es zurück und speichern Sie: Formeln und alles Unberührte bleiben, wie sie gelesen wurden.
 
 ## App features (Microsoft Store, up to 20 bullets of 200 characters)
 
@@ -97,7 +96,10 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 - Zahlen, Datumsangaben und Wahrheitswerte so dargestellt, wie das Dokument es vorgibt
 - Ein Blatt mit einer großen leeren Lücke öffnet so schnell wie ein volles, weil die Lücke nie ausgerollt wird
 - Das ganze Tabellenblatt als tabulatorgetrennten Text kopieren und überall einfügen
-- Liest und schreibt nie: kein Speichern, keine temporäre Datei daneben, nichts wird angelegt
+- In eine Zelle tippen, um sie zu ändern: Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text, und Rückgängig nimmt es zurück
+- Formeln bleiben erhalten und werden nicht bearbeitet; sobald sich etwas geändert hat, werden ihre Ergebnisse blass gezeichnet, bis eine Tabellenkalkulation sie neu berechnet
+- Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde
+- Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern
 - Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie
 - Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung
 - Spricht Deutsch und Englisch
@@ -105,19 +107,19 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 
 ## Description (both, written to 4,000)
 
-Odox Grid öffnet ein OpenDocument-Tabellendokument und zeigt Ihnen, was darin steht.
+Odox Grid öffnet ein OpenDocument-Tabellendokument, lässt Sie die Zellen ändern, die es brauchen, und speichert es als das Dokument zurück, das es war.
 
-Mehr nicht. Es gibt kein Speichern, kein Speichern unter und keinen Export; das Menü Datei bietet Öffnen, Neu einlesen, Schließen und Beenden. Die Datei, die Sie öffnen, wird zum Lesen geöffnet und bleibt genau so, wie sie war: keine temporäre Datei daneben, keine Sicherungskopie. Es wird nichts auf Ihre Festplatte geschrieben, auch nicht von Odox Grid selbst: keine Einstellungsdatei, keine Liste zuletzt geöffneter Dokumente, kein Zwischenspeicher.
+Es ist ein leichter Editor und keine Tabellenkalkulation. Tippen auf der gewählten Zelle ersetzt sie, Enter oder F2 öffnet sie mit ihrem Inhalt, Entf leert sie, und Rückgängig nimmt alles zurück. Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text. Eine Zelle mit einer Formel bleibt, wie sie ist, und wird nicht bearbeitet; sobald sich im Blatt etwas geändert hat, wird das Ergebnis jeder Formel blass gezeichnet, bis eine Tabellenkalkulation es neu berechnet, was LibreOffice beim Öffnen der Datei tut. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
 Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt. Es gibt einen Reiter je Tabellenblatt, und wer eine Zelle wählt, sieht die Formel dahinter über dem Gitter. Mit einem Befehl übernehmen Sie das ganze Blatt als tabulatorgetrennten Text und fügen es ein, wo Sie es brauchen.
 
-Ein Tabellendokument hat oft eine Lücke: einen Lauf von zehntausend leeren Zeilen zwischen zwei Zahlenblöcken. Ein Betrachter, der daraus zehntausend Zeilen im Speicher macht, öffnet langsam und rollt langsam. Odox Grid behält die Lücke so, wie das Dokument sie schreibt, und deshalb öffnet ein dünn besetztes Blatt so schnell wie ein dichtes.
+Ein Tabellendokument hat oft eine Lücke: einen Lauf von zehntausend leeren Zeilen zwischen zwei Zahlenblöcken. Ein Programm, das daraus zehntausend Zeilen im Speicher macht, öffnet langsam und rollt langsam. Odox Grid behält die Lücke so, wie das Dokument sie schreibt, und deshalb öffnet ein dünn besetztes Blatt so schnell wie ein dichtes.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst“, weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Grid ist eines von dreien. Odox Text liest Textdokumente und Odox Deck liest Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Grid ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
 
-Was ein Betrachter nicht tun müsste und dieser tut: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und bei jeder Änderung wird geprüft, dass eine wieder hinausgeschriebene Datei dasselbe ergibt. Einem Betrachter kostet das nichts. Es ist da, weil ein Betrachter, der wegwirft, was er nicht versteht, im Fenster genauso aussieht und zu einem Editor wird, der Dokumente still zerstört, sobald jemand zum ersten Mal speichert. Dorthin geht die Reise.
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 
@@ -125,11 +127,11 @@ In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://git
 
 **Mac App Store** (100 characters, comma-separated, no spaces after commas):
 
-    opendocument,odf,ods,tabelle,tabellendokument,betrachter,lesen,oasis
+    opendocument,odf,ods,tabelle,tabellendokument,editor,bearbeiten,oasis
 
 **Microsoft Store** (seven terms):
 
-    OpenDocument, ODF, ODS, Tabellendokument, Tabelle, Betrachter, OASIS
+    OpenDocument, ODF, ODS, Tabellendokument, Tabelle, Editor, OASIS
 
 ---
 
@@ -137,19 +139,17 @@ In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://git
 
 ## Subtitle (Mac App Store, 30)
 
-Präsentationen lesen
+Präsentationen bearbeiten
 
 ## Promotional text (Mac App Store, 170)
 
-Öffnen Sie eine OpenDocument-Präsentation und sehen Sie jede Folie wie entworfen: die Masterfolie dahinter, die Formen aus ihrer eigenen Geometrie, die Notizen darunter.
+Öffnen Sie eine OpenDocument-Präsentation, sehen Sie jede Folie wie entworfen, verschieben Sie eine Form oder ändern Sie ihren Text, und speichern Sie sie, wie sie war.
 
 ## Short description (Microsoft Store, 500)
 
-Ein kleiner, schneller Betrachter für OpenDocument-Präsentationen, also die ODP-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+Ein kleiner, schneller Editor für OpenDocument-Präsentationen, also die ODP-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
 
-Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt, mit Hintergrund und Verzierungen der Masterfolie dahinter und den Formen aus ihrer eigenen Geometrie statt angenähert. Die Notizen stehen darunter, die Folienliste daneben.
-
-Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
+Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt, mit der Masterfolie dahinter und den Formen aus ihrer eigenen Geometrie. Wählen Sie eine Form und ziehen Sie sie, ändern Sie ihre Größe oder ihren Text; Rückgängig nimmt es zurück, und alles andere bleibt, wie es gelesen wurde.
 
 ## App features (Microsoft Store, up to 20 bullets of 200 characters)
 
@@ -159,7 +159,10 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 - Formen aus ihrer eigenen Geometrie: Pfade, benutzerdefinierte Formen, Verbinder und ihre Beschriftungen
 - Einfarbige, lineare und axiale Verlaufsfüllungen sowie die Bilder, die eine Folie rahmt
 - Die Notizen unter jeder Folie und eine Liste der Folien daneben
-- Liest und schreibt nie: kein Speichern, keine temporäre Datei daneben, nichts wird angelegt
+- Eine Form wählen und ziehen, an einer Ecke in der Größe ändern oder auf ihren Text klicken und ihn an Ort und Stelle ändern, und alles mit Rückgängig zurücknehmen
+- Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde
+- Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, Masterfolie und Verzierungen der Vorlage eingeschlossen
+- Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern
 - Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie
 - Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung
 - Spricht Deutsch und Englisch
@@ -167,9 +170,9 @@ Er liest und schreibt nicht: Ihre Datei bleibt unverändert.
 
 ## Description (both, written to 4,000)
 
-Odox Deck öffnet eine OpenDocument-Präsentation und zeigt Ihnen, was darin steht.
+Odox Deck öffnet eine OpenDocument-Präsentation, lässt Sie ändern, was auf den Folien steht, und speichert sie als den Foliensatz zurück, der sie war.
 
-Mehr nicht. Es gibt kein Speichern, kein Speichern unter und keinen Export; das Menü Datei bietet Öffnen, Neu einlesen, Schließen und Beenden. Die Datei, die Sie öffnen, wird zum Lesen geöffnet und bleibt genau so, wie sie war: keine temporäre Datei daneben, keine Sicherungskopie. Es wird nichts auf Ihre Festplatte geschrieben, auch nicht von Odox Deck selbst: keine Einstellungsdatei, keine Liste zuletzt geöffneter Dokumente, kein Zwischenspeicher.
+Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, alles mit Rückgängig zurücknehmen und speichern. Eine Folie oder eine Form hinzufügen, formatieren oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
 Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt. Hinter dem Text und den Bildern der Folie liegt die Masterfolie: der Grund, den sie füllt, und die Verzierungen, die eine Vorlage auf jede Folie legt, und das ist das meiste von dem, was einen Foliensatz nach seiner Vorlage aussehen lässt. Die Formen werden aus der Geometrie gezeichnet, die das Dokument angibt, statt zu Rechtecken angenähert zu werden: Pfade, benutzerdefinierte Formen mit ihren eigenen Formeln, Verbinder zwischen den Formen, die sie verknüpfen, und die Beschriftung, die eine Form trägt. Die Notizen stehen unter der Folie, eine Liste der Folien daneben.
 
@@ -177,9 +180,9 @@ Wie gut gezeichnet wird, ist gemessen und nicht behauptet. Jede Folie der Vorlag
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst“, weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Deck ist eines von dreien. Odox Text liest Textdokumente und Odox Grid liest Tabellendokumente. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Deck ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Grid Tabellendokumente. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
 
-Was ein Betrachter nicht tun müsste und dieser tut: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und bei jeder Änderung wird geprüft, dass eine wieder hinausgeschriebene Datei dasselbe ergibt. Einem Betrachter kostet das nichts. Es ist da, weil ein Betrachter, der wegwirft, was er nicht versteht, im Fenster genauso aussieht und zu einem Editor wird, der Dokumente still zerstört, sobald jemand zum ersten Mal speichert. Dorthin geht die Reise.
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 
@@ -187,8 +190,8 @@ In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://git
 
 **Mac App Store** (100 characters, comma-separated, no spaces after commas):
 
-    opendocument,odf,odp,präsentation,folien,betrachter,lesen,oasis
+    opendocument,odf,odp,präsentation,folien,editor,bearbeiten,oasis
 
 **Microsoft Store** (seven terms):
 
-    OpenDocument, ODF, ODP, Präsentation, Folien, Betrachter, OASIS
+    OpenDocument, ODF, ODP, Präsentation, Folien, Editor, OASIS

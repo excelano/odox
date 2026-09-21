@@ -1,7 +1,7 @@
 [package]
 name = "odox-ui"
-description = "The shared window of the odox OpenDocument viewers: style mapping, document rendering and chrome"
-keywords = ["opendocument", "egui", "gui", "odf", "viewer"]
+description = "The shared window of the odox OpenDocument editors: style mapping, document rendering, editing and chrome"
+keywords = ["opendocument", "egui", "gui", "odf", "editor"]
 categories = ["gui"]
 version.workspace = true
 edition.workspace = true

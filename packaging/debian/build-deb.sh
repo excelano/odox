@@ -66,10 +66,10 @@ mkdir -p "$out"
 
 describe() {
     case "$1" in
-        xodt) echo "OpenDocument text document viewer|Open a .odt document and read it: headings, lists, tables, pictures and the document's own fonts, with an outline beside the page." ;;
-        xods) echo "OpenDocument spreadsheet viewer|Open a .ods workbook and read it: every sheet, the values the document holds and the text it displays, with the formula behind the cell you pick." ;;
-        xodp) echo "OpenDocument presentation viewer|Open a .odp deck and read it: every slide at the size the document sets, its text where the document puts it, and the speaker's notes." ;;
-        odox) echo "open an OpenDocument file with the viewer that reads it|One command for any OpenDocument file. It works out from the file whether it is a text document, a spreadsheet or a presentation, and becomes xodt, xods or xodp accordingly." ;;
+        xodt) echo "lightweight OpenDocument text document editor|Open a .odt document and read it: headings, lists, tables, pictures and the document's own fonts, with an outline beside the page. Change the text that needs changing, undo, and save it back as the document it was." ;;
+        xods) echo "lightweight OpenDocument spreadsheet editor|Open a .ods workbook and read it: every sheet, the values the document holds and the text it displays, with the formula behind the cell you pick. Type into a cell to change it, undo, and save it back as the document it was." ;;
+        xodp) echo "lightweight OpenDocument presentation editor|Open a .odp deck and read it: every slide at the size the document sets, its shapes where the document puts them, and the speaker's notes. Move a shape, resize it or change its text, undo, and save the deck back as it was." ;;
+        odox) echo "open an OpenDocument file with the application that reads it|One command for any OpenDocument file. It works out from the file whether it is a text document, a spreadsheet or a presentation, and becomes xodt, xods or xodp accordingly." ;;
     esac
 }
 
@@ -96,16 +96,15 @@ for app in xodt xods xodp odox; do
     gzip -9n "$staging/usr/share/doc/$app/changelog"
 
     IFS='|' read -r summary description <<<"$(describe "$app")"
-    # The launcher draws nothing, so it needs none of the window libraries, and
-    # it suggests the viewers rather than requiring them.
+    # The launcher draws nothing, so it needs none of the window libraries.
     if [ "$app" = odox ]; then
         app_depends="libc6, libgcc-s1, xodt, xods, xodp"
         recommends=""
-        closing="It draws nothing itself: it becomes the viewer that reads the file. Nothing is sent anywhere and nothing is written."
+        closing="It draws nothing itself: it becomes the application that reads the file. Nothing is sent anywhere and nothing is written."
     else
         app_depends="$depends"
         recommends="fonts-liberation"
-        closing="The document is drawn from the file and nothing is sent anywhere. Nothing is written either: this release reads OpenDocument and does not save it."
+        closing="Editing means changing what is there, not authoring: no formatting, no inserting, no formulas. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and nothing is written until Save, and then only the file that was opened or the one named."
     fi
     # A control file's extended description is one space-prefixed line per line,
     # and lintian refuses one longer than eighty columns.

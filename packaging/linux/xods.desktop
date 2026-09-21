@@ -2,16 +2,16 @@
 Type=Application
 Version=1.5
 Name=xods
-GenericName=OpenDocument Spreadsheet Viewer
-GenericName[de]=Betrachter für OpenDocument-Tabellendokumente
-Comment=Read OpenDocument spreadsheets
-Comment[de]=OpenDocument-Tabellendokumente lesen
+GenericName=OpenDocument Spreadsheet Editor
+GenericName[de]=Editor für OpenDocument-Tabellendokumente
+Comment=Open, edit and save OpenDocument spreadsheets
+Comment[de]=OpenDocument-Tabellendokumente öffnen, bearbeiten und speichern
 Exec=xods %f
 # The basename of this file, the binary's name and the viewport's app id all say
 # the same word, which is how a Wayland compositor finds this window's icon.
 Icon=xods
 StartupWMClass=xods
 Terminal=false
-Categories=Office;Viewer;
+Categories=Office;Spreadsheet;
 MimeType=application/vnd.oasis.opendocument.spreadsheet;application/vnd.oasis.opendocument.spreadsheet-template;
 Keywords=ODF;OpenDocument;

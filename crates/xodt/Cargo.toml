@@ -1,7 +1,7 @@
 [package]
 name = "xodt"
-description = "A small, fast viewer for OpenDocument text documents"
-keywords = ["opendocument", "odt", "viewer", "odf", "egui"]
+description = "A small, fast editor for OpenDocument text documents"
+keywords = ["opendocument", "odt", "editor", "odf", "egui"]
 categories = ["gui", "text-processing"]
 version.workspace = true
 edition.workspace = true

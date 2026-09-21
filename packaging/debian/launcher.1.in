@@ -24,14 +24,14 @@ the extension cannot, so a file named
 .I download
 or named nothing still opens in the right place.
 .PP
-The viewer is looked for beside this command and then on PATH, so a set
+The application is looked for beside this command and then on PATH, so a set
 installed together finds its own siblings. Any further arguments are passed to
-it. On this platform the command replaces itself with the viewer rather than
+it. On this platform the command replaces itself with the application rather than
 waiting for it.
 .SH OPTIONS
 .TP
 .BI \-\-which " FILE"
-Print the name of the viewer that would open the file, and launch nothing.
+Print the name of the application that would open the file, and launch nothing.
 .TP
 .B \-h ", " \-\-help
 A summary of this.
@@ -41,7 +41,7 @@ The version.
 .SH EXIT STATUS
 .TP
 .B 0
-The viewer was started, or
+The application was started, or
 .B \-\-which
 answered.
 .TP
@@ -49,15 +49,15 @@ answered.
 No file was given, the file is not there, or nothing here reads it.
 .TP
 .B 127
-The viewer that reads the file is not installed.
+The application that reads the file is not installed.
 .SH FILES
 None. odox writes no configuration, no cache and no temporary copy.
 .SH NOTES
-The Debian package depends on all three viewers, so
+The Debian package depends on all three applications, so
 .B apt install odox
 installs the whole suite. Installed any other way — from crates.io, say — the
-viewers are separate, and a file whose viewer is absent is reported as such
-rather than opened.
+applications are separate, and a file whose application is absent is reported
+as such rather than opened.
 .SH SEE ALSO
 .BR xodt (1),
 .BR xods (1),

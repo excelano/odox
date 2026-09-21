@@ -1,8 +1,9 @@
 # CLAUDE.md
 
-Three OpenDocument viewers over one library: `xodt` reads text documents, `xods`
-spreadsheets, `xodp` presentations; `odox` is a launcher that hands a file to the
-right one. `DESIGN.md` is the authority on how they are built; cite its sections.
+Three lightweight OpenDocument editors over one library: `xodt` opens text
+documents, `xods` spreadsheets, `xodp` presentations; `odox` is a launcher that
+hands a file to the right one. `DESIGN.md` is the authority on how they are
+built; cite its sections.
 
     cargo build --release
     cargo test --workspace                                  # walks corpus/
