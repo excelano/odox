@@ -385,17 +385,24 @@ build_bundle() {
     # What is left to go wrong is a missing or truncated file, so that is what is
     # checked: the four magic bytes every icon family begins with. A bundle whose
     # `.icns` is unreadable draws the generic application icon and says nothing.
-    icns="${here}/${app}.icns"
-    [ -f "$icns" ] || {
-        echo "build-app.sh: no icon at ${icns}; run 'cargo run --manifest-path packaging/make-icons/Cargo.toml'" >&2
-        exit 1
-    }
-    magic=$(dd if="$icns" bs=1 count=4 2>/dev/null)
-    [ "$magic" = "icns" ] || {
-        echo "build-app.sh: ${icns} does not begin 'icns', so it is not an icon family" >&2
-        exit 1
-    }
-    install -m 0644 "$icns" "${bundle}/Contents/Resources/${app}.icns"
+    #
+    # Two families, because the two things macOS draws are different drawings:
+    # `CFBundleIconFile` is the application, in the Dock and in Launchpad, and
+    # `CFBundleTypeIconFile` and `UTTypeIconFile` are what Finder puts on a
+    # document of the type this bundle claims.
+    for family in "${app}" "${app}-document"; do
+        icns="${here}/${family}.icns"
+        [ -f "$icns" ] || {
+            echo "build-app.sh: no icon at ${icns}; run 'cargo run --manifest-path packaging/make-icons/Cargo.toml'" >&2
+            exit 1
+        }
+        magic=$(dd if="$icns" bs=1 count=4 2>/dev/null)
+        [ "$magic" = "icns" ] || {
+            echo "build-app.sh: ${icns} does not begin 'icns', so it is not an icon family" >&2
+            exit 1
+        }
+        install -m 0644 "$icns" "${bundle}/Contents/Resources/${family}.icns"
+    done
 
     # `|` as the delimiter because half these values carry a `/` and all of them
     # carry a `.`. None carries a `|`.
@@ -403,6 +410,7 @@ build_bundle() {
         -e "s|@IDENTIFIER@|${identifier}|g" \
         -e "s|@PRODUCT@|${product}|g" \
         -e "s|@ICON@|${app}|g" \
+        -e "s|@DOCUMENT_ICON@|${app}-document|g" \
         -e "s|@UTI@|${uti}|g" \
         -e "s|@EXTENSION@|${extension}|g" \
         -e "s|@CONTENT_TYPE@|${content_type}|g" \

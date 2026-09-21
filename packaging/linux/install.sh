@@ -35,7 +35,7 @@ for app in xodt xods xodp; do
     fi
     install -m 755 "$binary" "$bin/$app"
     install -m 644 "$here/$app.desktop" "$apps/$app.desktop"
-    install -m 644 "$here/icons/$app.svg" "$icons/$app.svg"
+    install -m 644 "$here/../artwork/$app-application.svg" "$icons/$app.svg"
     echo "installed $app"
 done
 
