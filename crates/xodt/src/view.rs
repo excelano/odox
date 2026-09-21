@@ -6,9 +6,10 @@
 use std::path::Path;
 
 use eframe::egui::{self, Ui};
+use odox_core::Document;
 use odox_core::doc::TextDocument;
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Flow, Pictures, Viewer, fonts};
+use odox_ui::{Editing, Flow, Pictures, View, fonts};
 
 /// A text document, open or not.
 #[derive(Default)]
@@ -20,7 +21,7 @@ pub struct TextView {
     scroll_to: Option<usize>,
 }
 
-impl Viewer for TextView {
+impl View for TextView {
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String> {
         let document = TextDocument::read(bytes).map_err(|e| {
             fill(
@@ -54,7 +55,11 @@ impl Viewer for TextView {
         self.document.as_ref()?.document.meta.title.clone()
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32) {
+    fn document_mut(&mut self) -> Option<&mut Document> {
+        Some(&mut self.document.as_mut()?.document)
+    }
+
+    fn central(&mut self, ui: &mut Ui, zoom: f32, _editing: &mut Editing) {
         let Some(document) = &self.document else {
             return;
         };

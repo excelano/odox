@@ -107,4 +107,31 @@ impl Document {
         }
         self.package.write()
     }
+
+    /// Write the document and prove the bytes read back as the tree they were
+    /// written from, which is what a save has to know before it touches the
+    /// file.
+    ///
+    /// The round-trip tests make the same claim over the corpus, and a person's
+    /// document is not in the corpus. One re-parse per save is the price, and
+    /// the alternative is an editor that finds out it damaged a document after
+    /// it has.
+    ///
+    /// # Errors
+    ///
+    /// The package could not be assembled, or a part came back different, in
+    /// which case nothing should be written.
+    pub fn write_verified(&mut self) -> Result<Vec<u8>, Error> {
+        let bytes = self.write()?;
+        let written = Package::read(&bytes)?;
+        if written.xml("content.xml")? != self.content {
+            return Err(Error::Unfaithful("content.xml"));
+        }
+        if let Some(styles) = &self.styles_part
+            && written.optional_xml("styles.xml")?.as_ref() != Some(styles)
+        {
+            return Err(Error::Unfaithful("styles.xml"));
+        }
+        Ok(bytes)
+    }
 }

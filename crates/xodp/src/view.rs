@@ -15,9 +15,10 @@
 use std::path::Path;
 
 use eframe::egui::{self, Sense, Stroke, StrokeKind, Ui, vec2};
+use odox_core::Document;
 use odox_core::doc::Presentation;
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Canvas, Flow, Pictures, Viewer, fonts};
+use odox_ui::{Canvas, Editing, Flow, Pictures, View, fonts};
 
 /// A presentation, open or not.
 #[derive(Default)]
@@ -28,7 +29,7 @@ pub struct SlideView {
     show_notes: bool,
 }
 
-impl Viewer for SlideView {
+impl View for SlideView {
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String> {
         let document = Presentation::read(bytes).map_err(|e| {
             fill(
@@ -67,7 +68,11 @@ impl Viewer for SlideView {
         self.document.as_ref()?.document.meta.title.clone()
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32) {
+    fn document_mut(&mut self) -> Option<&mut Document> {
+        Some(&mut self.document.as_mut()?.document)
+    }
+
+    fn central(&mut self, ui: &mut Ui, zoom: f32, _editing: &mut Editing) {
         let count = self
             .document
             .as_ref()

@@ -22,6 +22,7 @@
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod edit;
 pub mod flow;
 pub mod fonts;
 pub mod format;
@@ -30,11 +31,14 @@ pub mod i18n;
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 pub mod opened_document;
+pub mod settings;
 pub mod shapes;
 pub mod shell;
 pub mod system_theme;
 
+pub use edit::Editing;
 pub use flow::{Flow, Pictures};
 pub use i18n::mark;
+pub use settings::Settings;
 pub use shapes::Canvas;
-pub use shell::{Product, Shell, Viewer, run};
+pub use shell::{Product, Shell, View, run};

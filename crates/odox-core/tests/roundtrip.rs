@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use odox_core::doc::TextDocument;
+use odox_core::doc::{Presentation, SheetDocument, TextDocument};
 use odox_core::{Package, xml};
 
 /// Every document under `corpus/`, at any depth.
@@ -143,6 +143,29 @@ fn a_document_writes_back_what_it_read() {
             again.outline().len(),
             "{} changed its outline",
             path.display()
+        );
+    }
+}
+
+/// What a save asks before it writes: the bytes read back as the tree they
+/// were written from, for every document of every format.
+#[test]
+fn every_document_writes_verified() {
+    for path in corpus() {
+        let bytes = std::fs::read(&path).expect("the document");
+        let written = match path.extension().and_then(|e| e.to_str()) {
+            Some("odt") => TextDocument::read(&bytes).map(|d| d.document),
+            Some("ods") => SheetDocument::read(&bytes).map(|d| d.document),
+            Some("odp") => Presentation::read(&bytes).map(|d| d.document),
+            _ => continue,
+        }
+        .expect("a readable document")
+        .write_verified();
+        assert!(
+            written.is_ok(),
+            "{} refused to save: {}",
+            path.display(),
+            written.err().map(|e| e.to_string()).unwrap_or_default()
         );
     }
 }
