@@ -288,3 +288,252 @@ fn the_wrong_format_is_named_rather_than_refused_silently() {
     assert!(message.contains("spreadsheet"), "{message}");
     assert!(message.contains("text"), "{message}");
 }
+
+/// Every cell of a sheet's used range as (row, column, value), for saying that
+/// an edit changed one cell and no other.
+fn snapshot(document: &SheetDocument, sheet: usize) -> Vec<(usize, usize, Value)> {
+    let sheet = &document.sheets()[sheet];
+    let mut out = Vec::new();
+    for row in 0..sheet.used_rows {
+        for column in 0..sheet.used_columns {
+            let value = document
+                .cell(sheet, row, column)
+                .map_or(Value::Empty, |c| c.value());
+            out.push((row, column, value));
+        }
+    }
+    out
+}
+
+#[test]
+fn a_cell_in_a_repeated_row_changes_alone() {
+    let bytes = spreadsheet(
+        r#"<table:table table:name="Sheet1">
+ <table:table-column table:style-name="co1" table:number-columns-repeated="16384"/>
+ <table:table-row table:style-name="ro1">
+  <table:table-cell office:value-type="string"><text:p>top</text:p></table:table-cell>
+ </table:table-row>
+ <table:table-row table:number-rows-repeated="1000" table:style-name="ro1">
+  <table:table-cell office:value-type="float" office:value="7" table:style-name="ce1"><text:p>7</text:p></table:table-cell>
+ </table:table-row>
+</table:table>"#,
+    );
+    let mut document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+    let before = snapshot(&document, 0);
+
+    document
+        .set_cell(0, 500, 0, &Value::Number(99.0))
+        .expect("a writable cell");
+
+    let after = snapshot(&document, 0);
+    assert_eq!(before.len(), after.len(), "the used range changed");
+    for ((row, column, was), (_, _, is)) in before.iter().zip(&after) {
+        if (*row, *column) == (500, 0) {
+            assert_eq!(*is, Value::Number(99.0));
+        } else {
+            assert_eq!(was, is, "row {row} column {column} changed");
+        }
+    }
+    // The run's style survives on the cell that was split out of it, and the
+    // rows either side are still one run each.
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 500, 0).expect("the cell");
+    assert_eq!(cell.style_name(), Some("ce1"));
+    assert_eq!(cell.text(), "99");
+    let rows = document
+        .document
+        .body_of("spreadsheet")
+        .and_then(|b| b.child(&odox_core::Ns::Table, "table"))
+        .map(|t| {
+            t.elements()
+                .filter(|e| e.is(&odox_core::Ns::Table, "table-row"))
+                .count()
+        });
+    assert_eq!(rows, Some(4), "top, 499 before, the one, 500 after");
+
+    // And it all reads back.
+    let written = document.document.write_verified().expect("saves");
+    let again = SheetDocument::read(&written).expect("readable");
+    assert_eq!(snapshot(&again, 0), after);
+}
+
+#[test]
+fn a_cell_in_a_repeated_run_and_past_the_end_are_both_reachable() {
+    let bytes = spreadsheet(
+        r#"<table:table table:name="Sheet1">
+ <table:table-column table:style-name="co1" table:number-columns-repeated="4"/>
+ <table:table-row>
+  <table:table-cell office:value-type="string" table:number-columns-repeated="3"><text:p>same</text:p></table:table-cell>
+ </table:table-row>
+</table:table>"#,
+    );
+    let mut document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+
+    // Inside the run.
+    document
+        .set_cell(0, 0, 1, &Value::Text("middle".to_owned()))
+        .expect("a writable cell");
+    let sheet = &document.sheets()[0];
+    assert_eq!(document.cell(sheet, 0, 0).expect("left").text(), "same");
+    assert_eq!(document.cell(sheet, 0, 1).expect("middle").text(), "middle");
+    assert_eq!(document.cell(sheet, 0, 2).expect("right").text(), "same");
+
+    // Past every cell in the row, and past every row in the sheet.
+    document
+        .set_cell(0, 0, 6, &Value::Boolean(true))
+        .expect("a cell past the row's end");
+    document
+        .set_cell(0, 4, 2, &Value::Number(1.5))
+        .expect("a cell past the sheet's end");
+    let sheet = &document.sheets()[0];
+    assert_eq!(sheet.used_rows, 5);
+    assert_eq!(sheet.used_columns, 7);
+    assert_eq!(
+        document.cell(sheet, 0, 6).expect("the far cell").value(),
+        Value::Boolean(true)
+    );
+    assert_eq!(
+        document.cell(sheet, 0, 6).expect("the far cell").text(),
+        "TRUE"
+    );
+    assert!(
+        document.cell(sheet, 0, 4).expect("the gap").value() == Value::Empty,
+        "the gap is empty"
+    );
+    assert_eq!(
+        document.cell(sheet, 4, 2).expect("the low cell").value(),
+        Value::Number(1.5)
+    );
+    assert!(
+        document
+            .cell(sheet, 2, 0)
+            .is_none_or(|c| c.value() == Value::Empty)
+    );
+    document.document.write_verified().expect("saves");
+}
+
+#[test]
+fn a_covered_cell_and_a_formula_are_refused_and_nothing_moves() {
+    let bytes = spreadsheet(
+        r#"<table:table table:name="Sheet1">
+ <table:table-row>
+  <table:table-cell office:value-type="string" table:number-columns-spanned="2"><text:p>wide</text:p></table:table-cell>
+  <table:covered-table-cell/>
+  <table:table-cell table:formula="of:=SUM([.A1:.B1])" office:value-type="float" office:value="0"><text:p>0</text:p></table:table-cell>
+ </table:table-row>
+</table:table>"#,
+    );
+    let mut document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+    let before = document.document.content.clone();
+    assert_eq!(
+        document.set_cell(0, 0, 1, &Value::Number(1.0)),
+        Err(odox_core::Refused::Covered)
+    );
+    assert_eq!(
+        document.set_cell(0, 0, 2, &Value::Number(1.0)),
+        Err(odox_core::Refused::Formula)
+    );
+    assert_eq!(
+        document.set_cell(3, 0, 0, &Value::Number(1.0)),
+        Err(odox_core::Refused::NotFound)
+    );
+    assert_eq!(document.document.content, before);
+}
+
+#[test]
+fn a_value_replaces_what_the_cell_held_and_keeps_its_style() {
+    let bytes = spreadsheet(
+        r#"<table:table table:name="Sheet1">
+ <table:table-row>
+  <table:table-cell office:value-type="date" office:date-value="2026-09-21" table:style-name="ce1"><text:p>21/09/2026</text:p><text:p>second line</text:p></table:table-cell>
+ </table:table-row>
+</table:table>"#,
+    );
+    let mut document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+    document
+        .set_cell(0, 0, 0, &Value::Text("two\nlines".to_owned()))
+        .expect("writable");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 0, 0).expect("the cell");
+    assert_eq!(cell.value(), Value::Text("two\nlines".to_owned()));
+    assert_eq!(cell.text(), "two\nlines");
+    assert_eq!(cell.style_name(), Some("ce1"));
+    assert!(
+        cell.element
+            .attr(&odox_core::Ns::Office, "date-value")
+            .is_none()
+    );
+    assert_eq!(
+        cell.element
+            .elements()
+            .filter(|e| e.is(&odox_core::Ns::Text, "p"))
+            .count(),
+        2
+    );
+
+    document.set_cell(0, 0, 0, &Value::Empty).expect("writable");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 0, 0).expect("the cell");
+    assert_eq!(cell.value(), Value::Empty);
+    assert_eq!(
+        cell.style_name(),
+        Some("ce1"),
+        "an emptied cell keeps its style"
+    );
+    assert_eq!(sheet.used_rows, 0, "an emptied sheet has no used rows");
+}
+
+#[test]
+fn input_reads_the_way_a_spreadsheet_reads_it() {
+    assert_eq!(Value::from_input("12"), Value::Number(12.0));
+    assert_eq!(Value::from_input(" -0.5 "), Value::Number(-0.5));
+    assert_eq!(Value::from_input("1e3"), Value::Number(1000.0));
+    assert_eq!(Value::from_input("TRUE"), Value::Boolean(true));
+    assert_eq!(Value::from_input("false"), Value::Boolean(false));
+    assert_eq!(Value::from_input(""), Value::Empty);
+    assert_eq!(Value::from_input("   "), Value::Empty);
+    assert_eq!(Value::from_input("inf"), Value::Text("inf".to_owned()));
+    assert_eq!(Value::from_input("NaN"), Value::Text("NaN".to_owned()));
+    assert_eq!(
+        Value::from_input("=SUM(A1)"),
+        Value::Text("=SUM(A1)".to_owned())
+    );
+    assert_eq!(
+        Value::from_input("12 apples"),
+        Value::Text("12 apples".to_owned())
+    );
+    assert_eq!(Value::Number(12.0).cached_text(), "12");
+    assert_eq!(Value::Number(0.1).cached_text(), "0.1");
+}
+
+#[test]
+fn the_corpus_spreadsheet_takes_a_value_in_the_prefixes_it_declares() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/calc.ods");
+    let Ok(bytes) = std::fs::read(path) else {
+        return;
+    };
+    let mut document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+    document
+        .set_cell(0, 1, 1, &Value::Number(99.0))
+        .expect("writable");
+    let written = document.document.write_verified().expect("saves");
+    let text = String::from_utf8(
+        odox_core::Package::read(&written)
+            .expect("package")
+            .part("content.xml")
+            .expect("content")
+            .data
+            .clone(),
+    )
+    .expect("utf-8");
+    assert!(
+        text.contains(r#"office:value-type="float" calcext:value-type="float" office:value="99""#)
+            || text.contains(r#"office:value-type="float" office:value="99""#),
+        "{text}"
+    );
+    assert!(
+        text.contains("calcext:value-type=\"float\""),
+        "LibreOffice's own type copy is written where the document declares calcext"
+    );
+}

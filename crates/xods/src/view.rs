@@ -5,9 +5,11 @@
 
 use std::path::Path;
 
-use eframe::egui::{self, Align, FontId, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use odox_core::Document;
-use odox_core::doc::{Sheet, SheetDocument};
+use eframe::egui::{
+    self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
+};
+use odox_core::doc::{Sheet, SheetDocument, Value};
+use odox_core::{Document, Refused};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, View, fonts};
@@ -24,6 +26,40 @@ pub struct SheetView {
     /// What the metrics were measured for, so that they are measured again when
     /// the sheet or the zoom changes and not on every frame.
     measured: (usize, f32),
+    /// The cell being typed into, while one is.
+    editor: Option<CellEditor>,
+    /// Why the picked cell could not be edited, shown until the pick moves.
+    notice: Option<String>,
+}
+
+/// A cell being typed into.
+///
+/// A spreadsheet edits without a mode, by every spreadsheet's convention:
+/// typing on the picked cell replaces it, Enter or F2 opens it with what it
+/// holds, Enter commits and moves down, Tab commits and moves right, Escape
+/// puts it back. The text box sits in the cell, in the cell's own font.
+struct CellEditor {
+    row: usize,
+    column: usize,
+    text: String,
+    /// What the cell held when the editor opened, so that leaving it as it was
+    /// is not an edit and does not retype a currency as a number.
+    original: String,
+    /// The editor was opened this frame and has yet to take the focus.
+    opened: bool,
+}
+
+/// What the editor asked for when it closed.
+enum Outcome {
+    Commit(Step),
+    Cancel,
+}
+
+/// Where the pick goes after a commit.
+enum Step {
+    Stay,
+    Down,
+    Right,
 }
 
 impl View for SheetView {
@@ -56,12 +92,16 @@ impl View for SheetView {
         self.document = Some(document);
         self.selected = (0, 0);
         self.metrics = None;
+        self.editor = None;
+        self.notice = None;
         Ok(())
     }
 
     fn close(&mut self) {
         self.document = None;
         self.metrics = None;
+        self.editor = None;
+        self.notice = None;
     }
 
     fn is_open(&self) -> bool {
@@ -81,15 +121,16 @@ impl View for SheetView {
             document.reindex();
         }
         self.metrics = None;
+        self.editor = None;
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32, _editing: &mut Editing) {
+    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         if self.document.is_none() {
             return;
         }
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
-        self.grid(ui, zoom);
+        self.grid(ui, zoom, editing);
     }
 
     fn side(&mut self, _ui: &mut Ui) -> bool {
@@ -144,6 +185,10 @@ impl SheetView {
             } else {
                 ui.label(text);
             }
+            if let Some(notice) = &self.notice {
+                ui.separator();
+                ui.colored_label(ui.visuals().warn_fg_color, notice);
+            }
         });
     }
 
@@ -173,6 +218,8 @@ impl SheetView {
                             self.sheet = index;
                             self.selected = (0, 0);
                             self.metrics = None;
+                            self.editor = None;
+                            self.notice = None;
                         }
                     }
                 });
@@ -181,7 +228,9 @@ impl SheetView {
 
     /// The grid, painting the cells the window covers and no others.
     #[allow(clippy::too_many_lines)]
-    fn grid(&mut self, ui: &mut Ui, zoom: f32) {
+    fn grid(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
+        let was_editing = self.editor.is_some();
+        let anything_changed = editing.modified();
         let Some(document) = &self.document else {
             return;
         };
@@ -204,6 +253,8 @@ impl SheetView {
         let header_fill = ui.visuals().faint_bg_color;
         let header_text = ui.visuals().text_color();
         let mut clicked = None;
+        let editor = &mut self.editor;
+        let mut outcome = None;
 
         egui::ScrollArea::both()
             .auto_shrink([false, false])
@@ -214,7 +265,7 @@ impl SheetView {
                     Sense::click(),
                 );
                 let origin = area.min + vec2(header_width, header_height);
-                let painter = ui.painter();
+                let painter = ui.painter().clone();
                 painter.rect_filled(Rect::from_min_max(origin, area.max), 0.0, palette.paper);
 
                 let rows = metrics.rows_between(
@@ -309,7 +360,16 @@ impl SheetView {
                         }
                         let drawn = rect;
 
-                        let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+                        let mut format =
+                            format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+                        // A formula's cached result may be out of date once
+                        // anything has changed, and which ones are cannot be
+                        // told without evaluating them; every one is drawn
+                        // faint until the file is opened by something that
+                        // recalculates. DESIGN.md §11.
+                        if anything_changed && cell.formula().is_some() {
+                            format.color = format.color.gamma_multiply(0.45);
+                        }
                         // Text against the left edge and numbers against the right,
                         // which is ODF's own default and every spreadsheet's, unless
                         // the cell's paragraph style says otherwise.
@@ -357,6 +417,62 @@ impl SheetView {
                         Stroke::new(2.0, ui.visuals().selection.stroke.color),
                         StrokeKind::Inside,
                     );
+                }
+
+                // The cell being typed into, as a text box where the cell is.
+                if let Some(editor) = editor.as_mut() {
+                    if rows.contains(&editor.row) && columns.contains(&editor.column) {
+                        let (top, row_height) = metrics.row(editor.row);
+                        let (left, column_width) = metrics.column(editor.column);
+                        // Wide enough to type in, whatever the column is.
+                        let rect = Rect::from_min_size(
+                            pos2(origin.x + left, origin.y + top),
+                            vec2(column_width.max(120.0 * zoom), row_height),
+                        );
+                        let cell = document.cell(sheet, editor.row, editor.column);
+                        let style = document.cell_style(sheet, cell.as_ref(), editor.column);
+                        let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+                        let id = egui::Id::new("cell-editor");
+                        let response = ui.put(
+                            rect,
+                            egui::TextEdit::singleline(&mut editor.text)
+                                .id(id)
+                                .font(format.font_id.clone())
+                                .text_color(format.color)
+                                .background_color(palette.paper)
+                                .margin(vec2(3.0 * zoom, 0.0))
+                                .vertical_align(Align::Center),
+                        );
+                        if editor.opened {
+                            editor.opened = false;
+                            response.request_focus();
+                            // The caret at the end of what is there, rather
+                            // than egui's choice of the start.
+                            let mut state =
+                                egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
+                            let end = egui::text::CCursor::new(editor.text.chars().count());
+                            state
+                                .cursor
+                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
+                            egui::TextEdit::store_state(ui.ctx(), id, state);
+                        } else if response.lost_focus() {
+                            outcome = Some(ui.input(|input| {
+                                if input.key_pressed(Key::Escape) {
+                                    Outcome::Cancel
+                                } else if input.key_pressed(Key::Enter) {
+                                    Outcome::Commit(Step::Down)
+                                } else if input.key_pressed(Key::Tab) {
+                                    Outcome::Commit(Step::Right)
+                                } else {
+                                    Outcome::Commit(Step::Stay)
+                                }
+                            }));
+                        }
+                    } else {
+                        // Scrolled out of sight, which takes the focus with
+                        // it: what was typed is kept rather than lost.
+                        outcome = Some(Outcome::Commit(Step::Stay));
+                    }
                 }
 
                 // The headers last and at the edge of what is visible, so that they
@@ -413,10 +529,115 @@ impl SheetView {
             });
 
         let extent = (sheet.used_rows, sheet.used_columns);
-        if let Some(cell) = clicked {
-            self.selected = cell;
+        if let Some(outcome) = outcome {
+            self.finish_editing(outcome, editing);
         }
-        self.arrow_keys(ui, extent);
+        if let Some(cell) = clicked
+            && cell != self.selected
+        {
+            self.selected = cell;
+            self.notice = None;
+        }
+        if self.editor.is_some() || editing.asking {
+            return;
+        }
+        if !was_editing {
+            self.begin_editing(ui, editing);
+        }
+        if self.editor.is_none() {
+            self.arrow_keys(ui, extent);
+        }
+    }
+
+    /// Open the editor on the picked cell when the keys ask for it: Enter or
+    /// F2 with what the cell holds, a typed character in its place. Delete
+    /// clears the cell without opening anything.
+    fn begin_editing(&mut self, ui: &Ui, editing: &mut Editing) {
+        if ui.ctx().egui_wants_keyboard_input() {
+            return;
+        }
+        let (typed, open, delete) = ui.input(|input| {
+            let typed = input.events.iter().find_map(|event| match event {
+                Event::Text(text) => Some(text.clone()),
+                _ => None,
+            });
+            (
+                typed,
+                input.key_pressed(Key::Enter) || input.key_pressed(Key::F2),
+                input.key_pressed(Key::Delete),
+            )
+        });
+        if typed.is_none() && !open && !delete {
+            return;
+        }
+        let (row, column) = self.selected;
+        let Some(document) = &self.document else {
+            return;
+        };
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
+            return;
+        }
+        if delete {
+            self.write(row, column, &Value::Empty, editing);
+            return;
+        }
+        let original = document
+            .sheets()
+            .get(self.sheet)
+            .and_then(|sheet| document.cell(sheet, row, column))
+            .map(|cell| cell.value().input_text())
+            .unwrap_or_default();
+        let text = typed.unwrap_or_else(|| original.clone());
+        self.notice = None;
+        self.editor = Some(CellEditor {
+            row,
+            column,
+            text,
+            original,
+            opened: true,
+        });
+    }
+
+    /// Close the editor, writing what was typed if it was committed and is
+    /// not what the cell already held.
+    fn finish_editing(&mut self, outcome: Outcome, editing: &mut Editing) {
+        let Some(editor) = self.editor.take() else {
+            return;
+        };
+        let Outcome::Commit(step) = outcome else {
+            return;
+        };
+        if editor.text != editor.original {
+            self.write(
+                editor.row,
+                editor.column,
+                &Value::from_input(&editor.text),
+                editing,
+            );
+        }
+        self.selected = match step {
+            Step::Stay => (editor.row, editor.column),
+            Step::Down => (editor.row + 1, editor.column),
+            Step::Right => (editor.row, editor.column + 1),
+        };
+    }
+
+    /// Put a value in a cell, recording the tree first so that it can be
+    /// undone.
+    fn write(&mut self, row: usize, column: usize, value: &Value, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
+            return;
+        }
+        editing.record(&document.document.content);
+        match document.set_cell(self.sheet, row, column, value) {
+            Ok(()) => self.metrics = None,
+            Err(refused) => self.notice = Some(notice(&refused)),
+        }
     }
 
     /// Move the picked cell with the arrow keys, which is how a person walks a
@@ -447,6 +668,16 @@ impl SheetView {
         });
         self.selected = (row.min(last_row), column.min(last_column));
     }
+}
+
+/// What the cell bar says about a cell that cannot be edited.
+fn notice(refused: &Refused) -> String {
+    match refused {
+        Refused::Formula => t("This cell holds a formula, which this version does not edit."),
+        Refused::Covered => t("This cell is covered by the one that spans it."),
+        Refused::NotFound => t("There is no cell there."),
+    }
+    .to_owned()
 }
 
 /// A sheet as text, for handing to something else.

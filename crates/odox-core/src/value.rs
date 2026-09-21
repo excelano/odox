@@ -46,6 +46,43 @@ impl Length {
         };
         Some(Self(points))
     }
+
+    /// Write the length in a unit, as ODF spells one: `2.54cm`.
+    ///
+    /// The unit is whichever the attribute carried when it was read, so a
+    /// document written in centimetres stays in centimetres; anything not an
+    /// ODF unit is written in centimetres. Four decimals, trailing zeros
+    /// dropped, which is finer than a hundredth of a point in any unit.
+    pub fn write(self, unit: &str) -> String {
+        let (value, unit) = match unit {
+            "pt" => (self.0, "pt"),
+            "in" => (self.0 / 72.0, "in"),
+            "mm" => (self.0 * 25.4 / 72.0, "mm"),
+            "pc" => (self.0 / 12.0, "pc"),
+            "px" => (self.0 / 0.75, "px"),
+            _ => (self.0 * 2.54 / 72.0, "cm"),
+        };
+        let mut text = format!("{value:.4}");
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
+        if text == "-0" {
+            "0".clone_into(&mut text);
+        }
+        format!("{text}{unit}")
+    }
+
+    /// The unit a written length ends in, for writing it back the same way.
+    pub fn unit_of(text: &str) -> &str {
+        let text = text.trim();
+        text.len()
+            .checked_sub(2)
+            .filter(|&split| text.is_char_boundary(split))
+            .map_or("cm", |split| &text[split..])
+    }
 }
 
 /// A percentage, held as the number before the sign.
@@ -151,6 +188,19 @@ mod tests {
         assert!((cm.points() - 72.0).abs() < 0.01);
         let mm = Length::parse("25.4mm").unwrap();
         assert!((mm.points() - 72.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn a_length_is_written_back_in_its_unit() {
+        let length = Length::parse("2.54cm").expect("a length");
+        assert_eq!(length.write("cm"), "2.54cm");
+        assert_eq!(length.write("in"), "1in");
+        assert_eq!(length.write("pt"), "72pt");
+        assert_eq!(Length(0.0).write("cm"), "0cm");
+        assert_eq!(Length::unit_of("12.5mm"), "mm");
+        assert_eq!(Length::unit_of("x"), "cm");
+        let back = Length::parse(&Length(100.0).write("mm")).expect("readable");
+        assert!((back.points() - 100.0).abs() < 0.001, "{}", back.points());
     }
 
     #[test]

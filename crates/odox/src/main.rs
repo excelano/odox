@@ -1,4 +1,4 @@
-//! odox: hand a document to whichever of the three viewers reads it.
+//! odox: hand a document to whichever of the three applications reads it.
 //!
 //! One command for any `OpenDocument` file, for a shell and for a script. It
 //! draws nothing itself — it works out which application reads the file it was
@@ -88,7 +88,7 @@ fn main() -> ExitCode {
 fn usage() {
     println!(
         "\
-odox {version} — open an OpenDocument file with the viewer that reads it
+odox {version} — open an OpenDocument file with the application that reads it
 
     odox FILE [ARGUMENT...]
 
@@ -97,10 +97,10 @@ presentation in xodp. The extension answers first and the package's own media
 type answers where the extension does not, so a file named wrongly, or not
 named at all, still opens in the right place.
 
-The viewer is looked for beside this command and then on PATH. Any further
+The application is looked for beside this command and then on PATH. Any further
 arguments are passed to it.
 
-    --which FILE     name the viewer and launch nothing
+    --which FILE     name the application and launch nothing
     -h, --help       this
     -V, --version    the version",
         version = env!("CARGO_PKG_VERSION")

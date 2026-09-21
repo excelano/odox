@@ -31,6 +31,7 @@
 
 pub mod doc;
 pub mod draw;
+pub mod edit;
 mod error;
 mod meta;
 mod package;
@@ -40,6 +41,7 @@ mod value;
 pub mod xml;
 
 pub use doc::Document;
+pub use edit::Refused;
 pub use error::Error;
 pub use meta::Meta;
 pub use package::{Package, Part};

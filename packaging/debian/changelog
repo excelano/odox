@@ -1,3 +1,28 @@
+odox (0.4.0) unstable; urgency=low
+
+  * The three applications edit. A window opens reading and Ctrl+E turns
+    editing on; a preference opens every document that way. In xodt a
+    click on a paragraph opens it as a text box where it sits; Enter
+    starts a new paragraph and Backspace at the start joins two. In xods
+    typing on the picked cell replaces it, Enter or F2 opens it, and
+    Delete clears it; a formula cell is kept and not edited. In xodp a
+    shape is dragged, resized by a corner, and its text edited in place.
+  * Save and Save as, undo and redo, and a question before changes are
+    thrown away. Before a save the bytes are read back and compared with
+    the document in the window, and a difference refuses the save.
+  * What was not touched is written back as it was read, element for
+    element. The tests mutate every paragraph of every corpus document
+    and check that.
+  * One preference, in odox/settings.toml under the configuration
+    directory, written only when it is changed.
+  * A proportional line height is a proportion of each run's own size, so
+    a title whose size lives on its span no longer sits in a line the
+    height of its paragraph's default.
+  * The desktop entries, the package descriptions and the man pages say
+    editor rather than viewer.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 21 Sep 2026 15:08:24 -0500
+
 odox (0.3.0) unstable; urgency=low
 
   * xodp draws five more of what a slide is made of: draw:path outlines,

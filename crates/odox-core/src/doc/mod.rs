@@ -17,7 +17,7 @@ pub use pres::{Presentation, Slide};
 pub use sheet::{Cell, Column, Sheet, SheetDocument, Value};
 pub use text::TextDocument;
 
-use crate::xml::{Element, Ns};
+use crate::xml::{Element, Name, Ns};
 use crate::{Error, Meta, Package, Styles};
 
 /// A document read from a package: everything the three formats share.
@@ -70,6 +70,33 @@ impl Document {
     /// `office:spreadsheet` or `office:presentation`.
     pub fn body_of(&self, local: &str) -> Option<&Element> {
         self.body()?.child(&Ns::Office, local)
+    }
+
+    /// A name for writing into the document, in the prefix the document
+    /// declares for the namespace on its content root, or the conventional one
+    /// where it declares none.
+    pub fn name(&self, ns: &Ns, local: &str) -> Name {
+        let declared = self
+            .content
+            .attrs
+            .iter()
+            .filter(|a| a.name.ns == Ns::Xmlns)
+            .find(|a| Ns::from_uri(&a.value) == *ns)
+            .map(|a| &*a.name.local);
+        Name::new(
+            declared.unwrap_or(ns.conventional_prefix()),
+            local,
+            ns.clone(),
+        )
+    }
+
+    /// Whether the content root declares a namespace, which is what decides
+    /// whether an attribute in it may be written at all.
+    pub fn declares(&self, ns: &Ns) -> bool {
+        self.content
+            .attrs
+            .iter()
+            .any(|a| a.name.ns == Ns::Xmlns && Ns::from_uri(&a.value) == *ns)
     }
 
     /// The version of the format the document declares, as `office:version`.

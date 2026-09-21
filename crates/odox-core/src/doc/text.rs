@@ -39,6 +39,14 @@ impl TextDocument {
         self.document.body_of("text")
     }
 
+    /// The same, for changing it.
+    pub fn body_mut(&mut self) -> Option<&mut Element> {
+        self.document
+            .content
+            .child_mut(&Ns::Office, "body")?
+            .child_mut(&Ns::Office, "text")
+    }
+
     /// The page layout the document's first master page points at.
     ///
     /// A text document has one master page per page style, and the first is the

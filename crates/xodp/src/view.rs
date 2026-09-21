@@ -3,22 +3,19 @@
 //! A slide is drawn at the geometry the document gives: every shape on a page
 //! carries its own position and size in the page's coordinate space, so the page
 //! is scaled to the space the window has and each shape is put where the document
-//! says. What this release draws is the text on a slide. Its shapes — rectangles,
-//! lines, connectors — and the background and placeholder geometry a master page
-//! contributes are the next release's, and a shape that is not text is drawn as
-//! the outline of the space it occupies so that a slide is not silently missing
-//! something.
+//! says. In edit mode the slide's own shapes can be picked, dragged and resized
+//! by their corners, which writes the four `svg:` attributes back. DESIGN.md §11.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
 use std::path::Path;
 
-use eframe::egui::{self, Sense, Stroke, StrokeKind, Ui, vec2};
-use odox_core::Document;
+use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use odox_core::doc::Presentation;
+use odox_core::{Document, Element, Length, Ns, edit};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Canvas, Editing, Flow, Pictures, View, fonts};
+use odox_ui::{Canvas, Editing, Flow, ParagraphEditor, ParagraphOutcome, Pictures, View, fonts};
 
 /// A presentation, open or not.
 #[derive(Default)]
@@ -27,7 +24,52 @@ pub struct SlideView {
     slide: usize,
     pictures: Pictures,
     show_notes: bool,
+    /// The shape picked on the slide, by its index among the page's children.
+    picked: Option<usize>,
+    /// A drag in progress on the picked shape.
+    drag: Option<Drag>,
+    /// The label paragraph being typed into, as a path from the page.
+    label: Option<ParagraphEditor>,
 }
+
+/// A shape's box on the page, in ODF points.
+#[derive(Clone, Copy)]
+struct Box {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+}
+
+/// What a drag took hold of: the shape itself, or one of its corners, named
+/// by which fraction of the box across and down it sits at.
+#[derive(Clone, Copy)]
+enum Grab {
+    Whole,
+    Corner(f32, f32),
+}
+
+/// A drag in progress: where it began on screen, what it took hold of, and
+/// the box as it was, so that each frame's geometry comes from the pointer's
+/// whole travel rather than from a sum of small steps.
+struct Drag {
+    shape: usize,
+    from: Pos2,
+    grab: Grab,
+    start: Box,
+}
+
+/// What the slide asked for this frame, applied once the document is free.
+enum Action {
+    Pick(Option<usize>),
+    Begin(Drag),
+    Move(Pos2),
+    End,
+}
+
+/// The size of a corner handle on screen, and how far from a corner a press
+/// still takes it.
+const HANDLE: f32 = 8.0;
 
 impl View for SlideView {
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String> {
@@ -52,12 +94,18 @@ impl View for SlideView {
         self.pictures.clear();
         self.document = Some(document);
         self.slide = 0;
+        self.picked = None;
+        self.drag = None;
+        self.label = None;
         Ok(())
     }
 
     fn close(&mut self) {
         self.document = None;
         self.pictures.clear();
+        self.picked = None;
+        self.drag = None;
+        self.label = None;
     }
 
     fn is_open(&self) -> bool {
@@ -72,7 +120,12 @@ impl View for SlideView {
         Some(&mut self.document.as_mut()?.document)
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32, _editing: &mut Editing) {
+    fn reindex(&mut self) {
+        self.drag = None;
+        self.label = None;
+    }
+
+    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         let count = self
             .document
             .as_ref()
@@ -84,38 +137,34 @@ impl View for SlideView {
             return;
         }
         self.step_keys(ui, count);
+        if ui.input(|input| input.key_pressed(Key::Escape)) && self.label.is_none() {
+            self.picked = None;
+            self.drag = None;
+        }
 
         // The document and the picture cache are taken as separate borrows of
         // separate fields, which is what lets the renderer hold one while filling
         // the other.
         let slide_index = self.slide;
         let show_notes = self.show_notes;
+        let edit_mode = editing.on && !editing.asking;
+        let picked = self.picked;
+        let dragging = self.drag.is_some();
+        let mut action = None;
+        let mut clicked = None;
+        let mut outcome = None;
         let Some(document) = &self.document else {
             return;
         };
         let pictures = &mut self.pictures;
+        let label = self.label.as_mut();
         let slides = document.slides();
         let Some(slide) = slides.get(slide_index) else {
             return;
         };
 
         if show_notes {
-            let notes = slide.notes();
-            egui::Panel::bottom("notes")
-                .default_size(160.0)
-                .resizable(true)
-                .show(ui, |ui| {
-                    ui.heading(t("Notes"));
-                    egui::ScrollArea::vertical().show(ui, |ui| match notes {
-                        Some(notes) => {
-                            let width = ui.available_width();
-                            Flow::new(&document.document, pictures, zoom).blocks(ui, notes, width);
-                        }
-                        None => {
-                            ui.weak(t("This slide has no notes."));
-                        }
-                    });
-                });
+            notes_panel(ui, &document.document, pictures, slide, zoom);
         }
 
         let layout = document.page_layout(slide);
@@ -134,7 +183,12 @@ impl View for SlideView {
 
         egui::ScrollArea::both().show(ui, |ui| {
             ui.vertical_centered(|ui| {
-                let (page, _) = ui.allocate_exact_size(size, Sense::hover());
+                let sense = if edit_mode {
+                    Sense::click_and_drag()
+                } else {
+                    Sense::hover()
+                };
+                let (page, response) = ui.allocate_exact_size(size, sense);
                 let palette = odox_ui::format::Palette::default();
                 // Paper under everything. A slide whose background is `none` —
                 // which is what a template says when its identity is the shapes
@@ -142,22 +196,20 @@ impl View for SlideView {
                 // window's own colour. `odox_ui::format::Palette` says why.
                 ui.painter().rect_filled(page, 2.0, palette.paper);
 
-                let mut canvas = Canvas {
-                    document: &document.document,
-                    pictures,
-                    page,
-                    scale: fit,
-                    palette,
-                };
+                let mut canvas = Canvas::new(&document.document, pictures, page, fit, palette);
+                canvas.edit_mode = edit_mode;
+                canvas.editor = label;
                 // Back to front: the ground, then what the master page draws on
                 // every slide, then the slide's own.
                 canvas.background(ui, &background);
                 for shape in &decorations {
                     canvas.shape(ui, shape);
                 }
-                for shape in slide.shapes() {
-                    canvas.shape(ui, shape);
+                for (index, shape) in slide.shapes_indexed() {
+                    canvas.slide_shape(ui, index, shape);
                 }
+                clicked = canvas.clicked.take();
+                outcome = canvas.outcome.take();
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.
@@ -167,8 +219,22 @@ impl View for SlideView {
                     Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
                     StrokeKind::Inside,
                 );
+
+                if edit_mode {
+                    action = interact(ui, &response, page, fit, slide, picked, dragging);
+                }
             });
         });
+
+        if let Some(outcome) = outcome {
+            self.finish_label(outcome, editing);
+        } else if let Some(path) = clicked
+            && self.label.is_none()
+        {
+            self.begin_label(path);
+        } else if let Some(action) = action {
+            self.act(action, fit, editing);
+        }
     }
 
     fn side(&mut self, ui: &mut Ui) -> bool {
@@ -190,8 +256,10 @@ impl View for SlideView {
                 .find(|text| !text.trim().is_empty())
                 .unwrap_or_else(|| slide.name.unwrap_or_default().to_owned());
             let label = format!("{}. {}", index + 1, first_line(&heading));
-            if ui.selectable_label(index == self.slide, label).clicked() {
+            if ui.selectable_label(index == self.slide, label).clicked() && index != self.slide {
                 self.slide = index;
+                self.picked = None;
+                self.drag = None;
             }
         }
         true
@@ -204,6 +272,131 @@ impl View for SlideView {
 }
 
 impl SlideView {
+    /// Open the text box on a label's paragraph, by its path from the page.
+    fn begin_label(&mut self, path: Vec<usize>) {
+        let Some(document) = &self.document else {
+            return;
+        };
+        let Some(paragraph) = document
+            .slides()
+            .get(self.slide)
+            .and_then(|slide| slide.element.at(&path))
+        else {
+            return;
+        };
+        self.drag = None;
+        self.label = Some(ParagraphEditor::open(path, edit::text(paragraph), None));
+    }
+
+    /// Close the text box on a label, writing what was typed where it was
+    /// kept; a join first keeps what was typed, then joins the paragraph onto
+    /// the one before it in the same label and opens the box again there.
+    fn finish_label(&mut self, outcome: ParagraphOutcome, editing: &mut Editing) {
+        let Some(editor) = self.label.take() else {
+            return;
+        };
+        if outcome == ParagraphOutcome::Cancel {
+            return;
+        }
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(position) = document.slides().get(self.slide).map(|s| s.position) else {
+            return;
+        };
+        if editor.changed() || outcome == ParagraphOutcome::JoinPrevious {
+            editing.record(&document.document.content);
+        }
+        let Some(page) = document.page_mut(position) else {
+            return;
+        };
+        if editor.changed() {
+            let _ = edit::apply(page, &editor.path, &editor.text);
+        }
+        if outcome == ParagraphOutcome::JoinPrevious {
+            let previous_len = previous_paragraph_len(page, &editor.path);
+            if let Ok(joined) = edit::join_with_previous(page, &editor.path)
+                && let Some(paragraph) = page.at(&joined)
+            {
+                self.label = Some(ParagraphEditor::open(
+                    joined,
+                    edit::text(paragraph),
+                    previous_len,
+                ));
+            }
+        }
+    }
+
+    /// Apply what the slide asked for.
+    fn act(&mut self, action: Action, scale: f32, editing: &mut Editing) {
+        match action {
+            Action::Pick(shape) => {
+                self.picked = shape;
+                self.drag = None;
+            }
+            Action::Begin(drag) => {
+                if let Some(document) = &self.document {
+                    editing.record(&document.document.content);
+                }
+                self.picked = Some(drag.shape);
+                self.drag = Some(drag);
+            }
+            Action::Move(at) => {
+                let Some(drag) = &self.drag else { return };
+                let travel = (at - drag.from) / scale;
+                let Box {
+                    mut x,
+                    mut y,
+                    mut width,
+                    mut height,
+                } = drag.start;
+                match drag.grab {
+                    Grab::Whole => {
+                        x += travel.x;
+                        y += travel.y;
+                    }
+                    Grab::Corner(u, v) => {
+                        // The grabbed corner follows the pointer and the
+                        // opposite one stays; a box is never thinner than a
+                        // point, which keeps it findable.
+                        if u > 0.5 {
+                            width = (width + travel.x).max(1.0);
+                        } else {
+                            let moved = travel.x.min(width - 1.0);
+                            x += moved;
+                            width -= moved;
+                        }
+                        if v > 0.5 {
+                            height = (height + travel.y).max(1.0);
+                        } else {
+                            let moved = travel.y.min(height - 1.0);
+                            y += moved;
+                            height -= moved;
+                        }
+                    }
+                }
+                let shape = drag.shape;
+                let Some(document) = &mut self.document else {
+                    return;
+                };
+                let Some(slide) = document.slides().get(self.slide).map(|s| s.position) else {
+                    return;
+                };
+                // A shape that refuses is one that cannot be placed this way,
+                // which the box list already leaves out; nothing to say.
+                let _ = document.set_geometry(
+                    slide,
+                    shape,
+                    Length(x),
+                    Length(y),
+                    Length(width),
+                    Length(height),
+                );
+            }
+            Action::End => self.drag = None,
+        }
+    }
+
     /// Page up and down, and the arrow keys, move between slides.
     fn step_keys(&mut self, ui: &Ui, count: usize) {
         let mut slide = self.slide;
@@ -227,8 +420,186 @@ impl SlideView {
                 slide = count.saturating_sub(1);
             }
         });
-        self.slide = slide.min(count.saturating_sub(1));
+        let slide = slide.min(count.saturating_sub(1));
+        if slide != self.slide {
+            self.slide = slide;
+            self.picked = None;
+            self.drag = None;
+        }
     }
+}
+
+/// The slide's shapes as things to take hold of: the picked one outlined with
+/// its corner handles, and what the pointer did this frame.
+fn interact(
+    ui: &Ui,
+    response: &egui::Response,
+    page: Rect,
+    fit: f32,
+    slide: &odox_core::doc::Slide<'_>,
+    picked: Option<usize>,
+    dragging: bool,
+) -> Option<Action> {
+    // The slide's own shapes that can be taken hold of, front
+    // first, as boxes on screen. A shape placed by a transform, a
+    // line placed by its ends, a group and a connector state no
+    // corner and are not among them.
+    let boxes: Vec<(usize, Rect)> = slide
+        .shapes_indexed()
+        .filter_map(|(index, shape)| {
+            let geometry = box_of(shape)?;
+            Some((index, on_screen(page, fit, geometry)))
+        })
+        .collect();
+    let shown = picked.and_then(|index| boxes.iter().find(|(i, _)| *i == index));
+    if let Some((_, rect)) = shown {
+        let colour = ui.visuals().selection.stroke.color;
+        ui.painter()
+            .rect_stroke(*rect, 0.0, Stroke::new(1.5, colour), StrokeKind::Outside);
+        for corner in corners(*rect) {
+            ui.painter().rect_filled(
+                Rect::from_center_size(corner, vec2(HANDLE, HANDLE)),
+                0.0,
+                colour,
+            );
+        }
+    }
+
+    let under = |at: Pos2| {
+        boxes
+            .iter()
+            .rev()
+            .find(|(_, rect)| rect.expand(2.0).contains(at))
+            .map(|(index, _)| *index)
+    };
+    // A drag begins where the button went down, not where the pointer was
+    // when it had moved far enough to count as a drag: a press on a handle
+    // is a press on the handle.
+    let pressed = ui
+        .input(|input| input.pointer.press_origin())
+        .or_else(|| response.interact_pointer_pos());
+    if response.drag_started()
+        && let Some(at) = pressed
+    {
+        // A corner of the picked shape first, then whatever shape
+        // is under the pointer, then nothing.
+        let grabbed = shown.and_then(|(index, rect)| {
+            corners(*rect)
+                .into_iter()
+                .zip([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+                .find(|(corner, _)| corner.distance(at) <= HANDLE)
+                .map(|(_, (u, v))| (*index, Grab::Corner(u, v)))
+        });
+        let grabbed = grabbed.or_else(|| under(at).map(|index| (index, Grab::Whole)));
+        return Some(match grabbed {
+            Some((shape, grab)) => {
+                let start = slide
+                    .shapes_indexed()
+                    .find(|(i, _)| *i == shape)
+                    .and_then(|(_, shape)| box_of(shape));
+                match start {
+                    Some(start) => Action::Begin(Drag {
+                        shape,
+                        from: at,
+                        grab,
+                        start,
+                    }),
+                    None => Action::Pick(None),
+                }
+            }
+            None => Action::Pick(None),
+        });
+    } else if dragging
+        && response.dragged()
+        && let Some(at) = response.interact_pointer_pos()
+    {
+        return Some(Action::Move(at));
+    } else if dragging && response.drag_stopped() {
+        return Some(Action::End);
+    } else if response.clicked()
+        && let Some(at) = response.interact_pointer_pos()
+    {
+        return Some(Action::Pick(under(at)));
+    }
+    None
+}
+
+/// The speaker's notes under the slide.
+fn notes_panel(
+    ui: &mut Ui,
+    document: &Document,
+    pictures: &mut Pictures,
+    slide: &odox_core::doc::Slide<'_>,
+    zoom: f32,
+) {
+    let notes = slide.notes();
+    egui::Panel::bottom("notes")
+        .default_size(160.0)
+        .resizable(true)
+        .show(ui, |ui| {
+            ui.heading(t("Notes"));
+            egui::ScrollArea::vertical().show(ui, |ui| match notes {
+                Some(notes) => {
+                    let width = ui.available_width();
+                    Flow::new(document, pictures, zoom).blocks(ui, notes, width);
+                }
+                None => {
+                    ui.weak(t("This slide has no notes."));
+                }
+            });
+        });
+}
+
+/// How long the paragraph before the one at a path is, which is where the
+/// caret goes once the two are joined.
+fn previous_paragraph_len(root: &Element, path: &[usize]) -> Option<usize> {
+    let (last, above) = path.split_last()?;
+    root.at(above)?.children[..*last]
+        .iter()
+        .rev()
+        .find_map(|node| match node {
+            odox_core::Node::Element(e) if e.is(&Ns::Text, "p") || e.is(&Ns::Text, "h") => {
+                Some(edit::text(e).chars().count())
+            }
+            _ => None,
+        })
+}
+
+/// A shape's box in the page's points, where it states one: a corner and a
+/// size and no transform. A shape placed by `draw:transform` states its place
+/// as operations and is not moved by writing a corner.
+fn box_of(shape: &Element) -> Option<Box> {
+    if shape.attr(&Ns::Draw, "transform").is_some() || shape.is(&Ns::Draw, "g") {
+        return None;
+    }
+    let at = |local: &str| shape.attr(&Ns::Svg, local).and_then(Length::parse);
+    Some(Box {
+        x: at("x")?.points(),
+        y: at("y")?.points(),
+        width: at("width")?.points(),
+        height: at("height")?.points(),
+    })
+}
+
+/// Where a box lands on the screen.
+fn on_screen(page: Rect, scale: f32, geometry: Box) -> Rect {
+    Rect::from_min_size(
+        pos2(
+            page.left() + geometry.x * scale,
+            page.top() + geometry.y * scale,
+        ),
+        vec2(geometry.width * scale, geometry.height * scale),
+    )
+}
+
+/// The four corners, going round from the top left.
+fn corners(rect: Rect) -> [Pos2; 4] {
+    [
+        rect.left_top(),
+        rect.right_top(),
+        rect.right_bottom(),
+        rect.left_bottom(),
+    ]
 }
 
 /// The first line of a slide's text, for a list that has one row per slide.

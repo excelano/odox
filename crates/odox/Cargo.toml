@@ -1,6 +1,6 @@
 [package]
 name = "odox"
-description = "Open an OpenDocument file with whichever of the odox viewers reads it"
+description = "Open an OpenDocument file with whichever of the odox applications reads it"
 keywords = ["opendocument", "odf", "odt", "ods", "odp"]
 categories = ["command-line-utilities"]
 version.workspace = true

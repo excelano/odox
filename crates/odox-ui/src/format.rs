@@ -4,7 +4,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use eframe::egui::{Align, Color32, FontFamily, FontId, Stroke, TextFormat};
-use odox_core::{Color, Measure, Position, TextProperties};
+use odox_core::{Color, Position, TextProperties};
 
 use crate::fonts::{Variant, family_of};
 
@@ -139,9 +139,4 @@ pub fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
 /// An ODF colour as egui's.
 pub fn color32(color: Color) -> Color32 {
     Color32::from_rgb(color.r, color.g, color.b)
-}
-
-/// A length or proportion resolved to points, for a line height.
-pub fn line_height(measure: Option<Measure>, size: f32) -> Option<f32> {
-    measure.map(|m| m.resolve(size))
 }

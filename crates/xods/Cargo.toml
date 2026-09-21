@@ -1,6 +1,6 @@
 [package]
 name = "xods"
-description = "A small, fast viewer for OpenDocument spreadsheets"
+description = "A small, fast editor for OpenDocument spreadsheets"
 keywords = ["opendocument", "ods", "spreadsheet", "odf", "egui"]
 categories = ["gui"]
 version.workspace = true

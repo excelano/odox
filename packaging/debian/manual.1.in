@@ -7,11 +7,18 @@
 .SH DESCRIPTION
 @DESCRIPTION@
 .PP
-The document is read from the file and nothing is sent anywhere. Nothing is
-written either: this release reads OpenDocument and does not save it.
+The document is read from the file and nothing is sent anywhere. Editing means
+changing what is there, not authoring: text can be typed and deleted, a
+paragraph split or joined, a cell given a value, a shape moved or resized, any
+of it undone, and the document saved. Formatting, inserting, formulas and find
+and replace are an office suite's. What was not touched is written back as it
+was read, element for element, so the saved document is the opened one with the
+change in it. Nothing is written until Save, and then only the file that was
+opened or the one named; before it is, what is about to be written is read back
+and compared with the document in the window, and a difference refuses the save.
 .SH OPTIONS
 There are none. A path given on the command line is opened at startup; a
-document may also be dropped on the window or chosen with Ctrl+O.
+document may also be chosen with Ctrl+O.
 .SH KEYS
 .TP
 .B Ctrl+O
@@ -23,10 +30,29 @@ Read the open document from disk again.
 .B Ctrl+W
 Close it.
 .TP
+.B Ctrl+S, Ctrl+Shift+S
+Save over the open file; save somewhere else.
+.TP
+.B Ctrl+Z, Ctrl+Shift+Z
+Take an edit back; put it back.
+.TP
+.B Ctrl+E
+Edit mode on or off. A window opens reading unless the preference in the Edit
+menu says otherwise.
+.TP
 .B Ctrl+plus, Ctrl+minus, Ctrl+0
 Zoom in, zoom out, and back to actual size.
 .SH FILES
-None. @APP@ writes no configuration, no cache and no temporary copy.
+.TP
+.I $XDG_CONFIG_HOME/odox/settings.toml
+The one preference, whether a document opens in edit mode, written only when it
+is changed in the menu.
+.I ~/.config
+where
+.B XDG_CONFIG_HOME
+is unset. @APP@ writes no cache and no temporary copy; a save goes through a
+.I .part
+file beside the target that is renamed over it.
 .SH SEE ALSO
 .BR xodt (1),
 .BR xods (1),

@@ -120,6 +120,11 @@ Serif. Both are in `crates/odox-ui/src/fonts.rs`.
 **A page is paper**, in a dark window as much as a light one: the page keeps its
 own ground and the window's chrome follows the desktop.
 
+**A proportional line height is a proportion of each run's own size**, so a
+span set larger than its paragraph takes a taller line; an absolute one is the
+same for every run. Resolved against the paragraph's size alone, a title whose
+size lives on its span sat in a line thirteen points tall.
+
 **Text in the page can be selected and copied**, by dragging, double-click,
 triple-click and Ctrl+C. The paragraph hands its laid-out galley and its anchor
 to egui's label-selection plugin, which paints the galley at that anchor and keeps
@@ -238,6 +243,18 @@ preference lives in one small file, `odox/settings.toml` under the platform's
 configuration directory, written only when a preference is changed in the menu,
 so an installation nobody has configured has no file.
 
+**A cell is edited in place.** Typing on the picked cell replaces it, Enter or
+F2 opens it with what it holds, Enter commits and moves down, Tab commits and
+moves right, Escape puts it back, and Delete clears it; the text box sits in
+the cell in the cell's own font. What is typed is read the way a spreadsheet
+reads it: a number is a number, `true` and `false` are booleans, anything else
+is text, and a formula is not recognised. A cell that holds a formula is not
+opened, and once anything in the document has changed every formula's cached
+result is drawn faint, because which of them went stale cannot be told without
+evaluating them and a spreadsheet application recalculates on opening the
+file. Leaving a cell as it was is not an edit, so stepping through a currency
+does not retype it as a number.
+
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
 bytes touch the disk they are read back and compared with the tree they were
@@ -247,6 +264,52 @@ the corpus. On Linux and Windows the bytes go into a `.part` file beside the
 target and are renamed over it, carrying the target's permissions, so the file
 is either what it was or what was written. macOS writes in place, because the
 sandbox grant covers the file and not its directory.
+
+**An edit changes one subtree and nothing beside it**, and the tests say so by
+mutating a corpus document and comparing everything else. A name written into
+the tree takes the prefix the document declares for its namespace on the
+content root, so a document that spells `text:` as `t:` is written its own way.
+A cell in a run the document wrote once with a repeat count is split into the
+run before, the one, and the run after, with the counts fixed, so the cell
+changes and its neighbours in the run keep what they had; a cell or row past
+what the document wrote is created, with one repeated empty run filling the
+gap. A cell that holds a formula is refused, and so is one under a neighbour's
+span. A shape's `svg:x`, `svg:y`, `svg:width` and `svg:height` are written in
+the unit each was read in.
+
+**A slide's shape is moved by hand.** In edit mode a click picks one of the
+slide's own shapes, a drag moves it, and a drag on a corner handle moves that
+corner with the opposite one fixed, never thinner than a point. The hit is
+tested where the button went down, because egui reports a drag only once the
+pointer has travelled, and a press on a handle is a press on the handle. What
+is not picked: a shape placed by `draw:transform`, which states no corner; a
+line, placed by its ends; a connector; a group; and everything the master page
+contributes. Each drag is one undo step, recorded when it begins.
+
+**A paragraph is edited in a text box where it sits**, in edit mode, on a
+click: the box shows the paragraph's flat text unformatted at the paragraph's
+own font, size, colour, indent and width, on the page's paper. Escape puts
+the paragraph back, Ctrl+Enter or a click elsewhere keeps what was typed,
+Enter is a new paragraph once it is kept, and Backspace with the caret at the
+very start joins the paragraph onto the one before it, the box reopening
+there with the caret at the join. A slide's labels are the same paragraphs
+through the same box, addressed from the page by the shape's index; in edit
+mode a drag on a slide moves the shape and does not select its text. A
+paragraph inside a frame anchored in a paragraph is drawn from a clone and is
+not edited in place. What is written is the difference between what the box
+was given and what it hands back, so a span or a marker outside the change is
+untouched and what replaces a bold word is bold.
+
+**A paragraph is edited through its flat text**, built from the tree and not
+from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
+`text:line-break` a newline, a span's or a link's contents the paragraph's own
+characters, and everything else in the paragraph — a bookmark, a frame, a
+field, a note — contributes nothing and stays where it was. Replacing a range
+deletes the characters from the nodes that hold them, puts the new text into
+the text node at the start of the range, then writes whitespace the way ODF
+requires. A split carries a zero-length element at the split point to the
+first half. `crates/odox-core/src/edit.rs` is the map; `tests/edit.rs`
+measures it over every paragraph of the corpus.
 
 **Undo is a stack of snapshots** of the content tree, bounded at a hundred.
 Every edit records the tree as it stands and then mutates; the document is

@@ -231,3 +231,51 @@ fn every_transform_in_the_corpus_places_the_shape_on_the_page() {
     }
     assert!(found > 0, "no decoration in the corpus is placed this way");
 }
+
+#[test]
+fn a_shape_is_moved_and_sized_in_the_unit_it_was_written_in() {
+    let Some(mut deck) = fixture("deck.odp") else {
+        return;
+    };
+    let (slide, shape) = {
+        let slides = deck.slides();
+        let slide = slides.first().expect("a slide");
+        let (index, frame) = slide
+            .shapes_indexed()
+            .find(|(_, s)| s.attr(&Ns::Svg, "x").is_some())
+            .expect("a placed shape");
+        assert!(frame.attr(&Ns::Svg, "x").expect("x").ends_with("cm"));
+        (slide.position, index)
+    };
+    deck.set_geometry(
+        slide,
+        shape,
+        Length(72.0),
+        Length(36.0),
+        Length(144.0),
+        Length(72.0),
+    )
+    .expect("a movable shape");
+    let slides = deck.slides();
+    let frame = slides[0]
+        .shapes_indexed()
+        .find(|(i, _)| *i == shape)
+        .map(|(_, s)| s)
+        .expect("the shape");
+    assert_eq!(frame.attr(&Ns::Svg, "x"), Some("2.54cm"));
+    assert_eq!(frame.attr(&Ns::Svg, "y"), Some("1.27cm"));
+    assert_eq!(frame.attr(&Ns::Svg, "width"), Some("5.08cm"));
+    assert_eq!(frame.attr(&Ns::Svg, "height"), Some("2.54cm"));
+    assert_eq!(
+        deck.set_geometry(
+            slide,
+            9999,
+            Length(0.0),
+            Length(0.0),
+            Length(1.0),
+            Length(1.0)
+        ),
+        Err(odox_core::Refused::NotFound)
+    );
+    deck.document.write_verified().expect("saves");
+}
