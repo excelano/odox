@@ -161,7 +161,7 @@ fill on.
 
 ## §7 The window
 
-One shell, `crates/odox-ui/src/shell.rs`, with a `Viewer` for the part that
+One shell, `crates/odox-ui/src/shell.rs`, with a `View` for the part that
 differs. The shell owns the menu, the keys, the file dialog, the error line, the
 zoom and the side panel, and every read from disk, so a view is handed bytes and
 never a path. The desktop's light and dark setting is read through the XDG portal
@@ -227,3 +227,30 @@ A formula cell carries `table:formula`, `office:value` and a `text:p` holding th
 value as last displayed, so a viewer needs neither a number-format engine nor a
 formula evaluator: it shows the string the producer formatted. Nothing gates on
 `office:version`; the reader accepts what it is given.
+
+## §11 Editing
+
+A window opens reading and is put into edit mode by a person, with Ctrl+E or
+the Edit menu, or by the one preference the suite keeps. Outside edit mode a
+view draws and selects and never opens an editor; the spreadsheet is the
+exception by convention, where typing on the selected cell edits. The
+preference lives in one small file, `odox/settings.toml` under the platform's
+configuration directory, written only when a preference is changed in the menu,
+so an installation nobody has configured has no file.
+
+**Nothing is written until Save, and then only the file that was opened or the
+one Save As named.** The shell owns the write as it owns the read. Before the
+bytes touch the disk they are read back and compared with the tree they were
+written from, and a difference refuses the save and says so: the round-trip
+tests make the same claim over the corpus, and a person's document is not in
+the corpus. On Linux and Windows the bytes go into a `.part` file beside the
+target and are renamed over it, carrying the target's permissions, so the file
+is either what it was or what was written. macOS writes in place, because the
+sandbox grant covers the file and not its directory.
+
+**Undo is a stack of snapshots** of the content tree, bounded at a hundred.
+Every edit records the tree as it stands and then mutates; the document is
+modified when the stack is not at the depth it had when the file was last read
+or written, so undoing back to that depth is a document with nothing to save.
+Close, Open, Reload, Quit and the window's own close button ask before a
+modified document is thrown away.

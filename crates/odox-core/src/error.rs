@@ -28,6 +28,11 @@ pub enum Error {
         /// The media type this reader wanted.
         wanted: &'static str,
     },
+    /// The document was serialized and read back, and a part did not come back
+    /// as the tree it was written from. Nothing has been written to disk: this
+    /// is the check that stands between an editor and a document it would have
+    /// damaged.
+    Unfaithful(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -39,6 +44,10 @@ impl fmt::Display for Error {
             Self::WrongFormat { found, wanted } => {
                 write!(f, "this is a {found} package, not a {wanted} one")
             }
+            Self::Unfaithful(part) => write!(
+                f,
+                "{part} would not read back as it was written, so the document was not saved; please report this"
+            ),
         }
     }
 }

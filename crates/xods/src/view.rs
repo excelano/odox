@@ -6,10 +6,11 @@
 use std::path::Path;
 
 use eframe::egui::{self, Align, FontId, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use odox_core::Document;
 use odox_core::doc::{Sheet, SheetDocument};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Viewer, fonts};
+use odox_ui::{Editing, View, fonts};
 
 use crate::grid::{Metrics, address, column_name};
 
@@ -25,7 +26,7 @@ pub struct SheetView {
     measured: (usize, f32),
 }
 
-impl Viewer for SheetView {
+impl View for SheetView {
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String> {
         let document = SheetDocument::read(bytes).map_err(|e| {
             fill(
@@ -71,7 +72,18 @@ impl Viewer for SheetView {
         self.document.as_ref()?.document.meta.title.clone()
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32) {
+    fn document_mut(&mut self) -> Option<&mut Document> {
+        Some(&mut self.document.as_mut()?.document)
+    }
+
+    fn reindex(&mut self) {
+        if let Some(document) = &mut self.document {
+            document.reindex();
+        }
+        self.metrics = None;
+    }
+
+    fn central(&mut self, ui: &mut Ui, zoom: f32, _editing: &mut Editing) {
         if self.document.is_none() {
             return;
         }

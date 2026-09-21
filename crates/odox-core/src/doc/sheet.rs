@@ -266,6 +266,12 @@ impl SheetDocument {
         &self.sheets
     }
 
+    /// Rebuild the index after the content tree has been replaced under it,
+    /// which is what undo does.
+    pub fn reindex(&mut self) {
+        self.sheets = index_sheets(&self.document);
+    }
+
     /// The `table:table` element of a sheet.
     fn table(&self, sheet: &Sheet) -> Option<&Element> {
         let body = self.document.body_of("spreadsheet")?;
