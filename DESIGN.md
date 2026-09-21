@@ -272,6 +272,15 @@ gap. A cell that holds a formula is refused, and so is one under a neighbour's
 span. A shape's `svg:x`, `svg:y`, `svg:width` and `svg:height` are written in
 the unit each was read in.
 
+**A slide's shape is moved by hand.** In edit mode a click picks one of the
+slide's own shapes, a drag moves it, and a drag on a corner handle moves that
+corner with the opposite one fixed, never thinner than a point. The hit is
+tested where the button went down, because egui reports a drag only once the
+pointer has travelled, and a press on a handle is a press on the handle. What
+is not picked: a shape placed by `draw:transform`, which states no corner; a
+line, placed by its ends; a connector; a group; and everything the master page
+contributes. Each drag is one undo step, recorded when it begins.
+
 **A paragraph is edited through its flat text**, built from the tree and not
 from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
 `text:line-break` a newline, a span's or a link's contents the paragraph's own
