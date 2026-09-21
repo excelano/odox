@@ -37,6 +37,7 @@ pub mod shell;
 pub mod system_theme;
 
 pub use edit::Editing;
+pub use flow::{Editor as ParagraphEditor, Outcome as ParagraphOutcome};
 pub use flow::{Flow, Pictures};
 pub use i18n::mark;
 pub use settings::Settings;

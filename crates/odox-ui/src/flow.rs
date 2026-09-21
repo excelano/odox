@@ -16,8 +16,11 @@
 use std::collections::HashMap;
 
 use eframe::egui::{
-    Align, ColorImage, Context, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, TextureHandle,
-    TextureOptions, Ui, pos2, text::LayoutJob, text_selection::LabelSelectionState, vec2,
+    Align, ColorImage, Context, Id, Key, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit,
+    TextFormat, TextureHandle, TextureOptions, Ui, pos2,
+    text::{CCursor, CCursorRange, CharIndex, LayoutJob},
+    text_selection::LabelSelectionState,
+    vec2,
 };
 use odox_core::{
     Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties,
@@ -82,6 +85,25 @@ pub struct Flow<'a> {
     pub scroll_to_heading: Option<usize>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
+    /// Whether a click on a paragraph opens it for editing.
+    pub edit_mode: bool,
+    /// The paragraph being edited, where it is under the root this flow
+    /// draws.
+    pub editor: Option<&'a mut Editor>,
+    /// The paragraph a person clicked this frame in edit mode, as a path from
+    /// the root.
+    pub clicked: Option<Vec<usize>>,
+    /// What the editor asked for this frame, if it closed.
+    pub outcome: Option<Outcome>,
+    /// Whether text in the page can be dragged over to select it. Off on a
+    /// slide in edit mode, where a drag moves the shape instead.
+    pub selectable: bool,
+    /// Where the flow is, as a path of child indices from the root, or from
+    /// wherever [`Self::start_at`] said the root sits.
+    path: Vec<usize>,
+    /// Inside a frame anchored in a paragraph, which is reached by a clone
+    /// and not by a path, so nothing in it can be edited in place.
+    detached: bool,
 }
 
 impl<'a> Flow<'a> {
@@ -94,8 +116,73 @@ impl<'a> Flow<'a> {
             palette: format::Palette::default(),
             scroll_to_heading: None,
             headings_seen: 0,
+            edit_mode: false,
+            editor: None,
+            clicked: None,
+            outcome: None,
+            selectable: true,
+            path: Vec::new(),
+            detached: false,
         }
     }
+
+    /// Name where the root this flow draws sits under something larger, so
+    /// that every path it reports and matches is from that larger root: a
+    /// slide's label is drawn from the shape and edited from the page.
+    pub fn start_at(&mut self, prefix: Vec<usize>) {
+        self.path = prefix;
+    }
+}
+
+/// A paragraph being typed into: which one, as a path of child indices from
+/// the root the flow draws, and what the text box holds.
+///
+/// The box shows the paragraph's text as [`odox_core::edit::text`] gives it,
+/// unformatted, at the paragraph's own font, size and width, and hands it
+/// back whole; the difference between what went in and what comes out is
+/// what is written. DESIGN.md §11.
+pub struct Editor {
+    /// The paragraph, from the root the flow was asked to draw.
+    pub path: Vec<usize>,
+    /// What the box holds.
+    pub text: String,
+    /// What the paragraph held when the box opened, so that leaving it as it
+    /// was is not an edit.
+    pub original: String,
+    /// The box was opened this frame and has yet to take the focus.
+    pub opened: bool,
+    /// Where the caret goes when the box opens: at an offset, or at the end.
+    pub caret: Option<usize>,
+}
+
+impl Editor {
+    /// A box on the paragraph at a path, holding its text.
+    pub fn open(path: Vec<usize>, text: String, caret: Option<usize>) -> Self {
+        Self {
+            path,
+            original: text.clone(),
+            text,
+            opened: true,
+            caret,
+        }
+    }
+
+    /// Whether what the box holds differs from what the paragraph held.
+    pub fn changed(&self) -> bool {
+        self.text != self.original
+    }
+}
+
+/// What the editor asked for when it closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Outcome {
+    /// Keep what was typed.
+    Commit,
+    /// Put the paragraph back as it was.
+    Cancel,
+    /// Backspace at the start: keep what was typed, then join this paragraph
+    /// onto the one before it.
+    JoinPrevious,
 }
 
 /// How far each list level is indented, in ODF points.
@@ -189,7 +276,8 @@ impl Flow<'_> {
     }
 
     fn blocks_with(&mut self, ui: &mut Ui, parent: &Element, width: f32, counters: &mut Counters) {
-        for element in parent.elements() {
+        for (index, element) in parent.elements_indexed() {
+            self.path.push(index);
             match () {
                 () if element.is(&Ns::Text, "p") || element.is(&Ns::Text, "h") => {
                     self.paragraph(ui, element, width, None);
@@ -214,6 +302,7 @@ impl Flow<'_> {
                 }
                 () => {}
             }
+            self.path.pop();
         }
     }
 
@@ -251,38 +340,28 @@ impl Flow<'_> {
         }
 
         let base = format::text_format(&properties.text, DEFAULT_SIZE, zoom, self.palette);
-        let mut job = LayoutJob {
-            wrap: eframe::egui::text::TextWrapping {
-                max_width: wrap,
-                ..Default::default()
-            },
-            halign: match properties.paragraph.align.unwrap_or(TextAlign::Start) {
-                TextAlign::Center => Align::Center,
-                TextAlign::End => Align::Max,
-                _ => Align::Min,
-            },
-            justify: properties.paragraph.align == Some(TextAlign::Justify),
-            ..LayoutJob::default()
-        };
-        let mut frames = Vec::new();
-        let run = Run {
-            inherited: &properties.text,
-            size,
-            format: &base,
-            palette: self.palette,
-        };
-        self.runs(element, &run, &mut job, &mut frames);
 
-        // An empty paragraph is a blank line and has to take its height, which an
-        // empty layout job would not.
-        if job.text.is_empty() {
-            job.append(" ", 0.0, base.clone());
-        }
-        if let Some(height) = format::line_height(properties.paragraph.line_height, size) {
-            for section in &mut job.sections {
-                section.format.line_height = Some(height * zoom);
+        if !self.detached && self.editor.as_ref().is_some_and(|e| e.path == self.path) {
+            // The box takes the paragraph's first run's format, so a title
+            // whose size lives on its span opens at the title's size.
+            let (job, _) = self.layout_job(element, &properties, &base, size, wrap);
+            let first = job
+                .sections
+                .first()
+                .map_or_else(|| base.clone(), |section| section.format.clone());
+            // Taken out and put back, because the box is drawn by a method of
+            // this flow and the editor is borrowed from outside it.
+            let mut editor = self.editor.take();
+            if let Some(editor) = editor.as_deref_mut() {
+                self.edit_box(ui, editor, &first, left, wrap);
             }
+            self.editor = editor;
+            if after > 0.0 {
+                ui.add_space(after);
+            }
+            return;
         }
+        let (job, frames) = self.layout_job(element, &properties, &base, size, wrap);
 
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
         let height = galley.size().y;
@@ -292,7 +371,16 @@ impl Flow<'_> {
         // what lets a double-click take a word and a triple-click a line.
         // Without the drag the pointer reaches the scroll area instead and
         // nothing is selected — measured, not read.
-        let (rect, response) = ui.allocate_exact_size(vec2(width, height), Sense::click_and_drag());
+        let sense = if self.selectable {
+            Sense::click_and_drag()
+        } else {
+            Sense::click()
+        };
+        let (rect, response) = ui.allocate_exact_size(vec2(width, height), sense);
+
+        if self.edit_mode && !self.detached && response.clicked() {
+            self.clicked = Some(self.path.clone());
+        }
 
         if element.is(&Ns::Text, "h") {
             if self.scroll_to_heading == Some(self.headings_seen) {
@@ -342,11 +430,153 @@ impl Flow<'_> {
                 .galley(pos2(x, rect.top()), label_galley, base.color);
         }
 
+        // Reached by a clone rather than by a path, so nothing inside is
+        // edited in place.
+        let was_detached = self.detached;
+        self.detached = true;
         for frame in frames {
             self.frame(ui, &frame, body_width);
         }
+        self.detached = was_detached;
         if after > 0.0 {
             ui.add_space(after);
+        }
+    }
+
+    /// The layout job for a paragraph, and the frames anchored inside it,
+    /// which are drawn after it.
+    fn layout_job(
+        &self,
+        element: &Element,
+        properties: &Properties,
+        base: &TextFormat,
+        size: f32,
+        wrap: f32,
+    ) -> (LayoutJob, Vec<Element>) {
+        let mut job = LayoutJob {
+            wrap: eframe::egui::text::TextWrapping {
+                max_width: wrap,
+                ..Default::default()
+            },
+            halign: match properties.paragraph.align.unwrap_or(TextAlign::Start) {
+                TextAlign::Center => Align::Center,
+                TextAlign::End => Align::Max,
+                _ => Align::Min,
+            },
+            justify: properties.paragraph.align == Some(TextAlign::Justify),
+            ..LayoutJob::default()
+        };
+        let mut frames = Vec::new();
+        let run = Run {
+            inherited: &properties.text,
+            size,
+            format: base,
+            palette: self.palette,
+        };
+        self.runs(element, &run, &mut job, &mut frames);
+
+        // An empty paragraph is a blank line and has to take its height, which an
+        // empty layout job would not.
+        if job.text.is_empty() {
+            job.append(" ", 0.0, base.clone());
+        }
+        if let Some(measure) = properties.paragraph.line_height {
+            // A proportional line height is a proportion of each run's own
+            // size, so a span set larger than its paragraph takes a taller
+            // line; an absolute one is the same for every run.
+            for section in &mut job.sections {
+                let own = section.format.font_id.size / self.zoom;
+                section.format.line_height = Some(measure.resolve(own) * self.zoom);
+            }
+        }
+        (job, frames)
+    }
+
+    /// The text box a paragraph becomes while it is being typed into, at the
+    /// paragraph's own font, colour, indent and width, on the page's paper.
+    ///
+    /// Escape puts the paragraph back, Ctrl+Enter or a click elsewhere keeps
+    /// what was typed, Enter is a new paragraph once it is kept, and Backspace
+    /// with the caret at the very start joins the paragraph onto the one
+    /// before it. Read before the box takes the keys, because the box
+    /// consumes what it handles.
+    fn edit_box(
+        &mut self,
+        ui: &mut Ui,
+        editor: &mut Editor,
+        base: &TextFormat,
+        left: f32,
+        wrap: f32,
+    ) {
+        let id = Id::new("paragraph-editor");
+        let at_start = TextEdit::load_state(ui.ctx(), id)
+            .and_then(|state| state.cursor.char_range())
+            .is_some_and(|range| {
+                range.primary.index == CharIndex(0) && range.secondary.index == CharIndex(0)
+            });
+        let (backspace, keep) = ui.input(|input| {
+            (
+                input.key_pressed(Key::Backspace),
+                input.modifiers.command && input.key_pressed(Key::Enter),
+            )
+        });
+        if !editor.opened && at_start && backspace && self.outcome.is_none() {
+            self.outcome = Some(Outcome::JoinPrevious);
+        }
+
+        // A sizing pass is an invisible ui, and an invisible ui is disabled: a
+        // text box added in one surrenders the focus the real one just took.
+        // So the pass gets the box's height and no box.
+        if ui.is_sizing_pass() {
+            let galley = ui.fonts_mut(|fonts| {
+                fonts.layout(editor.text.clone(), base.font_id.clone(), base.color, wrap)
+            });
+            ui.horizontal_top(|ui| {
+                ui.add_space(left);
+                ui.allocate_exact_size(vec2(wrap, galley.size().y + 4.0), Sense::hover());
+            });
+            return;
+        }
+
+        let response = ui
+            .horizontal_top(|ui| {
+                ui.add_space(left);
+                ui.add(
+                    TextEdit::multiline(&mut editor.text)
+                        .id(id)
+                        .font(base.font_id.clone())
+                        .text_color(base.color)
+                        .background_color(self.palette.paper)
+                        .desired_width(wrap)
+                        .desired_rows(1)
+                        .margin(vec2(2.0, 2.0)),
+                )
+            })
+            .inner;
+
+        if editor.opened {
+            editor.opened = false;
+            response.request_focus();
+            let mut state = TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
+            let at = editor
+                .caret
+                .unwrap_or_else(|| editor.text.chars().count())
+                .min(editor.text.chars().count());
+            state
+                .cursor
+                .set_char_range(Some(CCursorRange::one(CCursor::new(at))));
+            TextEdit::store_state(ui.ctx(), id, state);
+            return;
+        }
+        if keep && response.has_focus() {
+            response.surrender_focus();
+            self.outcome = Some(Outcome::Commit);
+        } else if response.lost_focus() && self.outcome.is_none() {
+            self.outcome = Some(if ui.input(|input| input.key_pressed(Key::Escape)) {
+                Outcome::Cancel
+            } else {
+                Outcome::Commit
+            });
         }
     }
 
@@ -451,11 +681,12 @@ impl Flow<'_> {
         let indent = LIST_STEP * self.zoom * (level as f32 + 1.0);
         let gutter = LIST_GUTTER * self.zoom;
 
-        for item in element.elements() {
+        for (item_index, item) in element.elements_indexed() {
             let numbered = item.is(&Ns::Text, "list-item");
             if !numbered && !item.is(&Ns::Text, "list-header") {
                 continue;
             }
+            self.path.push(item_index);
             let label = if numbered {
                 let level_style = self.level_style(&style_name, level);
                 let start = level_style
@@ -471,9 +702,11 @@ impl Flow<'_> {
             };
 
             let mut first = true;
-            for block in item.elements() {
+            for (block_index, block) in item.elements_indexed() {
+                self.path.push(block_index);
                 if block.is(&Ns::Text, "list") {
                     self.list(ui, block, width, level + 1, Some(&style_name), counters);
+                    self.path.pop();
                     continue;
                 }
                 let on_this_block = if first && !label.is_empty() {
@@ -503,7 +736,9 @@ impl Flow<'_> {
                         self.frame(ui, block, width - indent - gutter);
                     });
                 }
+                self.path.pop();
             }
+            self.path.pop();
         }
     }
 
@@ -569,7 +804,8 @@ impl Flow<'_> {
     }
 
     fn rows(&mut self, ui: &mut Ui, parent: &Element, columns: &[f32]) {
-        for element in parent.elements() {
+        for (index, element) in parent.elements_indexed() {
+            self.path.push(index);
             if element.is(&Ns::Table, "table-row") {
                 self.row(ui, element, columns);
             } else if element.is(&Ns::Table, "table-header-rows")
@@ -578,6 +814,7 @@ impl Flow<'_> {
             {
                 self.rows(ui, element, columns);
             }
+            self.path.pop();
         }
     }
 
@@ -591,7 +828,7 @@ impl Flow<'_> {
         let response = ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             let mut column = 0usize;
-            for cell in row.elements() {
+            for (cell_index, cell) in row.elements_indexed() {
                 let covered = cell.is(&Ns::Table, "covered-table-cell");
                 if !covered && !cell.is(&Ns::Table, "table-cell") {
                     continue;
@@ -633,7 +870,9 @@ impl Flow<'_> {
                                     ui.set_min_width(width);
                                     ui.set_max_width(width);
                                     let content = (width - padding * 2.0).max(8.0);
+                                    self.path.push(cell_index);
                                     self.blocks(ui, cell, content);
+                                    self.path.pop();
                                     ui.add_space(padding);
                                 },
                             )
@@ -722,7 +961,10 @@ impl Flow<'_> {
         // A text box draws the blocks inside it; anything else — an embedded
         // object, a chart, a formula — is a box the size the document asked for,
         // so that the page does not silently lose the space it occupied.
-        if let Some(box_) = frame.child(&Ns::Draw, "text-box") {
+        if let Some((box_index, box_)) = frame
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Draw, "text-box"))
+        {
             let w = declared("width").unwrap_or(width).min(width);
             ui.allocate_ui_with_layout(
                 vec2(w, 0.0),
@@ -730,7 +972,9 @@ impl Flow<'_> {
                 |ui| {
                     ui.set_max_width(w);
                     eframe::egui::Frame::group(ui.style()).show(ui, |ui| {
+                        self.path.push(box_index);
                         self.blocks(ui, box_, w - 16.0 * zoom);
+                        self.path.pop();
                     });
                 },
             );

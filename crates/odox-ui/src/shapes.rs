@@ -25,7 +25,7 @@ use odox_core::{
     Properties, Transform,
 };
 
-use crate::flow::{Flow, Pictures};
+use crate::flow::{Editor, Flow, Outcome, Pictures};
 use crate::format::{self, Palette};
 
 /// A page, and where on screen it is being drawn.
@@ -40,6 +40,20 @@ pub struct Canvas<'a> {
     pub scale: f32,
     /// The colours to draw in where the document names none.
     pub palette: Palette,
+    /// Whether a click on a label's paragraph opens it for editing.
+    pub edit_mode: bool,
+    /// The paragraph being edited, as a path from the page: the shape's index
+    /// among the page's children, then the way down to the paragraph.
+    pub editor: Option<&'a mut Editor>,
+    /// The paragraph a person clicked this frame in edit mode, as a path from
+    /// the page.
+    pub clicked: Option<Vec<usize>>,
+    /// What the editor asked for this frame, if it closed.
+    pub outcome: Option<Outcome>,
+    /// The index among the page's children of the shape being drawn, where it
+    /// is one of the slide's own; a master page's decoration has none and
+    /// nothing in it is edited.
+    at: Option<usize>,
 }
 
 /// Where a shape's own box lands on the screen.
@@ -94,6 +108,38 @@ impl Placement {
 enum Filled {
     Yes,
     No,
+}
+
+impl<'a> Canvas<'a> {
+    /// A canvas over a page, drawing nothing editable until told otherwise.
+    pub fn new(
+        document: &'a Document,
+        pictures: &'a mut Pictures,
+        page: Rect,
+        scale: f32,
+        palette: Palette,
+    ) -> Self {
+        Self {
+            document,
+            pictures,
+            page,
+            scale,
+            palette,
+            edit_mode: false,
+            editor: None,
+            clicked: None,
+            outcome: None,
+            at: None,
+        }
+    }
+
+    /// One of the slide's own shapes, by its index among the page's children,
+    /// which is what a label inside it is edited under.
+    pub fn slide_shape(&mut self, ui: &mut Ui, index: usize, shape: &Element) {
+        self.at = Some(index);
+        self.shape(ui, shape);
+        self.at = None;
+    }
 }
 
 impl Canvas<'_> {
@@ -374,20 +420,28 @@ impl Canvas<'_> {
             self.turned_picture(ui, shape, place);
             return;
         }
-        let content = if picture {
-            shape.clone()
-        } else if let Some(box_) = shape.child(&Ns::Draw, "text-box") {
-            box_.clone()
+        let text_box = shape
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Draw, "text-box"));
+        let (content, below) = if picture {
+            (shape.clone(), None)
+        } else if let Some((index, box_)) = text_box {
+            (box_.clone(), Some(index))
         } else if shape.child(&Ns::Text, "p").is_some() || shape.child(&Ns::Text, "list").is_some()
         {
             // A drawing shape keeps its label as paragraphs of its own. The box
             // is a frame's way of saying the same thing, and across the
             // presentation templates it is the shapes that use it, not the
             // frames.
-            shape.clone()
+            (shape.clone(), None)
         } else {
             return;
         };
+        // The way from the page to the content, for a label that is edited.
+        let prefix = self.at.map(|at| match below {
+            Some(index) => vec![at, index],
+            None => vec![at],
+        });
         if !place.is_upright() {
             return;
         }
@@ -408,11 +462,11 @@ impl Canvas<'_> {
             // so it is laid out twice: once into a ui that draws nothing, to
             // measure, and then once for real at the offset that measurement
             // gives.
-            let sized = self.lay_out(ui, &content, rect, picture, true);
+            let sized = self.lay_out(ui, &content, rect, picture, true, prefix.as_ref());
             top += (rect.height() - sized.min(rect.height())) * anchor.share();
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
-        self.lay_out(ui, &content, placed, picture, false);
+        self.lay_out(ui, &content, placed, picture, false, prefix.as_ref());
     }
 
     /// A picture in a frame that is turned, drawn as its own four corners.
@@ -462,27 +516,50 @@ impl Canvas<'_> {
         rect: Rect,
         picture: bool,
         measuring: bool,
+        prefix: Option<&Vec<usize>>,
     ) -> f32 {
         let (page, scale, palette) = (self.page, self.scale, self.palette);
         let document = self.document;
         let pictures = &mut *self.pictures;
+        // Editable where the label belongs to one of the slide's own shapes,
+        // which is what a prefix says.
+        let edit_mode = self.edit_mode && prefix.is_some();
+        let editor = self.editor.as_deref_mut().filter(|_| edit_mode);
         let mut builder = UiBuilder::new().max_rect(rect);
         if measuring {
             builder = builder.sizing_pass().invisible();
         }
-        ui.scope_builder(builder, |ui| {
-            ui.set_clip_rect(rect.intersect(page));
-            let mut flow = Flow::new(document, pictures, scale);
-            flow.palette = palette;
-            if picture {
-                flow.frame(ui, content, rect.width());
-            } else {
-                flow.blocks(ui, content, rect.width());
-            }
-        })
-        .response
-        .rect
-        .height()
+        let mut clicked = None;
+        let mut outcome = None;
+        let height = ui
+            .scope_builder(builder, |ui| {
+                ui.set_clip_rect(rect.intersect(page));
+                let mut flow = Flow::new(document, pictures, scale);
+                flow.palette = palette;
+                flow.edit_mode = edit_mode;
+                flow.selectable = !edit_mode;
+                flow.editor = editor;
+                if let Some(prefix) = prefix {
+                    flow.start_at(prefix.clone());
+                }
+                if picture {
+                    flow.frame(ui, content, rect.width());
+                } else {
+                    flow.blocks(ui, content, rect.width());
+                }
+                clicked = flow.clicked.take();
+                outcome = flow.outcome.take();
+            })
+            .response
+            .rect
+            .height();
+        if clicked.is_some() {
+            self.clicked = clicked;
+        }
+        if outcome.is_some() {
+            self.outcome = outcome;
+        }
+        height
     }
 
     /// The style a shape names, resolved.

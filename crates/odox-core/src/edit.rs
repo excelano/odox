@@ -181,8 +181,23 @@ pub fn replace(paragraph: &mut Element, range: Range<usize>, with: &str) {
     let len = text(paragraph).chars().count();
     let start = range.start.min(len);
     let end = range.end.clamp(start, len);
-    cut(paragraph, start..end, |_| false);
-    insert(paragraph, start, with);
+    let added = with.chars().count();
+    // Where the replaced range begins inside a text node, the new text goes
+    // into that node before the old comes out, so that what replaces a bold
+    // word is bold and a span emptied by the edit is not emptied first.
+    let holder = segments(paragraph).into_iter().find(|s| {
+        matches!(s.kind, Kind::Text(_)) && s.start <= start && start < s.start + s.kind.len()
+    });
+    if start < end
+        && added > 0
+        && let Some(segment) = holder
+    {
+        insert_into(paragraph, &segment.path, start - segment.start, with);
+        cut(paragraph, start + added..end + added, |_| false);
+    } else {
+        cut(paragraph, start..end, |_| false);
+        insert(paragraph, start, with);
+    }
     normalize(paragraph);
 }
 
@@ -214,6 +229,109 @@ pub fn join(first: &mut Element, second: Element) {
     first.children.extend(second.children);
     first.self_closing = false;
     normalize(first);
+}
+
+/// What a paragraph becomes when its whole text is replaced by what an editor
+/// hands back: one paragraph, or several where the new text holds newlines
+/// the old one did not.
+///
+/// The old and the new text are compared from both ends, and only the middle
+/// they differ in is replaced, so spans and markers outside it are untouched
+/// and a marker inside it stays where it was. A newline inside that middle is
+/// a paragraph break: the paragraph is split there, each half with the
+/// original's style, and the newline itself is not kept. A newline outside
+/// it is a `text:line-break` the editor was shown and left alone.
+pub fn rewrite(paragraph: &Element, edited: &str) -> Vec<Element> {
+    let before = text(paragraph);
+    let old: Vec<char> = before.chars().collect();
+    let new: Vec<char> = edited.chars().collect();
+    let prefix = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
+    let suffix = old[prefix..]
+        .iter()
+        .rev()
+        .zip(new[prefix..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let inserted: String = new[prefix..new.len() - suffix].iter().collect();
+
+    let mut whole = paragraph.clone();
+    replace(&mut whole, prefix..old.len() - suffix, &inserted);
+
+    // The breaks, as offsets into the rewritten text, last first so that each
+    // split leaves the earlier offsets where they were.
+    let mut breaks: Vec<usize> = inserted
+        .chars()
+        .enumerate()
+        .filter(|(_, c)| *c == '\n')
+        .map(|(i, _)| prefix + i)
+        .collect();
+    breaks.reverse();
+    let mut after = Vec::new();
+    for at in breaks {
+        let (first, mut second) = split(&whole, at);
+        // The newline itself, which the split left at the head of the second.
+        replace(&mut second, 0..1, "");
+        after.push(second);
+        whole = first;
+    }
+    after.push(whole);
+    after.reverse();
+    after
+}
+
+/// Replace the paragraph at a path under a root with what the editor hands
+/// back, which may be several paragraphs. Answers how many now stand there.
+///
+/// # Errors
+///
+/// The path leads to nothing, or to something that is not a paragraph.
+pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, Refused> {
+    let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
+    let Some(Node::Element(paragraph)) = parent.children.get(*last) else {
+        return Err(Refused::NotFound);
+    };
+    if !(paragraph.is(&Ns::Text, "p") || paragraph.is(&Ns::Text, "h")) {
+        return Err(Refused::NotFound);
+    }
+    let paragraphs = rewrite(paragraph, edited);
+    let count = paragraphs.len();
+    parent
+        .children
+        .splice(*last..=*last, paragraphs.into_iter().map(Node::Element));
+    Ok(count)
+}
+
+/// Join the paragraph at a path onto the paragraph before it among its
+/// parent's children, and answer where the joined paragraph is.
+///
+/// # Errors
+///
+/// The path leads to nothing, or there is no paragraph before it.
+pub fn join_with_previous(root: &mut Element, path: &[usize]) -> Result<Vec<usize>, Refused> {
+    let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
+    let is_paragraph = |node: &Node| matches!(node, Node::Element(e) if e.is(&Ns::Text, "p") || e.is(&Ns::Text, "h"));
+    if !parent.children.get(*last).is_some_and(is_paragraph) {
+        return Err(Refused::NotFound);
+    }
+    let previous = parent.children[..*last]
+        .iter()
+        .rposition(is_paragraph)
+        .ok_or(Refused::NotFound)?;
+    // Whitespace between the two, which was between them and is now inside
+    // neither, goes too.
+    let Node::Element(second) = parent.children.remove(*last) else {
+        return Err(Refused::NotFound);
+    };
+    parent.children.drain(previous + 1..*last);
+    let Some(Node::Element(first)) = parent.children.get_mut(previous) else {
+        return Err(Refused::NotFound);
+    };
+    join(first, second);
+    let mut at = above.to_vec();
+    at.push(previous);
+    Ok(at)
 }
 
 /// Delete a range of characters, and any zero-length element whose position
@@ -314,15 +432,8 @@ fn insert(paragraph: &mut Element, at: usize, with: &str) {
     let target = text_at(&|s, end| s.start < at && at < end)
         .or_else(|| text_at(&|_, end| end == at))
         .or_else(|| text_at(&|s, _| s.start == at));
-    if let Some(segment) = target
-        && let Some((parent, index)) = parent_of(paragraph, &segment.path)
-        && let Some(Node::Text(t) | Node::CData(t)) = parent.children.get_mut(index)
-    {
-        let byte = t
-            .char_indices()
-            .nth(at - segment.start)
-            .map_or(t.len(), |(b, _)| b);
-        t.insert_str(byte, with);
+    if let Some(segment) = target {
+        insert_into(paragraph, &segment.path, at - segment.start, with);
         return;
     }
     // No text node touches the offset: a new one goes after the last segment
@@ -349,6 +460,16 @@ fn insert(paragraph: &mut Element, at: usize, with: &str) {
     } else {
         paragraph.children.push(node);
         paragraph.self_closing = false;
+    }
+}
+
+/// Put text into the text node at a path, at a character offset within it.
+fn insert_into(paragraph: &mut Element, path: &[usize], offset: usize, with: &str) {
+    if let Some((parent, index)) = parent_of(paragraph, path)
+        && let Some(Node::Text(t) | Node::CData(t)) = parent.children.get_mut(index)
+    {
+        let byte = t.char_indices().nth(offset).map_or(t.len(), |(b, _)| b);
+        t.insert_str(byte, with);
     }
 }
 

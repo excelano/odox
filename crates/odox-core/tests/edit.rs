@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use odox_core::edit::{join, replace, split, text};
+use odox_core::edit::{apply, join, join_with_previous, replace, rewrite, split, text};
 use odox_core::{Element, Node, Ns, Package, xml};
 
 fn corpus() -> Vec<PathBuf> {
@@ -315,4 +315,71 @@ fn a_split_at_either_end_gives_an_empty_half() {
     assert_eq!(text(&second), "");
     let (_, second) = split(&paragraph(r#"<text:bookmark text:name="b"/>abc"#), 0);
     assert!(second.descendant(&Ns::Text, "bookmark").is_none());
+}
+
+#[test]
+fn a_rewrite_touches_only_the_middle_that_changed() {
+    let p = paragraph(
+        r#"one <text:span text:style-name="T1">two</text:span><text:bookmark text:name="b"/> three"#,
+    );
+    let out = rewrite(&p, "one TWO three");
+    assert_eq!(out.len(), 1);
+    assert_eq!(text(&out[0]), "one TWO three");
+    assert!(out[0].descendant(&Ns::Text, "bookmark").is_some());
+    // The change fell inside the span, so the span still holds it.
+    let span = out[0].descendant(&Ns::Text, "span").expect("the span");
+    assert_eq!(text(span), "TWO");
+
+    // Unchanged is unchanged.
+    assert_eq!(rewrite(&p, &text(&p)), vec![p.clone()]);
+}
+
+#[test]
+fn a_newline_typed_into_a_paragraph_splits_it() {
+    let p = paragraph(r#"first<text:line-break/>second third"#);
+    let out = rewrite(&p, "first\nsecond\nthird");
+    assert_eq!(out.len(), 2, "the old line break stays, the new one splits");
+    assert_eq!(text(&out[0]), "first\nsecond");
+    assert_eq!(text(&out[1]), "third");
+    assert!(out[0].descendant(&Ns::Text, "line-break").is_some());
+    assert_eq!(out[1].attr(&Ns::Text, "style-name"), Some("P1"));
+
+    let out = rewrite(&paragraph("abc"), "a\nb\nc");
+    assert_eq!(
+        out.iter().map(text).collect::<Vec<_>>(),
+        vec!["a", "b", "c"]
+    );
+    let out = rewrite(&paragraph("abc"), "abc\n");
+    assert_eq!(out.iter().map(text).collect::<Vec<_>>(), vec!["abc", ""]);
+}
+
+#[test]
+fn apply_and_join_work_by_path_under_a_root() {
+    let mut root = paragraph("");
+    root.name = odox_core::Name::new("office", "text", Ns::Office);
+    root.children.clear();
+    root.children.push(Node::Element(paragraph("one")));
+    root.children.push(Node::Text("\n  ".to_owned()));
+    root.children.push(Node::Element(paragraph("two")));
+
+    assert_eq!(apply(&mut root, &[2], "two\nthree"), Ok(2));
+    assert_eq!(root.children.len(), 4);
+    let texts: Vec<String> = root.elements().map(text).collect();
+    assert_eq!(texts, vec!["one", "two", "three"]);
+
+    let at = join_with_previous(&mut root, &[3]).expect("joins");
+    assert_eq!(at, vec![2]);
+    let texts: Vec<String> = root.elements().map(text).collect();
+    assert_eq!(texts, vec!["one", "twothree"]);
+
+    // The first paragraph has nothing before it; the whitespace node is not a
+    // paragraph.
+    assert_eq!(
+        join_with_previous(&mut root, &[0]),
+        Err(odox_core::Refused::NotFound)
+    );
+    assert_eq!(
+        apply(&mut root, &[1], "x"),
+        Err(odox_core::Refused::NotFound)
+    );
 }

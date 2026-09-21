@@ -141,6 +141,16 @@ impl Presentation {
         Ok(())
     }
 
+    /// The `draw:page` element at a position among the body's children, for
+    /// changing what is on it.
+    pub fn page_mut(&mut self, position: usize) -> Option<&mut Element> {
+        self.document
+            .content
+            .child_mut(&Ns::Office, "body")?
+            .child_mut(&Ns::Office, "presentation")?
+            .at_mut(&[position])
+    }
+
     /// The master page a slide names.
     pub fn master(&self, slide: &Slide<'_>) -> Option<&Element> {
         self.document.styles.master_page(slide.master_page?)
