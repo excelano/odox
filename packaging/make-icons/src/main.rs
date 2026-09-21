@@ -1,4 +1,4 @@
-//! Turn the three icon SVGs into every raster the three platforms want.
+//! Turn the icon drawings into every raster the three platforms want.
 //!
 //! Linux ships the SVGs and lets the desktop rasterize them. Neither other
 //! platform has such a step: the Windows shell reads a fixed set of sizes out of
@@ -15,11 +15,13 @@
 //! reaches that machine. `icns` is pure Rust and renders here, which takes the
 //! icon off the platform session's critical path.
 //!
-//! **Three drawings, and all three are applications.** Where segler has one
-//! application icon and two document icons, odox has three applications, and
-//! each one's drawing is also the icon of the format it reads. Because the three
-//! ship as three separate store packages, each gets its own asset set rather
-//! than sharing one.
+//! **Two drawings for each of the three applications.** The document icon is
+//! a page carrying the glyph of what is on it; the application icon is that
+//! glyph alone, grown to the grid the page left. Which one a raster comes from
+//! follows what the shell draws it for: a window, a taskbar, a Dock, a tile and
+//! a store listing take the application, and the icon of an `.odt`, an `.ods`
+//! or an `.odp` takes the document. Because the three ship as three separate
+//! store packages, each gets its own asset set rather than sharing one.
 //!
 //! Nothing is drawn for the launcher. It has no window, no desktop entry and no
 //! store package, and it ships only on apt.
@@ -36,10 +38,29 @@ use std::path::{Path, PathBuf};
 use resvg::tiny_skia;
 use resvg::usvg;
 
-/// The three applications, which are also the three drawings.
+/// The three applications, each of which is drawn twice.
 ///
 /// The launcher is deliberately absent; see the module comment.
 const APPLICATIONS: &[&str] = &["xodt", "xods", "xodp"];
+
+/// Which of an application's two drawings a raster is rendered from.
+#[derive(Clone, Copy)]
+enum Drawing {
+    /// The glyph alone.
+    Application,
+    /// The page, for a document of the format that application reads.
+    Document,
+}
+
+impl Drawing {
+    /// What this drawing is called in the artwork directory.
+    fn file(self, app: &str) -> String {
+        match self {
+            Self::Application => format!("{app}-application.svg"),
+            Self::Document => format!("{app}-document.svg"),
+        }
+    }
+}
 
 // ---------------------------------------------------------------- Windows ---
 
@@ -94,6 +115,8 @@ struct Asset {
     /// tile. Only `Square44x44Logo` is, and only that one gets the target-size
     /// and unplated variants.
     icon: bool,
+    /// Which of the application's two drawings this one is rendered from.
+    from: Drawing,
 }
 
 /// The five images each package's manifest names, and nothing else.
@@ -108,13 +131,14 @@ struct Asset {
 /// `FileTypeLogo` is the one association each package declares: `.odt` for one
 /// package, `.ods` for the next, `.odp` for the last. It is 256 because that is
 /// the largest the shell asks for and the only place a document icon is drawn
-/// big.
+/// big, and it is the one asset here rendered from the document drawing; every
+/// other image in the package stands for the application.
 const ASSETS: &[Asset] = &[
-    Asset { stem: "StoreLogo",         width:  50, height:  50, fill: 1.00, icon: false },
-    Asset { stem: "Square44x44Logo",   width:  44, height:  44, fill: 1.00, icon: true  },
-    Asset { stem: "Square150x150Logo", width: 150, height: 150, fill: 0.66, icon: false },
-    Asset { stem: "Wide310x150Logo",   width: 310, height: 150, fill: 0.66, icon: false },
-    Asset { stem: "FileTypeLogo",      width: 256, height: 256, fill: 1.00, icon: false },
+    Asset { stem: "StoreLogo",         width:  50, height:  50, fill: 1.00, icon: false, from: Drawing::Application },
+    Asset { stem: "Square44x44Logo",   width:  44, height:  44, fill: 1.00, icon: true,  from: Drawing::Application },
+    Asset { stem: "Square150x150Logo", width: 150, height: 150, fill: 0.66, icon: false, from: Drawing::Application },
+    Asset { stem: "Wide310x150Logo",   width: 310, height: 150, fill: 0.66, icon: false, from: Drawing::Application },
+    Asset { stem: "FileTypeLogo",      width: 256, height: 256, fill: 1.00, icon: false, from: Drawing::Document },
 ];
 
 /// The sizes Partner Center's *Store logo* listing field accepts.
@@ -161,7 +185,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let at = |given: Option<std::ffi::OsString>, fallback: &str| {
         given.map_or_else(|| here.join(fallback), PathBuf::from)
     };
-    let icons = at(args.next(), "../linux/icons");
+    let artwork = at(args.next(), "../artwork");
     let windows = at(args.next(), "../windows");
     let macos = at(args.next(), "../macos");
     let submission = at(args.next(), "../icons");
@@ -184,18 +208,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut counts = Vec::new();
     for &app in APPLICATIONS {
-        let source = std::fs::read_to_string(icons.join(format!("{app}.svg")))
-            .map_err(|e| format!("{}/{app}.svg: {e}", icons.display()))?;
-        let tree = usvg::Tree::from_data(source.as_bytes(), &usvg::Options::default())?;
+        let read = |drawing: Drawing| {
+            let name = drawing.file(app);
+            let source = std::fs::read_to_string(artwork.join(&name))
+                .map_err(|e| format!("{}/{name}: {e}", artwork.display()))?;
+            let tree = usvg::Tree::from_data(source.as_bytes(), &usvg::Options::default())?;
+            Ok::<_, Box<dyn std::error::Error>>((source, tree))
+        };
+        let (source, application) = read(Drawing::Application)?;
+        let (_, document) = read(Drawing::Document)?;
 
-        write_ico(&tree, &windows.join(format!("{app}.ico")))?;
-        write_icns(&tree, &macos.join(format!("{app}.icns")))?;
+        // Two of each on the platforms that take a compiled icon file, because
+        // there the document icon is a file of its own rather than an entry in
+        // a manifest: `install.ps1` points a ProgId's `DefaultIcon` at one and
+        // its `ApplicationIcon` at the other, and a macOS bundle carries the
+        // application's family beside the one `CFBundleTypeIconFile` names.
+        write_ico(&application, &windows.join(format!("{app}.ico")))?;
+        write_ico(&document, &windows.join(format!("{app}-document.ico")))?;
+        write_icns(&application, &macos.join(format!("{app}.icns")))?;
+        write_icns(&document, &macos.join(format!("{app}-document.icns")))?;
 
         // One asset set per application, because the three ship as three
         // packages and each manifest names its own.
         let assets = windows.join("assets").join(app);
         std::fs::create_dir_all(&assets)?;
-        let images = write_assets(&tree, &assets)?;
+        let images = write_assets(&application, &document, &assets)?;
 
         // The store listing logo, which is not in the package and must not be.
         //
@@ -210,7 +247,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(&listing)?;
         for &size in LISTING_SIZES {
             write_png(
-                &tree,
+                &application,
                 &listing,
                 &format!("store-logo-{size}.png"),
                 size,
@@ -221,6 +258,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Both shapes, for the submission forms.
         //
+        // The application drawing, because a listing is of the application.
         // Neither goes in a package and neither is read at run time. Each store
         // treats the shape differently: Apple's tooling masks a square itself
         // and wants the square, and a form that draws what it is handed wants
@@ -230,7 +268,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let round_tree = usvg::Tree::from_data(round.as_bytes(), &usvg::Options::default())?;
         std::fs::write(submission.join(format!("{app}-square.svg")), &source)?;
         std::fs::write(submission.join(format!("{app}-rounded.svg")), &round)?;
-        for (shape, drawn) in [("square", &tree), ("rounded", &round_tree)] {
+        for (shape, drawn) in [("square", &application), ("rounded", &round_tree)] {
             for &size in SUBMISSION_SIZES {
                 write_png(
                     drawn,
@@ -248,11 +286,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (app, images) in &counts {
         println!(
-            "{app}: {}.ico with {} sizes, {}.icns with {} elements, {images} package images, \
+            "{app}: two .ico of {} sizes, two .icns of {} elements, {images} package images, \
              {} listing images, {} submission images",
-            app,
             ICO_SIZES.len(),
-            app,
             ICNS_ELEMENTS.len(),
             LISTING_SIZES.len(),
             2 * SUBMISSION_SIZES.len(),
@@ -290,9 +326,17 @@ fn write_icns(tree: &usvg::Tree, path: &Path) -> Result<(), Box<dyn std::error::
 }
 
 /// Every PNG one package's manifest names. Returns how many were written.
-fn write_assets(tree: &usvg::Tree, into: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+fn write_assets(
+    application: &usvg::Tree,
+    document: &usvg::Tree,
+    into: &Path,
+) -> Result<usize, Box<dyn std::error::Error>> {
     let mut written = 0;
     for asset in ASSETS {
+        let tree = match asset.from {
+            Drawing::Application => application,
+            Drawing::Document => document,
+        };
         // The unqualified name as well as the qualified ones. The manifest names
         // this one, and it is what resolves when nothing indexes the package, so
         // keeping it means the assets are correct with or without
@@ -427,7 +471,7 @@ fn draw(
 /// `tiny_skia` renders into premultiplied pixels; both an icon directory and an
 /// icon family hold straight ones. Handing the pixmap's bytes over unconverted
 /// looks right everywhere the drawing is opaque and wrong along every
-/// antialiased edge, which on these drawings is the whole rounded page outline.
+/// antialiased edge, of which these drawings are largely made.
 fn straight(
     tree: &usvg::Tree,
     size: u32,

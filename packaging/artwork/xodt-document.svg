@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <!-- The page. Drawn on the 64-unit grid every platform's build script
-       rasterizes from, with width and height on the root element because the
-       macOS script rewrites them to render each size natively. -->
+  <!-- The document icon: the page, and the glyph of what is on it. Drawn on
+       the 64-unit grid `make-icons` rasterizes every platform's icons from,
+       with width and height on the root element so that a viewer which reads
+       no `viewBox` still has a size. The application icon is the glyph alone;
+       see the sibling file. -->
   <path d="M12 4h28l12 12v44a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z"
         fill="#f7f7f5" stroke="#2f6fb0" stroke-width="3" stroke-linejoin="round"/>
   <path d="M40 4l12 12H44a4 4 0 0 1-4-4z" fill="#2f6fb0"/>

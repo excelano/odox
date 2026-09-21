@@ -1,16 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <clipPath id="rounded"><rect width="64" height="64" rx="14.317"/></clipPath>
   <g clip-path="url(#rounded)">
-  <!-- The page. Drawn on the 64-unit grid every platform's build script
-       rasterizes from, with width and height on the root element because the
-       macOS script rewrites them to render each size natively. -->
-  <path d="M12 4h28l12 12v44a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z"
-        fill="#f7f7f5" stroke="#c1683a" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M40 4l12 12H44a4 4 0 0 1-4-4z" fill="#c1683a"/>
-  <g fill="none" stroke="#c1683a" stroke-width="3">
-    <rect x="15" y="27" width="34" height="22" rx="2"/>
-  </g>
-  <path d="M28 33l10 5-10 5z" fill="#c1683a"/>
-  <rect x="26" y="55" width="12" height="3" rx="1.5" fill="#c1683a"/>
+  <!-- The application icon: the glyph of the document icon, with the page
+       dropped and the drawing grown to the grid it left. A slide on its stand,
+       playing. Centred on 32,32 so that a launcher which pads the icon pads it
+       evenly, and drawn without a ground, so the desktop's own colour shows
+       through. -->
+  <rect x="7" y="11" width="50" height="34" rx="3"
+        fill="none" stroke="#c1683a" stroke-width="4"/>
+  <path d="M27 20l16 8-16 8z" fill="#c1683a"/>
+  <rect x="24" y="51" width="16" height="4" rx="2" fill="#c1683a"/>
 </g>
 </svg>

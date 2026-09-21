@@ -36,13 +36,13 @@ $ErrorActionPreference = 'Stop'
 # application added there and not here is exactly the dead association this
 # script exists to prevent.
 $Applications = @(
-    @{ Exe = 'xodt.exe'; Icon = 'xodt.ico'; Product = 'Odox Text'
+    @{ Exe = 'xodt.exe'; Icon = 'xodt.ico'; DocumentIcon = 'xodt-document.ico'; Product = 'Odox Text'
        Extension = '.odt'; ContentType = 'application/vnd.oasis.opendocument.text'
        ProgId = 'Excelano.Odox.Text' },
-    @{ Exe = 'xods.exe'; Icon = 'xods.ico'; Product = 'Odox Grid'
+    @{ Exe = 'xods.exe'; Icon = 'xods.ico'; DocumentIcon = 'xods-document.ico'; Product = 'Odox Grid'
        Extension = '.ods'; ContentType = 'application/vnd.oasis.opendocument.spreadsheet'
        ProgId = 'Excelano.Odox.Grid' },
-    @{ Exe = 'xodp.exe'; Icon = 'xodp.ico'; Product = 'Odox Deck'
+    @{ Exe = 'xodp.exe'; Icon = 'xodp.ico'; DocumentIcon = 'xodp-document.ico'; Product = 'Odox Deck'
        Extension = '.odp'; ContentType = 'application/vnd.oasis.opendocument.presentation'
        ProgId = 'Excelano.Odox.Deck' }
 )
@@ -116,7 +116,7 @@ if (Test-Path -LiteralPath $startMenu) {
 
 if (-not $KeepFiles -and (Test-Path -LiteralPath $Prefix)) {
     foreach ($app in $Applications) {
-        foreach ($file in $app.Exe, $app.Icon) {
+        foreach ($file in $app.Exe, $app.Icon, $app.DocumentIcon) {
             $path = Join-Path $Prefix $file
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
         }

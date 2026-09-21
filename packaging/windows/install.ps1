@@ -69,36 +69,45 @@ $here = $PSScriptRoot
 # documents, with no version suffix, because a `CurVer` indirection buys nothing
 # until there is a second version to point at and costs a key that has to be got
 # right.
+#
+# Two icon directories, because the shell draws two different things: `Icon` is
+# the application, on the Start menu shortcut and against the name of the
+# program, and `DocumentIcon` is what Explorer puts on a file of the type the
+# ProgId claims. `make-icons` writes both from the two drawings in
+# `packaging/artwork`.
 $Applications = @(
     @{
-        Exe         = 'xodt.exe'
-        Product     = 'Odox Text'
-        Icon        = 'xodt.ico'
-        Extension   = '.odt'
-        ContentType = 'application/vnd.oasis.opendocument.text'
-        TypeName    = 'OpenDocument Text'
-        ProgId      = 'Excelano.Odox.Text'
-        Summary     = 'Read an OpenDocument text document'
+        Exe          = 'xodt.exe'
+        Product      = 'Odox Text'
+        Icon         = 'xodt.ico'
+        DocumentIcon = 'xodt-document.ico'
+        Extension    = '.odt'
+        ContentType  = 'application/vnd.oasis.opendocument.text'
+        TypeName     = 'OpenDocument Text'
+        ProgId       = 'Excelano.Odox.Text'
+        Summary      = 'Read an OpenDocument text document'
     },
     @{
-        Exe         = 'xods.exe'
-        Product     = 'Odox Grid'
-        Icon        = 'xods.ico'
-        Extension   = '.ods'
-        ContentType = 'application/vnd.oasis.opendocument.spreadsheet'
-        TypeName    = 'OpenDocument Spreadsheet'
-        ProgId      = 'Excelano.Odox.Grid'
-        Summary     = 'Read an OpenDocument spreadsheet'
+        Exe          = 'xods.exe'
+        Product      = 'Odox Grid'
+        Icon         = 'xods.ico'
+        DocumentIcon = 'xods-document.ico'
+        Extension    = '.ods'
+        ContentType  = 'application/vnd.oasis.opendocument.spreadsheet'
+        TypeName     = 'OpenDocument Spreadsheet'
+        ProgId       = 'Excelano.Odox.Grid'
+        Summary      = 'Read an OpenDocument spreadsheet'
     },
     @{
-        Exe         = 'xodp.exe'
-        Product     = 'Odox Deck'
-        Icon        = 'xodp.ico'
-        Extension   = '.odp'
-        ContentType = 'application/vnd.oasis.opendocument.presentation'
-        TypeName    = 'OpenDocument Presentation'
-        ProgId      = 'Excelano.Odox.Deck'
-        Summary     = 'Read an OpenDocument presentation'
+        Exe          = 'xodp.exe'
+        Product      = 'Odox Deck'
+        Icon         = 'xodp.ico'
+        DocumentIcon = 'xodp-document.ico'
+        Extension    = '.odp'
+        ContentType  = 'application/vnd.oasis.opendocument.presentation'
+        TypeName     = 'OpenDocument Presentation'
+        ProgId       = 'Excelano.Odox.Deck'
+        Summary      = 'Read an OpenDocument presentation'
     }
 )
 
@@ -154,11 +163,13 @@ function Find-Built([string] $name) {
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 
 foreach ($app in $Applications) {
-    $icon = Join-Path $here $app.Icon
-    if (-not (Test-Path -LiteralPath $icon)) {
-        throw "install.ps1: no $($app.Icon) - run the generator: cargo run --manifest-path packaging/make-icons/Cargo.toml"
+    foreach ($name in $app.Icon, $app.DocumentIcon) {
+        $icon = Join-Path $here $name
+        if (-not (Test-Path -LiteralPath $icon)) {
+            throw "install.ps1: no $name - run the generator: cargo run --manifest-path packaging/make-icons/Cargo.toml"
+        }
+        Copy-Item -LiteralPath $icon -Destination (Join-Path $Prefix $name) -Force
     }
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $Prefix $app.Icon) -Force
 
     if ($NoBinary) { continue }
     $built = Find-Built $app.Exe
@@ -182,6 +193,7 @@ foreach ($app in $Applications) {
     $progId = $app.ProgId
     $installedExe = Join-Path $Prefix $app.Exe
     $installedIcon = Join-Path $Prefix $app.Icon
+    $installedDocumentIcon = Join-Path $Prefix $app.DocumentIcon
 
     # The type itself. `FriendlyTypeName` is what Explorer's Type column shows
     # and it is written as a plain string: the usual form is a reference into a
@@ -189,7 +201,7 @@ foreach ($app in $Applications) {
     # and nothing this project ships would resolve one.
     Set-RegistryValue "$classes\$progId" '' $app.TypeName
     Set-RegistryValue "$classes\$progId" 'FriendlyTypeName' $app.TypeName
-    Set-RegistryValue "$classes\$progId\DefaultIcon" '' "$installedIcon,0"
+    Set-RegistryValue "$classes\$progId\DefaultIcon" '' "$installedDocumentIcon,0"
     Set-RegistryValue "$classes\$progId\shell\open\command" '' "`"$installedExe`" `"%1`""
 
     # The application behind the type. `ApplicationName` is the first place the

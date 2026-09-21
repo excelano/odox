@@ -148,7 +148,7 @@
 				<string>@UTI@</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>@ICON@</string>
+			<string>@DOCUMENT_ICON@</string>
 		</dict>
 	</array>
 
@@ -177,7 +177,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeIconFile</key>
-			<string>@ICON@</string>
+			<string>@DOCUMENT_ICON@</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

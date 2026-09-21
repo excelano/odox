@@ -86,7 +86,7 @@ for app in xodt xods xodp odox; do
     if [ "$app" != odox ]; then
         install -Dm644 "$here/../linux/$app.desktop" \
             "$staging/usr/share/applications/$app.desktop"
-        install -Dm644 "$here/../linux/icons/$app.svg" \
+        install -Dm644 "$here/../artwork/$app-application.svg" \
             "$staging/usr/share/icons/hicolor/scalable/apps/$app.svg"
     fi
     install -Dm644 "$root/LICENSE" "$staging/usr/share/doc/$app/copyright"
