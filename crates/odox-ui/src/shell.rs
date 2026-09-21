@@ -374,9 +374,14 @@ impl<V: View> eframe::App for Shell<V> {
         }
 
         // Nothing is taken while the question is up, so an answer typed at it
-        // reaches it and nothing else.
-        if self.pending.is_none() {
+        // reaches it and nothing else; and nothing is taken while a text field
+        // has the focus, so Ctrl+Z inside a cell undoes the typing and not the
+        // document.
+        self.editing.asking = self.pending.is_some();
+        if self.pending.is_none() && !ctx.egui_wants_keyboard_input() {
             self.keys(&ctx);
+        }
+        if self.pending.is_none() {
             self.dropped_files(&ctx);
         }
 

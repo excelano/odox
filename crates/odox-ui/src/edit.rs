@@ -20,6 +20,9 @@ pub struct Editing {
     /// Whether the window is in edit mode. Outside it a view draws and
     /// selects and never opens an editor.
     pub on: bool,
+    /// A question is up over the window, and the keys belong to it: a view
+    /// does not open an editor on the Enter that answers it.
+    pub asking: bool,
     undo: Vec<Element>,
     redo: Vec<Element>,
     /// The depth of the undo stack when the document was last read or saved,

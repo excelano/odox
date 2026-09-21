@@ -132,6 +132,19 @@ impl Value {
         Self::Text(input.to_owned())
     }
 
+    /// The text a person edits for the value: a number's plain spelling, a
+    /// date's or a duration's ISO form, `TRUE` and `FALSE`, the text itself.
+    /// What [`Self::from_input`] reads back into the same value where it can,
+    /// which is not everywhere: a percentage, a currency or a date typed again
+    /// comes back as the number or the text it reads as, because reading it as
+    /// what it was needs the number format the cell carries.
+    pub fn input_text(&self) -> String {
+        match self {
+            Self::Percentage(n) => n.to_string(),
+            _ => self.cached_text(),
+        }
+    }
+
     /// The text a cell shows for the value, as this crate formats it: the
     /// shortest spelling of a number, `TRUE` and `FALSE`, the text itself. A
     /// document's own number format is not applied; a spreadsheet application
@@ -315,6 +328,26 @@ impl SheetDocument {
         self.sheets = index_sheets(&self.document);
     }
 
+    /// Whether a cell may be written, which is what [`Self::set_cell`] asks
+    /// first and what a window asks before it opens an editor.
+    ///
+    /// # Errors
+    ///
+    /// The cell is under a neighbour's span, holds a formula, or the sheet does
+    /// not exist.
+    pub fn can_edit(&self, sheet: usize, row: usize, column: usize) -> Result<(), Refused> {
+        let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
+        if let Some(cell) = self.cell(index, row, column) {
+            if cell.covered {
+                return Err(Refused::Covered);
+            }
+            if cell.formula().is_some() {
+                return Err(Refused::Formula);
+            }
+        }
+        Ok(())
+    }
+
     /// Put a value in a cell, by sheet, row and column, all counting from zero.
     ///
     /// A row or a cell the document wrote once with a repeat count is split
@@ -335,15 +368,8 @@ impl SheetDocument {
         column: usize,
         value: &Value,
     ) -> Result<(), Refused> {
+        self.can_edit(sheet, row, column)?;
         let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
-        if let Some(cell) = self.cell(index, row, column) {
-            if cell.covered {
-                return Err(Refused::Covered);
-            }
-            if cell.formula().is_some() {
-                return Err(Refused::Formula);
-            }
-        }
         let table_position = index.table;
         let range = index
             .row_range(row)

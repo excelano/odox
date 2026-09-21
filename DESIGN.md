@@ -238,6 +238,18 @@ preference lives in one small file, `odox/settings.toml` under the platform's
 configuration directory, written only when a preference is changed in the menu,
 so an installation nobody has configured has no file.
 
+**A cell is edited in place.** Typing on the picked cell replaces it, Enter or
+F2 opens it with what it holds, Enter commits and moves down, Tab commits and
+moves right, Escape puts it back, and Delete clears it; the text box sits in
+the cell in the cell's own font. What is typed is read the way a spreadsheet
+reads it: a number is a number, `true` and `false` are booleans, anything else
+is text, and a formula is not recognised. A cell that holds a formula is not
+opened, and once anything in the document has changed every formula's cached
+result is drawn faint, because which of them went stale cannot be told without
+evaluating them and a spreadsheet application recalculates on opening the
+file. Leaving a cell as it was is not an edit, so stepping through a currency
+does not retype it as a number.
+
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
 bytes touch the disk they are read back and compared with the tree they were

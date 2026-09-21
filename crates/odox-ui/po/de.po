@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-09-21 14:08-0500\n"
+"POT-Creation-Date: 2026-09-21 14:40-0500\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -18,13 +18,13 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
-#: crates/odox-ui/src/shell.rs:472 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/shell.rs:478 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr "Datei"
 
 #: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:36
-#: crates/xods/src/view.rs:33 crates/xodt/src/view.rs:28
+#: crates/xods/src/view.rs:69 crates/xodt/src/view.rs:28
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
@@ -32,111 +32,111 @@ msgstr "{file} konnte nicht geöffnet werden: {reason}"
 msgid "{file} could not be read: {reason}"
 msgstr "{file} konnte nicht gelesen werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:280
+#: crates/odox-ui/src/shell.rs:281
 msgid "{file} could not be saved: {reason}"
 msgstr "{file} konnte nicht gespeichert werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:330
+#: crates/odox-ui/src/shell.rs:331
 msgid "Save changes to {file}?"
 msgstr "Änderungen an {file} speichern?"
 
-#: crates/odox-ui/src/shell.rs:331
+#: crates/odox-ui/src/shell.rs:332
 msgid "The document has changes that are not saved."
 msgstr "Das Dokument hat ungespeicherte Änderungen."
 
-#: crates/odox-ui/src/shell.rs:334 crates/odox-ui/src/shell.rs:495
+#: crates/odox-ui/src/shell.rs:335 crates/odox-ui/src/shell.rs:501
 msgid "Save"
 msgstr "Speichern"
 
-#: crates/odox-ui/src/shell.rs:337
+#: crates/odox-ui/src/shell.rs:338
 msgid "Discard"
 msgstr "Verwerfen"
 
-#: crates/odox-ui/src/shell.rs:340
+#: crates/odox-ui/src/shell.rs:341
 msgid "Cancel"
 msgstr "Abbrechen"
 
-#: crates/odox-ui/src/shell.rs:399
+#: crates/odox-ui/src/shell.rs:405
 msgid "Dismiss"
 msgstr "Ausblenden"
 
-#: crates/odox-ui/src/shell.rs:473 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:479 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr "Öffnen …"
 
-#: crates/odox-ui/src/shell.rs:479 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:485 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr "Neu einlesen"
 
-#: crates/odox-ui/src/shell.rs:486
+#: crates/odox-ui/src/shell.rs:492
 msgid "Close"
 msgstr "Schließen"
 
-#: crates/odox-ui/src/shell.rs:502
+#: crates/odox-ui/src/shell.rs:508
 msgid "Save as…"
 msgstr "Speichern unter …"
 
-#: crates/odox-ui/src/shell.rs:509
+#: crates/odox-ui/src/shell.rs:515
 msgid "Quit"
 msgstr "Beenden"
 
-#: crates/odox-ui/src/shell.rs:514
+#: crates/odox-ui/src/shell.rs:520
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: crates/odox-ui/src/shell.rs:516
+#: crates/odox-ui/src/shell.rs:522
 msgid "Undo"
 msgstr "Rückgängig"
 
-#: crates/odox-ui/src/shell.rs:523
+#: crates/odox-ui/src/shell.rs:529
 msgid "Redo"
 msgstr "Wiederholen"
 
-#: crates/odox-ui/src/shell.rs:530
+#: crates/odox-ui/src/shell.rs:536
 msgid "Edit mode"
 msgstr "Bearbeitungsmodus"
 
-#: crates/odox-ui/src/shell.rs:534
+#: crates/odox-ui/src/shell.rs:540
 msgid "Open documents in edit mode"
 msgstr "Dokumente im Bearbeitungsmodus öffnen"
 
-#: crates/odox-ui/src/shell.rs:540
+#: crates/odox-ui/src/shell.rs:546
 msgid "The setting could not be saved: {reason}"
 msgstr "Die Einstellung konnte nicht gespeichert werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:545
+#: crates/odox-ui/src/shell.rs:551
 msgid "View"
 msgstr "Ansicht"
 
-#: crates/odox-ui/src/shell.rs:546
+#: crates/odox-ui/src/shell.rs:552
 msgid "Zoom in"
 msgstr "Vergrößern"
 
-#: crates/odox-ui/src/shell.rs:549
+#: crates/odox-ui/src/shell.rs:555
 msgid "Zoom out"
 msgstr "Verkleinern"
 
-#: crates/odox-ui/src/shell.rs:552
+#: crates/odox-ui/src/shell.rs:558
 msgid "Actual size"
 msgstr "Originalgröße"
 
-#: crates/odox-ui/src/shell.rs:556
+#: crates/odox-ui/src/shell.rs:562
 msgid "Show the side panel"
 msgstr "Seitenleiste anzeigen"
 
-#: crates/odox-ui/src/shell.rs:562
+#: crates/odox-ui/src/shell.rs:568
 msgid "{percent}%"
 msgstr "{percent} %"
 
-#: crates/odox-ui/src/shell.rs:565
+#: crates/odox-ui/src/shell.rs:571
 msgid "Editing"
 msgstr "Bearbeitung"
 
-#: crates/odox-ui/src/shell.rs:581
+#: crates/odox-ui/src/shell.rs:587
 msgid "Open a document…"
 msgstr "Ein Dokument öffnen …"
 
-#: crates/odox-ui/src/shell.rs:586
+#: crates/odox-ui/src/shell.rs:592
 msgid "or drop one on this window"
 msgstr "oder eines auf dieses Fenster ziehen"
 
@@ -168,9 +168,22 @@ msgstr "Folien"
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
 
-#: crates/xods/src/view.rs:110
+#: crates/xods/src/view.rs:151
 msgid "Copy the sheet as tab-separated text"
 msgstr "Tabellenblatt als tabulatorgetrennten Text kopieren"
+
+#: crates/xods/src/view.rs:669
+msgid "This cell holds a formula, which this version does not edit."
+msgstr ""
+"Diese Zelle enthält eine Formel; diese Version bearbeitet keine Formeln."
+
+#: crates/xods/src/view.rs:670
+msgid "This cell is covered by the one that spans it."
+msgstr "Diese Zelle wird von der Zelle verdeckt, die sich über sie erstreckt."
+
+#: crates/xods/src/view.rs:671
+msgid "There is no cell there."
+msgstr "Dort ist keine Zelle."
 
 #: crates/xodt/src/main.rs:27
 msgid "OpenDocument Text"
