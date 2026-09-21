@@ -77,7 +77,9 @@ how each lane is run.
 
 ## Using them
 
-Give a document on the command line, drop one on the window, or press Ctrl+O.
+Give a document on the command line, or press Ctrl+O; on X11, Windows and
+macOS a document can also be dropped on the window, which a Wayland session
+does not deliver to the window.
 Ctrl+R re-reads the file from disk, Ctrl+W closes it, and Ctrl+plus, Ctrl+minus
 and Ctrl+0 change the zoom.
 
