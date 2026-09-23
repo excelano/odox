@@ -94,9 +94,20 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$apps" ] || {
-    echo "build-app.sh: name an application, or pass --all" >&2
-    usage >&2
-    exit 2
+    # The release-binary step every other repository in the fleet shares
+    # calls this with no application named and no --all, because none of
+    # them had three to choose among until this one: it asks for a universal
+    # build by the executable's name alone. --store still refuses unnamed,
+    # since one provisioning profile covers one application and there is no
+    # sensible "all" for it - but --universal with nothing named is asking
+    # for exactly what --all --universal already means, so it means that.
+    if [ "$universal" = yes ] && [ -z "$store_profile" ]; then
+        apps="xodt xods xodp"
+    else
+        echo "build-app.sh: name an application, or pass --all" >&2
+        usage >&2
+        exit 2
+    fi
 }
 
 # The six strings each application differs in, and the corpus document to open
