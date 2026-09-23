@@ -1,5 +1,50 @@
 odox (0.4.0) unstable; urgency=low
 
+  * Refresh dependencies and write real release notes for 0.4.0
+  * Catch macOS and Windows packaging up to editing: Editor, not Viewer
+  * Ship msix and appstore, now that ship supports three products from one repo
+  * No drag and drop
+  * The README says where a drop on the window works
+  * The words say editor
+  * A paragraph is edited where it sits
+  * A shape is moved by hand
+  * A cell is edited in place
+  * An edit changes one subtree and nothing beside it
+  * Save, before anything can edit
+  * The application icon is the glyph alone
+  * The generated files say which template wrote them
+  * Package versions stop coming from Dependabot
+  * Dependabot merges move to the organisation's sweep
+  * Take the generated screenshot files ship rewrote
+  * Render through wgpu, which is eframe's default and the fleet's
+  * The reference frame is taken in the state the set is measured in
+  * Follow upload-artifact to v7 on the Apple silicon lane
+  * An executable that starts and stops says its exit code and what it printed
+  * ship sync: a missing window says which of three things happened
+  * The runner takes the store screenshots, and the step is the org's
+  * The packaging scripts parse, and the step is the org's
+  * ship sync: the zoom pair, by name
+  * The screenshot driver is ship's, and the frames are recipes
+  * UserChoice is Explorer's to write, and still ours to remove
+  * The install check is excelano/.github's
+  * Re-run the Windows lane against the corrected action
+  * The Store packaging comes from excelano/.github
+  * The publisher is a secret, so the log does not carry it
+  * The identity splits on what is actually an account's
+  * Say what is true rather than pointing at a deleted document
+  * Count the applications, not a key that no longer exists
+  * Package all three applications
+  * Assemble the Store package on the runner, and attach it on the release
+  * The profile is targets and names
+  * Dependabot: monthly, grouped, merged when every run on the commit is green
+  * Prose to present tense; the checklist goes
+  * Delete the changelog and the preflight script: ship does both
+  * Delete the release document: ship is the procedure
+
+ -- David M. Anderson <david.anderson@excelano.com>  Wed, 23 Sep 2026 11:57:41 -0500
+
+odox (0.4.0) unstable; urgency=low
+
   * The three applications edit. A window opens reading and Ctrl+E turns
     editing on; a preference opens every document that way. In xodt a
     click on a paragraph opens it as a text box where it sits; Enter
