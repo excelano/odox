@@ -3,7 +3,8 @@
   The sandbox, and the one grant it needs.
 
   One file for three bundles, because nothing in it is per-application: each
-  opens the file a person chose and writes nothing at all.
+  opens the file a person chose and saves back to it or to another file the
+  same panel names.
 
   **The entitlement does nothing until it is inside a signature.** An unsigned
   bundle is not sandboxed, so every measurement of sandbox behaviour has to be
@@ -11,17 +12,14 @@
   that. This is why `build-app.sh` signs even for a development build, and why
   nothing about the sandbox can be settled from Linux.
 
-  `files.user-selected.read-only`, because these applications read and do not
-  write. A capability asked for and unused is a question at review with no good
-  answer, and a viewer asking permission to write is exactly that question.
-
-  The editing branch will widen this to `read-write`, which is one word in one
-  file. An earlier draft of this comment argued for asking now on the grounds
-  that widening later would move the sandbox container a person's grants live
-  in. That was wrong: the container is keyed by the bundle identifier and an
-  entitlement change does not move it. The wrong reason is recorded here rather
-  than quietly deleted, because it is the kind of claim that would otherwise be
-  repeated.
+  `files.user-selected.read-write`, because these applications edit and save.
+  Read-only was correct before the editing branch landed and is not now: a
+  save under a read-only grant is refused by the sandbox itself, silently to
+  the application and as a permission error to nobody, since there is no
+  window to report it in. A capability asked for and unused is a question at
+  review with no good answer - which is the read-only grant's own argument for
+  itself, and exactly why it has to move the day the capability stops being
+  unused.
 
   Nothing else. No network, no broad filesystem access, no device, and no
   keychain group even though the provisioning profile grants one.
@@ -34,7 +32,7 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>

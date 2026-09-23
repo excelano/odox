@@ -17,7 +17,7 @@
 #
 # The launcher is not installed. It exists so that `odox <file>` works from a
 # shell on a machine where apt put all three on the path, and it hands off by
-# replacing itself with the right viewer, which Windows has no equivalent of.
+# replacing itself with the right editor, which Windows has no equivalent of.
 #
 # **NOTHING HERE CLAIMS TO BE THE DEFAULT, AND THAT IS DELIBERATE**
 #

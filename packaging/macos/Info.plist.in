@@ -13,7 +13,7 @@
   notice.
 
   The launcher gets no bundle. It hands off by replacing itself with the right
-  viewer, which macOS has no use for, and it ships only on apt.
+  editor, which macOS has no use for, and it ships only on apt.
 
   TWO KINDS OF DECLARATION, WHICH ARE NOT THE SAME THING
 
@@ -37,15 +37,19 @@
   also claim it, and Alternate is the value that says *I can open this* without
   asking to be preferred. A person can still choose it in Get Info.
 
-  `CFBundleTypeRole` is **Viewer**, because these read and do not write. Editor
-  would be a claim to the platform that is not true, and it is the claim that
-  changes the day the editing branch lands rather than a value to set early.
+  `CFBundleTypeRole` is **Editor**, because these edit and save now. Viewer was
+  the correct claim before the editing branch landed and would be a false one
+  now: `check-install.sh` reads it back out of the installed bundle for the
+  same reason it reads the sandbox grant back rather than trusting the source,
+  since a role that disagrees with `odox.entitlements` is a claim the File menu
+  does not keep.
 
   WHAT THE UPLOAD REFUSES WITHOUT
 
   `LSApplicationCategoryType` is required by App Store Connect and refused at
-  upload without one. Productivity is what the `.desktop` entries say with
-  `Office;Viewer;`.
+  upload without one. Productivity is what the `.desktop` entries categorize
+  these under too, each by its own kind - `Office;WordProcessor;` and so on -
+  rather than one shared word.
 
   `ITSAppUsesNonExemptEncryption` false is answered here so that it is not asked
   once per upload. These applications contain no encryption: a package is
@@ -140,7 +144,7 @@
 			<key>CFBundleTypeName</key>
 			<string>@TYPE_NAME@</string>
 			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
+			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
 			<key>LSItemContentTypes</key>

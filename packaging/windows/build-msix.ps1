@@ -208,8 +208,8 @@ $APPLICATIONS = [ordered] @{
         TypeName = 'odt'
         TypeDisplayName = 'OpenDocument Text'
         ContentType = 'application/vnd.oasis.opendocument.text'
-        TileDescription = 'OpenDocument text document viewer'
-        Description = "Open a .odt document and read it: headings, lists, tables, pictures and the document's own fonts, with an outline beside the page. The document is drawn from the file and nothing is sent anywhere. Nothing is written either: this release reads OpenDocument and does not save it."
+        TileDescription = 'OpenDocument text document editor'
+        Description = "Open a .odt document and read it: headings, lists, tables, pictures and the document's own fonts, with an outline beside the page. Change the text that needs changing, undo, and save it back as the document it was."
     }
     xods = @{
         Product = 'Odox Grid'
@@ -219,8 +219,8 @@ $APPLICATIONS = [ordered] @{
         TypeName = 'ods'
         TypeDisplayName = 'OpenDocument Spreadsheet'
         ContentType = 'application/vnd.oasis.opendocument.spreadsheet'
-        TileDescription = 'OpenDocument spreadsheet viewer'
-        Description = 'Open a .ods workbook and read it: every sheet, the values the document holds and the text it displays, with the formula behind the cell you pick. The workbook is drawn from the file and nothing is sent anywhere. Nothing is written either: this release reads OpenDocument and does not save it.'
+        TileDescription = 'OpenDocument spreadsheet editor'
+        Description = 'Open a .ods workbook and read it: every sheet, the values the document holds and the text it displays, with the formula behind the cell you pick. Type into a cell to change it, undo, and save it back as the document it was.'
     }
     xodp = @{
         Product = 'Odox Deck'
@@ -230,8 +230,8 @@ $APPLICATIONS = [ordered] @{
         TypeName = 'odp'
         TypeDisplayName = 'OpenDocument Presentation'
         ContentType = 'application/vnd.oasis.opendocument.presentation'
-        TileDescription = 'OpenDocument presentation viewer'
-        Description = "Open a .odp deck and read it: every slide at the size the document sets, its text where the document puts it, and the speaker's notes. The deck is drawn from the file and nothing is sent anywhere. Nothing is written either: this release reads OpenDocument and does not save it."
+        TileDescription = 'OpenDocument presentation editor'
+        Description = "Open a .odp deck and read it: every slide at the size the document sets, its shapes where the document puts them, and the speaker's notes. Move a shape, resize it or change its text, undo, and save the deck back as it was."
     }
 }
 

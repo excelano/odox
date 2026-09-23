@@ -56,9 +56,12 @@
 
   No capabilities beyond `runFullTrust`. These applications make no network call,
   need no broad filesystem access - each opens the file it was launched with and
-  writes nothing at all - and ask for no device. A capability requested and
-  unused is a question at certification with no good answer, and it is what a
-  person reads on the store page before installing.
+  writes back to that file or to one a save dialog names, nothing else - and ask
+  for no device. A capability requested and unused is a question at
+  certification with no good answer, and it is what a person reads on the store
+  page before installing. `runFullTrust` itself already covers ordinary file
+  I/O; unlike the Mac sandbox, there is no separate read-only capability here
+  that widening for the editing branch had to move.
 
   Author: David M. Anderson
   Built with AI assistance (Claude, Anthropic)

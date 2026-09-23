@@ -25,7 +25,7 @@ throwaway certificate so a package can be installed and looked at here, and
 runs on every push the checks that need no identity; the package build, the kit
 and the screenshots need this machine.
 
-`odox.manifest` is embedded in all three viewers by each crate's `build.rs`,
+`odox.manifest` is embedded in all three editors by each crate's `build.rs`,
 through two linker arguments and no resource compiler; it declares per-monitor
 DPI awareness and UTF-8 as the active code page. The window icon travels the
 same way: `build.rs` stages the `.ico` into `OUT_DIR` and the application

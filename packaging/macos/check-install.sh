@@ -25,24 +25,24 @@
 # three bundle identifiers are one letter apart and the cheapest way to sign one
 # application's profile into another's bundle is to look at only one of them.
 #
-# WHAT A READER MUST NOT CARRY, AND MUST SAY
+# WHAT A BUILD MUST CARRY, AND MUST SAY
 #
-# These applications read and never write, and three of the checks below are
-# here because of it rather than because the fleet's other scripts have them.
+# These applications edit and save, and two of the checks below are here
+# because of it rather than because the fleet's other scripts have them.
 #
-# The sandbox grant is `files.user-selected.read-only`. A write grant is a
-# finding and not a harmless extra: a capability asked for and unused is a
-# question at review with no good answer, and a reader asking permission to
-# write is exactly that question. It is read back out of the signature rather
-# than off `odox.entitlements`, which is the only way to notice a build path
-# that signed with a different file.
+# The sandbox grant is `files.user-selected.read-write`. Read-only was correct
+# before the editing branch landed; carrying it now is not a harmless leftover,
+# it is a sandbox that refuses every save silently, since there is no window to
+# report the refusal in. It is read back out of the signature rather than off
+# `odox.entitlements`, which is the only way to notice a build path that signed
+# with a different file.
 #
-# `CFBundleTypeRole` is `Viewer` and `LSHandlerRank` is `Alternate`.
+# `CFBundleTypeRole` is `Editor` and `LSHandlerRank` is `Alternate`.
 # `Info.plist.in` says why both: the first is a true statement about what the
-# application does, and the second is what claims a format this project reads
-# and does not own without asking to be preferred over the office suite that
-# may already be installed. Either one wrong is a claim to the platform that the
-# store listing contradicts.
+# application does now, and the second is what claims a format this project
+# reads and does not own without asking to be preferred over the office suite
+# that may already be installed. Either one wrong is a claim to the platform
+# that the store listing contradicts.
 #
 # `CFBundleLocalizations` lists `en` and `de`. macOS builds its per-application
 # language picker from that key, so without it nobody can set one of these to
@@ -236,17 +236,14 @@ check_one() {
             bad "the sandbox is in the signature" "present but not true" ;;
         *) bad "the sandbox is in the signature" "absent — the build is not sandboxed" ;;
     esac
-    # The one grant, and the header above says why a second one is a finding
-    # rather than a spare. Both spellings of true again.
+    # The one grant, and the header above says why read-only left behind is a
+    # finding and not a harmless leftover. Both spellings of true again.
     case "$ents" in
-        *'"com.apple.security.files.user-selected.read-only" => 1'*|*'"com.apple.security.files.user-selected.read-only" => true'*)
-            ok "the file grant is read-only" "files.user-selected.read-only" ;;
-        *) bad "the file grant is read-only" "absent — the open panel will hand over nothing" ;;
-    esac
-    case "$ents" in
-        *'com.apple.security.files.user-selected.read-write'*)
-            bad "and nothing more than read-only" "read-write is in the signature, and this suite writes nothing" ;;
-        *) ok "and nothing more than read-only" "no write grant" ;;
+        *'"com.apple.security.files.user-selected.read-write" => 1'*|*'"com.apple.security.files.user-selected.read-write" => true'*)
+            ok "the file grant is read-write" "files.user-selected.read-write" ;;
+        *'com.apple.security.files.user-selected.read-only'*)
+            bad "the file grant is read-write" "read-only is in the signature — every save will be refused by the sandbox" ;;
+        *) bad "the file grant is read-write" "absent — the open and save panels will hand over nothing" ;;
     esac
     # The store listing says these applications make no network request of any
     # kind. This is the half of that claim a command can settle.
@@ -321,10 +318,10 @@ check_one() {
     #    Neither is visible anywhere a person would look, and both contradict
     #    the store listing if they are wrong.
     got=$(plist_get "CFBundleDocumentTypes:0:CFBundleTypeRole")
-    if [ "$got" = Viewer ]; then
-        ok "the document type's role is Viewer" "these read and do not write"
+    if [ "$got" = Editor ]; then
+        ok "the document type's role is Editor" "these edit and save"
     else
-        bad "the document type's role is Viewer" "${got:-nothing} — Editor is a claim the File menu does not keep"
+        bad "the document type's role is Editor" "${got:-nothing} — Viewer is a claim the File menu no longer keeps"
     fi
     got=$(plist_get "CFBundleDocumentTypes:0:LSHandlerRank")
     if [ "$got" = Alternate ]; then

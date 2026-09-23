@@ -18,15 +18,15 @@
 #
 # THREE BUNDLES, ONE SCRIPT
 #
-# This is slipcase-desktop's script taking an application name. The three viewers
-# differ in six strings and in nothing else, so the table below holds the six and
-# the rest of the file is what those repositories measured; the comment beside
-# each refusal says what it cost there. `--all` builds three bundles in a row,
-# which is what a release wants and what `--store` cannot have: a provisioning
-# profile covers one bundle identifier.
+# This is slipcase-desktop's script taking an application name. The three
+# applications differ in six strings and in nothing else, so the table below
+# holds the six and the rest of the file is what those repositories measured;
+# the comment beside each refusal says what it cost there. `--all` builds three
+# bundles in a row, which is what a release wants and what `--store` cannot
+# have: a provisioning profile covers one bundle identifier.
 #
 # The launcher gets no bundle. It hands off by replacing itself with the right
-# viewer, which macOS has no use for, and it ships only on apt.
+# editor, which macOS has no use for, and it ships only on apt.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -564,16 +564,10 @@ build_store() {
     # The entitlements a Store build is signed with are not the ones a development
     # build is signed with, and this is generated rather than committed so the
     # team identifier has exactly one source: the profile. It is otherwise
-    # `odox.entitlements` with two keys added, and that file says why the sandbox
-    # grant is read-write.
-    #
-    # **The file grant is read-only, and it has to match `odox.entitlements`.**
-    # This block came in from slipcase-desktop, which edits documents, and asked
-    # for read-write; the development build beside it asks for read-only because
-    # these applications write nothing. That would have shipped a write grant to
-    # review while `packaging/store-listing.toml` told the reviewer in writing that
-    # there is "no write entitlement of any kind". Two files stating a capability
-    # is two places for them to disagree, and this is the one that reaches Apple.
+    # `odox.entitlements`, which is where the file grant is explained and has to
+    # match: both files say `read-write` for the reason `odox.entitlements` gives
+    # - these applications edit and save now, and a stale `read-only` grant is not
+    # a harmless leftover but a sandbox that silently refuses every save.
     #
     # `keychain-access-groups` is deliberately absent. The profile grants it and
     # these applications touch no keychain, and a capability asked for and unused
@@ -587,7 +581,7 @@ build_store() {
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.application-identifier</key>
 	<string>${store_app_id}</string>

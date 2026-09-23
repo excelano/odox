@@ -25,11 +25,12 @@ machine that made it, because its entitlements need a profile covering the Mac
 and a Store profile covers none, which is why the script unregisters the bundle
 from Launch Services after building it.
 
-`CFBundleTypeRole` is `Viewer` and `LSHandlerRank` is `Alternate`, because the
-applications read a format they do not own; the OpenDocument types are declared
-as imported. `LSMinimumSystemVersion` is 11.0 and the build's
-`MACOSX_DEPLOYMENT_TARGET` has to agree with it, which `build-app.sh` checks.
-The sandbox grant is `files.user-selected.read-only` and nothing else.
+`CFBundleTypeRole` is `Editor`, because the applications edit and save.
+`LSHandlerRank` is `Alternate` regardless: that claim is about not owning the
+format, and the OpenDocument types are declared as imported either way.
+`LSMinimumSystemVersion` is 11.0 and the build's `MACOSX_DEPLOYMENT_TARGET` has
+to agree with it, which `build-app.sh` checks.
+The sandbox grant is `files.user-selected.read-write` and nothing else.
 `CFBundleVersion` is the first-parent commit count. `lsregister` is under
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`
 and not on `PATH`.
