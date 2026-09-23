@@ -11,16 +11,23 @@
 #
 # Nothing else reads this. The GitHub release, the Debian changelog and the
 # AppStream entry take commit subjects.
-#
-# Flat rather than [products.*]: this text was written once for all three
-# applications, and stays that way for as long as a release note is true of
-# all three. A release where one of them changes and the others do not is
-# when this splits into a table per product.
 
-version = "0.3.0"
+version = "0.4.0"
 
-[locales.en-us]
-whats-new = "First release."
+[products.xodt.locales.en-us]
+whats-new = "Odox now edits. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you change what is there: text in a paragraph, a value in a cell, the place and size of a shape on a slide, and the text in it. Undo takes it back and Save writes the document back as it was opened, with your change in it. What you did not touch is written back as it was read, element for element, and a save that would not read back the same is refused rather than written. One preference, opening documents ready to edit, is kept in a settings file that is written only when you change it."
 
-[locales.de-de]
-whats-new = "Erste Veröffentlichung."
+[products.xodt.locales.de-de]
+whats-new = "Odox bearbeitet jetzt. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie ändern, was da ist: Text in einem Absatz, einen Wert in einer Zelle, Ort und Größe einer Form auf einer Folie und ihren Text. Rückgängig nimmt es zurück, und Speichern schreibt das Dokument so zurück, wie es geöffnet wurde, mit Ihrer Änderung darin. Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, und ein Speichern, das nicht genauso zurückgelesen würde, wird verweigert, statt geschrieben zu werden. Eine Einstellung, ob Dokumente bereit zum Bearbeiten geöffnet werden, wird in einer Einstellungsdatei abgelegt, die nur geschrieben wird, wenn Sie sie ändern."
+
+[products.xods.locales.en-us]
+whats-new = "Odox now edits. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you change what is there: text in a paragraph, a value in a cell, the place and size of a shape on a slide, and the text in it. Undo takes it back and Save writes the document back as it was opened, with your change in it. What you did not touch is written back as it was read, element for element, and a save that would not read back the same is refused rather than written. One preference, opening documents ready to edit, is kept in a settings file that is written only when you change it."
+
+[products.xods.locales.de-de]
+whats-new = "Odox bearbeitet jetzt. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie ändern, was da ist: Text in einem Absatz, einen Wert in einer Zelle, Ort und Größe einer Form auf einer Folie und ihren Text. Rückgängig nimmt es zurück, und Speichern schreibt das Dokument so zurück, wie es geöffnet wurde, mit Ihrer Änderung darin. Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, und ein Speichern, das nicht genauso zurückgelesen würde, wird verweigert, statt geschrieben zu werden. Eine Einstellung, ob Dokumente bereit zum Bearbeiten geöffnet werden, wird in einer Einstellungsdatei abgelegt, die nur geschrieben wird, wenn Sie sie ändern."
+
+[products.xodp.locales.en-us]
+whats-new = "Odox now edits. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you change what is there: text in a paragraph, a value in a cell, the place and size of a shape on a slide, and the text in it. Undo takes it back and Save writes the document back as it was opened, with your change in it. What you did not touch is written back as it was read, element for element, and a save that would not read back the same is refused rather than written. One preference, opening documents ready to edit, is kept in a settings file that is written only when you change it."
+
+[products.xodp.locales.de-de]
+whats-new = "Odox bearbeitet jetzt. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie ändern, was da ist: Text in einem Absatz, einen Wert in einer Zelle, Ort und Größe einer Form auf einer Folie und ihren Text. Rückgängig nimmt es zurück, und Speichern schreibt das Dokument so zurück, wie es geöffnet wurde, mit Ihrer Änderung darin. Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, und ein Speichern, das nicht genauso zurückgelesen würde, wird verweigert, statt geschrieben zu werden. Eine Einstellung, ob Dokumente bereit zum Bearbeiten geöffnet werden, wird in einer Einstellungsdatei abgelegt, die nur geschrieben wird, wenn Sie sie ändern."
