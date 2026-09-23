@@ -16,13 +16,27 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The release event is what gives the Mac lane something to sign: this
+  # builds the release binary for each of the three applications and attaches
+  # it, over ssh, to the machine that holds the Apple Distribution key.
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build the release binaries for (e.g. v0.5.0)'
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: apple-silicon-${{ github.ref }}
-  cancel-in-progress: true
+  # Keyed by the tag when this is releasing and by the ref when it is
+  # checking, so the two never share a group and a push to main cannot cancel
+  # a dispatched run that is building a release's binaries.
+  group: apple-silicon-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 env:
   # The bundle declares 11.0 and `build-app.sh` refuses a binary built for another floor.
@@ -34,6 +48,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
 
       # A runner label is a promise rather than a fact, so the architecture is checked.
       - name: The runner is Apple silicon
@@ -268,3 +284,34 @@ jobs:
           name: arm64-crashes
           path: ${{ runner.temp }}/crashes
           if-no-files-found: ignore
+
+      # Three release binaries rather than one: odox ships three applications
+      # from one workspace, each its own bundle and its own Store listing, so
+      # each gets its own signed package on the Mac and its own asset here.
+      # The step is excelano/.github's, because it is the same one in every
+      # repository that has this target; building the whole workspace for the
+      # first application makes the other two's builds a cache hit rather than
+      # three full compiles.
+      - name: The release binary, Odox Text
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        uses: excelano/.github/.github/actions/mac-release-binary@main
+        with:
+          binary: xodt
+          tag: ${{ github.event.release.tag_name || inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: The release binary, Odox Grid
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        uses: excelano/.github/.github/actions/mac-release-binary@main
+        with:
+          binary: xods
+          tag: ${{ github.event.release.tag_name || inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: The release binary, Odox Deck
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        uses: excelano/.github/.github/actions/mac-release-binary@main
+        with:
+          binary: xodp
+          tag: ${{ github.event.release.tag_name || inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}

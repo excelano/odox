@@ -16,7 +16,7 @@
 #       --document corpus/libreoffice/focus.odp --out shots/xodp-01.png
 #
 # The bundle defaults to `dist/<Product>.app`, which is where `build-app.sh`
-# puts it, and the document to the corpus file `packaging/store-listing.md`
+# puts it, and the document to the corpus file `packaging/store-listing.toml`
 # names for that application. Only `--out` has no sensible default.
 #
 # FOUR ACTIONS, IN THE ORDER GIVEN
@@ -66,7 +66,7 @@
 # kernel refuses its entitlements without a profile covering this Mac — so no
 # screenshot can ever be of the exact artefact that gets uploaded. Build the
 # bundle from the commit being released and say so in
-# `packaging/store-listing.md`.
+# `packaging/store-listing.toml`.
 #
 # THE WINDOW IS FOUND BY PROCESS ID AND NOT BY NAME
 #
@@ -112,7 +112,7 @@ usage() {
 refuse() { echo "screenshot.sh: $1" >&2; exit 1; }
 
 # The two strings this needs per application, and the document
-# `packaging/store-listing.md` tells a reviewer to open, which is the document
+# `packaging/store-listing.toml` tells a reviewer to open, which is the document
 # the listing's own pictures should therefore be of. `build-app.sh` holds the
 # full table; only these three columns are wanted here.
 table() {

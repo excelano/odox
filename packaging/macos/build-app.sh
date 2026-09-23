@@ -571,7 +571,7 @@ build_store() {
     # This block came in from slipcase-desktop, which edits documents, and asked
     # for read-write; the development build beside it asks for read-only because
     # these applications write nothing. That would have shipped a write grant to
-    # review while `packaging/store-listing.md` told the reviewer in writing that
+    # review while `packaging/store-listing.toml` told the reviewer in writing that
     # there is "no write entitlement of any kind". Two files stating a capability
     # is two places for them to disagree, and this is the one that reaches Apple.
     #

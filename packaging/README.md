@@ -5,8 +5,9 @@ that install them under `~/.local`, plus `check-libraries.sh`, which is where
 `debian/`'s `Depends` line comes from. `debian/` builds one `.deb` per
 application from a release build. `windows/` and `macos/` each carry
 their platform's manifest, build script, install check and screenshot script,
-with a README saying how to run that lane. `store-listing.md` and its German
-half are the text both stores take. Releases are `ship odox`.
+with a README saying how to run that lane. `store-listing.toml` is the text
+both stores take, and `release-notes.toml` is what a release says changed.
+Releases are `ship odox`.
 
 `version.sh` is the only thing that reads the version, from the workspace
 `Cargo.toml`, in whichever spelling a caller needs: plain, `--appx` for the

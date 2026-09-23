@@ -1,0 +1,394 @@
+# The copy both store listings are filled in from, for all three
+# applications: one [products.<key>] table each, keyed the way
+# packaging/windows/identity.psd1 and packaging/macos/identity.toml key the
+# same applications: xodt, xods, xodp.
+#
+# The fields both stores take sit at the top of a language, under a product;
+# the rest sit under the store that takes them, because the two do not take
+# the same fields and do not count them the same way. The name is under each
+# store because the two can disagree about it, though these three do not.
+#
+# Limits, which ship checks before the tag and counts in characters rather
+# than bytes: apple.name and apple.subtitle 30, apple.promotional-text 170,
+# apple.keywords 100 including the commas, description 4,000 - the Microsoft
+# Store allows 10,000 and this is written to Apple's - microsoft.short-description
+# 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30.
+#
+# What is *not* here is what changed in this release. That is
+# release-notes.toml, which is rewritten every time; this changes when a
+# product does.
+#
+# No URLs reach the Microsoft Store from here. Its submission document has no
+# field for them: Partner Center keeps the website, the privacy policy and the
+# support contact against the product.
+#
+# THE GERMAN HALF
+#
+# Terminology is the applications' own, out of `crates/odox-ui/po/de.po` and
+# the `.desktop` entries: *Textdokument*, *Tabellendokument*, *Präsentation*.
+# German runs longer than English, which is what the limits above are for.
+#
+# APP REVIEW NOTES
+#
+# Apple's own "Notes for Review" field, which ship pushes nowhere: there is no
+# submission field for it and no API this fleet's App Store Connect key can
+# write it through, so it is typed into App Store Connect by hand, once, and
+# again only when it goes stale. Kept here because it is still copy a reviewer
+# is told, the same reason the description and the entitlements are.
+#
+# The same notes for all three, with one sentence differing, marked below.
+#
+# Odox is three lightweight editors for OpenDocument files: Odox Text for text
+# documents, Odox Grid for spreadsheets, Odox Deck for presentations. No
+# account, no sign-in, no test credentials, and no network connection of any
+# kind are needed to test any of them.
+#
+# Open a document first. With nothing open the window is empty and there is
+# nothing to try. These read from the repository and need no release asset:
+# Odox Text, https://github.com/excelano/odox/raw/main/corpus/libreoffice/text.odt
+# Odox Grid, https://github.com/excelano/odox/raw/main/corpus/libreoffice/calc.ods
+# Odox Deck, https://github.com/excelano/odox/raw/main/corpus/libreoffice/growing-liberty.odp
+#
+# Each was written by LibreOffice rather than by hand, so what you are opening
+# is what an office application actually emits. Nothing in any of them is
+# anybody else's copyright. Any OpenDocument file of your own will do as well.
+#
+# Editing is changing what is there. A window opens reading; Edit mode, from
+# the Edit menu or Ctrl+E, lets a reviewer type into a paragraph, a cell or a
+# slide's text, and drag or resize a shape. Save writes the document back over
+# the file that was opened and Save As writes it elsewhere; nothing else is
+# written, except one preference, in a settings file, when it is changed in
+# the menu. The bundle declares CFBundleTypeRole as Editor. There is no
+# Export, no formatting, no inserting and no formula editing, which is the
+# scope of the application rather than a limitation of the review build.
+#
+# Each declares its one OpenDocument type at rank Alternate rather than
+# Default or Owner. OpenDocument is an OASIS standard that this project reads
+# and does not own, on a machine that may well have a full office suite
+# already claiming it, so the application adds itself to the list a person can
+# choose from and does not ask to be preferred.
+#
+# The App Sandbox is on with two entitlements: the sandbox itself, and
+# read-write access to user-selected files, which is the grant a person gives
+# by choosing a document in the open panel or naming one in the save panel.
+# There is no network entitlement and no temporary exception. The application
+# makes no network request; it writes the document a person saves, in place,
+# and its one preference inside its own container.
+#
+# The full privacy statement is at https://excelano.com/legal/#odox and the
+# complete source is at https://github.com/excelano/odox.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+[products.xodt.locales."en-us"]
+description = """
+Odox Text opens an OpenDocument text document, lets you change what is in it, and saves it back as the document it was.
+
+It is a lightweight editor and not a word processor. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, take any of it back with Undo, and save. You cannot apply formatting, insert a table or a picture, or find and replace: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
+
+It draws the page at the width the document asks for. Headings, nested lists, tables with merged cells and borders, and the pictures inside the document appear where the document puts them, in the fonts it asks for, resolved against the ones you have installed. An outline sits beside the page and moves it when you click a heading. You can select across paragraphs and copy, or take the whole document as plain text in one command.
+
+It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
+
+It is one of three. Odox Grid reads spreadsheets and Odox Deck reads presentations, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. A test that every document in the corpus comes back the same, and that an edit to any paragraph of it changes that paragraph and nothing else, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+
+Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xodt.locales."en-us".apple]
+name = "Odox Text"
+subtitle = "Edit OpenDocument text"
+promotional-text = "Open an OpenDocument text document, read it as it was written, fix what needs fixing, and save it back as the document it was."
+keywords = "opendocument,odf,odt,document,editor,edit,text,oasis,open,office"
+
+[products.xodt.locales."en-us".microsoft]
+name = "Odox Text"
+short-description = """
+A small, fast editor for OpenDocument text documents, the `.odt` files written by LibreOffice, OpenOffice and everything else that speaks the OASIS standard.
+
+It draws the page at the width the document asks for, with its headings, lists, tables and pictures where the document puts them, and an outline beside it. Click a paragraph to change it, take it back with Undo, and save: what you did not touch is written back as it was read, so the document you save is the one you opened.
+"""
+features = [
+    "Opens .odt text documents written by any application that follows the OpenDocument standard",
+    "Draws the page at the width the document asks for, with its own fonts resolved against the ones you have installed",
+    "Headings, nested lists, tables with merged cells, and the pictures inside the document, each where the document puts it",
+    "An outline beside the page that moves it when you click a heading",
+    "Select across paragraphs and copy, or copy the whole document as plain text",
+    "Click a paragraph to change it, split it with Enter or join it with Backspace, and take any of it back with Undo",
+    "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
+    "What you did not touch is written back as it was read, element for element, including what Odox has never heard of",
+    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
+    "No network connection of any kind, no account, and no telemetry",
+    "Follows your desktop's light or dark setting",
+    "Speaks English and German",
+    "Free and open source under the MIT licence",
+]
+keywords = ["opendocument", "odf", "odt", "document editor", "edit document", "text document", "oasis"]
+
+[products.xodt.locales."de-de"]
+description = """
+Odox Text öffnet ein OpenDocument-Textdokument, lässt Sie ändern, was darin steht, und speichert es als das Dokument zurück, das es war.
+
+Es ist ein leichter Editor und keine Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie auf einen Absatz klicken und seinen Text an Ort und Stelle ändern, mit Enter einen neuen Absatz beginnen, mit der Rücktaste zwei zusammenfügen, alles mit Rückgängig zurücknehmen und speichern. Formatieren, eine Tabelle oder ein Bild einfügen, suchen und ersetzen: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
+
+Die Seite wird in der Breite gezeichnet, die das Dokument verlangt. Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und Rahmen sowie die Bilder im Dokument erscheinen dort, wo das Dokument sie hinsetzt, in den Schriften, die es verlangt, aufgelöst gegen die auf Ihrem Rechner installierten. Neben der Seite steht eine Gliederung, die beim Klick auf eine Überschrift dorthin springt. Sie können über Absätze hinweg markieren und kopieren oder das ganze Dokument mit einem Befehl als reinen Text übernehmen.
+
+Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
+
+Odox Text ist eines von dreien. Odox Grid bearbeitet Tabellendokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
+
+In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xodt.locales."de-de".apple]
+name = "Odox Text"
+subtitle = "Textdokumente bearbeiten"
+promotional-text = "Öffnen Sie ein OpenDocument-Textdokument, lesen Sie es wie geschrieben, ändern Sie, was zu ändern ist, und speichern Sie es als das Dokument, das es war."
+keywords = "opendocument,odf,odt,textdokument,editor,bearbeiten,dokument,oasis,büro"
+
+[products.xodt.locales."de-de".microsoft]
+name = "Odox Text"
+short-description = """
+Ein kleiner, schneller Editor für OpenDocument-Textdokumente, also die ODT-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+
+Die Seite wird in der Breite gezeichnet, die das Dokument verlangt, mit Überschriften, Listen, Tabellen und Bildern an ihrem Platz und einer Gliederung daneben. Klicken Sie auf einen Absatz, um ihn zu ändern, nehmen Sie es zurück und speichern Sie: Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde.
+"""
+features = [
+    "Öffnet ODT-Textdokumente aus jeder Anwendung, die dem OpenDocument-Standard folgt",
+    "Zeichnet die Seite in der Breite, die das Dokument verlangt, mit den Schriften, die auf Ihrem Rechner installiert sind",
+    "Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und die Bilder im Dokument, jedes an seinem Platz",
+    "Eine Gliederung neben der Seite, die beim Klick auf eine Überschrift dorthin springt",
+    "Über Absätze hinweg markieren und kopieren, oder das ganze Dokument als reinen Text übernehmen",
+    "Auf einen Absatz klicken und ihn ändern, mit Enter teilen oder mit der Rücktaste zusammenfügen, und alles mit Rückgängig zurücknehmen",
+    "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
+    "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, auch das, wovon Odox nie gehört hat",
+    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
+    "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
+    "Spricht Deutsch und Englisch",
+    "Frei und quelloffen unter der MIT-Lizenz",
+]
+keywords = ["OpenDocument", "ODF", "ODT", "Textdokument", "Editor", "Dokument bearbeiten", "OASIS"]
+
+[products.xods.locales."en-us"]
+description = """
+Odox Grid opens an OpenDocument spreadsheet, lets you change the cells that need changing, and saves it back as the document it was.
+
+It is a lightweight editor and not a spreadsheet application. Typing on the cell you picked replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited, and once anything in the sheet has changed every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
+
+It draws the sheet at the document's own column widths and row heights, with the cell styles the document carries, and shows numbers, dates and booleans the way the document says to show them. There is one tab per sheet, and picking a cell shows the formula behind it above the grid. Take the whole sheet as tab-separated text in one command and paste it wherever you need it.
+
+A spreadsheet often has a gap in it, a run of ten thousand empty rows between one block of figures and the next, and a reader that turns that gap into ten thousand rows in memory is slow to open and slow to scroll. Odox Grid keeps the gap as the document writes it, which is why a sparse sheet opens as fast as a dense one.
+
+It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
+
+It is one of three. Odox Text reads text documents and Odox Deck reads presentations, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a run of a thousand identical rows the document wrote once is split around the one cell you changed and the rest stay one run. A test that every document in the corpus comes back the same, and that an edit changes one cell and no other, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+
+Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xods.locales."en-us".apple]
+name = "Odox Grid"
+subtitle = "Edit OpenDocument sheets"
+promotional-text = "Open an OpenDocument spreadsheet at its own column widths and cell styles, change the cells that need changing, and save it back as the document it was."
+keywords = "opendocument,odf,ods,spreadsheet,editor,edit,sheet,oasis,calc,csv"
+
+[products.xods.locales."en-us".microsoft]
+name = "Odox Grid"
+short-description = """
+A small, fast editor for OpenDocument spreadsheets, the `.ods` files written by LibreOffice, OpenOffice and everything else that speaks the OASIS standard.
+
+It draws the sheet at the document's own column widths and cell styles, with one tab per sheet and the formula behind whichever cell you pick. Type into a cell to change it, take it back with Undo, and save: the formulas and everything you did not touch are written back as they were read, so the sheet you save is the one you opened.
+"""
+features = [
+    "Opens .ods spreadsheets written by any application that follows the OpenDocument standard",
+    "Draws the sheet at the document's own column widths, row heights and cell styles",
+    "One tab per sheet, and the formula behind whichever cell you pick shown above the grid",
+    "Numbers, dates and booleans shown the way the document says to show them",
+    "A sheet with a large empty gap in it opens as fast as one without, because the gap is never expanded",
+    "Copy the whole sheet as tab-separated text, ready to paste anywhere",
+    "Type into a cell to change it: a number is a number, TRUE and FALSE are booleans, anything else is text, and Undo takes it back",
+    "Formulas are kept and not edited; once anything has changed their results are drawn faint until a spreadsheet application recalculates them",
+    "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
+    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
+    "No network connection of any kind, no account, and no telemetry",
+    "Follows your desktop's light or dark setting",
+    "Speaks English and German",
+    "Free and open source under the MIT licence",
+]
+keywords = ["opendocument", "odf", "ods", "spreadsheet editor", "edit spreadsheet", "sheet", "oasis"]
+
+[products.xods.locales."de-de"]
+description = """
+Odox Grid öffnet ein OpenDocument-Tabellendokument, lässt Sie die Zellen ändern, die es brauchen, und speichert es als das Dokument zurück, das es war.
+
+Es ist ein leichter Editor und keine Tabellenkalkulation. Tippen auf der gewählten Zelle ersetzt sie, Enter oder F2 öffnet sie mit ihrem Inhalt, Entf leert sie, und Rückgängig nimmt alles zurück. Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text. Eine Zelle mit einer Formel bleibt, wie sie ist, und wird nicht bearbeitet; sobald sich im Blatt etwas geändert hat, wird das Ergebnis jeder Formel blass gezeichnet, bis eine Tabellenkalkulation es neu berechnet, was LibreOffice beim Öffnen der Datei tut. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
+
+Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt. Es gibt einen Reiter je Tabellenblatt, und wer eine Zelle wählt, sieht die Formel dahinter über dem Gitter. Mit einem Befehl übernehmen Sie das ganze Blatt als tabulatorgetrennten Text und fügen es ein, wo Sie es brauchen.
+
+Ein Tabellendokument hat oft eine Lücke: einen Lauf von zehntausend leeren Zeilen zwischen zwei Zahlenblöcken. Ein Programm, das daraus zehntausend Zeilen im Speicher macht, öffnet langsam und rollt langsam. Odox Grid behält die Lücke so, wie das Dokument sie schreibt, und deshalb öffnet ein dünn besetztes Blatt so schnell wie ein dichtes.
+
+Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
+
+Odox Grid ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
+
+In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xods.locales."de-de".apple]
+name = "Odox Grid"
+subtitle = "Tabellendokumente bearbeiten"
+promotional-text = "Öffnen Sie ein OpenDocument-Tabellendokument mit seinen eigenen Spaltenbreiten und Zellformaten, ändern Sie Zellen und speichern Sie es als das Dokument, das es war."
+keywords = "opendocument,odf,ods,tabelle,tabellendokument,editor,bearbeiten,oasis"
+
+[products.xods.locales."de-de".microsoft]
+name = "Odox Grid"
+short-description = """
+Ein kleiner, schneller Editor für OpenDocument-Tabellendokumente, also die ODS-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+
+Das Blatt wird mit den Spaltenbreiten und Zellformaten des Dokuments gezeichnet, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle. Tippen Sie in eine Zelle, um sie zu ändern, nehmen Sie es zurück und speichern Sie: Formeln und alles Unberührte bleiben, wie sie gelesen wurden.
+"""
+features = [
+    "Öffnet ODS-Tabellendokumente aus jeder Anwendung, die dem OpenDocument-Standard folgt",
+    "Zeichnet das Blatt mit den Spaltenbreiten, Zeilenhöhen und Zellformaten des Dokuments",
+    "Ein Reiter je Tabellenblatt, und über dem Gitter die Formel hinter der gewählten Zelle",
+    "Zahlen, Datumsangaben und Wahrheitswerte so dargestellt, wie das Dokument es vorgibt",
+    "Ein Blatt mit einer großen leeren Lücke öffnet so schnell wie ein volles, weil die Lücke nie ausgerollt wird",
+    "Das ganze Tabellenblatt als tabulatorgetrennten Text kopieren und überall einfügen",
+    "In eine Zelle tippen, um sie zu ändern: Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text, und Rückgängig nimmt es zurück",
+    "Formeln bleiben erhalten und werden nicht bearbeitet; sobald sich etwas geändert hat, werden ihre Ergebnisse blass gezeichnet, bis eine Tabellenkalkulation sie neu berechnet",
+    "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
+    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
+    "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
+    "Spricht Deutsch und Englisch",
+    "Frei und quelloffen unter der MIT-Lizenz",
+]
+keywords = ["OpenDocument", "ODF", "ODS", "Tabellendokument", "Tabelle", "Editor", "OASIS"]
+
+[products.xodp.locales."en-us"]
+description = """
+Odox Deck opens an OpenDocument presentation, lets you change what is on its slides, and saves it back as the deck it was.
+
+It is a lightweight editor and not a presentation application. A deck opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, take any of it back with Undo, and save. You cannot add a slide or a shape, apply formatting, or change a master page: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
+
+It draws each slide at the size the document sets. Behind the slide's own text and pictures is the master page: the ground it fills and the decorations a template puts on every slide, which is most of what makes a deck look like the template it was built from. The shapes are drawn from the geometry the document states rather than approximated into rectangles, which covers paths, custom shapes with their own formulas, connectors routed between the shapes they join, and the labels a shape carries. The speaker's notes sit underneath the slide and a list of slides beside it.
+
+How well it draws is measured rather than asserted. Every slide of the templates in its corpus is rendered by Odox Deck and by LibreOffice from the same file, and the two are compared colour by colour, because a renderer is the kind of thing that passes every test and still looks wrong.
+
+It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
+
+It is one of three. Odox Text reads text documents and Odox Grid reads spreadsheets, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a moved shape is four attributes changed, in the unit the document wrote them in, and nothing else. A test that every document in the corpus comes back the same runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+
+Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xodp.locales."en-us".apple]
+name = "Odox Deck"
+subtitle = "Edit OpenDocument slides"
+promotional-text = "Open an OpenDocument presentation and see each slide as it was designed; move a shape, resize it or change its text, and save the deck back as it was."
+keywords = "opendocument,odf,odp,presentation,slides,editor,edit,deck,oasis,impress"
+
+[products.xodp.locales."en-us".microsoft]
+name = "Odox Deck"
+short-description = """
+A small, fast editor for OpenDocument presentations, the `.odp` files written by LibreOffice, OpenOffice and everything else that speaks the OASIS standard.
+
+It draws each slide at the size the document sets, with the master page's background and decorations behind it and the shapes drawn from their own geometry. Pick a shape and drag it, resize it by a corner, or click its text to change it; take it back with Undo, and save: what you did not touch is written back as it was read.
+"""
+features = [
+    "Opens .odp presentations written by any application that follows the OpenDocument standard",
+    "Draws each slide at the size the document sets, on the master page's own background",
+    "The decorations a template puts behind every slide, drawn rather than skipped",
+    "Shapes drawn from their own geometry: paths, custom shapes, connectors and the labels they carry",
+    "Solid, linear and axial gradient fills, and the pictures a slide frames",
+    "The speaker's notes underneath each slide, and a list of slides beside",
+    "Pick a shape and drag it, resize it by a corner, or click its text to change it where it sits, and take any of it back with Undo",
+    "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
+    "What you did not touch is written back as it was read, element for element, the master page and the template's decorations included",
+    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
+    "No network connection of any kind, no account, and no telemetry",
+    "Follows your desktop's light or dark setting",
+    "Speaks English and German",
+    "Free and open source under the MIT licence",
+]
+keywords = ["opendocument", "odf", "odp", "presentation editor", "edit slides", "slides", "oasis"]
+
+[products.xodp.locales."de-de"]
+description = """
+Odox Deck öffnet eine OpenDocument-Präsentation, lässt Sie ändern, was auf den Folien steht, und speichert sie als den Foliensatz zurück, der sie war.
+
+Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, alles mit Rückgängig zurücknehmen und speichern. Eine Folie oder eine Form hinzufügen, formatieren oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
+
+Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt. Hinter dem Text und den Bildern der Folie liegt die Masterfolie: der Grund, den sie füllt, und die Verzierungen, die eine Vorlage auf jede Folie legt, und das ist das meiste von dem, was einen Foliensatz nach seiner Vorlage aussehen lässt. Die Formen werden aus der Geometrie gezeichnet, die das Dokument angibt, statt zu Rechtecken angenähert zu werden: Pfade, benutzerdefinierte Formen mit ihren eigenen Formeln, Verbinder zwischen den Formen, die sie verknüpfen, und die Beschriftung, die eine Form trägt. Die Notizen stehen unter der Folie, eine Liste der Folien daneben.
+
+Wie gut gezeichnet wird, ist gemessen und nicht behauptet. Jede Folie der Vorlagen im Prüfbestand wird von Odox Deck und von LibreOffice aus derselben Datei gezeichnet, und beide werden Farbe für Farbe verglichen, denn ein Zeichner ist genau die Art von Sache, die jeden Test besteht und trotzdem falsch aussieht.
+
+Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
+
+Odox Deck ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Grid Tabellendokumente. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
+
+In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+"""
+website = "https://excelano.com/odox/"
+support = "https://excelano.com/odox/#support"
+privacy = "https://excelano.com/legal/#odox"
+
+[products.xodp.locales."de-de".apple]
+name = "Odox Deck"
+subtitle = "Präsentationen bearbeiten"
+promotional-text = "Öffnen Sie eine OpenDocument-Präsentation, sehen Sie jede Folie wie entworfen, verschieben Sie eine Form oder ändern Sie ihren Text, und speichern Sie sie, wie sie war."
+keywords = "opendocument,odf,odp,präsentation,folien,editor,bearbeiten,oasis"
+
+[products.xodp.locales."de-de".microsoft]
+name = "Odox Deck"
+short-description = """
+Ein kleiner, schneller Editor für OpenDocument-Präsentationen, also die ODP-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
+
+Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt, mit der Masterfolie dahinter und den Formen aus ihrer eigenen Geometrie. Wählen Sie eine Form und ziehen Sie sie, ändern Sie ihre Größe oder ihren Text; Rückgängig nimmt es zurück, und alles andere bleibt, wie es gelesen wurde.
+"""
+features = [
+    "Öffnet ODP-Präsentationen aus jeder Anwendung, die dem OpenDocument-Standard folgt",
+    "Zeichnet jede Folie in der Größe, die das Dokument vorgibt, auf dem Hintergrund der Masterfolie",
+    "Die Verzierungen, die eine Vorlage hinter jede Folie legt, werden gezeichnet statt übergangen",
+    "Formen aus ihrer eigenen Geometrie: Pfade, benutzerdefinierte Formen, Verbinder und ihre Beschriftungen",
+    "Einfarbige, lineare und axiale Verlaufsfüllungen sowie die Bilder, die eine Folie rahmt",
+    "Die Notizen unter jeder Folie und eine Liste der Folien daneben",
+    "Eine Form wählen und ziehen, an einer Ecke in der Größe ändern oder auf ihren Text klicken und ihn an Ort und Stelle ändern, und alles mit Rückgängig zurücknehmen",
+    "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
+    "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, Masterfolie und Verzierungen der Vorlage eingeschlossen",
+    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
+    "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
+    "Spricht Deutsch und Englisch",
+    "Frei und quelloffen unter der MIT-Lizenz",
+]
+keywords = ["OpenDocument", "ODF", "ODP", "Präsentation", "Folien", "Editor", "OASIS"]

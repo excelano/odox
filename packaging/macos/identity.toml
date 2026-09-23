@@ -1,0 +1,25 @@
+# The bundle identifiers App Store Connect knows these applications by.
+#
+# Info.plist.in is one template substituted three ways at build time (see its
+# own header), so the file on disk never carries a real CFBundleIdentifier for
+# ship to read the way it reads a single-application repo's. This is the copy
+# ship reads instead, one table per application, keyed the way
+# packaging/windows/identity.psd1's Applications map is.
+#
+# build-app.sh substitutes the same three identifiers into its own case
+# statement rather than reading this file - a shell script reading TOML is a
+# dependency this repository does not otherwise have - so the two have to be
+# kept in sync by hand. They change only if an application is ever renamed,
+# which changes the Store listing under it too.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+[xodt]
+bundle_id = "com.excelano.xodt"
+
+[xods]
+bundle_id = "com.excelano.xods"
+
+[xodp]
+bundle_id = "com.excelano.xodp"

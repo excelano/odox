@@ -35,7 +35,8 @@ The target directory is shared across the fleet: `df -h /` before a long build.
 The commit trailer is one line, a `Co-Authored-By` naming the model, and nothing
 under it: no `Claude-Session:` line, because this repository is public.
 
-Stay inside your own platform's arm: Linux is `packaging/linux` and
-`packaging/debian`; `packaging/windows` and `packaging/macos` are reviewed from
-here and changed only on their own machine. What cannot be settled here goes to
-David rather than into a guess.
+Linux is `packaging/linux` and `packaging/debian`. `packaging/windows` and
+`packaging/macos` are edited from here too — `ssh winwork` reaches the Windows
+VM (not always running) and `ssh macmini` reaches the Mac, for whatever
+building, signing or verifying needs the real machine. What cannot be settled
+even reaching those goes to David rather than into a guess.
