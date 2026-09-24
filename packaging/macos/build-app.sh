@@ -340,25 +340,31 @@ build_bundle() {
     # compiled by this script.
     binary="$binary_arg"
     if [ "$universal" = yes ]; then
-        [ -z "$binary" ] || {
-            echo "build-app.sh: --universal builds its own binary; drop --binary" >&2
-            exit 2
-        }
-        slices=""
-        for triple in x86_64-apple-darwin aarch64-apple-darwin; do
-            slice="${target_dir}/${triple}/release/${app}"
-            [ -x "$slice" ] || {
-                echo "build-app.sh: no executable at ${slice}; run 'cargo build --release -p ${app} --target ${triple}' first" >&2
-                exit 1
-            }
-            slices="${slices} ${slice}"
-        done
-        binary="${target_dir}/release/${app}-universal"
-        # shellcheck disable=SC2086
-        lipo -create ${slices} -output "$binary"
+        # `--binary` already names a joined executable where the App Store lane
+        # supplies one: the Apple silicon runner lipo'd it once in CI and
+        # attached it to the release, and ship's Mac step hands that file
+        # straight to this script rather than paying for the join twice. Only
+        # where nothing was named does this script do what its own name says
+        # and build the two slices itself.
+        if [ -z "$binary" ]; then
+            slices=""
+            for triple in x86_64-apple-darwin aarch64-apple-darwin; do
+                slice="${target_dir}/${triple}/release/${app}"
+                [ -x "$slice" ] || {
+                    echo "build-app.sh: no executable at ${slice}; run 'cargo build --release -p ${app} --target ${triple}' first" >&2
+                    exit 1
+                }
+                slices="${slices} ${slice}"
+            done
+            binary="${target_dir}/release/${app}-universal"
+            # shellcheck disable=SC2086
+            lipo -create ${slices} -output "$binary"
+        fi
         # A `lipo` that quietly produced one architecture would be a Store upload
         # rejected days later, or worse, accepted and unrunnable on half the
-        # machines that bought it. Checked here instead.
+        # machines that bought it. Checked here whichever way the binary
+        # arrived: a file named by --binary has to carry both slices exactly as
+        # much as one this script joined itself.
         for arch in x86_64 arm64; do
             lipo -info "$binary" | grep -q "$arch" || {
                 echo "build-app.sh: the joined executable has no ${arch} slice" >&2
@@ -536,9 +542,19 @@ build_store() {
     # one keychain is an ordinary state, an expiring one beside its replacement,
     # and picking whichever `grep` found first is how a package gets signed with
     # the wrong one.
+    #
+    # Deduplicated by fingerprint (field 2, the SHA-1 hash `security` prints
+    # before the name) rather than by the name a `sed` alone would compare:
+    # the search list can report one identity more than once - measured on
+    # this fleet's own Mac, where a certificate present in both the signing
+    # and login keychains was enumerated four times over - and that is a
+    # keychain search-list artefact, not a second certificate. Deduping on the
+    # name instead would have hidden the real ambiguity this exists to catch,
+    # because an expiring certificate and its renewal report the identical
+    # name and only the fingerprint tells them apart.
     find_identity() {
         matches=$(security find-identity -v 2>/dev/null |
-            grep "$1: .*(${store_team})" | sed 's/.*"\(.*\)"/\1/')
+            grep "$1: .*(${store_team})" | sort -u -k2,2 | sed 's/.*"\(.*\)"/\1/')
         count=$(printf '%s' "$matches" | grep -c . || true)
         [ "$count" = 1 ] || {
             echo "build-app.sh: expected one \"$1\" identity for team ${store_team}, found ${count}" >&2
