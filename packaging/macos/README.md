@@ -12,7 +12,7 @@ substituted, the `.icns`, and the entitlements. From the repository root:
     ./packaging/macos/build-app.sh xodt \
         --store ~/Downloads/Odox_Text_Mac_App_Store.provisionprofile
     ./packaging/macos/check-install.sh --all             # what an installed bundle is
-    ./packaging/macos/screenshot.sh xodt --out shots/xodt-01-page.png
+    ./packaging/macos/shots.sh --app 'dist/Odox Text.app' --lang en   # a store screenshot
 
 The sandbox entitlement does nothing until it is inside a signature, so a
 bundle to test is signed with an Apple Development identity. `--store` signs
