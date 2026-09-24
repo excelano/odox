@@ -45,7 +45,12 @@ param(
     # The packaged application, as `<PackageFamilyName>!<ApplicationId>`. One
     # per application, so this takes the family name and the application id is
     # the application's own name.
-    [string] $Aumid
+    [string] $Aumid,
+    # The language the window is put in, and the locale subdirectory the set
+    # lands in - take-shots.ps1 turns this into en-US or de-DE, which is what
+    # the Store files a frame under. None of the three carries translated
+    # content, so this changes the window and not the document.
+    [ValidateSet('en', 'de')][string] $Lang = 'en'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -140,4 +145,4 @@ if ($Reference -and -not $Only) {
 
 $first = if ($Only) { $Only } else { 'xodt' }
 Take-Shots -Launch (Opens $first) -Process $first `
-    -Width $WIDTH -Height $HEIGHT -OutDir $OutDir -Reference:$Reference
+    -Width $WIDTH -Height $HEIGHT -OutDir $OutDir -Reference:$Reference -Lang $Lang

@@ -37,6 +37,16 @@ on:
         default: 'no'
         type: choice
         options: ['no', 'reference', 'full']
+      # Which of the three applications a screenshots run photographs. odox
+      # ships three executables from one workspace, so - unlike a
+      # single-application repo, where the recipes already know what to open -
+      # a set has to say which one; ship's own dispatch sends this whenever it
+      # asks for a set.
+      app:
+        description: 'Application to photograph (with screenshots): xodt, xods or xodp'
+        required: false
+        type: choice
+        options: ['', 'xodt', 'xods', 'xodp']
 
 permissions:
   contents: write
@@ -186,6 +196,11 @@ jobs:
       # `shots.ps1` carries the recipes and is the same command that retakes
       # them by hand on the Windows machine.
       #
+      # `-Only app` narrows the set to one application - ship's own dispatch
+      # always sends `app` for a repo with more than one, anderix/ship#103 -
+      # and is left off where none was given, which is every three
+      # applications' frames, same as before this existed.
+      #
       # No install step: this repository's frames launch the release
       # executables by name with the document as an argument, because an
       # install here never writes `UserChoice` and on a machine with an office
@@ -195,3 +210,5 @@ jobs:
         uses: excelano/.github/.github/actions/store-screenshots@main
         with:
           mode: ${{ inputs.screenshots }}
+          languages: en de
+          args: ${{ inputs.app && format('-Only {0}', inputs.app) || '' }}

@@ -27,6 +27,24 @@ on:
         description: 'Tag to build the release binaries for (e.g. v0.5.0)'
         required: false
         type: string
+      # A choice rather than a boolean, because there is a third thing to ask
+      # for: `reference` takes the one plain frame a coordinate gets measured
+      # off, and `full` takes the set.
+      screenshots:
+        description: 'Store screenshots'
+        required: false
+        default: 'no'
+        type: choice
+        options: ['no', 'reference', 'full']
+      # Which of the three applications a screenshots run photographs. odox
+      # ships three bundles from one workspace, so - unlike a single-application
+      # repo, where the recipes already know what to open - a set has to say
+      # which one; ship's own dispatch sends this whenever it asks for a set.
+      app:
+        description: 'Application to photograph (with screenshots): xodt, xods or xodp'
+        required: false
+        type: choice
+        options: ['', 'xodt', 'xods', 'xodp']
 
 permissions:
   contents: write
@@ -315,3 +333,36 @@ jobs:
           binary: xodp
           tag: ${{ github.event.release.tag_name || inputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Off unless asked for. A bug fix should not pay for a set of Store
+      # screenshots, and a set nobody asked for is a set nobody looks at.
+      # `shots.sh` carries the recipes and is the same command that retakes
+      # them by hand on the Mac.
+      #
+      # One application, because the driver photographs a bundle and odox has
+      # three: `app` says which, and ship's own dispatch always sends it -
+      # anderix/ship#103. The bundle is the debug one "Assemble the three
+      # bundles" already built; a Store package cannot be launched off the
+      # Store, so this is the closest any Mac screenshot can get, same as the
+      # Windows lane.
+      - name: Which bundle this dispatch photographs
+        id: bundle
+        if: inputs.screenshots && inputs.screenshots != 'no'
+        run: |
+          case "${{ inputs.app }}" in
+            xodt) echo "path=dist/Odox Text.app" >> "$GITHUB_OUTPUT" ;;
+            xods) echo "path=dist/Odox Grid.app" >> "$GITHUB_OUTPUT" ;;
+            xodp) echo "path=dist/Odox Deck.app" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::error::screenshots need app naming which bundle: xodt, xods or xodp" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: The Store screenshots
+        if: inputs.screenshots && inputs.screenshots != 'no'
+        uses: excelano/.github/.github/actions/mac-store-screenshots@main
+        with:
+          app: ${{ steps.bundle.outputs.path }}
+          mode: ${{ inputs.screenshots }}
+          languages: en de
