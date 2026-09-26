@@ -1,10 +1,9 @@
-# The Windows checks a machine can run: build, test, clippy and format on this
-# target; each shipped binary imports nothing Windows does not ship; the viewers
-# are GUI subsystem with the DPI manifest and the icon embedded; the integration
-# installs and uninstalls cleanly; the committed icons match their generator.
-#
-# Not reached: the window, an MSIX package, a file association, the certification
-# kit, `build-msix.ps1`, and the icon as a person sees it.
+# Run the suite on Windows, check the things only a Windows machine can say,
+# and assemble the Store package, attaching it to a published release. The
+# checks themselves live in excelano/.github so every desktop-app repo in the
+# fleet runs the same ones and a correction reaches all of them at once; what
+# stays here is this product's own names, paths, its three applications and
+# the icon-embedding check none of the others need.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -28,9 +27,6 @@ on:
         description: 'Tag to package for (e.g. v0.3.1)'
         required: false
         type: string
-      # A choice rather than a boolean, because there is a third thing to ask
-      # for: `reference` takes the one plain frame a coordinate gets measured
-      # off, and `full` takes the set.
       screenshots:
         description: 'Store screenshots'
         required: false
@@ -51,164 +47,55 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  # Keyed by the tag when this is releasing and by the ref when it is checking,
-  # so the two never share a group. `github.ref` is refs/heads/main for a
-  # workflow_dispatch as much as for a push, so keying on it alone lets a push
-  # to main cancel the dispatched run that is building a release's package.
-  group: windows-${{ github.event.release.tag_name || inputs.tag || format('{0}-{1}', github.event_name, github.ref) }}
-  # A superseded check is worth cancelling; a half-built release is not.
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-
 jobs:
   windows:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
-
-      # The packaging scripts are the only code here that nothing else compiles
-      # or runs, and there is no PowerShell on the Linux lane. The step is
-      # excelano/.github's because it is the same one in every repository that
-      # has them.
-      - name: The packaging scripts parse
-        uses: excelano/.github/.github/actions/powershell-parses@main
-
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: What is installed
-        run: rustc -V && cargo -V
-
-      - name: Build
-        run: cargo build --workspace --all-targets
-
-      - name: Test
-        run: cargo test --workspace
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Format
-        run: cargo fmt --all --check
-
-      # `+crt-static` keeps the Visual C++ runtime out of the MSVC build, and this
-      # is the guard on it, over the release binaries because those are what ship.
-      - name: Every DLL the shipped binaries import comes with Windows
-        run: |
-          cargo build --release
-          powershell -ExecutionPolicy Bypass -File packaging/windows/check-imports.ps1
-
-      # The GUI subsystem comes from an attribute that is off under
-      # `debug_assertions`, and the DPI declaration from the manifest `build.rs`
-      # hands the linker; both are read out of the release artefact. The launcher
-      # is a console program on purpose and embeds no manifest, so it is exempt.
-      - name: The shipped viewers are GUI subsystem and declare their DPI awareness
-        shell: pwsh
-        run: |
-          $meta = cargo metadata --format-version 1 --no-deps | ConvertFrom-Json
-          foreach ($app in 'xodt', 'xods', 'xodp') {
-            $exe = Join-Path $meta.target_directory "release\$app.exe"
-            $bytes = [System.IO.File]::ReadAllBytes($exe)
-            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
-            $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 92)
-            if ($subsystem -ne 2) {
-              throw "$app is subsystem $subsystem, and a shipped viewer must be 2 (Windows GUI)"
-            }
-            # Case-insensitively, because Windows reads these values that way
-            # and this manifest writes them in lower case with a fallback for
-            # older releases, `permonitorv2,permonitor`, where the fleet's other
-            # manifests write the single mixed-case `PerMonitorV2`. A check
-            # copied from a sibling and left case-sensitive fails a binary whose
-            # manifest is embedded and correct, which is what it did here.
-            $text = [System.Text.Encoding]::UTF8.GetString($bytes)
-            if ($text -notmatch 'permonitorv2') {
-              throw "no per-monitor DPI declaration in $app - build.rs did not embed the application manifest"
-            }
-            Write-Host "$app : subsystem 2, and the application manifest is embedded"
-          }
-
-      # Windows takes a window's icon from a resource and this build compiles none,
-      # so `build.rs` stages the `.ico` into OUT_DIR; the icon directory's own
-      # bytes in the binary say the staging worked.
-      - name: The window icon reached the binaries
-        shell: pwsh
-        run: |
-          $meta = cargo metadata --format-version 1 --no-deps | ConvertFrom-Json
-          foreach ($app in 'xodt', 'xods', 'xodp') {
-            $exe = Join-Path $meta.target_directory "release\$app.exe"
-            $ico = [System.IO.File]::ReadAllBytes("packaging/windows/$app.ico")
-            $bytes = [System.IO.File]::ReadAllBytes($exe)
-            $needle = $ico[0..63]
-            $found = $false
-            for ($i = 0; $i -lt $bytes.Length - $needle.Length; $i++) {
-              if ($bytes[$i] -ne $needle[0]) { continue }
-              $match = $true
-              for ($j = 1; $j -lt $needle.Length; $j++) {
-                if ($bytes[$i + $j] -ne $needle[$j]) { $match = $false; break }
-              }
-              if ($match) { $found = $true; break }
-            }
-            if (-not $found) {
-              throw "$app.ico is not inside $app.exe - build.rs staged nothing and the window will have no icon"
-            }
-            Write-Host "$app : the icon directory is in the binary"
-          }
-
-      # The `.ico` files, the package assets and the `.icns` files are committed
-      # artefacts, so the generator is run and its output compared with the tree,
-      # over whole directories rather than named files.
-      - name: The committed icons and Store assets still match their generator
-        run: |
-          cargo run --manifest-path packaging/make-icons/Cargo.toml
-          git diff --exit-code -- packaging/windows packaging/macos packaging/icons
-
-      # The install scripts against the registry, read back. The steps are
-      # excelano/.github's: it was the same script in three repositories and
-      # absent from three more, and the absent ones included the repository
-      # whose uninstall reported success while leaving the association dead.
-      - name: The integration goes on and comes off cleanly
-        uses: excelano/.github/.github/actions/windows-install-check@main
-        with:
-          associations: '[{"extension": ".odt", "progId": "Excelano.Odox.Text", "contentType": "application/vnd.oasis.opendocument.text"}, {"extension": ".ods", "progId": "Excelano.Odox.Grid", "contentType": "application/vnd.oasis.opendocument.spreadsheet"}, {"extension": ".odp", "progId": "Excelano.Odox.Deck", "contentType": "application/vnd.oasis.opendocument.presentation"}]'
-          owns-extension: 'false'
-          install-args: '-NoBinary'
-
-      # The Store takes the package unsigned, and the runner assembles the one that
-      # is uploaded. The steps are excelano/.github's, because they were the same in
-      # every repository that has this target; the publisher is the organisation
-      # secret, being the one value in the identity that is an account's rather than
-      # this product's.
-      - name: The Store package
-        uses: excelano/.github/.github/actions/store-package@main
-        with:
-          publisher: ${{ secrets.STORE_PUBLISHER }}
-          tag: ${{ github.event.release.tag_name || inputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -All
-
-      # Off unless asked for. A bug fix should not pay for a set of Store
-      # screenshots, and a set nobody asked for is a set nobody looks at.
-      # `shots.ps1` carries the recipes and is the same command that retakes
-      # them by hand on the Windows machine.
-      #
+    uses: excelano/.github/.github/workflows/windows-desktop-ci.yml@main
+    with:
+      tag: ${{ inputs.tag }}
+      binary-names: 'xodt xods xodp'
+      workspace: true
+      install-rust: true
+      fmt: true
+      gui-subsystem-check: true
+      icon-check: true
+      icon-check-manifest: packaging/make-icons/Cargo.toml
+      icon-check-paths: 'packaging/windows packaging/macos packaging/icons'
+      install-check-associations: '[{"extension": ".odt", "progId": "Excelano.Odox.Text", "contentType": "application/vnd.oasis.opendocument.text"}, {"extension": ".ods", "progId": "Excelano.Odox.Grid", "contentType": "application/vnd.oasis.opendocument.spreadsheet"}, {"extension": ".odp", "progId": "Excelano.Odox.Deck", "contentType": "application/vnd.oasis.opendocument.presentation"}]'
+      install-check-owns-extension: 'false'
+      store-package-args: '-All'
+      screenshots: ${{ inputs.screenshots }}
       # `-Only app` narrows the set to one application - ship's own dispatch
       # always sends `app` for a repo with more than one, anderix/ship#103 -
       # and is left off where none was given, which is every three
-      # applications' frames, same as before this existed.
-      #
-      # No install step: this repository's frames launch the release
+      # applications' frames, same as before this existed. No
+      # pre-screenshot-script: this repository's frames launch the release
       # executables by name with the document as an argument, because an
       # install here never writes `UserChoice` and on a machine with an office
       # suite the shell would open the office suite.
-      - name: The Store screenshots
-        if: inputs.screenshots && inputs.screenshots != 'no'
-        uses: excelano/.github/.github/actions/store-screenshots@main
-        with:
-          mode: ${{ inputs.screenshots }}
-          languages: en de
-          args: ${{ inputs.app && format('-Only {0}', inputs.app) || '' }}
+      shot-args: ${{ inputs.app && format('-Only {0}', inputs.app) || '' }}
+      # Windows takes a window's icon from a resource and this build compiles
+      # none, so `build.rs` stages the `.ico` into OUT_DIR; the icon
+      # directory's own bytes in the binary say the staging worked. Unique to
+      # odox's three viewers, so it stays here rather than in the shared file.
+      extra-verify-script: |
+        $meta = cargo metadata --format-version 1 --no-deps | ConvertFrom-Json
+        foreach ($app in 'xodt', 'xods', 'xodp') {
+          $exe = Join-Path $meta.target_directory "release\$app.exe"
+          $ico = [System.IO.File]::ReadAllBytes("packaging/windows/$app.ico")
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          $needle = $ico[0..63]
+          $found = $false
+          for ($i = 0; $i -lt $bytes.Length - $needle.Length; $i++) {
+            if ($bytes[$i] -ne $needle[0]) { continue }
+            $match = $true
+            for ($j = 1; $j -lt $needle.Length; $j++) {
+              if ($bytes[$i + $j] -ne $needle[$j]) { $match = $false; break }
+            }
+            if ($match) { $found = $true; break }
+          }
+          if (-not $found) {
+            throw "$app.ico is not inside $app.exe - build.rs staged nothing and the window will have no icon"
+          }
+          Write-Host "$app : the icon directory is in the binary"
+        }
+    secrets: inherit
