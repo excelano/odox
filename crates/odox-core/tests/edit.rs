@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use odox_core::edit::{apply, join, join_with_previous, replace, rewrite, split, text};
+use odox_core::edit::{apply, join, join_with_previous, replace, rewrite, split, split_at, text};
 use odox_core::{Element, Node, Ns, Package, xml};
 
 fn corpus() -> Vec<PathBuf> {
@@ -382,4 +382,38 @@ fn apply_and_join_work_by_path_under_a_root() {
         apply(&mut root, &[1], "x"),
         Err(odox_core::Refused::NotFound)
     );
+}
+
+#[test]
+fn a_split_by_path_puts_the_second_half_after_the_first() {
+    let mut root = paragraph("");
+    root.children.clear();
+    root.children.push(Node::Element(paragraph("onetwo")));
+    root.children.push(Node::Element(paragraph("three")));
+
+    assert_eq!(split_at(&mut root, &[0], 3), Ok(vec![1]));
+    let texts: Vec<String> = root.elements().map(text).collect();
+    assert_eq!(texts, vec!["one", "two", "three"]);
+    assert_eq!(
+        split_at(&mut root, &[7], 0),
+        Err(odox_core::Refused::NotFound)
+    );
+}
+
+#[test]
+fn a_join_does_not_reach_over_a_table() {
+    let mut root = paragraph("");
+    root.children.clear();
+    root.children.push(Node::Element(paragraph("before")));
+    root.children.push(Node::Text("\n".to_owned()));
+    root.children
+        .push(Node::Element(Element::new("table", "table", Ns::Table)));
+    root.children.push(Node::Text("\n".to_owned()));
+    root.children.push(Node::Element(paragraph("after")));
+
+    assert_eq!(
+        join_with_previous(&mut root, &[4]),
+        Err(odox_core::Refused::NotFound)
+    );
+    assert_eq!(root.children.len(), 5, "the table is where it was");
 }

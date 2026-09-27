@@ -94,6 +94,18 @@ fn is_inline_container(element: &Element) -> bool {
         )
 }
 
+/// Whether an element is a paragraph or a heading: what an editor edits.
+pub fn is_paragraph(element: &Element) -> bool {
+    element.is(&Ns::Text, "p") || element.is(&Ns::Text, "h")
+}
+
+/// Whether an element inside a paragraph holds characters of the paragraph's
+/// text, as a span or a link does, rather than being a mark or a field that
+/// contributes none of its own.
+pub fn holds_text(element: &Element) -> bool {
+    is_inline_container_name(element)
+}
+
 /// The containers above, whether or not they hold anything: what an edit may
 /// drop once it has emptied one.
 fn is_inline_container_name(element: &Element) -> bool {
@@ -291,7 +303,7 @@ pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, 
     let Some(Node::Element(paragraph)) = parent.children.get(*last) else {
         return Err(Refused::NotFound);
     };
-    if !(paragraph.is(&Ns::Text, "p") || paragraph.is(&Ns::Text, "h")) {
+    if !is_paragraph(paragraph) {
         return Err(Refused::NotFound);
     }
     let paragraphs = rewrite(paragraph, edited);
@@ -302,22 +314,50 @@ pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, 
     Ok(count)
 }
 
+/// Split the paragraph at a path under a root at a character offset, the
+/// second half becoming the paragraph after it, and answer where the second
+/// half is.
+///
+/// # Errors
+///
+/// The path leads to nothing, or to something that is not a paragraph.
+pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usize>, Refused> {
+    let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
+    let Some(Node::Element(paragraph)) = parent.children.get(*last) else {
+        return Err(Refused::NotFound);
+    };
+    if !is_paragraph(paragraph) {
+        return Err(Refused::NotFound);
+    }
+    let (first, second) = split(paragraph, at);
+    parent
+        .children
+        .splice(*last..=*last, [Node::Element(first), Node::Element(second)]);
+    let mut second_at = above.to_vec();
+    second_at.push(last + 1);
+    Ok(second_at)
+}
+
 /// Join the paragraph at a path onto the paragraph before it among its
 /// parent's children, and answer where the joined paragraph is.
 ///
 /// # Errors
 ///
-/// The path leads to nothing, or there is no paragraph before it.
+/// The path leads to nothing, or the element before it is not a paragraph:
+/// there is none, or a table or a list stands between, which a join would
+/// otherwise delete.
 pub fn join_with_previous(root: &mut Element, path: &[usize]) -> Result<Vec<usize>, Refused> {
     let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
     let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
-    let is_paragraph = |node: &Node| matches!(node, Node::Element(e) if e.is(&Ns::Text, "p") || e.is(&Ns::Text, "h"));
-    if !parent.children.get(*last).is_some_and(is_paragraph) {
+    let paragraph_node = |node: &Node| matches!(node, Node::Element(e) if is_paragraph(e));
+    if !parent.children.get(*last).is_some_and(paragraph_node) {
         return Err(Refused::NotFound);
     }
     let previous = parent.children[..*last]
         .iter()
-        .rposition(is_paragraph)
+        .rposition(|node| matches!(node, Node::Element(_)))
+        .filter(|&index| paragraph_node(&parent.children[index]))
         .ok_or(Refused::NotFound)?;
     // Whitespace between the two, which was between them and is now inside
     // neither, goes too.
