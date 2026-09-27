@@ -151,6 +151,15 @@ impl Presentation {
             .at_mut(&[position])
     }
 
+    /// Where the slide at a position among the body's children is under the
+    /// content root, as a path of child indices: what an editor addresses its
+    /// labels' paragraphs from.
+    pub fn page_path(&self, position: usize) -> Option<Vec<usize>> {
+        let mut path = self.document.body_path("presentation")?;
+        path.push(position);
+        Some(path)
+    }
+
     /// The master page a slide names.
     pub fn master(&self, slide: &Slide<'_>) -> Option<&Element> {
         self.document.styles.master_page(slide.master_page?)

@@ -203,7 +203,8 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     /// what the pointer does on it. Called for every editable paragraph in
     /// document order, on screen or not, after [`Self::input`].
     ///
-    /// `response` is the paragraph's, allocated to sense clicks and drags.
+    /// `response` is the paragraph's, allocated to sense clicks and, for a
+    /// drag to select, drags.
     pub fn paragraph(&mut self, ui: &Ui, response: &Response, paragraph: &P, laid: Laid) {
         let Laid {
             mut galley,
@@ -714,11 +715,15 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
 
         // A press and its release can arrive in one frame, a quick click on a
         // slow frame, and then the button is no longer down on anything; the
-        // click says where it was.
-        if pressed
-            && (response.is_pointer_button_down_on() || response.clicked())
-            && let Some(pos) = pos
-        {
+        // click says where it was. A paragraph that leaves drags to what is
+        // under it takes the click alone, so a press that becomes a drag puts
+        // no caret down.
+        let placed = if response.sense.senses_drag() {
+            pressed && (response.is_pointer_button_down_on() || response.clicked())
+        } else {
+            response.clicked()
+        };
+        if placed && let Some(pos) = pos {
             let cursor = at_pointer(pos);
             let to = Position::new(paragraph.clone(), map.to_model(cursor.index.0));
             match &mut self.selection {
@@ -728,7 +733,9 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             self.next_row = cursor.prefer_next_row;
             self.group = None;
             self.column = None;
-            self.dragging = true;
+            // A paragraph that does not sense drags leaves them to what is
+            // under it, as a slide does to move the shape.
+            self.dragging = response.sense.senses_drag();
             self.last_interaction = ui.input(|input| input.time);
             ui.memory_mut(|memory| memory.request_focus(self.id));
         } else if self.dragging && !down {

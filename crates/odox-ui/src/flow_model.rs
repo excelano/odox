@@ -38,6 +38,9 @@ pub struct FlowModel<'a> {
     /// Where the flow's root is under the content root.
     root: Vec<usize>,
     editing: &'a mut Editing,
+    /// The part of the root the paragraphs are kept to, as a path under it:
+    /// on a slide, the one shape being typed into.
+    scope: Vec<usize>,
     /// Every editable paragraph in drawing order, found when first asked for
     /// and forgotten when an edit changes it.
     order: OnceCell<Vec<Vec<usize>>>,
@@ -50,8 +53,18 @@ impl<'a> FlowModel<'a> {
             content,
             root,
             editing,
+            scope: Vec::new(),
             order: OnceCell::new(),
         }
+    }
+
+    /// Keep to the paragraphs under one element beneath the root, so that
+    /// moving and joining never leave it: a slide's label does not run on
+    /// into the next shape.
+    #[must_use]
+    pub fn within(mut self, scope: Vec<usize>) -> Self {
+        self.scope = scope;
+        self
     }
 
     fn root(&self) -> Option<&Element> {
@@ -71,6 +84,7 @@ impl<'a> FlowModel<'a> {
             if let Some(root) = self.root() {
                 blocks(root, &mut Vec::new(), &mut out);
             }
+            out.retain(|path| path.starts_with(&self.scope));
             out
         })
     }
@@ -248,6 +262,10 @@ fn block(element: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
             blocks(text_box, path, out);
             path.pop();
         }
+    } else if element.name.ns == Ns::Draw {
+        // A drawing shape keeps its label as paragraphs of its own, where a
+        // frame keeps them in a text box.
+        blocks(element, path, out);
     } else if is_block_container(element) {
         blocks(element, path, out);
     }

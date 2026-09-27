@@ -336,17 +336,13 @@ lays the paragraph out, so a click on one lands at its edge and the caret
 steps over it, and a test holds the two lengths equal for every paragraph in
 the corpus.
 
-**A slide's label is edited in a text box where it sits**, in edit mode, on a
-click: the box shows the paragraph's flat text unformatted at the paragraph's
-own font, size, colour, indent and width, on the page's paper. Escape puts
-the paragraph back, Ctrl+Enter or a click elsewhere keeps what was typed,
-Enter is a new paragraph once it is kept, and Backspace with the caret at the
-very start joins the paragraph onto the one before it, the box reopening
-there with the caret at the join. The labels are addressed from the page by
-the shape's index; in edit mode a drag on a slide moves the shape and does not
-select its text. What is written is the difference between what the box was
-given and what it hands back, so a span or a marker outside the change is
-untouched.
+**A slide's label is edited the same way, on the slide.** Its paragraphs are
+named by their path from the page, which begins with the shape's index, and
+the caret keeps to the shape it is in: moving and joining never cross into
+another shape, and a click in another moves it there. A drag on a slide moves
+the shape, so a label's paragraphs take clicks alone and the caret goes down
+on the click; Shift with the arrows selects. The arrows and the page keys step
+through the slides only while nothing has the keyboard.
 
 **A paragraph is edited through its flat text**, built from the tree and not
 from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a

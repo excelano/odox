@@ -13,12 +13,11 @@ use std::path::Path;
 
 use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use odox_core::doc::Presentation;
-use odox_core::{Document, Element, Length, Ns, edit};
+use odox_core::{Document, Element, Length, Ns};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Canvas, Editing, Flow, ParagraphEditor, ParagraphOutcome, Pictures, View, fonts};
+use odox_ui::{Canvas, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
 
 /// A presentation, open or not.
-#[derive(Default)]
 pub struct SlideView {
     document: Option<Presentation>,
     slide: usize,
@@ -28,8 +27,23 @@ pub struct SlideView {
     picked: Option<usize>,
     /// A drag in progress on the picked shape.
     drag: Option<Drag>,
-    /// The label paragraph being typed into, as a path from the page.
-    label: Option<ParagraphEditor>,
+    /// The caret in a label, in edit mode, its paragraphs named by their
+    /// path from the page.
+    page_editor: PageEditor,
+}
+
+impl Default for SlideView {
+    fn default() -> Self {
+        Self {
+            document: None,
+            slide: 0,
+            pictures: Pictures::default(),
+            show_notes: false,
+            picked: None,
+            drag: None,
+            page_editor: page_editor(),
+        }
+    }
 }
 
 /// A shape's box on the page, in ODF points.
@@ -96,7 +110,7 @@ impl View for SlideView {
         self.slide = 0;
         self.picked = None;
         self.drag = None;
-        self.label = None;
+        self.page_editor.clear();
         Ok(())
     }
 
@@ -105,7 +119,7 @@ impl View for SlideView {
         self.pictures.clear();
         self.picked = None;
         self.drag = None;
-        self.label = None;
+        self.page_editor.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -122,7 +136,7 @@ impl View for SlideView {
 
     fn reindex(&mut self) {
         self.drag = None;
-        self.label = None;
+        self.page_editor.document_replaced();
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
@@ -136,10 +150,18 @@ impl View for SlideView {
             });
             return;
         }
-        self.step_keys(ui, count);
-        if ui.input(|input| input.key_pressed(Key::Escape)) && self.label.is_none() {
+        // The arrows and the page keys step through the slides unless
+        // something has the keyboard, as the caret in a label does.
+        if !ui.ctx().egui_wants_keyboard_input() {
+            self.step_keys(ui, count);
+        }
+        if ui.input(|input| input.key_pressed(Key::Escape)) {
             self.picked = None;
             self.drag = None;
+            self.page_editor.clear();
+        }
+        if !editing.on {
+            self.page_editor.clear();
         }
 
         // The document and the picture cache are taken as separate borrows of
@@ -151,13 +173,30 @@ impl View for SlideView {
         let picked = self.picked;
         let dragging = self.drag.is_some();
         let mut action = None;
-        let mut clicked = None;
-        let mut outcome = None;
+
+        // What was typed goes into the tree before it is drawn, kept to the
+        // one shape the caret is in.
+        if edit_mode
+            && let Some(document) = &mut self.document
+            && let Some(position) = document.slides().get(slide_index).map(|s| s.position)
+            && let Some(root) = document.page_path(position)
+        {
+            let scope = self
+                .page_editor
+                .selection()
+                .and_then(|selection| selection.focus.paragraph.first().copied())
+                .into_iter()
+                .collect();
+            let mut model =
+                FlowModel::new(&mut document.document.content, root, editing).within(scope);
+            self.page_editor.input(ui, &mut model);
+        }
+
         let Some(document) = &self.document else {
             return;
         };
         let pictures = &mut self.pictures;
-        let label = self.label.as_mut();
+        let page_editor = edit_mode.then_some(&mut self.page_editor);
         let slides = document.slides();
         let Some(slide) = slides.get(slide_index) else {
             return;
@@ -197,8 +236,7 @@ impl View for SlideView {
                 ui.painter().rect_filled(page, 2.0, palette.paper);
 
                 let mut canvas = Canvas::new(&document.document, pictures, page, fit, palette);
-                canvas.edit_mode = edit_mode;
-                canvas.editor = label;
+                canvas.page_editor = page_editor;
                 // Back to front: the ground, then what the master page draws on
                 // every slide, then the slide's own.
                 canvas.background(ui, &background);
@@ -208,8 +246,6 @@ impl View for SlideView {
                 for (index, shape) in slide.shapes_indexed() {
                     canvas.slide_shape(ui, index, shape);
                 }
-                clicked = canvas.clicked.take();
-                outcome = canvas.outcome.take();
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.
@@ -226,13 +262,7 @@ impl View for SlideView {
             });
         });
 
-        if let Some(outcome) = outcome {
-            self.finish_label(outcome, editing);
-        } else if let Some(path) = clicked
-            && self.label.is_none()
-        {
-            self.begin_label(path);
-        } else if let Some(action) = action {
+        if let Some(action) = action {
             self.act(action, fit, editing);
         }
     }
@@ -260,6 +290,7 @@ impl View for SlideView {
                 self.slide = index;
                 self.picked = None;
                 self.drag = None;
+                self.page_editor.clear();
             }
         }
         true
@@ -272,61 +303,6 @@ impl View for SlideView {
 }
 
 impl SlideView {
-    /// Open the text box on a label's paragraph, by its path from the page.
-    fn begin_label(&mut self, path: Vec<usize>) {
-        let Some(document) = &self.document else {
-            return;
-        };
-        let Some(paragraph) = document
-            .slides()
-            .get(self.slide)
-            .and_then(|slide| slide.element.at(&path))
-        else {
-            return;
-        };
-        self.drag = None;
-        self.label = Some(ParagraphEditor::open(path, edit::text(paragraph), None));
-    }
-
-    /// Close the text box on a label, writing what was typed where it was
-    /// kept; a join first keeps what was typed, then joins the paragraph onto
-    /// the one before it in the same label and opens the box again there.
-    fn finish_label(&mut self, outcome: ParagraphOutcome, editing: &mut Editing) {
-        let Some(editor) = self.label.take() else {
-            return;
-        };
-        if outcome == ParagraphOutcome::Cancel {
-            return;
-        }
-        let Some(document) = &mut self.document else {
-            return;
-        };
-        let Some(position) = document.slides().get(self.slide).map(|s| s.position) else {
-            return;
-        };
-        if editor.changed() || outcome == ParagraphOutcome::JoinPrevious {
-            editing.record(&document.document.content);
-        }
-        let Some(page) = document.page_mut(position) else {
-            return;
-        };
-        if editor.changed() {
-            let _ = edit::apply(page, &editor.path, &editor.text);
-        }
-        if outcome == ParagraphOutcome::JoinPrevious {
-            let previous_len = previous_paragraph_len(page, &editor.path);
-            if let Ok(joined) = edit::join_with_previous(page, &editor.path)
-                && let Some(paragraph) = page.at(&joined)
-            {
-                self.label = Some(ParagraphEditor::open(
-                    joined,
-                    edit::text(paragraph),
-                    previous_len,
-                ));
-            }
-        }
-    }
-
     /// Apply what the slide asked for.
     fn act(&mut self, action: Action, scale: f32, editing: &mut Editing) {
         match action {
@@ -425,6 +401,7 @@ impl SlideView {
             self.slide = slide;
             self.picked = None;
             self.drag = None;
+            self.page_editor.clear();
         }
     }
 }
@@ -548,21 +525,6 @@ fn notes_panel(
                 }
             });
         });
-}
-
-/// How long the paragraph before the one at a path is, which is where the
-/// caret goes once the two are joined.
-fn previous_paragraph_len(root: &Element, path: &[usize]) -> Option<usize> {
-    let (last, above) = path.split_last()?;
-    root.at(above)?.children[..*last]
-        .iter()
-        .rev()
-        .find_map(|node| match node {
-            odox_core::Node::Element(e) if e.is(&Ns::Text, "p") || e.is(&Ns::Text, "h") => {
-                Some(edit::text(e).chars().count())
-            }
-            _ => None,
-        })
 }
 
 /// A shape's box in the page's points, where it states one: a corner and a

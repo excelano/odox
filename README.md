@@ -109,9 +109,8 @@ spreadsheet application recalculates it.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
-a drag on a corner resizes it, and a click on the text in one opens it as a
-text box where it sits: Escape puts it back, Ctrl+Enter or a click elsewhere
-keeps what you typed.
+a drag on a corner resizes it, and a click on the text in one puts the caret
+there to type into it as in `xodt`, within that shape.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.
