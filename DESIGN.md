@@ -314,10 +314,19 @@ Ctrl+C, Ctrl+X and Ctrl+V go through the clipboard, a pasted line break
 beginning a paragraph. `egui_richedit` does the caret and the keys;
 `odox-ui`'s `FlowModel` names each paragraph by its path under the body, in
 the order the flow draws them through lists, table cells and text boxes, and
-turns each edit into an `odox-core` edit. An edit that would join across
-anything other than a neighbouring paragraph — a table, a list item's edge —
-is refused and changes nothing. A paragraph inside a frame anchored in a
-paragraph is drawn from a clone and is not edited in place.
+turns each edit into an `odox-core` edit. A paragraph inside a frame
+anchored in a paragraph is drawn from a clone and is not edited in place.
+
+**A range joins its ends across list structure and not out of a table.**
+Replacing a selection, or Backspace at a paragraph's start, joins what is
+left of the last paragraph onto the first and removes what lay between,
+list items and lists emptied by that included; the first paragraph keeps its
+style and its place. Enter in a list item begins a new item after it, taking
+what followed in the item. A table or a frame the range wholly contains goes
+with the rest. A range with an end inside a table, a cell or a frame it does
+not wholly contain takes the selected text out of each paragraph it covers
+and leaves every paragraph and cell standing, so Backspace at the start of a
+cell does nothing.
 
 The caret stands in the paragraph's flat text, and what is drawn is not that
 text character for character: a tab is drawn as spaces, a note as its

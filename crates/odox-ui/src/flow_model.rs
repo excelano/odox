@@ -13,7 +13,7 @@ use std::cell::OnceCell;
 use eframe::egui::Id;
 use egui_richedit::{Edit, Model, Position, RichEdit};
 use odox_core::edit::{self, is_paragraph};
-use odox_core::{Element, Node, Ns};
+use odox_core::{Element, Ns, Refused};
 
 use crate::Editing;
 use crate::flow::is_block_container;
@@ -87,28 +87,55 @@ impl<'a> FlowModel<'a> {
         to: &Position<Vec<usize>>,
         text: &str,
     ) -> Option<()> {
-        if from.paragraph == to.paragraph {
-            let paragraph = self.paragraph_mut(&from.paragraph)?;
-            edit::replace(paragraph, from.offset..to.offset, text);
-            return Some(());
+        let root = self.content.at_mut(&self.root)?;
+        match edit::replace_range(
+            root,
+            (&from.paragraph, from.offset),
+            (&to.paragraph, to.offset),
+            text,
+        ) {
+            Ok(()) => Some(()),
+            Err(Refused::Structure) => self.clear_between(from, to, text),
+            Err(_) => None,
         }
-        // Across a paragraph break, only onto the paragraph right beside it:
-        // a range reaching further would take tables and list items with it,
-        // which is not yet something an edit here can do.
-        let (from_last, above) = from.paragraph.split_last()?;
-        let (to_last, to_above) = to.paragraph.split_last()?;
-        let parent = self.root()?.at(above)?;
-        let between = parent.children.get(from_last + 1..*to_last)?;
-        if above != to_above || between.iter().any(|n| matches!(n, Node::Element(_))) {
+    }
+
+    /// A range that crosses a table or a frame, which no join takes apart:
+    /// the selected text goes from every paragraph it covers, each paragraph
+    /// stays where it is, and the new text goes in at the start. Nothing to
+    /// remove and nothing to put in, as Backspace at the start of a cell, is
+    /// refused rather than made an edit of nothing.
+    fn clear_between(
+        &mut self,
+        from: &Position<Vec<usize>>,
+        to: &Position<Vec<usize>>,
+        text: &str,
+    ) -> Option<()> {
+        let order = self.order();
+        let first = order.iter().position(|p| *p == from.paragraph)?;
+        let last = order.iter().position(|p| *p == to.paragraph)?;
+        let covered: Vec<Vec<usize>> = order.get(first..=last)?.to_vec();
+        let ranges: Vec<(Vec<usize>, usize, usize)> = covered
+            .into_iter()
+            .map(|path| {
+                let len = self.text(&path).map_or(0, |t| t.chars().count());
+                let start = if path == from.paragraph {
+                    from.offset
+                } else {
+                    0
+                };
+                let end = if path == to.paragraph { to.offset } else { len };
+                (path, start, end.max(start))
+            })
+            .collect();
+        if text.is_empty() && ranges.iter().all(|(_, start, end)| start == end) {
             return None;
         }
-        let second = self.paragraph_mut(&to.paragraph)?;
-        edit::replace(second, 0..to.offset, "");
-        let first = self.paragraph_mut(&from.paragraph)?;
-        let len = edit::text(first).chars().count();
-        edit::replace(first, from.offset..len, text);
-        let root = self.content.at_mut(&self.root)?;
-        edit::join_with_previous(root, &to.paragraph).ok()?;
+        for (path, start, end) in ranges.into_iter().rev() {
+            let with = if path == from.paragraph { text } else { "" };
+            let paragraph = self.paragraph_mut(&path)?;
+            edit::replace(paragraph, start..end, with);
+        }
         Some(())
     }
 }
@@ -277,6 +304,70 @@ mod tests {
     }
 
     #[test]
+    fn a_selection_over_a_whole_table_takes_it_and_joins_the_ends() {
+        let mut content = content();
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        // From inside "item" to inside "two", over the table's one cell.
+        let at = model.apply(
+            Edit::Replace {
+                from: Position::new(vec![1, 0, 0], 2),
+                to: Position::new(vec![3], 1),
+                text: "X",
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![1, 0, 0], 3)));
+        assert_eq!(model.text(&vec![1, 0, 0]).as_deref(), Some("itXwo"));
+        assert_eq!(
+            model.next(&vec![1, 0, 0]),
+            None,
+            "the table and \"two\" are gone"
+        );
+    }
+
+    #[test]
+    fn a_selection_out_of_a_cell_takes_the_text_and_leaves_the_cell() {
+        let mut content = content();
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        // From inside "cell" to inside "two".
+        let at = model.apply(
+            Edit::Replace {
+                from: Position::new(vec![2, 0, 0, 0], 2),
+                to: Position::new(vec![3], 1),
+                text: "",
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![2, 0, 0, 0], 2)));
+        assert_eq!(model.text(&vec![2, 0, 0, 0]).as_deref(), Some("ce"));
+        assert_eq!(model.text(&vec![3]).as_deref(), Some("wo"));
+    }
+
+    #[test]
+    fn backspace_at_a_list_item_joins_it_to_the_paragraph_before() {
+        let mut content = content();
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let at = model.apply(
+            Edit::Replace {
+                from: Position::new(vec![0], 3),
+                to: Position::new(vec![1, 0, 0], 0),
+                text: "",
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![0], 3)));
+        assert_eq!(model.text(&vec![0]).as_deref(), Some("oneitem"));
+        // The list had one item, and went with it.
+        assert_eq!(model.text(&vec![1, 0, 0, 0]).as_deref(), Some("cell"));
+    }
+
+    #[test]
     fn typing_that_runs_on_past_a_save_is_a_change() {
         let mut content = content();
         let mut editing = Editing::default();
@@ -314,11 +405,12 @@ mod tests {
         assert_eq!(model.text(&vec![0]).as_deref(), Some("o"));
         assert_eq!(model.text(&vec![1]).as_deref(), Some("ne"));
 
-        // Joining across the list is refused, and the refusal is not a step.
+        // Backspace at the start of a table's cell: nothing to join and
+        // nothing to remove, which is refused and is not a step.
         let refused = model.apply(
             Edit::Replace {
-                from: Position::new(vec![1], 2),
-                to: Position::new(vec![2, 0, 0], 0),
+                from: Position::new(vec![2, 0, 0], 4),
+                to: Position::new(vec![3, 0, 0, 0], 0),
                 text: "",
             },
             true,

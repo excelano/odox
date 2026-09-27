@@ -12,7 +12,9 @@
 
 use std::path::{Path, PathBuf};
 
-use odox_core::edit::{apply, join, join_with_previous, replace, rewrite, split, split_at, text};
+use odox_core::edit::{
+    apply, join, join_with_previous, replace, replace_range, rewrite, split, split_at, text,
+};
 use odox_core::{Element, Node, Ns, Package, xml};
 
 fn corpus() -> Vec<PathBuf> {
@@ -416,4 +418,95 @@ fn a_join_does_not_reach_over_a_table() {
         Err(odox_core::Refused::NotFound)
     );
     assert_eq!(root.children.len(), 5, "the table is where it was");
+}
+
+/// A body of blocks written as XML, with the namespaces declared.
+fn body(inner: &str) -> Element {
+    let source = format!(
+        r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{inner}</office:text>"#
+    );
+    xml::parse(source.as_bytes(), "test").expect("a body")
+}
+
+/// The body written back out, without its root's namespace declarations.
+fn inner(body: &Element) -> String {
+    let written = String::from_utf8(xml::serialize(body)).expect("UTF-8");
+    let root = written.find("<office:text").expect("the body's start tag");
+    let open = root + written[root..].find('>').expect("a start tag") + 1;
+    let close = written.rfind("</").expect("an end tag");
+    written[open..close].to_owned()
+}
+
+#[test]
+fn a_range_across_list_items_joins_the_ends_and_drops_the_middle() {
+    let mut root = body(
+        "<text:list><text:list-item><text:p>one</text:p></text:list-item><text:list-item><text:p>two</text:p></text:list-item><text:list-item><text:p>three</text:p></text:list-item></text:list>",
+    );
+    replace_range(&mut root, (&[0, 0, 0], 2), (&[0, 2, 0], 2), "X").expect("joins");
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item><text:p>onXree</text:p></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn backspace_at_a_list_s_first_item_joins_it_to_the_paragraph_before() {
+    let mut root = body(
+        "<text:p>before</text:p><text:list><text:list-item><text:p>one</text:p></text:list-item><text:list-item><text:p>two</text:p></text:list-item></text:list>",
+    );
+    replace_range(&mut root, (&[0], 6), (&[1, 0, 0], 0), "").expect("joins");
+    assert_eq!(
+        inner(&root),
+        "<text:p>beforeone</text:p><text:list><text:list-item><text:p>two</text:p></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn a_range_into_a_nested_list_takes_what_it_passes_over() {
+    let mut root = body(
+        "<text:list><text:list-item><text:p>first</text:p></text:list-item><text:list-item><text:p>second</text:p><text:list><text:list-item><text:p>nested</text:p></text:list-item></text:list></text:list-item><text:list-item><text:p>last</text:p></text:list-item></text:list>",
+    );
+    replace_range(&mut root, (&[0, 0, 0], 5), (&[0, 1, 1, 0, 0], 0), "").expect("joins");
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item><text:p>firstnested</text:p></text:list-item><text:list-item><text:p>last</text:p></text:list-item></text:list>"
+    );
+}
+
+const TABLE_BETWEEN: &str = "<text:p>before</text:p><table:table><table:table-row><table:table-cell><text:p>cell</text:p></table:table-cell></table:table-row></table:table><text:p>after</text:p>";
+
+#[test]
+fn a_range_ending_inside_a_table_is_refused_and_changes_nothing() {
+    let mut root = body(TABLE_BETWEEN);
+    let untouched = root.clone();
+    assert_eq!(
+        replace_range(&mut root, (&[0], 6), (&[1, 0, 0, 0], 0), ""),
+        Err(odox_core::Refused::Structure),
+        "into a cell"
+    );
+    assert_eq!(
+        replace_range(&mut root, (&[1, 0, 0, 0], 2), (&[2], 2), ""),
+        Err(odox_core::Refused::Structure),
+        "out of one"
+    );
+    assert_eq!(root, untouched);
+}
+
+#[test]
+fn a_range_over_a_whole_table_takes_the_table() {
+    let mut root = body(TABLE_BETWEEN);
+    replace_range(&mut root, (&[0], 2), (&[2], 2), "").expect("joins");
+    assert_eq!(inner(&root), "<text:p>beter</text:p>");
+}
+
+#[test]
+fn a_split_in_a_list_item_begins_a_new_item_with_what_followed() {
+    let mut root = body(
+        "<text:list><text:list-item text:start-value=\"4\"><text:p>onetwo</text:p><text:list><text:list-item><text:p>nested</text:p></text:list-item></text:list></text:list-item></text:list>",
+    );
+    assert_eq!(split_at(&mut root, &[0, 0, 0], 3), Ok(vec![0, 1, 0]));
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item text:start-value=\"4\"><text:p>one</text:p></text:list-item><text:list-item><text:p>two</text:p><text:list><text:list-item><text:p>nested</text:p></text:list-item></text:list></text:list-item></text:list>"
+    );
 }

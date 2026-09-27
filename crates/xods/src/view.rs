@@ -675,7 +675,9 @@ fn notice(refused: &Refused) -> String {
     match refused {
         Refused::Formula => t("This cell holds a formula, which this version does not edit."),
         Refused::Covered => t("This cell is covered by the one that spans it."),
-        Refused::NotFound => t("There is no cell there."),
+        // A cell is never a range, so a refusal over structure is not one a
+        // cell hears.
+        Refused::NotFound | Refused::Structure => t("There is no cell there."),
     }
     .to_owned()
 }

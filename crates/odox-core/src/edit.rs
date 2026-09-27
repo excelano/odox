@@ -32,6 +32,9 @@ pub enum Refused {
     Formula,
     /// There is no such sheet, slide, shape or paragraph.
     NotFound,
+    /// An end of the range is inside a table, a cell or a frame the range
+    /// does not wholly contain, which a join of text does not take apart.
+    Structure,
 }
 
 impl fmt::Display for Refused {
@@ -40,6 +43,7 @@ impl fmt::Display for Refused {
             Self::Covered => write!(f, "the cell is covered by a neighbour's span"),
             Self::Formula => write!(f, "the cell holds a formula"),
             Self::NotFound => write!(f, "nothing is there to edit"),
+            Self::Structure => write!(f, "the range crosses a table or a frame"),
         }
     }
 }
@@ -318,6 +322,9 @@ pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, 
 /// second half becoming the paragraph after it, and answer where the second
 /// half is.
 ///
+/// In a list item the second half begins a new item after it, as Enter does
+/// in a list, and whatever followed the paragraph in the item goes with it.
+///
 /// # Errors
 ///
 /// The path leads to nothing, or to something that is not a paragraph.
@@ -331,12 +338,156 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
         return Err(Refused::NotFound);
     }
     let (first, second) = split(paragraph, at);
-    parent
-        .children
-        .splice(*last..=*last, [Node::Element(first), Node::Element(second)]);
-    let mut second_at = above.to_vec();
-    second_at.push(last + 1);
+    if !parent.is(&Ns::Text, "list-item") {
+        parent
+            .children
+            .splice(*last..=*last, [Node::Element(first), Node::Element(second)]);
+        let mut second_at = above.to_vec();
+        second_at.push(last + 1);
+        return Ok(second_at);
+    }
+
+    // A new item, named the way the document names its items, holding the
+    // second half and what followed it. The item's attributes stay with the
+    // item: a start value or an id belongs to one item and not to two.
+    let mut item = Element {
+        name: parent.name.clone(),
+        attrs: Vec::new(),
+        children: vec![Node::Element(second)],
+        self_closing: false,
+    };
+    item.children.extend(parent.children.drain(last + 1..));
+    parent.children[*last] = Node::Element(first);
+    let (item_at, list_path) = above.split_last().ok_or(Refused::NotFound)?;
+    let enclosing = root.at_mut(list_path).ok_or(Refused::NotFound)?;
+    enclosing.children.insert(item_at + 1, Node::Element(item));
+    let mut second_at = list_path.to_vec();
+    second_at.extend([item_at + 1, 0]);
     Ok(second_at)
+}
+
+/// Replace the text from one position to another with new text, and join
+/// what is left of the last paragraph onto the first. A position is a
+/// paragraph's path under the root and a character offset into its text.
+///
+/// Everything between the two goes, as a selection over it takes it:
+/// paragraphs, tables and frames the range wholly contains, and list items
+/// and lists left with nothing in them. The first paragraph keeps its style
+/// and its place, and the last one's remaining text follows the new text in
+/// it.
+///
+/// # Errors
+///
+/// Either path does not lead to a paragraph, or the first is not before the
+/// last; or an end is inside a table, a cell or a frame that the range does
+/// not wholly contain ([`Refused::Structure`]), which no join takes apart.
+/// Each is refused before anything changes.
+pub fn replace_range(
+    root: &mut Element,
+    from: (&[usize], usize),
+    to: (&[usize], usize),
+    with: &str,
+) -> Result<(), Refused> {
+    let ((from, start), (to, end)) = (from, to);
+    if !root.at(from).is_some_and(is_paragraph) || !root.at(to).is_some_and(is_paragraph) {
+        return Err(Refused::NotFound);
+    }
+    if from == to {
+        let paragraph = root.at_mut(from).ok_or(Refused::NotFound)?;
+        replace(paragraph, start..end, with);
+        return Ok(());
+    }
+    // The deepest element holding both ends, and which of its children each
+    // end is in.
+    let common = from.iter().zip(to).take_while(|(a, b)| a == b).count();
+    if common >= from.len() || common >= to.len() || from[common] >= to[common] {
+        return Err(Refused::NotFound);
+    }
+    if end_inside_structure(root, common, from, to) {
+        return Err(Refused::Structure);
+    }
+    let (first_child, last_child) = (from[common], to[common]);
+
+    // The last paragraph first: it is after everything else touched, so
+    // taking it apart moves no path still to be used.
+    let last = root.at_mut(to).ok_or(Refused::NotFound)?;
+    replace(last, 0..end, "");
+    let tail = std::mem::take(&mut last.children);
+
+    let holder = root.at_mut(&from[..common]).ok_or(Refused::NotFound)?;
+    let emptied = match holder.children.get_mut(last_child) {
+        Some(Node::Element(child)) if common + 1 < to.len() => {
+            strip_before(child, &to[common + 1..])
+        }
+        _ => true,
+    };
+    if emptied {
+        holder.children.remove(last_child);
+    }
+    holder.children.drain(first_child + 1..last_child);
+    if let Some(Node::Element(child)) = holder.children.get_mut(first_child) {
+        strip_after(child, &from[common + 1..]);
+    }
+
+    let first = root.at_mut(from).ok_or(Refused::NotFound)?;
+    let len = text(first).chars().count();
+    replace(first, start..len, with);
+    let mut rest = Element::new("text", "p", Ns::Text);
+    rest.children = tail;
+    join(first, rest);
+    Ok(())
+}
+
+/// Whether either end of a range, whose two paths agree for their first
+/// `common` steps, sits inside a table, a cell or a frame that the range
+/// does not wholly contain. One wholly between the ends goes with the rest.
+fn end_inside_structure(root: &Element, common: usize, from: &[usize], to: &[usize]) -> bool {
+    let inside = |path: &[usize]| {
+        (common + 1..path.len()).any(|depth| root.at(&path[..depth]).is_some_and(is_structure))
+    };
+    inside(from) || inside(to)
+}
+
+fn is_structure(element: &Element) -> bool {
+    element.is(&Ns::Table, "table")
+        || element.is(&Ns::Table, "table-row")
+        || element.is(&Ns::Table, "table-cell")
+        || element.is(&Ns::Table, "covered-table-cell")
+        || element.is(&Ns::Draw, "frame")
+        || element.is(&Ns::Draw, "text-box")
+}
+
+/// Remove, under an element, everything before the end of a path, the end
+/// itself, and every element that leaves empty. Answers whether the element
+/// is left with no elements in it.
+fn strip_before(element: &mut Element, path: &[usize]) -> bool {
+    let Some((&at, rest)) = path.split_first() else {
+        return true;
+    };
+    let emptied = match element.children.get_mut(at) {
+        Some(Node::Element(child)) if !rest.is_empty() => strip_before(child, rest),
+        _ => true,
+    };
+    let through = if emptied { at + 1 } else { at };
+    element
+        .children
+        .drain(..through.min(element.children.len()));
+    !element
+        .children
+        .iter()
+        .any(|n| matches!(n, Node::Element(_)))
+}
+
+/// Remove, under an element, everything after the end of a path, at every
+/// level down to it.
+fn strip_after(element: &mut Element, path: &[usize]) {
+    let Some((&at, rest)) = path.split_first() else {
+        return;
+    };
+    if let Some(Node::Element(child)) = element.children.get_mut(at) {
+        strip_after(child, rest);
+    }
+    element.children.truncate(at + 1);
 }
 
 /// Join the paragraph at a path onto the paragraph before it among its
