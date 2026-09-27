@@ -32,9 +32,6 @@ Wayland: `env -u WAYLAND_DISPLAY DISPLAY=:0 cargo run -p xodt -- <file> &`, then
 `import -window <id>`. `pkill -x xodt` stops it; `pkill -f` kills the shell too.
 The target directory is shared across the fleet: `df -h /` before a long build.
 
-The commit trailer is one line, a `Co-Authored-By` naming the model, and nothing
-under it: no `Claude-Session:` line, because this repository is public.
-
 Linux is `packaging/linux` and `packaging/debian`. `packaging/windows` and
 `packaging/macos` are edited from here too — `ssh winwork` reaches the Windows
 VM (not always running) and `ssh macmini` reaches the Mac, for whatever
