@@ -181,3 +181,99 @@ pub fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
 pub fn color32(color: Color) -> Color32 {
     Color32::from_rgb(color.r, color.g, color.b)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `LibreOffice`'s own "Internet Link" style, which every hyperlink this
+    /// file draws is at least as likely to carry as no colour at all.
+    fn navy() -> Color {
+        Color {
+            r: 0x00,
+            g: 0x00,
+            b: 0x80,
+        }
+    }
+
+    #[test]
+    fn for_theme_light_is_the_default_palette() {
+        let light = Palette::for_theme(false);
+        let default = Palette::default();
+        assert_eq!(light.paper, default.paper);
+        assert_eq!(light.ink, default.ink);
+        assert_eq!(light.link, default.link);
+    }
+
+    #[test]
+    fn for_theme_dark_moves_paper_ink_and_link_together() {
+        let dark = Palette::for_theme(true);
+        let light = Palette::for_theme(false);
+        assert_ne!(dark.paper, light.paper);
+        assert_ne!(dark.ink, light.ink);
+        assert_ne!(dark.link, light.link);
+    }
+
+    #[test]
+    fn text_format_keeps_a_documents_own_colour_in_either_theme() {
+        let properties = TextProperties {
+            color: Some(navy()),
+            ..TextProperties::default()
+        };
+        for dark_mode in [false, true] {
+            let format = text_format(
+                &properties,
+                DEFAULT_SIZE,
+                1.0,
+                Palette::for_theme(dark_mode),
+            );
+            assert_eq!(format.color, color32(navy()));
+        }
+    }
+
+    #[test]
+    fn text_format_falls_back_to_the_palettes_ink_when_unset() {
+        let properties = TextProperties::default();
+        let palette = Palette::for_theme(true);
+        let format = text_format(&properties, DEFAULT_SIZE, 1.0, palette);
+        assert_eq!(format.color, palette.ink);
+    }
+
+    /// The regression this guards: `LibreOffice` resolves a colour into every
+    /// hyperlink's "Internet Link" style whether an author touched it or not,
+    /// so a link that only followed an *unset* colour almost never followed
+    /// the theme in a real document. `link_format` has to win against a
+    /// colour the document actually carries, not just against none at all.
+    #[test]
+    fn link_format_overrides_a_documents_own_resolved_colour() {
+        let properties = TextProperties {
+            color: Some(navy()),
+            ..TextProperties::default()
+        };
+        let palette = Palette::for_theme(true);
+        let format = link_format(&properties, DEFAULT_SIZE, 1.0, palette);
+        assert_eq!(format.color, palette.link);
+        assert_ne!(format.color, color32(navy()));
+    }
+
+    #[test]
+    fn link_format_underline_follows_the_link_colour_not_the_old_text_colour() {
+        let properties = TextProperties {
+            color: Some(navy()),
+            underline: Some(true),
+            ..TextProperties::default()
+        };
+        let palette = Palette::for_theme(true);
+        let format = link_format(&properties, DEFAULT_SIZE, 1.0, palette);
+        assert_eq!(format.underline.color, palette.link);
+    }
+
+    #[test]
+    fn link_format_underlines_a_link_with_no_styling_at_all() {
+        let properties = TextProperties::default();
+        let palette = Palette::for_theme(false);
+        let format = link_format(&properties, DEFAULT_SIZE, 1.0, palette);
+        assert_eq!(format.color, palette.link);
+        assert!(format.underline.width >= 1.0);
+    }
+}
