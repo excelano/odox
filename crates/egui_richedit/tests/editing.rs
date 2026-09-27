@@ -2,7 +2,8 @@
 //! raw input, and what the model holds afterwards is what is checked.
 //!
 //! The model is a list of plain strings, which is the point: nothing about the
-//! editor may need a richer document than that to work.
+//! editor may need a richer document than that to work. Bold, one flag a
+//! character, is the one formatting it keeps, for the marks.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -10,11 +11,13 @@
 use egui::output::OutputCommand;
 use egui::text::LayoutJob;
 use egui::{Context, Event, Id, Key, Modifiers, Pos2, RawInput, Rect, Sense, TextFormat, vec2};
-use egui_richedit::{Edit, Laid, Model, ParagraphJob, Position, RichEdit, Selection};
+use egui_richedit::{Edit, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection};
 
 /// Paragraphs of plain text, named by their index.
 struct Plain {
     paragraphs: Vec<String>,
+    /// Whether each character of each paragraph is bold.
+    bold: Vec<Vec<bool>>,
     /// How many undo steps the edits made so far began.
     steps: usize,
 }
@@ -23,8 +26,42 @@ impl Plain {
     fn new(paragraphs: &[&str]) -> Self {
         Self {
             paragraphs: paragraphs.iter().map(|&p| p.to_owned()).collect(),
+            bold: paragraphs
+                .iter()
+                .map(|p| vec![false; p.chars().count()])
+                .collect(),
             steps: 0,
         }
+    }
+
+    /// The bold characters of a paragraph.
+    fn bold_text(&self, paragraph: usize) -> String {
+        self.paragraphs[paragraph]
+            .chars()
+            .zip(&self.bold[paragraph])
+            .filter(|(_, bold)| **bold)
+            .map(|(c, _)| c)
+            .collect()
+    }
+
+    /// Each paragraph from one position to another, with the range of it
+    /// between them.
+    fn spans(
+        &self,
+        from: &Position<usize>,
+        to: &Position<usize>,
+    ) -> Vec<(usize, std::ops::Range<usize>)> {
+        (from.paragraph..=to.paragraph)
+            .map(|p| {
+                let start = if p == from.paragraph { from.offset } else { 0 };
+                let end = if p == to.paragraph {
+                    to.offset
+                } else {
+                    self.bold[p].len()
+                };
+                (p, start..end)
+            })
+            .collect()
     }
 }
 
@@ -57,6 +94,24 @@ impl Model for Plain {
         self.paragraphs.len().checked_sub(1)
     }
 
+    fn marked(&self, from: &Position<usize>, to: &Position<usize>, mark: Mark) -> Option<bool> {
+        if mark != Mark::Bold {
+            return Some(false);
+        }
+        if from == to {
+            // Typed text takes the character before it.
+            let bold = &self.bold[from.paragraph];
+            let at = from.offset.saturating_sub(1);
+            return Some(bold.get(at).copied().unwrap_or(false));
+        }
+        let mut chars = self
+            .spans(from, to)
+            .into_iter()
+            .flat_map(|(p, range)| self.bold[p][range].to_vec());
+        let first = chars.next()?;
+        chars.all(|b| b == first).then_some(first)
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
         if new_step {
             self.steps += 1;
@@ -67,11 +122,18 @@ impl Model for Plain {
                     let last = self.paragraphs.get(to.paragraph)?;
                     last[byte(last, to.offset)..].to_owned()
                 };
+                let tail_bold = self.bold[to.paragraph][to.offset..].to_vec();
+                let bold = &mut self.bold[from.paragraph];
+                let typed_bold = from.offset > 0 && bold[from.offset - 1];
+                bold.truncate(from.offset);
+                bold.extend(std::iter::repeat_n(typed_bold, text.chars().count()));
+                bold.extend(tail_bold);
                 let first = self.paragraphs.get_mut(from.paragraph)?;
                 first.truncate(byte(first, from.offset));
                 first.push_str(text);
                 first.push_str(&tail);
                 self.paragraphs.drain(from.paragraph + 1..=to.paragraph);
+                self.bold.drain(from.paragraph + 1..=to.paragraph);
                 Some(Position::new(
                     from.paragraph,
                     from.offset + text.chars().count(),
@@ -81,7 +143,17 @@ impl Model for Plain {
                 let paragraph = self.paragraphs.get_mut(at.paragraph)?;
                 let second = paragraph.split_off(byte(paragraph, at.offset));
                 self.paragraphs.insert(at.paragraph + 1, second);
+                let second = self.bold[at.paragraph].split_off(at.offset);
+                self.bold.insert(at.paragraph + 1, second);
                 Some(Position::new(at.paragraph + 1, 0))
+            }
+            Edit::Format { from, to, mark, on } => {
+                if mark == Mark::Bold {
+                    for (p, range) in self.spans(&from, &to) {
+                        self.bold[p][range].fill(on);
+                    }
+                }
+                Some(to)
             }
         }
     }
@@ -362,6 +434,10 @@ impl Model for Refusing {
         self.0.last()
     }
 
+    fn marked(&self, from: &Position<usize>, to: &Position<usize>, mark: Mark) -> Option<bool> {
+        self.0.marked(from, to, mark)
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
         match &edit {
             Edit::Replace { from, to, .. } if from.paragraph != to.paragraph => None,
@@ -564,4 +640,72 @@ fn a_paragraph_that_leaves_drags_takes_a_caret_on_a_click_and_not_on_a_drag() {
     frame(vec![button(5.0, true)]);
     let clicked = frame(vec![button(5.0, false)]).expect("a click puts a caret down");
     assert_eq!(clicked.focus.paragraph, 0);
+}
+
+fn command(key: Key) -> (Key, Modifiers) {
+    (key, Modifiers::COMMAND)
+}
+
+#[test]
+fn a_mark_on_a_selection_is_one_step_and_keeps_the_selection() {
+    let mut h = Harness::new(&["one two", "three"]);
+    h.caret(0, 4);
+    // "two", the break, and "th".
+    let mut keys = vec![(Key::ArrowRight, Modifiers::SHIFT); 6];
+    keys.push(command(Key::B));
+    h.keys(&keys);
+    assert_eq!(h.model.bold_text(0), "two");
+    assert_eq!(h.model.bold_text(1), "th");
+    assert_eq!(h.model.steps, 1);
+    let selection = h.editor.selection().expect("a selection").clone();
+    assert!(!selection.is_caret(), "the selection stays");
+    assert_eq!(h.editor.marked(&h.model, Mark::Bold), Some(true));
+
+    // All of it bold: the mark comes off.
+    h.keys(&[command(Key::B)]);
+    assert_eq!(h.model.bold_text(0), "");
+    assert_eq!(h.model.steps, 2);
+}
+
+#[test]
+fn a_mixed_selection_takes_the_mark_throughout() {
+    let mut h = Harness::new(&["abcd"]);
+    h.caret(0, 0);
+    h.keys(&[(Key::ArrowRight, Modifiers::SHIFT), command(Key::B)]);
+    assert_eq!(h.model.bold_text(0), "a");
+    h.caret(0, 0);
+    h.keys(&[(Key::End, Modifiers::SHIFT)]);
+    assert_eq!(h.editor.marked(&h.model, Mark::Bold), None);
+    h.keys(&[command(Key::B)]);
+    assert_eq!(h.model.bold_text(0), "abcd");
+}
+
+#[test]
+fn a_mark_at_a_caret_goes_to_what_is_typed_there_next() {
+    let mut h = Harness::new(&["ab"]);
+    h.caret(0, 1);
+    h.keys(&[command(Key::B)]);
+    assert_eq!(h.model.steps, 0, "nothing changed yet");
+    assert_eq!(h.editor.marked(&h.model, Mark::Bold), Some(true));
+    h.typed("x");
+    h.typed("y");
+    assert_eq!(h.model.paragraphs, ["axyb"]);
+    assert_eq!(h.model.bold_text(0), "xy");
+    assert_eq!(h.model.steps, 1, "the typing and its mark are one step");
+}
+
+#[test]
+fn a_mark_at_a_caret_is_forgotten_when_the_caret_moves_or_is_toggled_back() {
+    let mut h = Harness::new(&["abc"]);
+    h.caret(0, 1);
+    h.keys(&[command(Key::B)]);
+    h.key(Key::ArrowRight);
+    assert_eq!(h.editor.marked(&h.model, Mark::Bold), Some(false));
+    h.typed("x");
+    assert_eq!(h.model.bold_text(0), "");
+
+    h.keys(&[command(Key::B), command(Key::B)]);
+    assert_eq!(h.editor.marked(&h.model, Mark::Bold), Some(false));
+    h.typed("y");
+    assert_eq!(h.model.bold_text(0), "");
 }

@@ -18,7 +18,7 @@ use egui::{
     Response, Sense, Ui, vec2,
 };
 
-use crate::{Edit, Model, OffsetMap, Position, Selection};
+use crate::{Edit, Mark, Model, OffsetMap, Position, Selection};
 
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
@@ -79,6 +79,16 @@ pub struct RichEdit<P> {
     /// When the caret last moved or the text last changed, which is when its
     /// blink restarts.
     last_interaction: f64,
+    /// Marks given or taken off at a caret, for the text typed there next.
+    pending: Option<Pending<P>>,
+}
+
+/// Marks given or taken off with a caret and nothing selected. The next text
+/// typed at that caret takes them; once the caret is anywhere else, or the
+/// document has changed, they are forgotten.
+struct Pending<P> {
+    at: Position<P>,
+    marks: Vec<(Mark, bool)>,
 }
 
 /// What the caret is owed by the next frame that draws it.
@@ -131,6 +141,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             page_height: 0.0,
             dragging: false,
             last_interaction: 0.0,
+            pending: None,
         }
     }
 
@@ -145,6 +156,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.selection = Some(selection);
         self.group = None;
         self.column = None;
+        self.pending = None;
         self.owed = Owed::FocusAndReveal;
     }
 
@@ -154,6 +166,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.group = None;
         self.column = None;
         self.dragging = false;
+        self.pending = None;
     }
 
     /// The document was changed or replaced by something other than this
@@ -162,6 +175,63 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     pub fn document_replaced(&mut self) {
         self.group = None;
         self.column = None;
+        self.pending = None;
+    }
+
+    /// Whether the selection carries a mark, as a toolbar shows it: `None`
+    /// where part of it does, and for a caret what text typed there would
+    /// take, a mark given or taken off at the caret included. `None` too when
+    /// there is no caret.
+    pub fn marked<M: Model<Paragraph = P>>(&self, model: &M, mark: Mark) -> Option<bool> {
+        let selection = self.selection.as_ref()?;
+        if let Some(on) = self.pending_mark(mark) {
+            return Some(on);
+        }
+        let (from, to) = self.ordered(selection);
+        model.marked(&from, &to, mark)
+    }
+
+    /// Give the selection a mark, or take it off where all of it has it, in
+    /// one undo step; with a caret and nothing selected, give it to or take it
+    /// off what is typed next at the caret. Answers whether the document
+    /// changed. The editor takes the keyboard back from whatever asked, as a
+    /// toolbar's button does.
+    pub fn toggle<M: Model<Paragraph = P>>(&mut self, model: &mut M, mark: Mark) -> bool {
+        let Some(selection) = self.selection.clone() else {
+            return false;
+        };
+        self.owed = Owed::FocusAndReveal;
+        let on = self.marked(model, mark) != Some(true);
+        if selection.is_caret() {
+            let at = selection.focus;
+            let mut marks = match self.pending.take() {
+                Some(pending) if pending.at == at => pending.marks,
+                _ => Vec::new(),
+            };
+            marks.retain(|(m, _)| *m != mark);
+            if model.marked(&at, &at, mark) != Some(on) {
+                marks.push((mark, on));
+            }
+            self.pending = (!marks.is_empty()).then_some(Pending { at, marks });
+            return false;
+        }
+        let (from, to) = self.ordered(&selection);
+        self.group = None;
+        let changed = self.format(model, from, to, mark, on, Group::Other);
+        self.group = None;
+        changed
+    }
+
+    /// What a mark given or taken off at the caret says, while the caret is
+    /// where it was then.
+    fn pending_mark(&self, mark: Mark) -> Option<bool> {
+        let selection = self.selection.as_ref().filter(|s| s.is_caret())?;
+        let pending = self.pending.as_ref().filter(|p| p.at == selection.focus)?;
+        pending
+            .marks
+            .iter()
+            .find(|(m, _)| *m == mark)
+            .map(|(_, on)| *on)
     }
 
     /// Take this frame's events and apply them to the model. Called once a
@@ -322,7 +392,10 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 pressed: true,
                 modifiers,
                 ..
-            } => self.key(model, *key, *modifiers),
+            } => match shortcut(*key).filter(|_| modifiers.command) {
+                Some(mark) => (false, self.toggle(model, mark)),
+                None => self.key(model, *key, *modifiers),
+            },
             _ => (false, false),
         }
     }
@@ -447,13 +520,31 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
     }
 
-    /// Replace the selection with text, as typing does.
+    /// Replace the selection with text, as typing does, and give what was
+    /// typed the marks given or taken off at the caret.
     fn type_text<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let Some(selection) = &self.selection else {
             return false;
         };
         let (from, to) = self.ordered(selection);
-        self.apply(model, Edit::Replace { from, to, text }, Group::Typing)
+        let marks: Vec<(Mark, bool)> = Mark::ALL
+            .into_iter()
+            .filter_map(|mark| self.pending_mark(mark).map(|on| (mark, on)))
+            .collect();
+        let edit = Edit::Replace {
+            from: from.clone(),
+            to,
+            text,
+        };
+        if !self.apply(model, edit, Group::Typing) {
+            return false;
+        }
+        if let Some(end) = self.selection.as_ref().map(|s| s.focus.clone()) {
+            for (mark, on) in marks {
+                self.format(model, from.clone(), end.clone(), mark, on, Group::Typing);
+            }
+        }
+        true
     }
 
     /// Paste text, each of its lines after the first a paragraph of its own,
@@ -518,6 +609,27 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.selection = Some(Selection::caret(at));
         self.next_row = false;
         self.column = None;
+        self.pending = None;
+        true
+    }
+
+    /// Hand a format to the model, as [`Self::apply`] does an edit, leaving
+    /// the selection where it is.
+    fn format<M: Model<Paragraph = P>>(
+        &mut self,
+        model: &mut M,
+        from: Position<P>,
+        to: Position<P>,
+        mark: Mark,
+        on: bool,
+        group: Group,
+    ) -> bool {
+        let new_step = self.group != Some(group);
+        let edit = Edit::Format { from, to, mark, on };
+        if model.apply(edit, new_step).is_none() {
+            return false;
+        }
+        self.group = Some(group);
         true
     }
 
@@ -814,6 +926,17 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             CCursor::new(map.to_galley(start)),
             CCursor::new(map.to_galley(end)),
         ))
+    }
+}
+
+/// The mark a key toggles with Ctrl, or Command on a Mac. Strikethrough has
+/// no shortcut that people share, so it has none.
+fn shortcut(key: Key) -> Option<Mark> {
+    match key {
+        Key::B => Some(Mark::Bold),
+        Key::I => Some(Mark::Italic),
+        Key::U => Some(Mark::Underline),
+        _ => None,
     }
 }
 
