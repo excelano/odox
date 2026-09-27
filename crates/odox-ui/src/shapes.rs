@@ -25,7 +25,8 @@ use odox_core::{
     Properties, Transform,
 };
 
-use crate::flow::{Editor, Flow, Outcome, Pictures};
+use crate::flow::{Flow, Pictures};
+use crate::flow_model::PageEditor;
 use crate::format::{self, Palette};
 
 /// A page, and where on screen it is being drawn.
@@ -40,16 +41,10 @@ pub struct Canvas<'a> {
     pub scale: f32,
     /// The colours to draw in where the document names none.
     pub palette: Palette,
-    /// Whether a click on a label's paragraph opens it for editing.
-    pub edit_mode: bool,
-    /// The paragraph being edited, as a path from the page: the shape's index
-    /// among the page's children, then the way down to the paragraph.
-    pub editor: Option<&'a mut Editor>,
-    /// The paragraph a person clicked this frame in edit mode, as a path from
-    /// the page.
-    pub clicked: Option<Vec<usize>>,
-    /// What the editor asked for this frame, if it closed.
-    pub outcome: Option<Outcome>,
+    /// The page editor, in edit mode: the slide's own labels are typed into
+    /// through it, each paragraph named by its path from the page, which is
+    /// the shape's index among the page's children and then the way down.
+    pub page_editor: Option<&'a mut PageEditor>,
     /// The index among the page's children of the shape being drawn, where it
     /// is one of the slide's own; a master page's decoration has none and
     /// nothing in it is edited.
@@ -125,10 +120,7 @@ impl<'a> Canvas<'a> {
             page,
             scale,
             palette,
-            edit_mode: false,
-            editor: None,
-            clicked: None,
-            outcome: None,
+            page_editor: None,
             at: None,
         }
     }
@@ -522,44 +514,35 @@ impl Canvas<'_> {
         let document = self.document;
         let pictures = &mut *self.pictures;
         // Editable where the label belongs to one of the slide's own shapes,
-        // which is what a prefix says.
-        let edit_mode = self.edit_mode && prefix.is_some();
-        let editor = self.editor.as_deref_mut().filter(|_| edit_mode);
+        // which is what a prefix says, and in the pass that draws it: the
+        // measuring pass draws nothing, and the editor would take its clicks.
+        let edit_mode = self.page_editor.is_some() && prefix.is_some();
+        let page_editor = self
+            .page_editor
+            .as_deref_mut()
+            .filter(|_| edit_mode && !measuring);
         let mut builder = UiBuilder::new().max_rect(rect);
         if measuring {
             builder = builder.sizing_pass().invisible();
         }
-        let mut clicked = None;
-        let mut outcome = None;
-        let height = ui
-            .scope_builder(builder, |ui| {
-                ui.set_clip_rect(rect.intersect(page));
-                let mut flow = Flow::new(document, pictures, scale);
-                flow.palette = palette;
-                flow.edit_mode = edit_mode;
-                flow.selectable = !edit_mode;
-                flow.editor = editor;
-                if let Some(prefix) = prefix {
-                    flow.start_at(prefix.clone());
-                }
-                if picture {
-                    flow.frame(ui, content, rect.width());
-                } else {
-                    flow.blocks(ui, content, rect.width());
-                }
-                clicked = flow.clicked.take();
-                outcome = flow.outcome.take();
-            })
-            .response
-            .rect
-            .height();
-        if clicked.is_some() {
-            self.clicked = clicked;
-        }
-        if outcome.is_some() {
-            self.outcome = outcome;
-        }
-        height
+        ui.scope_builder(builder, |ui| {
+            ui.set_clip_rect(rect.intersect(page));
+            let mut flow = Flow::new(document, pictures, scale);
+            flow.palette = palette;
+            flow.selectable = !edit_mode;
+            flow.page = page_editor;
+            if let Some(prefix) = prefix {
+                flow.start_at(prefix.clone());
+            }
+            if picture {
+                flow.frame(ui, content, rect.width());
+            } else {
+                flow.blocks(ui, content, rect.width());
+            }
+        })
+        .response
+        .rect
+        .height()
     }
 
     /// The style a shape names, resolved.

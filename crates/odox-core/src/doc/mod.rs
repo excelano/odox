@@ -72,6 +72,19 @@ impl Document {
         self.body()?.child(&Ns::Office, local)
     }
 
+    /// Where [`Self::body_of`] is under the content root, as a path of child
+    /// indices: what an editor addresses the body's paragraphs from.
+    pub fn body_path(&self, local: &str) -> Option<Vec<usize>> {
+        let (at_body, body) = self
+            .content
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "body"))?;
+        let (at_part, _) = body
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, local))?;
+        Some(vec![at_body, at_part])
+    }
+
     /// A name for writing into the document, in the prefix the document
     /// declares for the namespace on its content root, or the conventional one
     /// where it declares none.

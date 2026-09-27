@@ -16,11 +16,8 @@
 use std::collections::HashMap;
 
 use eframe::egui::{
-    Align, ColorImage, Context, Id, Key, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit,
-    TextFormat, TextureHandle, TextureOptions, Ui, pos2,
-    text::{CCursor, CCursorRange, CharIndex, LayoutJob},
-    text_selection::LabelSelectionState,
-    vec2,
+    Align, ColorImage, Context, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, TextureHandle,
+    TextureOptions, Ui, pos2, text::LayoutJob, text_selection::LabelSelectionState, vec2,
 };
 use egui_richedit::{Laid, ParagraphJob};
 use odox_core::{
@@ -87,16 +84,6 @@ pub struct Flow<'a> {
     pub scroll_to_heading: Option<usize>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
-    /// Whether a click on a paragraph opens it for editing.
-    pub edit_mode: bool,
-    /// The paragraph being edited, where it is under the root this flow
-    /// draws.
-    pub editor: Option<&'a mut Editor>,
-    /// The paragraph a person clicked this frame in edit mode, as a path from
-    /// the root.
-    pub clicked: Option<Vec<usize>>,
-    /// What the editor asked for this frame, if it closed.
-    pub outcome: Option<Outcome>,
     /// The page editor, which puts a caret in every paragraph under the root
     /// and paints them. Outside edit mode there is none.
     pub page: Option<&'a mut PageEditor>,
@@ -121,10 +108,6 @@ impl<'a> Flow<'a> {
             palette: format::Palette::default(),
             scroll_to_heading: None,
             headings_seen: 0,
-            edit_mode: false,
-            editor: None,
-            clicked: None,
-            outcome: None,
             page: None,
             selectable: true,
             path: Vec::new(),
@@ -138,57 +121,6 @@ impl<'a> Flow<'a> {
     pub fn start_at(&mut self, prefix: Vec<usize>) {
         self.path = prefix;
     }
-}
-
-/// A paragraph being typed into: which one, as a path of child indices from
-/// the root the flow draws, and what the text box holds.
-///
-/// The box shows the paragraph's text as [`odox_core::edit::text`] gives it,
-/// unformatted, at the paragraph's own font, size and width, and hands it
-/// back whole; the difference between what went in and what comes out is
-/// what is written. DESIGN.md §11.
-pub struct Editor {
-    /// The paragraph, from the root the flow was asked to draw.
-    pub path: Vec<usize>,
-    /// What the box holds.
-    pub text: String,
-    /// What the paragraph held when the box opened, so that leaving it as it
-    /// was is not an edit.
-    pub original: String,
-    /// The box was opened this frame and has yet to take the focus.
-    pub opened: bool,
-    /// Where the caret goes when the box opens: at an offset, or at the end.
-    pub caret: Option<usize>,
-}
-
-impl Editor {
-    /// A box on the paragraph at a path, holding its text.
-    pub fn open(path: Vec<usize>, text: String, caret: Option<usize>) -> Self {
-        Self {
-            path,
-            original: text.clone(),
-            text,
-            opened: true,
-            caret,
-        }
-    }
-
-    /// Whether what the box holds differs from what the paragraph held.
-    pub fn changed(&self) -> bool {
-        self.text != self.original
-    }
-}
-
-/// What the editor asked for when it closed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Outcome {
-    /// Keep what was typed.
-    Commit,
-    /// Put the paragraph back as it was.
-    Cancel,
-    /// Backspace at the start: keep what was typed, then join this paragraph
-    /// onto the one before it.
-    JoinPrevious,
 }
 
 /// How far each list level is indented, in ODF points.
@@ -350,27 +282,6 @@ impl Flow<'_> {
 
         let base = format::text_format(&properties.text, DEFAULT_SIZE, zoom, self.palette);
 
-        if !self.detached && self.editor.as_ref().is_some_and(|e| e.path == self.path) {
-            // The box takes the paragraph's first run's format, so a title
-            // whose size lives on its span opens at the title's size.
-            let (job, _) = self.layout_job(element, &properties, &base, size, wrap);
-            let (job, _) = job.into_parts();
-            let first = job
-                .sections
-                .first()
-                .map_or_else(|| base.clone(), |section| section.format.clone());
-            // Taken out and put back, because the box is drawn by a method of
-            // this flow and the editor is borrowed from outside it.
-            let mut editor = self.editor.take();
-            if let Some(editor) = editor.as_deref_mut() {
-                self.edit_box(ui, editor, &first, left, wrap);
-            }
-            self.editor = editor;
-            if after > 0.0 {
-                ui.add_space(after);
-            }
-            return;
-        }
         let (job, frames) = self.layout_job(element, &properties, &base, size, wrap);
         let (job, map) = job.into_parts();
 
@@ -383,17 +294,14 @@ impl Flow<'_> {
         // what lets a double-click take a word and a triple-click a line.
         // Without the drag the pointer reaches the scroll area instead and
         // nothing is selected — measured, not read. The page editor selects
-        // the same way.
-        let sense = if self.selectable || edited {
+        // the same way, and on a slide in edit mode, where a drag moves the
+        // shape, it takes clicks alone.
+        let sense = if self.selectable {
             Sense::click_and_drag()
         } else {
             Sense::click()
         };
         let (rect, response) = ui.allocate_exact_size(vec2(width, height), sense);
-
-        if self.edit_mode && !self.detached && response.clicked() {
-            self.clicked = Some(self.path.clone());
-        }
 
         if element.is(&Ns::Text, "h") {
             if self.scroll_to_heading == Some(self.headings_seen) {
@@ -516,94 +424,6 @@ impl Flow<'_> {
             }
         }
         (job, frames)
-    }
-
-    /// The text box a paragraph becomes while it is being typed into, at the
-    /// paragraph's own font, colour, indent and width, on the page's paper.
-    ///
-    /// Escape puts the paragraph back, Ctrl+Enter or a click elsewhere keeps
-    /// what was typed, Enter is a new paragraph once it is kept, and Backspace
-    /// with the caret at the very start joins the paragraph onto the one
-    /// before it. Read before the box takes the keys, because the box
-    /// consumes what it handles.
-    fn edit_box(
-        &mut self,
-        ui: &mut Ui,
-        editor: &mut Editor,
-        base: &TextFormat,
-        left: f32,
-        wrap: f32,
-    ) {
-        let id = Id::new("paragraph-editor");
-        let at_start = TextEdit::load_state(ui.ctx(), id)
-            .and_then(|state| state.cursor.char_range())
-            .is_some_and(|range| {
-                range.primary.index == CharIndex(0) && range.secondary.index == CharIndex(0)
-            });
-        let (backspace, keep) = ui.input(|input| {
-            (
-                input.key_pressed(Key::Backspace),
-                input.modifiers.command && input.key_pressed(Key::Enter),
-            )
-        });
-        if !editor.opened && at_start && backspace && self.outcome.is_none() {
-            self.outcome = Some(Outcome::JoinPrevious);
-        }
-
-        // A sizing pass is an invisible ui, and an invisible ui is disabled: a
-        // text box added in one surrenders the focus the real one just took.
-        // So the pass gets the box's height and no box.
-        if ui.is_sizing_pass() {
-            let galley = ui.fonts_mut(|fonts| {
-                fonts.layout(editor.text.clone(), base.font_id.clone(), base.color, wrap)
-            });
-            ui.horizontal_top(|ui| {
-                ui.add_space(left);
-                ui.allocate_exact_size(vec2(wrap, galley.size().y + 4.0), Sense::hover());
-            });
-            return;
-        }
-
-        let response = ui
-            .horizontal_top(|ui| {
-                ui.add_space(left);
-                ui.add(
-                    TextEdit::multiline(&mut editor.text)
-                        .id(id)
-                        .font(base.font_id.clone())
-                        .text_color(base.color)
-                        .background_color(self.palette.paper)
-                        .desired_width(wrap)
-                        .desired_rows(1)
-                        .margin(vec2(2.0, 2.0)),
-                )
-            })
-            .inner;
-
-        if editor.opened {
-            editor.opened = false;
-            response.request_focus();
-            let mut state = TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
-            let at = editor
-                .caret
-                .unwrap_or_else(|| editor.text.chars().count())
-                .min(editor.text.chars().count());
-            state
-                .cursor
-                .set_char_range(Some(CCursorRange::one(CCursor::new(at))));
-            TextEdit::store_state(ui.ctx(), id, state);
-            return;
-        }
-        if keep && response.has_focus() {
-            response.surrender_focus();
-            self.outcome = Some(Outcome::Commit);
-        } else if response.lost_focus() && self.outcome.is_none() {
-            self.outcome = Some(if ui.input(|input| input.key_pressed(Key::Escape)) {
-                Outcome::Cancel
-            } else {
-                Outcome::Commit
-            });
-        }
     }
 
     /// Append the text of a paragraph's children to a layout job.

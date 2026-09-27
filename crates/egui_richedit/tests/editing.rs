@@ -513,3 +513,55 @@ fn page_down_moves_a_view_s_height_and_page_up_comes_back() {
     h.key(Key::PageUp);
     assert_eq!(h.focus(), Position::new(0, 2));
 }
+
+#[test]
+fn a_paragraph_that_leaves_drags_takes_a_caret_on_a_click_and_not_on_a_drag() {
+    let ctx = Context::default();
+    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut model = Plain::new(&["a label on a slide"]);
+    let mut frame = |events: Vec<Event>| {
+        let input = RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
+            ..RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            editor.input(ui, &mut model);
+            let mut job = ParagraphJob::new(LayoutJob::default());
+            job.text(&model.paragraphs[0], TextFormat::default());
+            let (job, map) = job.into_parts();
+            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+            let (rect, response) =
+                ui.allocate_exact_size(vec2(300.0, galley.size().y), Sense::click());
+            let laid = Laid {
+                galley,
+                map,
+                origin: rect.min,
+            };
+            editor.paragraph(ui, &response, &0, laid);
+        });
+        output.textures_delta.clear();
+        editor.selection().cloned()
+    };
+    let button = |x: f32, pressed| Event::PointerButton {
+        pos: Pos2::new(x, 5.0),
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    frame(vec![Event::PointerMoved(Pos2::new(5.0, 5.0))]);
+    frame(vec![button(5.0, true)]);
+    for x in [40.0, 80.0, 120.0] {
+        frame(vec![Event::PointerMoved(Pos2::new(x, 5.0))]);
+    }
+    assert_eq!(
+        frame(vec![button(120.0, false)]),
+        None,
+        "a drag is not a click"
+    );
+
+    frame(vec![Event::PointerMoved(Pos2::new(5.0, 5.0))]);
+    frame(vec![button(5.0, true)]);
+    let clicked = frame(vec![button(5.0, false)]).expect("a click puts a caret down");
+    assert_eq!(clicked.focus.paragraph, 0);
+}
