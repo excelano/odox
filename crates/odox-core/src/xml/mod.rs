@@ -305,6 +305,29 @@ impl Element {
         Some(self.attrs.remove(at).value)
     }
 
+    /// A name for writing under this element, in the prefix it declares for
+    /// the namespace, or the conventional one where it declares none.
+    pub fn name_for(&self, ns: &Ns, local: &str) -> Name {
+        let declared = self
+            .attrs
+            .iter()
+            .filter(|a| a.name.ns == Ns::Xmlns)
+            .find(|a| Ns::from_uri(&a.value) == *ns)
+            .map(|a| &*a.name.local);
+        Name::new(
+            declared.unwrap_or(ns.conventional_prefix()),
+            local,
+            ns.clone(),
+        )
+    }
+
+    /// Whether this element declares a namespace.
+    pub fn declares(&self, ns: &Ns) -> bool {
+        self.attrs
+            .iter()
+            .any(|a| a.name.ns == Ns::Xmlns && Ns::from_uri(&a.value) == *ns)
+    }
+
     /// The first child element with the given name.
     pub fn child(&self, ns: &Ns, local: &str) -> Option<&Element> {
         self.elements().find(|e| e.is(ns, local))

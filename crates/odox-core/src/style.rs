@@ -611,6 +611,23 @@ impl Styles {
         }
     }
 
+    /// Take in a style an edit has written into the document, so that it
+    /// resolves from now on.
+    ///
+    /// Nothing is ever taken out: a style an undo removed from the tree stays
+    /// here, which keeps its name from being given to a different style while
+    /// a resolution of it may still be cached.
+    pub fn add(&mut self, element: &Element) {
+        if let (Some(name), Some(family)) = (
+            element.attr(&Ns::Style, "name"),
+            element.attr(&Ns::Style, "family"),
+        ) {
+            let key = (Family::parse(family), name.to_owned());
+            self.cache.borrow_mut().remove(&key);
+        }
+        self.collect_style(element);
+    }
+
     /// A style by family and name.
     pub fn style(&self, family: &Family, name: &str) -> Option<&Style> {
         self.by_name.get(&(family.clone(), name.to_owned()))
