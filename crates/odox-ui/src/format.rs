@@ -23,21 +23,36 @@ const SCRIPT_SCALE: f32 = 0.58;
 
 /// The colours a document is drawn in where the document itself does not say.
 ///
-/// **A page is paper, in a dark window as much as a light one.** The colours in
-/// a document are the document's: a heading the author made near-black is drawn
-/// near-black, and drawing it on a dark ground because the desktop asked for a
-/// dark desktop makes it invisible. Found by opening a deck Impress wrote, whose
-/// title is dark by its master page's style and disappeared. So the page keeps
-/// its own ground and the window's chrome — menus, panels, the grid's headers —
-/// follows the desktop. That is what every office application and every PDF
-/// viewer does with a page, and what the theme is for everywhere else.
+/// The document's own colours are always the document's: a colour the author
+/// set is drawn as set, whatever the window's theme. Where a document sets
+/// none, [`Palette::for_theme`] follows the window instead of staying fixed —
+/// paper and ink move together, the way a page and its own unset text would
+/// if it were reprinted for the window it is read in, so a document that
+/// never colours itself is legible in both. The chrome around the page —
+/// menus, panels, the grid's headers — already follows the desktop by the
+/// same principle, one level up.
+///
+/// This does not reach a document that colours its own text but leaves the
+/// page unset: that colour is drawn as set, on paper that now follows the
+/// window, and an author's own dark heading can still land on dark paper.
+/// That is the narrower case the old, page-only version of this rule was
+/// written against; recolouring an author's own choice for contrast is a
+/// larger step than this file takes.
+///
+/// `link` is the one colour that does not follow this rule: [`link_format`]
+/// draws every hyperlink in it regardless of what the document says, because
+/// almost every ODF producer writes a resolved colour into a hyperlink's
+/// character style whether an author touched it or not — "the document set
+/// a colour" is barely ever true of a link's blue in the way it is of a
+/// heading's, so treating it as an author's choice would mean this file's
+/// dark mode never reaching almost any real hyperlink.
 #[derive(Debug, Clone, Copy)]
 pub struct Palette {
     /// What the page itself is.
     pub paper: Color32,
     /// The colour of text the document does not colour.
     pub ink: Color32,
-    /// The colour of a link the document does not colour.
+    /// The colour every hyperlink is drawn in, whatever the document says.
     pub link: Color32,
 }
 
@@ -51,6 +66,29 @@ impl Default for Palette {
             // hyperlink colour is not: that one is chosen against the window's
             // background and can be a pale blue meant for a dark panel.
             link: Color32::from_rgb(0x1a, 0x5f, 0xb4),
+        }
+    }
+}
+
+impl Palette {
+    /// The palette for a window in, or not in, dark mode.
+    ///
+    /// All three move together, because they are the unset document's own
+    /// page and the unset document's own text, and a page redrawn dark with
+    /// text left black would be unreadable rather than themed. The dark ink
+    /// is an off-white rather than pure white, and the dark link a lighter,
+    /// more saturated blue than the light palette's — both chosen to meet
+    /// WCAG AA contrast against the dark paper (measured: ink 11.2:1, link
+    /// 5.4:1; AA needs 4.5:1) rather than merely looking legible in one shot.
+    pub fn for_theme(dark_mode: bool) -> Self {
+        if dark_mode {
+            Self {
+                paper: Color32::from_rgb(0x1e, 0x1e, 0x1e),
+                ink: Color32::from_rgb(0xd4, 0xd4, 0xd4),
+                link: Color32::from_rgb(0x37, 0x94, 0xff),
+            }
+        } else {
+            Self::default()
         }
     }
 }
@@ -113,6 +151,10 @@ pub fn text_format(
 }
 
 /// The same, for a run the document marks as a hyperlink.
+///
+/// Always `palette.link`, even where `properties` carries its own colour:
+/// [`Palette`]'s own doc says why a hyperlink's colour does not get the
+/// respect this file gives every other one.
 pub fn link_format(
     properties: &TextProperties,
     inherited: f32,
@@ -120,12 +162,11 @@ pub fn link_format(
     palette: Palette,
 ) -> TextFormat {
     let mut format = text_format(properties, inherited, zoom, palette);
-    if properties.color.is_none() {
-        format.color = palette.link;
-        if format.underline == Stroke::NONE {
-            format.underline = Stroke::new(1.0, format.color);
-        }
-    }
+    format.color = palette.link;
+    // The underline keeps the width the document asked for, if any, but its
+    // colour follows the text it underlines rather than whatever colour that
+    // text used to be.
+    format.underline = Stroke::new(format.underline.width.max(1.0), format.color);
     format
 }
 

@@ -93,12 +93,14 @@ impl View for TextView {
             .show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     let width = page.min(ui.available_width() - margin * 2.0).max(80.0);
+                    let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
                     egui::Frame::new()
-                        .fill(odox_ui::format::Palette::default().paper)
+                        .fill(palette.paper)
                         .inner_margin(margin)
                         .show(ui, |ui| {
                             ui.set_width(width);
                             let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
+                            flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();
                             flow.edit_mode = edit_mode;
                             flow.editor = self.editor.as_mut();

@@ -117,8 +117,17 @@ has first, and the families with a metrically compatible substitute are named so
 that a document asking for Times New Roman keeps its line breaks under Liberation
 Serif. Both are in `crates/odox-ui/src/fonts.rs`.
 
-**A page is paper**, in a dark window as much as a light one: the page keeps its
-own ground and the window's chrome follows the desktop.
+**What a document leaves uncoloured follows the window's theme**: unset paper
+and ink turn dark together with a dark window, matching the chrome around
+them, so a document that colours nothing stays legible in either. A colour the
+document does set is drawn as set regardless — including text coloured dark
+against a page left unset, which the theme cannot then save from landing on
+now-dark paper.
+
+**A hyperlink is the one exception**: every link is drawn in the theme's link
+colour even where the document's own character style resolves one, because
+that style is almost always an ODF producer's boilerplate rather than
+something an author chose, unlike a heading someone coloured by hand.
 
 **A proportional line height is a proportion of each run's own size**, so a
 span set larger than its paragraph takes a taller line; an absolute one is the

@@ -248,7 +248,7 @@ impl SheetView {
         let header_width = 46.0 * zoom;
         // The grid is a page and carries the document's own colours; the headers
         // around it are chrome and follow the desktop. `format::Palette` says why.
-        let palette = format::Palette::default();
+        let palette = format::Palette::for_theme(ui.visuals().dark_mode);
         let faint = palette.ink.gamma_multiply(0.18);
         let header_fill = ui.visuals().faint_bg_color;
         let header_text = ui.visuals().text_color();

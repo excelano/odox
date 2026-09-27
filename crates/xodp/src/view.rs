@@ -189,7 +189,7 @@ impl View for SlideView {
                     Sense::hover()
                 };
                 let (page, response) = ui.allocate_exact_size(size, sense);
-                let palette = odox_ui::format::Palette::default();
+                let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
                 // Paper under everything. A slide whose background is `none` —
                 // which is what a template says when its identity is the shapes
                 // rather than the ground — is drawn on paper and not on the
