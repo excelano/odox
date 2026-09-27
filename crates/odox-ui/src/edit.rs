@@ -5,14 +5,29 @@
 //! commands. The tree derives `Clone`, a document of the size these
 //! applications open clones in well under a millisecond, and commands would buy
 //! redo granularity nobody has asked for. DESIGN.md §11.
+//!
+//! Each snapshot also holds where the caret stood in that state, where the
+//! view has one, so that taking an edit back or putting it back shows the
+//! place it happened.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+use egui_richedit::Position;
 use odox_core::Element;
 
 /// How many edits can be taken back. Past this the oldest is forgotten.
 const DEPTH: usize = 100;
+
+/// Where a caret stood: a paragraph's path under the root the view draws, and
+/// a character offset into its text.
+pub type Caret = Position<Vec<usize>>;
+
+/// A state of the content tree and where the caret was in it.
+struct Snapshot {
+    content: Element,
+    caret: Option<Caret>,
+}
 
 /// The shell's editing state, handed to the view on every frame.
 #[derive(Default)]
@@ -23,8 +38,8 @@ pub struct Editing {
     /// A question is up over the window, and the keys belong to it: a view
     /// does not open an editor on the Enter that answers it.
     pub asking: bool,
-    undo: Vec<Element>,
-    redo: Vec<Element>,
+    undo: Vec<Snapshot>,
+    redo: Vec<Snapshot>,
     /// The depth of the undo stack when the document was last read or saved,
     /// which is the state the file on disk holds. `None` once that state can no
     /// longer be reached by undoing, because a new edit was made below it.
@@ -45,31 +60,53 @@ impl Editing {
     /// mutates. A redo history is discarded, because the edit that follows is
     /// a new branch.
     pub fn record(&mut self, content: &Element) {
+        self.record_snapshot(content.clone(), None);
+    }
+
+    /// The same, for a snapshot already taken, with where the caret stood in
+    /// it: an editor that learns only after an edit whether it succeeded
+    /// takes the tree before trying, and records it once it has.
+    pub fn record_snapshot(&mut self, content: Element, caret: Option<Caret>) {
         if self.saved_at.is_some_and(|depth| depth > self.undo.len()) {
             // The saved state was above this point and is now off the line.
             self.saved_at = None;
         }
         self.redo.clear();
-        self.undo.push(content.clone());
+        self.undo.push(Snapshot { content, caret });
         if self.undo.len() > DEPTH {
             self.undo.remove(0);
             self.saved_at = self.saved_at.and_then(|depth| depth.checked_sub(1));
         }
     }
 
-    /// Take the last edit back. Given the tree as it stands, so that the edit
-    /// can be redone; answers the tree to put in its place.
-    pub fn undo(&mut self, current: &Element) -> Option<Element> {
+    /// Take the last edit back. Given the tree as it stands and where the
+    /// caret is, so that the edit can be redone; answers the tree to put in
+    /// its place and where the caret was in it.
+    pub fn undo(
+        &mut self,
+        current: &Element,
+        caret: Option<Caret>,
+    ) -> Option<(Element, Option<Caret>)> {
         let previous = self.undo.pop()?;
-        self.redo.push(current.clone());
-        Some(previous)
+        self.redo.push(Snapshot {
+            content: current.clone(),
+            caret,
+        });
+        Some((previous.content, previous.caret))
     }
 
-    /// Put back the edit last taken back.
-    pub fn redo(&mut self, current: &Element) -> Option<Element> {
+    /// Put back the edit last taken back, the same way.
+    pub fn redo(
+        &mut self,
+        current: &Element,
+        caret: Option<Caret>,
+    ) -> Option<(Element, Option<Caret>)> {
         let next = self.redo.pop()?;
-        self.undo.push(current.clone());
-        Some(next)
+        self.undo.push(Snapshot {
+            content: current.clone(),
+            caret,
+        });
+        Some((next.content, next.caret))
     }
 
     /// Whether there is anything to undo.
@@ -116,11 +153,17 @@ mod tests {
         current = tree("two");
         assert!(editing.modified());
 
-        current = editing.undo(&current).expect("something to undo");
+        current = editing
+            .undo(&current, None)
+            .map(|(tree, _)| tree)
+            .expect("something to undo");
         assert_eq!(current, tree("one"));
         assert!(!editing.modified(), "undone to what the file holds");
 
-        current = editing.redo(&current).expect("something to redo");
+        current = editing
+            .redo(&current, None)
+            .map(|(tree, _)| tree)
+            .expect("something to redo");
         assert_eq!(current, tree("two"));
         assert!(editing.modified());
     }
@@ -137,7 +180,10 @@ mod tests {
 
         // Back to "one", then a different second edit: the saved "two" is on
         // a branch that no longer exists.
-        current = editing.undo(&current).expect("something to undo");
+        current = editing
+            .undo(&current, None)
+            .map(|(tree, _)| tree)
+            .expect("something to undo");
         assert!(editing.modified());
         editing.record(&current);
         assert!(
@@ -145,6 +191,21 @@ mod tests {
             "the same depth is not the same document"
         );
         assert!(!editing.can_redo(), "the branch the save was on is gone");
+    }
+
+    #[test]
+    fn undo_and_redo_answer_where_the_caret_was() {
+        let mut editing = Editing::default();
+        editing.reset();
+        let before = super::Caret::new(vec![0], 1);
+        let after = super::Caret::new(vec![0], 4);
+        editing.record_snapshot(tree("one"), Some(before.clone()));
+        let (_, caret) = editing
+            .undo(&tree("one more"), Some(after.clone()))
+            .expect("something to undo");
+        assert_eq!(caret, Some(before), "where the edit began");
+        let (_, caret) = editing.redo(&tree("one"), None).expect("something to redo");
+        assert_eq!(caret, Some(after), "where the caret was when it was undone");
     }
 
     #[test]
@@ -157,7 +218,7 @@ mod tests {
         assert!(editing.modified());
         let mut undone = 0;
         let mut current = tree("last");
-        while let Some(previous) = editing.undo(&current) {
+        while let Some(previous) = editing.undo(&current, None).map(|(tree, _)| tree) {
             current = previous;
             undone += 1;
         }

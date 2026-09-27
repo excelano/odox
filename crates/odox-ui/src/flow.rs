@@ -22,10 +22,12 @@ use eframe::egui::{
     text_selection::LabelSelectionState,
     vec2,
 };
+use egui_richedit::{Laid, ParagraphJob};
 use odox_core::{
-    Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties,
+    Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties, edit,
 };
 
+use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
 
 /// Pictures already decoded, kept for as long as the document is open.
@@ -95,6 +97,9 @@ pub struct Flow<'a> {
     pub clicked: Option<Vec<usize>>,
     /// What the editor asked for this frame, if it closed.
     pub outcome: Option<Outcome>,
+    /// The page editor, which puts a caret in every paragraph under the root
+    /// and paints them. Outside edit mode there is none.
+    pub page: Option<&'a mut PageEditor>,
     /// Whether text in the page can be dragged over to select it. Off on a
     /// slide in edit mode, where a drag moves the shape instead.
     pub selectable: bool,
@@ -120,6 +125,7 @@ impl<'a> Flow<'a> {
             editor: None,
             clicked: None,
             outcome: None,
+            page: None,
             selectable: true,
             path: Vec::new(),
             detached: false,
@@ -236,6 +242,9 @@ struct Run<'a> {
     format: &'a TextFormat,
     /// The colours to use where the document names none.
     palette: format::Palette,
+    /// Whether the run's characters are the paragraph's own text, which the
+    /// caret moves through, or a field's value, which it steps over.
+    counted: bool,
 }
 
 /// Where a list's counters stand, one per level.
@@ -345,6 +354,7 @@ impl Flow<'_> {
             // The box takes the paragraph's first run's format, so a title
             // whose size lives on its span opens at the title's size.
             let (job, _) = self.layout_job(element, &properties, &base, size, wrap);
+            let (job, _) = job.into_parts();
             let first = job
                 .sections
                 .first()
@@ -362,16 +372,19 @@ impl Flow<'_> {
             return;
         }
         let (job, frames) = self.layout_job(element, &properties, &base, size, wrap);
+        let (job, map) = job.into_parts();
 
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
         let height = galley.size().y;
+        let edited = !self.detached && self.page.is_some();
         // Click and drag, and not merely hover: the selection plugin begins a
         // selection only on a response whose sense includes drag, which is what
         // `Label` adds to its own when it is selectable, and the click half is
         // what lets a double-click take a word and a triple-click a line.
         // Without the drag the pointer reaches the scroll area instead and
-        // nothing is selected — measured, not read.
-        let sense = if self.selectable {
+        // nothing is selected — measured, not read. The page editor selects
+        // the same way.
+        let sense = if self.selectable || edited {
             Sense::click_and_drag()
         } else {
             Sense::click()
@@ -402,21 +415,32 @@ impl Flow<'_> {
             TextAlign::End => rect.left() + left + indent.max(0.0) + wrap,
             _ => rect.left() + left + indent.max(0.0),
         };
-        // Through egui's selection plugin rather than the painter, which is what
-        // lets a person drag across the page and press Ctrl+C. The hook paints
-        // the galley itself, at the same anchor the painter would have taken,
-        // so alignment is untouched. It is called for every paragraph and not
+        // Through the page editor in edit mode, and through egui's selection
+        // plugin otherwise, rather than the painter: either is what lets a
+        // person drag across the page and press Ctrl+C. Both paint the galley
+        // themselves, at the same anchor the painter would have taken, so
+        // alignment is untouched. Both are called for every paragraph and not
         // only the visible ones: the plugin drops a selection whose ends it did
-        // not see this frame, so a paragraph skipped for being scrolled off
-        // would end a selection the moment it left the window.
-        LabelSelectionState::label_text_selection(
-            ui,
-            &response,
-            pos2(anchor, rect.top()),
-            galley,
-            base.color,
-            Stroke::NONE,
-        );
+        // not see this frame, and the editor moves Up and Down through where
+        // each paragraph was drawn.
+        let origin = pos2(anchor, rect.top());
+        if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
+            let laid = Laid {
+                galley,
+                map,
+                origin,
+            };
+            page.paragraph(ui, &response, &self.path, laid);
+        } else {
+            LabelSelectionState::label_text_selection(
+                ui,
+                &response,
+                origin,
+                galley,
+                base.color,
+                Stroke::NONE,
+            );
+        }
 
         if let Some(label) = label {
             let mut label_job = LayoutJob::default();
@@ -452,8 +476,8 @@ impl Flow<'_> {
         base: &TextFormat,
         size: f32,
         wrap: f32,
-    ) -> (LayoutJob, Vec<Element>) {
-        let mut job = LayoutJob {
+    ) -> (ParagraphJob, Vec<Element>) {
+        let job = LayoutJob {
             wrap: eframe::egui::text::TextWrapping {
                 max_width: wrap,
                 ..Default::default()
@@ -466,27 +490,29 @@ impl Flow<'_> {
             justify: properties.paragraph.align == Some(TextAlign::Justify),
             ..LayoutJob::default()
         };
+        let mut job = ParagraphJob::new(job);
         let mut frames = Vec::new();
         let run = Run {
             inherited: &properties.text,
             size,
             format: base,
             palette: self.palette,
+            counted: true,
         };
         self.runs(element, &run, &mut job, &mut frames);
 
         // An empty paragraph is a blank line and has to take its height, which an
         // empty layout job would not.
-        if job.text.is_empty() {
-            job.append(" ", 0.0, base.clone());
+        if job.is_empty() {
+            job.atom(" ", 0, base.clone());
         }
         if let Some(measure) = properties.paragraph.line_height {
             // A proportional line height is a proportion of each run's own
             // size, so a span set larger than its paragraph takes a taller
             // line; an absolute one is the same for every run.
-            for section in &mut job.sections {
-                let own = section.format.font_id.size / self.zoom;
-                section.format.line_height = Some(measure.resolve(own) * self.zoom);
+            for format in job.formats_mut() {
+                let own = format.font_id.size / self.zoom;
+                format.line_height = Some(measure.resolve(own) * self.zoom);
             }
         }
         (job, frames)
@@ -586,11 +612,16 @@ impl Flow<'_> {
     /// out runs of spaces, tabs and line breaks rather than writing them
     /// literally — or collected to be drawn after the paragraph, which is what
     /// happens to a picture anchored inside one.
+    ///
+    /// Each piece is recorded against the characters [`edit::text`] gives the
+    /// paragraph, so that a caret placed in what is drawn lands in the text an
+    /// edit changes: where the two differ, as a tab drawn as spaces or a field
+    /// drawn as its value, the piece is an atom the caret steps over.
     fn runs(
         &self,
         parent: &Element,
         run: &Run<'_>,
-        job: &mut LayoutJob,
+        job: &mut ParagraphJob,
         frames: &mut Vec<Element>,
     ) {
         let Run {
@@ -598,23 +629,33 @@ impl Flow<'_> {
             size,
             format,
             palette,
+            counted,
         } = *run;
+        let put = |job: &mut ParagraphJob, shown: &str, model_len: usize| {
+            if !counted {
+                job.atom(shown, 0, format.clone());
+            } else if shown.chars().count() == model_len {
+                job.text(shown, format.clone());
+            } else {
+                job.atom(shown, model_len, format.clone());
+            }
+        };
         for child in &parent.children {
             match child {
-                Node::Text(text) | Node::CData(text) => job.append(text, 0.0, format.clone()),
+                Node::Text(text) | Node::CData(text) => put(job, text, text.chars().count()),
                 Node::Comment(_) | Node::ProcessingInstruction(_) => {}
                 Node::Element(element) => {
                     if element.is(&Ns::Text, "s") {
-                        let count = element.attr_usize(&Ns::Text, "c").unwrap_or(1).min(256);
-                        job.append(&" ".repeat(count), 0.0, format.clone());
+                        let count = element.attr_usize(&Ns::Text, "c").unwrap_or(1);
+                        put(job, &" ".repeat(count.min(256)), count);
                     } else if element.is(&Ns::Text, "tab") {
                         // egui lays out a tab as a glyph rather than advancing to
                         // a stop, so the paragraph's tab stops are approximated
                         // by a fixed advance. A document whose layout depends on
                         // tab stops is one §6 of DESIGN.md names.
-                        job.append("    ", 0.0, format.clone());
+                        put(job, "    ", 1);
                     } else if element.is(&Ns::Text, "line-break") {
-                        job.append("\n", 0.0, format.clone());
+                        put(job, "\n", 1);
                     } else if element.is(&Ns::Text, "span") {
                         let style = self.style_of(element, &Family::Text);
                         let merged = merge(inherited, &style.text);
@@ -625,6 +666,7 @@ impl Flow<'_> {
                             size: inner_size,
                             format: &inner,
                             palette,
+                            counted,
                         };
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Text, "a") {
@@ -637,6 +679,7 @@ impl Flow<'_> {
                             size: inner_size,
                             format: &inner,
                             palette,
+                            counted,
                         };
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Draw, "frame") {
@@ -649,10 +692,17 @@ impl Flow<'_> {
                             let mut raised = format.clone();
                             raised.font_id.size *= 0.7;
                             raised.valign = Align::TOP;
-                            job.append(&citation.plain_text(), 0.0, raised);
+                            job.atom(&citation.plain_text(), 0, raised);
                         }
                     } else if is_inline_passthrough(element) {
-                        self.runs(element, run, job, frames);
+                        // A mark's contents are the paragraph's text; a field's
+                        // are its value, which the paragraph's text does not
+                        // hold.
+                        let run = Run {
+                            counted: counted && edit::holds_text(element),
+                            ..*run
+                        };
+                        self.runs(element, &run, job, frames);
                     }
                 }
             }
@@ -1186,7 +1236,7 @@ fn roman(number: usize) -> String {
 }
 
 /// Whether an element holds blocks on the body's behalf rather than being one.
-fn is_block_container(element: &Element) -> bool {
+pub(crate) fn is_block_container(element: &Element) -> bool {
     element.name.ns == Ns::Text
         && matches!(
             &*element.name.local,
@@ -1254,4 +1304,77 @@ fn is_inline_passthrough(element: &Element) -> bool {
                 | "hidden-text"
                 | "text-input"
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{Flow, Pictures};
+    use crate::format::{self, DEFAULT_SIZE};
+    use odox_core::{Document, Element, Family, edit, media_type};
+
+    const ANY: &[&str] = &[
+        media_type::TEXT,
+        media_type::TEXT_WEB,
+        media_type::SPREADSHEET,
+        media_type::PRESENTATION,
+    ];
+
+    fn documents(directory: &Path, into: &mut Vec<Document>) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return;
+        };
+        for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
+            if path.is_dir() {
+                documents(&path, into);
+            } else if matches!(
+                path.extension().and_then(|e| e.to_str()),
+                Some("odt" | "ods" | "odp")
+            ) {
+                let bytes = std::fs::read(&path).expect("a corpus document reads");
+                into.push(Document::read(&bytes, ANY).expect("a corpus document parses"));
+            }
+        }
+    }
+
+    fn paragraphs<'a>(element: &'a Element, into: &mut Vec<&'a Element>) {
+        for child in element.elements() {
+            if edit::is_paragraph(child) {
+                into.push(child);
+            }
+            paragraphs(child, into);
+        }
+    }
+
+    /// The caret is placed in what is drawn and an edit changes what the tree
+    /// holds, so for every paragraph in the corpus the two have to agree on
+    /// how many characters there are.
+    #[test]
+    fn what_is_drawn_maps_onto_the_text_an_edit_changes() {
+        let mut corpus = Vec::new();
+        documents(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus"),
+            &mut corpus,
+        );
+        assert!(!corpus.is_empty(), "the corpus is where it was");
+        let mut checked = 0;
+        for document in &corpus {
+            let mut pictures = Pictures::default();
+            let flow = Flow::new(document, &mut pictures, 1.0);
+            let mut found = Vec::new();
+            paragraphs(&document.content, &mut found);
+            for paragraph in found {
+                let properties = flow.style_of(paragraph, &Family::Paragraph);
+                let base = format::text_format(&properties.text, DEFAULT_SIZE, 1.0, flow.palette);
+                let size = format::size_of(&properties.text, DEFAULT_SIZE);
+                let (job, _) = flow.layout_job(paragraph, &properties, &base, size, 400.0);
+                let (_, map) = job.into_parts();
+                let text = edit::text(paragraph);
+                assert_eq!(map.model_len(), text.chars().count(), "{text:?}");
+                checked += 1;
+            }
+        }
+        assert!(checked > 0);
+    }
 }

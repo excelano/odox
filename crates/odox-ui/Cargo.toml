@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [dependencies]
 odox-core.workspace = true
+egui_richedit.workspace = true
 eframe.workspace = true
 rfd.workspace = true
 fontdb.workspace = true

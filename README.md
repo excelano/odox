@@ -91,10 +91,12 @@ that would not come back the same.
 
 `xodt` shows the document as one continuous page at the width its page layout
 asks for, with the headings listed beside it; clicking one scrolls to it. In
-edit mode a click on a paragraph opens it as a text box where it sits: Escape
-puts it back, Ctrl+Enter or a click elsewhere keeps what you typed, Enter
-starts a new paragraph, and Backspace at the very start joins the paragraph
-onto the one before it.
+edit mode a click puts the caret where you clicked and you type into the page
+as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
+breaks the line, Backspace at the start of a paragraph joins it to the one
+before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
+Shift and the clipboard work across paragraphs the way they do in any word
+processor. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, one tab per sheet, and shows the formula behind whichever cell you pick.
@@ -108,7 +110,8 @@ spreadsheet application recalculates it.
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one opens it as a
-text box the way a paragraph opens in `xodt`.
+text box where it sits: Escape puts it back, Ctrl+Enter or a click elsewhere
+keeps what you typed.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

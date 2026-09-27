@@ -899,6 +899,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_richedit"
+version = "0.4.0"
+dependencies = [
+ "eframe",
+ "egui",
+]
+
+[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2263,6 +2271,7 @@ version = "0.4.0"
 dependencies = [
  "block2 0.6.2",
  "eframe",
+ "egui_richedit",
  "fontdb",
  "ico",
  "image",
@@ -4267,6 +4276,7 @@ name = "xodt"
 version = "0.4.0"
 dependencies = [
  "eframe",
+ "egui_richedit",
  "odox-core",
  "odox-ui",
 ]

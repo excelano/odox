@@ -47,6 +47,20 @@ impl TextDocument {
             .child_mut(&Ns::Office, "text")
     }
 
+    /// Where [`Self::body`] is under the content root, as a path of child
+    /// indices: what an editor addresses the body's paragraphs from.
+    pub fn body_path(&self) -> Option<Vec<usize>> {
+        let (at_body, body) = self
+            .document
+            .content
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "body"))?;
+        let (at_text, _) = body
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "text"))?;
+        Some(vec![at_body, at_text])
+    }
+
     /// The page layout the document's first master page points at.
     ///
     /// A text document has one master page per page style, and the first is the
