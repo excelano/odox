@@ -156,7 +156,64 @@ pub fn address(row: usize, column: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{address, column_name, index_at};
+    use super::{Metrics, address, column_name, index_at};
+
+    fn metrics() -> Metrics {
+        Metrics {
+            rows: vec![0.0, 10.0, 25.0, 45.0],
+            columns: vec![0.0, 20.0, 40.0],
+        }
+    }
+
+    #[test]
+    fn size_is_the_last_offset_in_each_table() {
+        assert_eq!(metrics().size(), (40.0, 45.0));
+    }
+
+    #[test]
+    fn size_of_an_empty_table_is_zero() {
+        let empty = Metrics {
+            rows: Vec::new(),
+            columns: Vec::new(),
+        };
+        assert_eq!(empty.size(), (0.0, 0.0));
+    }
+
+    #[test]
+    fn row_and_column_give_a_start_and_a_length() {
+        let metrics = metrics();
+        assert_eq!(metrics.row(0), (0.0, 10.0));
+        assert_eq!(metrics.row(2), (25.0, 20.0));
+        assert_eq!(metrics.column(1), (20.0, 20.0));
+        // Past the last real entry is the closing total, with nothing after it:
+        // a length of zero rather than a panic.
+        assert_eq!(metrics.row(3), (45.0, 0.0));
+        assert_eq!(metrics.row(50), (0.0, 0.0));
+    }
+
+    #[test]
+    fn row_at_and_column_at_answer_through_the_same_search_as_index_at() {
+        let metrics = metrics();
+        assert_eq!(metrics.row_at(24.9), 1);
+        assert_eq!(metrics.column_at(20.0), 1);
+    }
+
+    #[test]
+    fn rows_between_covers_every_row_a_span_touches() {
+        let metrics = metrics();
+        // 5 is in row 0, 30 is in row 2: both ends, and what is between.
+        assert_eq!(metrics.rows_between(5.0, 30.0), 0..3);
+        // A span entirely inside one row still names that row, not an empty range.
+        assert_eq!(metrics.rows_between(1.0, 2.0), 0..1);
+    }
+
+    #[test]
+    fn columns_between_stops_at_the_last_real_column() {
+        let metrics = metrics();
+        // Run off the end of the sheet: the range stops at the last column,
+        // not at the closing total past it.
+        assert_eq!(metrics.columns_between(0.0, 1000.0), 0..2);
+    }
 
     #[test]
     fn column_names_carry_the_way_a_spreadsheet_does() {

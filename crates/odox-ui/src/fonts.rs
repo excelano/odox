@@ -298,3 +298,89 @@ fn collect(
         collect(child, families, faces);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn family_of_names_a_variant_with_a_suffix() {
+        let plain = Variant {
+            bold: false,
+            italic: false,
+        };
+        let bold = Variant {
+            bold: true,
+            italic: false,
+        };
+        let italic = Variant {
+            bold: false,
+            italic: true,
+        };
+        let both = Variant {
+            bold: true,
+            italic: true,
+        };
+        assert_eq!(family_of("Arial", plain), FontFamily::Name("Arial".into()));
+        assert_eq!(
+            family_of("Arial", bold),
+            FontFamily::Name("Arial:bold".into())
+        );
+        assert_eq!(
+            family_of("Arial", italic),
+            FontFamily::Name("Arial:italic".into())
+        );
+        assert_eq!(
+            family_of("Arial", both),
+            FontFamily::Name("Arial:bolditalic".into())
+        );
+    }
+
+    #[test]
+    fn metric_substitutes_matches_regardless_of_case_or_spaces() {
+        assert_eq!(
+            metric_substitutes("Times New Roman"),
+            ["Liberation Serif", "DejaVu Serif"]
+        );
+        assert_eq!(
+            metric_substitutes("TIMES NEW ROMAN"),
+            ["Liberation Serif", "DejaVu Serif"]
+        );
+        assert_eq!(
+            metric_substitutes("TimesNewRoman"),
+            ["Liberation Serif", "DejaVu Serif"]
+        );
+        assert_eq!(metric_substitutes("Calibri"), ["Carlito"]);
+    }
+
+    #[test]
+    fn metric_substitutes_is_empty_for_a_family_with_no_known_substitute() {
+        assert!(metric_substitutes("Comic Sans MS").is_empty());
+    }
+
+    /// The order this checks in is load-bearing: `Liberation Mono` contains
+    /// neither "times" nor "serif", but a family named for a monospace face
+    /// still has to be caught before falling through to the serif check.
+    #[test]
+    fn generic_recognises_monospace_families() {
+        assert_eq!(generic("Liberation Mono"), fontdb::Family::Monospace);
+        assert_eq!(generic("Courier New"), fontdb::Family::Monospace);
+        assert_eq!(generic("Consolas"), fontdb::Family::Monospace);
+    }
+
+    #[test]
+    fn generic_recognises_serif_families() {
+        assert_eq!(generic("Times New Roman"), fontdb::Family::Serif);
+        assert_eq!(generic("Liberation Serif"), fontdb::Family::Serif);
+        assert_eq!(generic("Georgia"), fontdb::Family::Serif);
+    }
+
+    /// The case the comment on `generic` calls out by name: `Liberation Sans`
+    /// contains "sans", not "serif", so the serif check above must not catch
+    /// it - if it did, every sans-serif document would draw with serifs.
+    #[test]
+    fn generic_defaults_to_sans_serif_rather_than_matching_serif_by_accident() {
+        assert_eq!(generic("Liberation Sans"), fontdb::Family::SansSerif);
+        assert_eq!(generic("Wingdings"), fontdb::Family::SansSerif);
+    }
+}
