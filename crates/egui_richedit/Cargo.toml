@@ -1,0 +1,22 @@
+[package]
+name = "egui_richedit"
+description = "Rich-text editing for egui over paragraphs the application lays out itself: caret, selection and typing on styled galleys"
+keywords = ["egui", "text", "editor", "rich-text", "gui"]
+categories = ["gui", "text-editors"]
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# egui and nothing else. A dependency on anything in the workspace this crate
+# sits in would make it that workspace's crate; `tests/independent.rs` reads
+# this manifest and refuses one.
+[dependencies]
+egui.workspace = true
+
+[dev-dependencies]
+# The example is a window, and the tests need egui's own fonts to lay text out.
+eframe.workspace = true

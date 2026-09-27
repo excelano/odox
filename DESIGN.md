@@ -29,6 +29,12 @@ link egui, and does not open files: a document is made from a byte slice and
 turned back into a `Vec<u8>`, so one library serves a window, a sandboxed macOS
 application and a test that never reads a disk.
 
+`egui_richedit` sits below `odox-ui` and knows nothing of ODF: it is the caret,
+the selection and the keys over paragraphs an application lays out itself, and
+it reaches a document only through the `Model` trait the application implements.
+It depends on egui alone, its tests hold it to that, and it is published as a
+crate for any egui application.
+
 ## §2 What the build depends on
 
 Pure Rust: a build that needs a Rust toolchain and nothing else cross-compiles
@@ -135,11 +141,12 @@ same for every run. Resolved against the paragraph's size alone, a title whose
 size lives on its span sat in a line thirteen points tall.
 
 **Text in the page can be selected and copied**, by dragging, double-click,
-triple-click and Ctrl+C. The paragraph hands its laid-out galley and its anchor
-to egui's label-selection plugin, which paints the galley at that anchor and keeps
-the selection across paragraphs and scrolling because every paragraph reports to
-it whether or not it is on screen. The plugin begins a selection only on a
-response that senses drag, which a bare allocation does not.
+triple-click and Ctrl+C. Outside edit mode the paragraph hands its laid-out
+galley and its anchor to egui's label-selection plugin, and in edit mode to the
+page editor of §11; either paints the galley at that anchor and keeps the
+selection across paragraphs and scrolling because every paragraph reports to it
+whether or not it is on screen. Both begin a selection only on a response that
+senses drag, which a bare allocation does not.
 
 **What is not drawn.** Nothing paginates: a page layout gives a width, and page
 boxes, widows, floats and multiple columns are typesetting rather than reading.
@@ -295,19 +302,41 @@ is not picked: a shape placed by `draw:transform`, which states no corner; a
 line, placed by its ends; a connector; a group; and everything the master page
 contributes. Each drag is one undo step, recorded when it begins.
 
-**A paragraph is edited in a text box where it sits**, in edit mode, on a
+**A text document is edited on the page as it is drawn.** In edit mode a
+click puts a caret into the paragraph under it, and typing goes into the tree
+before the next layout, so the paragraph is drawn with its own formatting as
+it changes and what is typed into a bold word is bold. Enter splits the
+paragraph, Shift+Enter is a line break inside it, and Backspace at its start
+or Delete at its end joins it to its neighbour; the arrows, Home and End
+cross from one paragraph into the next, Up and Down keeping to the column they
+began in. A selection made with Shift or a drag runs across paragraphs, and
+Ctrl+C, Ctrl+X and Ctrl+V go through the clipboard, a pasted line break
+beginning a paragraph. `egui_richedit` does the caret and the keys;
+`odox-ui`'s `FlowModel` names each paragraph by its path under the body, in
+the order the flow draws them through lists, table cells and text boxes, and
+turns each edit into an `odox-core` edit. An edit that would join across
+anything other than a neighbouring paragraph — a table, a list item's edge —
+is refused and changes nothing. A paragraph inside a frame anchored in a
+paragraph is drawn from a clone and is not edited in place.
+
+The caret stands in the paragraph's flat text, and what is drawn is not that
+text character for character: a tab is drawn as spaces, a note as its
+citation, a field as its value. The renderer records each such piece as it
+lays the paragraph out, so a click on one lands at its edge and the caret
+steps over it, and a test holds the two lengths equal for every paragraph in
+the corpus.
+
+**A slide's label is edited in a text box where it sits**, in edit mode, on a
 click: the box shows the paragraph's flat text unformatted at the paragraph's
 own font, size, colour, indent and width, on the page's paper. Escape puts
 the paragraph back, Ctrl+Enter or a click elsewhere keeps what was typed,
 Enter is a new paragraph once it is kept, and Backspace with the caret at the
 very start joins the paragraph onto the one before it, the box reopening
-there with the caret at the join. A slide's labels are the same paragraphs
-through the same box, addressed from the page by the shape's index; in edit
-mode a drag on a slide moves the shape and does not select its text. A
-paragraph inside a frame anchored in a paragraph is drawn from a clone and is
-not edited in place. What is written is the difference between what the box
-was given and what it hands back, so a span or a marker outside the change is
-untouched and what replaces a bold word is bold.
+there with the caret at the join. The labels are addressed from the page by
+the shape's index; in edit mode a drag on a slide moves the shape and does not
+select its text. What is written is the difference between what the box was
+given and what it hands back, so a span or a marker outside the change is
+untouched.
 
 **A paragraph is edited through its flat text**, built from the tree and not
 from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
@@ -321,7 +350,9 @@ first half. `crates/odox-core/src/edit.rs` is the map; `tests/edit.rs`
 measures it over every paragraph of the corpus.
 
 **Undo is a stack of snapshots** of the content tree, bounded at a hundred.
-Every edit records the tree as it stands and then mutates; the document is
+Every edit records the tree as it stands and then mutates, except that a run
+of typing, or of deleting, on the page is one step, ended by a move of the
+caret or an edit of another kind; the document is
 modified when the stack is not at the depth it had when the file was last read
 or written, so undoing back to that depth is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a

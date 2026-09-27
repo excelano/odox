@@ -45,12 +45,19 @@ impl Editing {
     /// mutates. A redo history is discarded, because the edit that follows is
     /// a new branch.
     pub fn record(&mut self, content: &Element) {
+        self.record_snapshot(content.clone());
+    }
+
+    /// The same, for a snapshot already taken: an editor that learns only
+    /// after an edit whether it succeeded takes the tree before trying, and
+    /// records it once it has.
+    pub fn record_snapshot(&mut self, snapshot: Element) {
         if self.saved_at.is_some_and(|depth| depth > self.undo.len()) {
             // The saved state was above this point and is now off the line.
             self.saved_at = None;
         }
         self.redo.clear();
-        self.undo.push(content.clone());
+        self.undo.push(snapshot);
         if self.undo.len() > DEPTH {
             self.undo.remove(0);
             self.saved_at = self.saved_at.and_then(|depth| depth.checked_sub(1));

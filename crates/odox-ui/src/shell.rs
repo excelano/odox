@@ -375,9 +375,13 @@ impl<V: View> eframe::App for Shell<V> {
         // Nothing is taken while the question is up, so an answer typed at it
         // reaches it and nothing else; and nothing is taken while a text field
         // has the focus, so Ctrl+Z inside a cell undoes the typing and not the
-        // document.
+        // document. The page editor is not such a field: its typing is the
+        // document's, and so is its Ctrl+Z.
         self.editing.asking = self.pending.is_some();
-        if self.pending.is_none() && !ctx.egui_wants_keyboard_input() {
+        let field_focused = ctx
+            .memory(egui::Memory::focused)
+            .is_some_and(|id| id != crate::flow_model::page_editor_id());
+        if self.pending.is_none() && !field_focused {
             self.keys(&ctx);
         }
 
