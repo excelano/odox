@@ -344,11 +344,12 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 (true, false)
             }
             Key::ArrowUp | Key::ArrowDown => {
-                let column = self.column;
                 let to = self.vertical(model, &selection.focus, key == Key::ArrowDown);
+                // The column `vertical` aimed at, kept across the run, which
+                // `move_to` would forget.
+                let column = self.column;
                 self.move_to(to, extend);
-                // Kept across the run, which `move_to` would forget.
-                self.column = self.column.or(column);
+                self.column = column;
                 (true, false)
             }
             Key::Backspace | Key::Delete => {
@@ -371,7 +372,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             Key::Enter if modifiers.shift => (false, self.type_text(model, "\n")),
             Key::Enter => {
                 self.group = None;
-                let mut changed = self.delete_selection(model, Group::Other);
+                // A selection the model will not delete is not split in the
+                // middle of either.
+                let changed = self.delete_selection(model, Group::Other);
+                if !changed && !selection.is_caret() {
+                    return (false, false);
+                }
+                let mut changed = changed;
                 let at = self.selection.clone().map(|s| s.focus);
                 if let Some(at) = at {
                     changed |= self.apply(model, Edit::Split { at }, Group::Other);
@@ -404,7 +411,8 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     }
 
     /// Paste text, each of its lines after the first a paragraph of its own,
-    /// in one undo step.
+    /// in one undo step. It stops at the first part the model refuses, so a
+    /// selection that cannot be replaced is left as it was.
     fn paste<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let text = text.replace("\r\n", "\n").replace('\r', "\n");
         self.group = None;
@@ -429,7 +437,10 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                     to,
                     text: line,
                 };
-                changed |= self.apply(model, edit, Group::Other);
+                if !self.apply(model, edit, Group::Other) {
+                    break;
+                }
+                changed = true;
             }
         }
         self.group = None;
@@ -641,13 +652,23 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             self.dragging = false;
         } else if self.dragging
             && let Some(pos) = pos
-            && (response.rect.top()..response.rect.bottom()).contains(&pos.y)
+            // The paragraph the pointer is over, and not merely level with:
+            // cells in a table row share their height.
+            && response.rect.contains(pos)
             && let Some(selection) = &mut self.selection
         {
             let cursor = at_pointer(pos);
             selection.focus = Position::new(paragraph.clone(), map.to_model(cursor.index.0));
             self.next_row = cursor.prefer_next_row;
             self.last_interaction = ui.input(|input| input.time);
+        }
+
+        // egui takes the focus from a widget on any click it does not hover,
+        // and the editor's own is under the paragraphs, so a click ending on
+        // one would take the keyboard from the caret it just put down. The
+        // paragraph is the editor's, and the focus comes back to it.
+        if response.clicked() {
+            ui.memory_mut(|memory| memory.request_focus(self.id));
         }
 
         if (response.double_clicked() || response.triple_clicked())

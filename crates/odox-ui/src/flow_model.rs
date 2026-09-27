@@ -136,6 +136,10 @@ impl Model for FlowModel<'_> {
         edit: Edit<'_, Vec<usize>>,
         new_step: bool,
     ) -> Option<Position<Vec<usize>>> {
+        // An edit to a document that matches its file always begins a step,
+        // whatever the editor thinks: typing that runs on past a save is a
+        // change the save does not hold, and has to be one a close asks about.
+        let new_step = new_step || !self.editing.modified();
         // Taken before trying, because only trying says whether the edit is
         // made. A refusal is decided before anything in the tree changes.
         let before = new_step.then(|| self.content.clone());
@@ -270,6 +274,28 @@ mod tests {
             at = next;
         }
         assert_eq!(seen, ["one", "item", "cell", "two"]);
+    }
+
+    #[test]
+    fn typing_that_runs_on_past_a_save_is_a_change() {
+        let mut content = content();
+        let mut editing = Editing::default();
+        editing.reset();
+        let at = |offset| Position::new(vec![0], offset);
+        let typed = |offset| Edit::Replace {
+            from: at(offset),
+            to: at(offset),
+            text: "x",
+        };
+        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        model.apply(typed(0), true);
+        model.editing.mark_saved();
+        // The same run of typing, as far as the editor knows.
+        model.apply(typed(1), false);
+        assert!(
+            editing.modified(),
+            "what was typed after the save is unsaved"
+        );
     }
 
     #[test]

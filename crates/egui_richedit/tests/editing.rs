@@ -315,3 +315,147 @@ fn a_selection_left_past_the_end_by_an_outside_change_is_pulled_back() {
     h.typed("!");
     assert_eq!(h.model.paragraphs, ["ab!"]);
 }
+
+#[test]
+fn a_run_of_downs_keeps_its_column_through_a_short_line() {
+    let mut h = Harness::new(&["a longer first line", "ab", "a longer third line"]);
+    h.caret(0, 12);
+    h.frame(Vec::new());
+    h.key(Key::ArrowDown);
+    assert_eq!(h.focus(), Position::new(1, 2), "the short line's end");
+    h.key(Key::ArrowDown);
+    let below = h.focus();
+    assert_eq!(below.paragraph, 2);
+    assert!(
+        (11..=13).contains(&below.offset),
+        "back at the column: {below:?}"
+    );
+}
+
+/// A model that refuses any replace across paragraphs, as an application
+/// whose paragraphs sit in different containers does.
+struct Refusing(Plain);
+
+impl Model for Refusing {
+    type Paragraph = usize;
+
+    fn text(&self, paragraph: &usize) -> Option<String> {
+        self.0.text(paragraph)
+    }
+
+    fn next(&self, paragraph: &usize) -> Option<usize> {
+        self.0.next(paragraph)
+    }
+
+    fn previous(&self, paragraph: &usize) -> Option<usize> {
+        self.0.previous(paragraph)
+    }
+
+    fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
+        match &edit {
+            Edit::Replace { from, to, .. } if from.paragraph != to.paragraph => None,
+            _ => self.0.apply(edit, new_step),
+        }
+    }
+}
+
+#[test]
+fn a_selection_the_model_refuses_is_left_whole_by_paste_and_enter() {
+    let ctx = Context::default();
+    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut model = Refusing(Plain::new(&["ab", "cd"]));
+    let selection = Selection {
+        anchor: Position::new(0, 1),
+        focus: Position::new(1, 1),
+    };
+    for event in [
+        Event::Paste("x\ny".to_owned()),
+        Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        },
+    ] {
+        editor.select(&ctx, selection.clone());
+        let input = RawInput {
+            events: vec![event],
+            ..RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            editor.input(ui, &mut model);
+        });
+        output.textures_delta.clear();
+        assert_eq!(model.0.paragraphs, ["ab", "cd"]);
+    }
+}
+
+#[test]
+fn a_click_whose_release_comes_a_frame_later_keeps_the_caret() {
+    let mut h = Harness::new(&["Hello world"]);
+    let at = Pos2::new(1.0, 5.0);
+    let button = |pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    h.frame(vec![Event::PointerMoved(at)]);
+    h.frame(vec![button(true)]);
+    h.frame(vec![button(false)]);
+    h.frame(Vec::new());
+    h.typed(">");
+    assert_eq!(h.model.paragraphs, [">Hello world"]);
+}
+
+#[test]
+fn a_drag_stays_in_the_paragraph_it_is_over_when_another_sits_beside_it() {
+    // Two paragraphs side by side, as two cells of a table row are.
+    let ctx = Context::default();
+    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut model = Plain::new(&["left cell text", "right"]);
+    let mut frame = |events: Vec<Event>| {
+        let input = RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
+            ..RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            editor.input(ui, &mut model);
+            ui.horizontal_top(|ui| {
+                for (index, text) in model.paragraphs.iter().enumerate() {
+                    let mut job = ParagraphJob::new(LayoutJob::default());
+                    job.text(text, TextFormat::default());
+                    let (job, map) = job.into_parts();
+                    let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+                    let (rect, response) = ui
+                        .allocate_exact_size(vec2(150.0, galley.size().y), Sense::click_and_drag());
+                    let laid = Laid {
+                        galley,
+                        map,
+                        origin: rect.min,
+                    };
+                    editor.paragraph(ui, &response, &index, laid);
+                }
+            });
+        });
+        output.textures_delta.clear();
+    };
+    let button = |x: f32, pressed| Event::PointerButton {
+        pos: Pos2::new(x, 5.0),
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    frame(vec![Event::PointerMoved(Pos2::new(2.0, 5.0))]);
+    frame(vec![button(2.0, true)]);
+    for x in [10.0, 20.0, 30.0] {
+        frame(vec![Event::PointerMoved(Pos2::new(x, 5.0))]);
+    }
+    frame(vec![button(30.0, false)]);
+    let selection = editor.selection().expect("a selection").clone();
+    assert_eq!(selection.anchor.paragraph, 0);
+    assert_eq!(selection.focus.paragraph, 0, "the drag stayed in its cell");
+    assert!(selection.focus.offset > 0);
+}
