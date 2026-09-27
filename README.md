@@ -94,8 +94,9 @@ asks for, with the headings listed beside it; clicking one scrolls to it. In
 edit mode a click puts the caret where you clicked and you type into the page
 as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
-before, and the arrows, Shift and the clipboard work across paragraphs the way
-they do in any word processor.
+before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
+Shift and the clipboard work across paragraphs the way they do in any word
+processor. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, one tab per sheet, and shows the formula behind whichever cell you pick.

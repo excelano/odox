@@ -37,7 +37,7 @@ pub mod shapes;
 pub mod shell;
 pub mod system_theme;
 
-pub use edit::Editing;
+pub use edit::{Caret, Editing};
 pub use flow::{Editor as ParagraphEditor, Outcome as ParagraphOutcome};
 pub use flow::{Flow, Pictures};
 pub use flow_model::{FlowModel, PageEditor, page_editor};

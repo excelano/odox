@@ -158,6 +158,14 @@ impl Model for FlowModel<'_> {
         self.neighbour(paragraph, -1)
     }
 
+    fn first(&self) -> Option<Vec<usize>> {
+        self.order().first().cloned()
+    }
+
+    fn last(&self) -> Option<Vec<usize>> {
+        self.order().last().cloned()
+    }
+
     fn apply(
         &mut self,
         edit: Edit<'_, Vec<usize>>,
@@ -169,7 +177,12 @@ impl Model for FlowModel<'_> {
         let new_step = new_step || !self.editing.modified();
         // Taken before trying, because only trying says whether the edit is
         // made. A refusal is decided before anything in the tree changes.
+        // Where the edit begins is where an undo of it puts the caret.
         let before = new_step.then(|| self.content.clone());
+        let begins = match &edit {
+            Edit::Replace { from, .. } => from.clone(),
+            Edit::Split { at } => at.clone(),
+        };
         let at = match edit {
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
@@ -183,7 +196,7 @@ impl Model for FlowModel<'_> {
         };
         if at.is_some() {
             if let Some(before) = before {
-                self.editing.record_snapshot(before);
+                self.editing.record_snapshot(before, Some(begins));
             }
             self.order = OnceCell::new();
         }
@@ -419,7 +432,7 @@ mod tests {
         assert!(editing.can_undo());
         let mut undone = 0;
         let mut current = content.clone();
-        while let Some(previous) = editing.undo(&current) {
+        while let Some(previous) = editing.undo(&current, None).map(|(tree, _)| tree) {
             current = previous;
             undone += 1;
         }

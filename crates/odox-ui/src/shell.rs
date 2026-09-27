@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use odox_core::Document;
 
-use crate::edit::Editing;
+use crate::edit::{Caret, Editing};
 use crate::i18n::{fill, t};
 use crate::settings::Settings;
 
@@ -74,6 +74,16 @@ pub trait View {
     /// The content tree was replaced under the document, by undo or redo.
     /// A view that derives anything from the tree rebuilds it here.
     fn reindex(&mut self) {}
+
+    /// Where the caret is, for a view that has one, so that an undo can
+    /// bring it back there.
+    fn caret(&self) -> Option<Caret> {
+        None
+    }
+
+    /// Put the caret where an undo or a redo says it was, after
+    /// [`Self::reindex`].
+    fn restore_caret(&mut self, _caret: Caret) {}
 
     /// Draw the document. The shell has already put a scroll area or a panel
     /// around whatever this needs. The editing state says whether edit mode is
@@ -286,20 +296,31 @@ impl<V: View> Shell<V> {
     }
 
     fn undo(&mut self) {
+        let caret = self.view.caret();
         if let Some(document) = self.view.document_mut()
-            && let Some(previous) = self.editing.undo(&document.content)
+            && let Some((previous, caret)) = self.editing.undo(&document.content, caret)
         {
             document.content = previous;
-            self.view.reindex();
+            self.after_history(caret);
         }
     }
 
     fn redo(&mut self) {
+        let caret = self.view.caret();
         if let Some(document) = self.view.document_mut()
-            && let Some(next) = self.editing.redo(&document.content)
+            && let Some((next, caret)) = self.editing.redo(&document.content, caret)
         {
             document.content = next;
-            self.view.reindex();
+            self.after_history(caret);
+        }
+    }
+
+    /// The tree was replaced by undo or redo: the view rebuilds from it, and
+    /// the caret goes where the state it returned to had it.
+    fn after_history(&mut self, caret: Option<Caret>) {
+        self.view.reindex();
+        if let Some(caret) = caret {
+            self.view.restore_caret(caret);
         }
     }
 

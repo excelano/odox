@@ -308,8 +308,9 @@ before the next layout, so the paragraph is drawn with its own formatting as
 it changes and what is typed into a bold word is bold. Enter splits the
 paragraph, Shift+Enter is a line break inside it, and Backspace at its start
 or Delete at its end joins it to its neighbour; the arrows, Home and End
-cross from one paragraph into the next, Up and Down keeping to the column they
-began in. A selection made with Shift or a drag runs across paragraphs, and
+cross from one paragraph into the next, Up, Down, Page Up and Page Down
+keeping to the column they began in, and Ctrl+Home, Ctrl+End and Ctrl+A reach
+the whole document. A selection made with Shift or a drag runs across paragraphs, and
 Ctrl+C, Ctrl+X and Ctrl+V go through the clipboard, a pasted line break
 beginning a paragraph. `egui_richedit` does the caret and the keys;
 `odox-ui`'s `FlowModel` names each paragraph by its path under the body, in
@@ -361,8 +362,10 @@ measures it over every paragraph of the corpus.
 **Undo is a stack of snapshots** of the content tree, bounded at a hundred.
 Every edit records the tree as it stands and then mutates, except that a run
 of typing, or of deleting, on the page is one step, ended by a move of the
-caret or an edit of another kind; the document is
-modified when the stack is not at the depth it had when the file was last read
-or written, so undoing back to that depth is a document with nothing to save.
+caret or an edit of another kind. A snapshot also holds where the caret stood,
+so undo puts the caret where the edit began and redo where it was when the
+edit was undone. The document is modified when the stack is not at the depth
+it had when the file was last read or written, so undoing back to that depth
+is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a
 modified document is thrown away.

@@ -36,6 +36,14 @@ impl Model for Notes {
         paragraph.checked_sub(1)
     }
 
+    fn first(&self) -> Option<usize> {
+        (!self.paragraphs.is_empty()).then_some(0)
+    }
+
+    fn last(&self) -> Option<usize> {
+        self.paragraphs.len().checked_sub(1)
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, _new_step: bool) -> Option<Position<usize>> {
         match edit {
             Edit::Replace { from, to, text } => {
@@ -129,7 +137,7 @@ fn main() -> eframe::Result {
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
             let mut editor = RichEdit::new(Id::new("notes"));
-            editor.select(&cc.egui_ctx, Selection::caret(Position::new(1, 0)));
+            editor.select(Selection::caret(Position::new(1, 0)));
             Ok(Box::new(App { notes, editor }))
         }),
     )

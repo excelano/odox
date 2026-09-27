@@ -6,10 +6,11 @@
 use std::path::Path;
 
 use eframe::egui::{self, Ui};
+use egui_richedit::Selection;
 use odox_core::Document;
 use odox_core::doc::TextDocument;
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
+use odox_ui::{Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
 
 /// A text document, open or not.
 pub struct TextView {
@@ -75,6 +76,16 @@ impl View for TextView {
 
     fn reindex(&mut self) {
         self.page.document_replaced();
+    }
+
+    fn caret(&self) -> Option<Caret> {
+        self.page
+            .selection()
+            .map(|selection| selection.focus.clone())
+    }
+
+    fn restore_caret(&mut self, caret: Caret) {
+        self.page.select(Selection::caret(caret));
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {

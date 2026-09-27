@@ -49,6 +49,14 @@ impl Model for Plain {
         paragraph.checked_sub(1)
     }
 
+    fn first(&self) -> Option<usize> {
+        (!self.paragraphs.is_empty()).then_some(0)
+    }
+
+    fn last(&self) -> Option<usize> {
+        self.paragraphs.len().checked_sub(1)
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
         if new_step {
             self.steps += 1;
@@ -100,9 +108,8 @@ impl Harness {
     }
 
     fn caret(&mut self, paragraph: usize, offset: usize) {
-        let ctx = self.ctx.clone();
         self.editor
-            .select(&ctx, Selection::caret(Position::new(paragraph, offset)));
+            .select(Selection::caret(Position::new(paragraph, offset)));
     }
 
     /// One frame with these events in it, answering what egui was asked to
@@ -265,14 +272,10 @@ fn a_selection_across_paragraphs_is_replaced_by_what_is_typed() {
 #[test]
 fn copy_takes_the_selection_with_paragraphs_on_lines_of_their_own() {
     let mut h = Harness::new(&["one", "two", "three"]);
-    let ctx = h.ctx.clone();
-    h.editor.select(
-        &ctx,
-        Selection {
-            anchor: Position::new(2, 2),
-            focus: Position::new(0, 1),
-        },
-    );
+    h.editor.select(Selection {
+        anchor: Position::new(2, 2),
+        focus: Position::new(0, 1),
+    });
     assert_eq!(h.frame(vec![Event::Copy]).as_deref(), Some("ne\ntwo\nth"));
 }
 
@@ -351,6 +354,14 @@ impl Model for Refusing {
         self.0.previous(paragraph)
     }
 
+    fn first(&self) -> Option<usize> {
+        self.0.first()
+    }
+
+    fn last(&self) -> Option<usize> {
+        self.0.last()
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
         match &edit {
             Edit::Replace { from, to, .. } if from.paragraph != to.paragraph => None,
@@ -378,7 +389,7 @@ fn a_selection_the_model_refuses_is_left_whole_by_paste_and_enter() {
             modifiers: Modifiers::NONE,
         },
     ] {
-        editor.select(&ctx, selection.clone());
+        editor.select(selection.clone());
         let input = RawInput {
             events: vec![event],
             ..RawInput::default()
@@ -458,4 +469,47 @@ fn a_drag_stays_in_the_paragraph_it_is_over_when_another_sits_beside_it() {
     assert_eq!(selection.anchor.paragraph, 0);
     assert_eq!(selection.focus.paragraph, 0, "the drag stayed in its cell");
     assert!(selection.focus.offset > 0);
+}
+
+#[test]
+fn ctrl_a_selects_the_whole_document() {
+    let mut h = Harness::new(&["one", "two", "three"]);
+    h.caret(1, 1);
+    h.keys(&[(Key::A, Modifiers::COMMAND)]);
+    assert_eq!(
+        h.frame(vec![Event::Copy]).as_deref(),
+        Some("one\ntwo\nthree")
+    );
+}
+
+#[test]
+fn ctrl_home_and_end_go_to_the_document_s_ends_and_shift_selects() {
+    let mut h = Harness::new(&["one", "two", "three"]);
+    h.caret(1, 1);
+    h.keys(&[(Key::End, Modifiers::COMMAND)]);
+    assert_eq!(h.focus(), Position::new(2, 5));
+    h.keys(&[(Key::Home, Modifiers::COMMAND | Modifiers::SHIFT)]);
+    let selection = h.editor.selection().expect("a selection").clone();
+    assert_eq!(selection.anchor, Position::new(2, 5));
+    assert_eq!(selection.focus, Position::new(0, 0));
+}
+
+#[test]
+fn page_down_moves_a_view_s_height_and_page_up_comes_back() {
+    let lines: Vec<String> = (0..200).map(|i| format!("line {i}")).collect();
+    let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let mut h = Harness::new(&lines);
+    h.caret(0, 2);
+    h.frame(Vec::new());
+    h.key(Key::PageDown);
+    let below = h.focus();
+    // The harness's view is 400 points tall, and a line is a little over 16.
+    assert!(
+        (18..=30).contains(&below.paragraph),
+        "a view down: {below:?}"
+    );
+    assert_eq!(below.offset, 2, "kept to the column");
+    h.frame(Vec::new());
+    h.key(Key::PageUp);
+    assert_eq!(h.focus(), Position::new(0, 2));
 }

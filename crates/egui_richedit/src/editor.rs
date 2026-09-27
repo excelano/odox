@@ -69,13 +69,26 @@ pub struct RichEdit<P> {
     placed: HashMap<P, Placed>,
     /// This frame's, as they are reported.
     placing: Placing<P>,
-    /// The caret moved and should be scrolled into view where it is drawn.
-    reveal: bool,
+    /// What the next frame owes the caret.
+    owed: Owed,
+    /// How tall the view the paragraphs are drawn in is, which is how far
+    /// Page Up and Page Down move.
+    page_height: f32,
     /// The pointer went down on a paragraph and has not come up.
     dragging: bool,
     /// When the caret last moved or the text last changed, which is when its
     /// blink restarts.
     last_interaction: f64,
+}
+
+/// What the caret is owed by the next frame that draws it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Owed {
+    Nothing,
+    /// It moved, and is scrolled into view where it is drawn.
+    Reveal,
+    /// It was put somewhere from outside, and takes the keyboard too.
+    FocusAndReveal,
 }
 
 struct Placed {
@@ -114,7 +127,8 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             group: None,
             placed: HashMap::new(),
             placing: Placing::default(),
-            reveal: false,
+            owed: Owed::Nothing,
+            page_height: 0.0,
             dragging: false,
             last_interaction: 0.0,
         }
@@ -125,14 +139,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.selection.as_ref()
     }
 
-    /// Put the caret or the selection somewhere, and give the editor the
-    /// keyboard.
-    pub fn select(&mut self, ctx: &egui::Context, selection: Selection<P>) {
+    /// Put the caret or the selection somewhere. The next frame scrolls it
+    /// into view and gives the editor the keyboard.
+    pub fn select(&mut self, selection: Selection<P>) {
         self.selection = Some(selection);
         self.group = None;
         self.column = None;
-        self.reveal = true;
-        ctx.memory_mut(|memory| memory.request_focus(self.id));
+        self.owed = Owed::FocusAndReveal;
     }
 
     /// Take the caret away.
@@ -161,6 +174,11 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         // that did not appear in the last one. It senses no pointer, so the
         // paragraphs over it still get theirs.
         ui.interact(ui.clip_rect(), self.id, Sense::focusable_noninteractive());
+        self.page_height = ui.clip_rect().height();
+        if self.owed == Owed::FocusAndReveal {
+            self.owed = Owed::Reveal;
+            ui.memory_mut(|memory| memory.request_focus(self.id));
+        }
         if !ui.memory(|memory| memory.has_focus(self.id)) {
             self.dragging = false;
             return false;
@@ -174,7 +192,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             let (moved, edited) = self.event(ui, model, event);
             if moved || edited {
                 self.last_interaction = ui.input(|input| input.time);
-                self.reveal = true;
+                self.owed = Owed::Reveal;
             }
             changed |= edited;
         }
@@ -218,8 +236,8 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             let caret = galley.pos_from_cursor(cursor).translate(origin.to_vec2());
             let since = ui.input(|input| input.time) - self.last_interaction;
             paint_text_cursor(ui, ui.painter(), caret, since);
-            if self.reveal {
-                self.reveal = false;
+            if self.owed == Owed::Reveal {
+                self.owed = Owed::Nothing;
                 ui.scroll_to_rect(caret.expand(4.0), None);
             }
             // Where an input method draws what is being composed.
@@ -338,9 +356,36 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 self.move_to(to, extend);
                 (true, false)
             }
+            Key::A if modifiers.command => {
+                let (Some(first), Some(last)) = (model.first(), model.last()) else {
+                    return (false, false);
+                };
+                self.move_to(Position::new(first, 0), false);
+                self.move_to(edge(model, last, true), true);
+                (true, false)
+            }
+            Key::Home | Key::End if modifiers.command => {
+                let end = key == Key::End;
+                let paragraph = if end { model.last() } else { model.first() };
+                let Some(paragraph) = paragraph else {
+                    return (false, false);
+                };
+                self.next_row = false;
+                self.move_to(edge(model, paragraph, end), extend);
+                (true, false)
+            }
             Key::Home | Key::End => {
                 let to = self.row_edge(model, &selection.focus, key == Key::End);
                 self.move_to(to, extend);
+                (true, false)
+            }
+            Key::PageUp | Key::PageDown => {
+                let Some(to) = self.page(&selection.focus, key == Key::PageDown) else {
+                    return (false, false);
+                };
+                let column = self.column;
+                self.move_to(to, extend);
+                self.column = column;
                 (true, false)
             }
             Key::ArrowUp | Key::ArrowDown => {
@@ -546,6 +591,44 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         // offset; which row the caret is drawn on is what was asked for.
         self.next_row = !end;
         Position::new(at.paragraph.clone(), placed.map.to_model(edge.index.0))
+    }
+
+    /// The position a view's height above or below another, keeping to the
+    /// column, in whichever paragraph last frame drew nearest there. `None`
+    /// without last frame's layout of the paragraph the caret is in.
+    fn page(&mut self, at: &Position<P>, down: bool) -> Option<Position<P>> {
+        let placed = self.placed.get(&at.paragraph)?;
+        let cursor = CCursor {
+            index: CharIndex(placed.map.to_galley(at.offset)),
+            prefer_next_row: self.next_row,
+        };
+        let caret = placed
+            .galley
+            .pos_from_cursor(cursor)
+            .translate(placed.origin.to_vec2());
+        let x = self.column.unwrap_or_else(|| caret.center().x);
+        let y = caret.center().y
+            + if down {
+                self.page_height
+            } else {
+                -self.page_height
+            };
+        let distance = |placed: &Placed| {
+            let top = placed.origin.y + placed.galley.rect.top();
+            let bottom = placed.origin.y + placed.galley.rect.bottom();
+            (top - y).max(y - bottom).max(0.0)
+        };
+        let (paragraph, there) = self
+            .placed
+            .iter()
+            .min_by(|(_, a), (_, b)| distance(a).total_cmp(&distance(b)))?;
+        let landed = there
+            .galley
+            .cursor_from_pos(vec2(x - there.origin.x, y - there.origin.y));
+        let to = Position::new(paragraph.clone(), there.map.to_model(landed.index.0));
+        self.column = Some(x);
+        self.next_row = landed.prefer_next_row;
+        Some(to)
     }
 
     /// The position one row up or down from another, keeping to the column

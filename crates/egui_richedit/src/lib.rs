@@ -127,6 +127,12 @@ pub trait Model {
     /// The editable paragraph before this one in document order.
     fn previous(&self, paragraph: &Self::Paragraph) -> Option<Self::Paragraph>;
 
+    /// The first editable paragraph, `None` when there is none.
+    fn first(&self) -> Option<Self::Paragraph>;
+
+    /// The last editable paragraph, `None` when there is none.
+    fn last(&self) -> Option<Self::Paragraph>;
+
     /// Make an edit, and answer where the caret stands after it: after the
     /// replacing text, or at the start of the second half of a split. `None`
     /// refuses the edit and leaves the document as it was.
