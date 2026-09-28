@@ -344,6 +344,33 @@ the shape, so a label's paragraphs take clicks alone and the caret goes down
 on the click; Shift with the arrows selects. The arrows and the page keys step
 through the slides only while nothing has the keyboard.
 
+**Text is made bold, italic, underlined or struck through**, and nothing else
+is formatting a person can apply. Ctrl+B, Ctrl+I and Ctrl+U, or the row of
+buttons over the page in edit mode, give the selection the mark or take it off
+where all of it already has it; strikethrough has a button and no key. With a
+caret and nothing selected, the mark goes to what is typed next at the caret,
+and moving the caret forgets it. A button is lit where the whole selection has
+its mark, and for a caret where the text typed there would. Each is one undo
+step, and a mark put on with typing is the same step as the typing. A
+spreadsheet cell is not formatted.
+
+**A mark changes spans and automatic styles and nothing else.** The range's
+ends are cut into the nodes they fall inside. A span the range holds whole has
+its style changed; any other run of what the range holds is wrapped in a new
+span inside whatever holds it, a link included, so no link or span the
+document had is taken apart. A property is written only where it changes what
+is drawn: a span inside the range whose own style says otherwise stops saying
+it, a span left saying nothing gives way to its contents, and taking a mark off
+text it was put on gives back the paragraph it was. Bold and italic are written
+for Asian and complex scripts too. A span's style is an automatic style in
+`content.xml`, one the document already holds wherever one says the same, and
+otherwise a new one named `T` and the first number no text style has; `Styles`
+learns of each as it is written and forgets none, so an undo never frees a name
+for a different style. A document with no automatic styles is given the
+container before its body. `crates/odox-core/src/edit/format.rs` is the
+mechanism; `tests/format.rs` formats a range of every paragraph in the corpus
+and holds everything outside it equal.
+
 **A paragraph is edited through its flat text**, built from the tree and not
 from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
 `text:line-break` a newline, a span's or a link's contents the paragraph's own

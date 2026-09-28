@@ -10,8 +10,9 @@
 The document is read from the file and nothing is sent anywhere. Editing means
 changing what is there, not authoring: text can be typed and deleted, a
 paragraph split or joined, a cell given a value, a shape moved or resized, any
-of it undone, and the document saved. Formatting, inserting, formulas and find
-and replace are an office suite's. What was not touched is written back as it
+of it undone, and the document saved; in a text document or on a slide, text
+can be made bold, italic, underlined or struck through. Other formatting,
+inserting, formulas and find and replace are an office suite's. What was not touched is written back as it
 was read, element for element, so the saved document is the opened one with the
 change in it. Nothing is written until Save, and then only the file that was
 opened or the one named; before it is, what is about to be written is read back
@@ -35,6 +36,11 @@ Save over the open file; save somewhere else.
 .TP
 .B Ctrl+Z, Ctrl+Shift+Z
 Take an edit back; put it back.
+.TP
+.B Ctrl+B, Ctrl+I, Ctrl+U
+In a text document or on a slide, make the selection bold, italic or
+underlined, or take it off where all of it is; with nothing selected, what is
+typed next.
 .TP
 .B Ctrl+E
 Edit mode on or off. A window opens reading unless the preference in the Edit

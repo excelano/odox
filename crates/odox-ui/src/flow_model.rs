@@ -3,17 +3,20 @@
 //! A paragraph is named by its path of child indices from the root the flow
 //! draws, which is the path [`crate::Flow`] reports it under. The editor's
 //! edits become `odox-core` edits on the tree, and an edit that begins an undo
-//! step is recorded in [`Editing`] once it has succeeded. DESIGN.md §11.
+//! step is recorded in [`Editing`] once it has succeeded. A format writes
+//! automatic styles, which the document's [`Styles`] is told of as they are
+//! written. DESIGN.md §11.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
 use std::cell::OnceCell;
+use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Model, Position, RichEdit};
+use egui_richedit::{Edit, Mark, Model, Position, RichEdit};
 use odox_core::edit::{self, is_paragraph};
-use odox_core::{Element, Ns, Refused};
+use odox_core::{Element, Ns, Refused, Styles};
 
 use crate::Editing;
 use crate::flow::is_block_container;
@@ -35,6 +38,7 @@ pub fn page_editor() -> PageEditor {
 /// The paragraphs under a root in a content tree, for one frame's editing.
 pub struct FlowModel<'a> {
     content: &'a mut Element,
+    styles: &'a mut Styles,
     /// Where the flow's root is under the content root.
     root: Vec<usize>,
     editing: &'a mut Editing,
@@ -47,10 +51,17 @@ pub struct FlowModel<'a> {
 }
 
 impl<'a> FlowModel<'a> {
-    /// The paragraphs under the element at a path in a content tree.
-    pub fn new(content: &'a mut Element, root: Vec<usize>, editing: &'a mut Editing) -> Self {
+    /// The paragraphs under the element at a path in a content tree, whose
+    /// document's styles are `styles`.
+    pub fn new(
+        content: &'a mut Element,
+        styles: &'a mut Styles,
+        root: Vec<usize>,
+        editing: &'a mut Editing,
+    ) -> Self {
         Self {
             content,
+            styles,
             root,
             editing,
             scope: Vec::new(),
@@ -125,32 +136,85 @@ impl<'a> FlowModel<'a> {
         to: &Position<Vec<usize>>,
         text: &str,
     ) -> Option<()> {
+        let ranges = self.covered(from, to)?;
+        if text.is_empty() && ranges.iter().all(|(_, range)| range.is_empty()) {
+            return None;
+        }
+        for (path, range) in ranges.into_iter().rev() {
+            let with = if path == from.paragraph { text } else { "" };
+            let paragraph = self.paragraph_mut(&path)?;
+            edit::replace(paragraph, range, with);
+        }
+        Some(())
+    }
+
+    /// Each paragraph from one position to another in drawing order, with
+    /// the range of its text between them.
+    fn covered(
+        &self,
+        from: &Position<Vec<usize>>,
+        to: &Position<Vec<usize>>,
+    ) -> Option<Vec<(Vec<usize>, Range<usize>)>> {
         let order = self.order();
         let first = order.iter().position(|p| *p == from.paragraph)?;
         let last = order.iter().position(|p| *p == to.paragraph)?;
         let covered: Vec<Vec<usize>> = order.get(first..=last)?.to_vec();
-        let ranges: Vec<(Vec<usize>, usize, usize)> = covered
-            .into_iter()
-            .map(|path| {
-                let len = self.text(&path).map_or(0, |t| t.chars().count());
-                let start = if path == from.paragraph {
-                    from.offset
-                } else {
-                    0
-                };
-                let end = if path == to.paragraph { to.offset } else { len };
-                (path, start, end.max(start))
-            })
-            .collect();
-        if text.is_empty() && ranges.iter().all(|(_, start, end)| start == end) {
-            return None;
-        }
-        for (path, start, end) in ranges.into_iter().rev() {
-            let with = if path == from.paragraph { text } else { "" };
-            let paragraph = self.paragraph_mut(&path)?;
-            edit::replace(paragraph, start..end, with);
+        Some(
+            covered
+                .into_iter()
+                .map(|path| {
+                    let len = self.text(&path).map_or(0, |t| t.chars().count());
+                    let start = if path == from.paragraph {
+                        from.offset
+                    } else {
+                        0
+                    };
+                    let end = if path == to.paragraph { to.offset } else { len };
+                    (path, start..end.max(start))
+                })
+                .collect(),
+        )
+    }
+
+    /// Give the text from one position to another a mark, or take it off,
+    /// paragraph by paragraph.
+    fn format(
+        &mut self,
+        from: &Position<Vec<usize>>,
+        to: &Position<Vec<usize>>,
+        mark: edit::Mark,
+        on: bool,
+    ) -> Option<()> {
+        let automatic =
+            |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
+        for (path, range) in self.covered(from, to)? {
+            if range.is_empty() {
+                continue;
+            }
+            let had = automatic(self.content);
+            let mut at = self.root.clone();
+            at.extend(&path);
+            edit::format(self.content, &at, range, mark, on, self.styles).ok()?;
+            // Styles written into a document that had nowhere to keep them go
+            // before its body, and move the body, and the root, one along.
+            if !had
+                && automatic(self.content)
+                && let Some(first) = self.root.first_mut()
+            {
+                *first += 1;
+            }
         }
         Some(())
+    }
+}
+
+/// The library's name for a mark.
+fn core_mark(mark: Mark) -> edit::Mark {
+    match mark {
+        Mark::Bold => edit::Mark::Bold,
+        Mark::Italic => edit::Mark::Italic,
+        Mark::Underline => edit::Mark::Underline,
+        Mark::Strike => edit::Mark::Strike,
     }
 }
 
@@ -180,6 +244,34 @@ impl Model for FlowModel<'_> {
         self.order().last().cloned()
     }
 
+    fn marked(
+        &self,
+        from: &Position<Vec<usize>>,
+        to: &Position<Vec<usize>>,
+        mark: Mark,
+    ) -> Option<bool> {
+        let root = self.root()?;
+        let mark = core_mark(mark);
+        let ranges: Vec<_> = self
+            .covered(from, to)?
+            .into_iter()
+            .filter(|(_, range)| !range.is_empty())
+            .collect();
+        if ranges.is_empty() {
+            let at = from.offset..from.offset;
+            return edit::marked(root.at(&from.paragraph)?, at, mark, self.styles);
+        }
+        let mut answer = None;
+        for (path, range) in ranges {
+            let value = edit::marked(root.at(&path)?, range, mark, self.styles)?;
+            if answer.is_some_and(|a| a != value) {
+                return None;
+            }
+            answer = Some(value);
+        }
+        answer
+    }
+
     fn apply(
         &mut self,
         edit: Edit<'_, Vec<usize>>,
@@ -194,7 +286,7 @@ impl Model for FlowModel<'_> {
         // Where the edit begins is where an undo of it puts the caret.
         let before = new_step.then(|| self.content.clone());
         let begins = match &edit {
-            Edit::Replace { from, .. } => from.clone(),
+            Edit::Replace { from, .. } | Edit::Format { from, .. } => from.clone(),
             Edit::Split { at } => at.clone(),
         };
         let at = match edit {
@@ -206,6 +298,9 @@ impl Model for FlowModel<'_> {
                 edit::split_at(root, &at.paragraph, at.offset)
                     .ok()
                     .map(|second| Position::new(second, 0))
+            }
+            Edit::Format { from, to, mark, on } => {
+                self.format(&from, &to, core_mark(mark), on).map(|()| to)
             }
         };
         if at.is_some() {
@@ -276,7 +371,7 @@ mod tests {
     use super::FlowModel;
     use crate::Editing;
     use egui_richedit::{Edit, Model, Position};
-    use odox_core::{Element, Node, Ns};
+    use odox_core::{Element, Node, Ns, Styles};
 
     fn element(prefix: &str, local: &str, ns: Ns, children: Vec<Node>) -> Node {
         let mut e = Element::new(prefix, local, ns);
@@ -322,8 +417,9 @@ mod tests {
     #[test]
     fn paragraphs_follow_one_another_through_lists_and_tables() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
-        let model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         let mut at = vec![0];
         let mut seen = vec![model.text(&at).expect("the first")];
         while let Some(next) = model.next(&at) {
@@ -337,9 +433,10 @@ mod tests {
     #[test]
     fn a_selection_over_a_whole_table_takes_it_and_joins_the_ends() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         // From inside "item" to inside "two", over the table's one cell.
         let at = model.apply(
             Edit::Replace {
@@ -361,9 +458,10 @@ mod tests {
     #[test]
     fn a_selection_out_of_a_cell_takes_the_text_and_leaves_the_cell() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         // From inside "cell" to inside "two".
         let at = model.apply(
             Edit::Replace {
@@ -381,9 +479,10 @@ mod tests {
     #[test]
     fn backspace_at_a_list_item_joins_it_to_the_paragraph_before() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         let at = model.apply(
             Edit::Replace {
                 from: Position::new(vec![0], 3),
@@ -401,6 +500,7 @@ mod tests {
     #[test]
     fn typing_that_runs_on_past_a_save_is_a_change() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
         let at = |offset| Position::new(vec![0], offset);
@@ -409,7 +509,7 @@ mod tests {
             to: at(offset),
             text: "x",
         };
-        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         model.apply(typed(0), true);
         model.editing.mark_saved();
         // The same run of typing, as far as the editor knows.
@@ -423,9 +523,10 @@ mod tests {
     #[test]
     fn an_edit_that_begins_a_step_is_recorded_once_it_succeeds() {
         let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let mut model = FlowModel::new(&mut content, vec![0, 0], &mut editing);
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         let at = model.apply(
             Edit::Split {
                 at: Position::new(vec![0], 1),

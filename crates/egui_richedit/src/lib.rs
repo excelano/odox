@@ -108,6 +108,38 @@ pub enum Edit<'a, P> {
         /// Where the paragraph is split.
         at: Position<P>,
     },
+    /// Give the text from one position to another a mark, or take it off.
+    /// The two may be in different paragraphs, `from` first in document
+    /// order; no paragraph is joined or split.
+    Format {
+        /// Where the formatted text begins.
+        from: Position<P>,
+        /// Where it ends.
+        to: Position<P>,
+        /// Which mark.
+        mark: Mark,
+        /// Given, or taken off.
+        on: bool,
+    },
+}
+
+/// Formatting a range of text is given or has taken off. The set is fixed, so
+/// that neither the editor nor the model needs a style system to agree on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Mark {
+    /// Bold.
+    Bold,
+    /// Italic.
+    Italic,
+    /// Underlined.
+    Underline,
+    /// Struck through.
+    Strike,
+}
+
+impl Mark {
+    /// Every mark, in the order a toolbar shows them.
+    pub const ALL: [Self; 4] = [Self::Bold, Self::Italic, Self::Underline, Self::Strike];
 }
 
 /// The document, as the editor sees it. The application implements this over
@@ -133,9 +165,25 @@ pub trait Model {
     /// The last editable paragraph, `None` when there is none.
     fn last(&self) -> Option<Self::Paragraph>;
 
+    /// Whether the text from one position to another carries a mark: `Some`
+    /// when all of it says the same, `None` when it differs. Two positions
+    /// that are the same answer for the text typed there would take its
+    /// formatting from. A model that keeps no formatting leaves this as it
+    /// is, which says nothing is marked, and refuses [`Edit::Format`].
+    fn marked(
+        &self,
+        from: &Position<Self::Paragraph>,
+        to: &Position<Self::Paragraph>,
+        mark: Mark,
+    ) -> Option<bool> {
+        let _ = (from, to, mark);
+        Some(false)
+    }
+
     /// Make an edit, and answer where the caret stands after it: after the
-    /// replacing text, or at the start of the second half of a split. `None`
-    /// refuses the edit and leaves the document as it was.
+    /// replacing text, at the start of the second half of a split, or for a
+    /// format at the end of the formatted text. `None` refuses the edit and
+    /// leaves the document as it was.
     ///
     /// `new_step` says whether the edit begins a new undo step or continues
     /// the one before it: the editor groups a run of typing into one step. An

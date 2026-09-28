@@ -58,9 +58,12 @@
 # slide's text, and drag or resize a shape. Save writes the document back over
 # the file that was opened and Save As writes it elsewhere; nothing else is
 # written, except one preference, in a settings file, when it is changed in
-# the menu. The bundle declares CFBundleTypeRole as Editor. There is no
-# Export, no formatting, no inserting and no formula editing, which is the
-# scope of the application rather than a limitation of the review build.
+# the menu. In a text document or a slide's text, Ctrl+B, Ctrl+I and Ctrl+U,
+# or the buttons above the page, make the selection bold, italic or underlined,
+# and a button strikes it through. The bundle declares CFBundleTypeRole as
+# Editor. There is no Export, no other formatting, no inserting and no formula
+# editing, which is the scope of the application rather than a limitation of
+# the review build.
 #
 # Each declares its one OpenDocument type at rank Alternate rather than
 # Default or Owner. OpenDocument is an OASIS standard that this project reads
@@ -85,7 +88,7 @@
 description = """
 Odox Text opens an OpenDocument text document, lets you change what is in it, and saves it back as the document it was.
 
-It is a lightweight editor and not a word processor. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, take any of it back with Undo, and save. You cannot apply formatting, insert a table or a picture, or find and replace: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
+It is a lightweight editor and not a word processor. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, make text bold, italic, underlined or struck through, take any of it back with Undo, and save. You cannot apply other formatting, insert a table or a picture, or find and replace: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
 
 It draws the page at the width the document asks for. Headings, nested lists, tables with merged cells and borders, and the pictures inside the document appear where the document puts them, in the fonts it asks for, resolved against the ones you have installed. An outline sits beside the page and moves it when you click a heading. You can select across paragraphs and copy, or take the whole document as plain text in one command.
 
@@ -121,6 +124,7 @@ features = [
     "An outline beside the page that moves it when you click a heading",
     "Select across paragraphs and copy, or copy the whole document as plain text",
     "Click a paragraph to change it, split it with Enter or join it with Backspace, and take any of it back with Undo",
+    "Make text bold, italic, underlined or struck through, from the keyboard or the buttons above the page",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
     "What you did not touch is written back as it was read, element for element, including what Odox has never heard of",
     "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
@@ -135,7 +139,7 @@ keywords = ["opendocument", "odf", "odt", "document editor", "edit document", "t
 description = """
 Odox Text öffnet ein OpenDocument-Textdokument, lässt Sie ändern, was darin steht, und speichert es als das Dokument zurück, das es war.
 
-Es ist ein leichter Editor und keine Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie auf einen Absatz klicken und seinen Text an Ort und Stelle ändern, mit Enter einen neuen Absatz beginnen, mit der Rücktaste zwei zusammenfügen, alles mit Rückgängig zurücknehmen und speichern. Formatieren, eine Tabelle oder ein Bild einfügen, suchen und ersetzen: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
+Es ist ein leichter Editor und keine Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie auf einen Absatz klicken und seinen Text an Ort und Stelle ändern, mit Enter einen neuen Absatz beginnen, mit der Rücktaste zwei zusammenfügen, Text fett, kursiv, unterstrichen oder durchgestrichen formatieren, alles mit Rückgängig zurücknehmen und speichern. Anders formatieren, eine Tabelle oder ein Bild einfügen, suchen und ersetzen: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
 Die Seite wird in der Breite gezeichnet, die das Dokument verlangt. Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und Rahmen sowie die Bilder im Dokument erscheinen dort, wo das Dokument sie hinsetzt, in den Schriften, die es verlangt, aufgelöst gegen die auf Ihrem Rechner installierten. Neben der Seite steht eine Gliederung, die beim Klick auf eine Überschrift dorthin springt. Sie können über Absätze hinweg markieren und kopieren oder das ganze Dokument mit einem Befehl als reinen Text übernehmen.
 
@@ -171,6 +175,7 @@ features = [
     "Eine Gliederung neben der Seite, die beim Klick auf eine Überschrift dorthin springt",
     "Über Absätze hinweg markieren und kopieren, oder das ganze Dokument als reinen Text übernehmen",
     "Auf einen Absatz klicken und ihn ändern, mit Enter teilen oder mit der Rücktaste zusammenfügen, und alles mit Rückgängig zurücknehmen",
+    "Text fett, kursiv, unterstrichen oder durchgestrichen formatieren, über die Tastatur oder die Schaltflächen über der Seite",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
     "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, auch das, wovon Odox nie gehört hat",
     "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
@@ -291,7 +296,7 @@ keywords = ["OpenDocument", "ODF", "ODS", "Tabellendokument", "Tabelle", "Editor
 description = """
 Odox Deck opens an OpenDocument presentation, lets you change what is on its slides, and saves it back as the deck it was.
 
-It is a lightweight editor and not a presentation application. A deck opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, take any of it back with Undo, and save. You cannot add a slide or a shape, apply formatting, or change a master page: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
+It is a lightweight editor and not a presentation application. A deck opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, take any of it back with Undo, and save. You cannot add a slide or a shape, apply other formatting, or change a master page: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
 
 It draws each slide at the size the document sets. Behind the slide's own text and pictures is the master page: the ground it fills and the decorations a template puts on every slide, which is most of what makes a deck look like the template it was built from. The shapes are drawn from the geometry the document states rather than approximated into rectangles, which covers paths, custom shapes with their own formulas, connectors routed between the shapes they join, and the labels a shape carries. The speaker's notes sit underneath the slide and a list of slides beside it.
 
@@ -330,6 +335,7 @@ features = [
     "Solid, linear and axial gradient fills, and the pictures a slide frames",
     "The speaker's notes underneath each slide, and a list of slides beside",
     "Pick a shape and drag it, resize it by a corner, or click its text to change it where it sits, and take any of it back with Undo",
+    "Make a shape's text bold, italic, underlined or struck through",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
     "What you did not touch is written back as it was read, element for element, the master page and the template's decorations included",
     "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
@@ -344,7 +350,7 @@ keywords = ["opendocument", "odf", "odp", "presentation editor", "edit slides", 
 description = """
 Odox Deck öffnet eine OpenDocument-Präsentation, lässt Sie ändern, was auf den Folien steht, und speichert sie als den Foliensatz zurück, der sie war.
 
-Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, alles mit Rückgängig zurücknehmen und speichern. Eine Folie oder eine Form hinzufügen, formatieren oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
+Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, ihn fett, kursiv, unterstrichen oder durchgestrichen formatieren, alles mit Rückgängig zurücknehmen und speichern. Eine Folie oder eine Form hinzufügen, anders formatieren oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
 Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt. Hinter dem Text und den Bildern der Folie liegt die Masterfolie: der Grund, den sie füllt, und die Verzierungen, die eine Vorlage auf jede Folie legt, und das ist das meiste von dem, was einen Foliensatz nach seiner Vorlage aussehen lässt. Die Formen werden aus der Geometrie gezeichnet, die das Dokument angibt, statt zu Rechtecken angenähert zu werden: Pfade, benutzerdefinierte Formen mit ihren eigenen Formeln, Verbinder zwischen den Formen, die sie verknüpfen, und die Beschriftung, die eine Form trägt. Die Notizen stehen unter der Folie, eine Liste der Folien daneben.
 
@@ -383,6 +389,7 @@ features = [
     "Einfarbige, lineare und axiale Verlaufsfüllungen sowie die Bilder, die eine Folie rahmt",
     "Die Notizen unter jeder Folie und eine Liste der Folien daneben",
     "Eine Form wählen und ziehen, an einer Ecke in der Größe ändern oder auf ihren Text klicken und ihn an Ort und Stelle ändern, und alles mit Rückgängig zurücknehmen",
+    "Den Text einer Form fett, kursiv, unterstrichen oder durchgestrichen formatieren",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
     "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, Masterfolie und Verzierungen der Vorlage eingeschlossen",
     "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",

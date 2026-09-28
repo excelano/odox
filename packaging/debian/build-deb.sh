@@ -18,6 +18,9 @@
 # Unversioned, because there is no coupling to version: the launcher finds an
 # editor by name and hands the file over, so any version of one works with any
 # version of the other.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -104,7 +107,7 @@ for app in xodt xods xodp odox; do
     else
         app_depends="$depends"
         recommends="fonts-liberation"
-        closing="Editing means changing what is there, not authoring: no formatting, no inserting, no formulas. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and nothing is written until Save, and then only the file that was opened or the one named."
+        closing="Editing means changing what is there, not authoring: no formatting beyond bold, italic, underline and strikethrough, no inserting, no formulas. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and nothing is written until Save, and then only the file that was opened or the one named."
     fi
     # A control file's extended description is one space-prefixed line per line,
     # and lintian refuses one longer than eighty columns.

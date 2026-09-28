@@ -89,27 +89,13 @@ impl Document {
     /// declares for the namespace on its content root, or the conventional one
     /// where it declares none.
     pub fn name(&self, ns: &Ns, local: &str) -> Name {
-        let declared = self
-            .content
-            .attrs
-            .iter()
-            .filter(|a| a.name.ns == Ns::Xmlns)
-            .find(|a| Ns::from_uri(&a.value) == *ns)
-            .map(|a| &*a.name.local);
-        Name::new(
-            declared.unwrap_or(ns.conventional_prefix()),
-            local,
-            ns.clone(),
-        )
+        self.content.name_for(ns, local)
     }
 
     /// Whether the content root declares a namespace, which is what decides
     /// whether an attribute in it may be written at all.
     pub fn declares(&self, ns: &Ns) -> bool {
-        self.content
-            .attrs
-            .iter()
-            .any(|a| a.name.ns == Ns::Xmlns && Ns::from_uri(&a.value) == *ns)
+        self.content.declares(ns)
     }
 
     /// The version of the format the document declares, as `office:version`.

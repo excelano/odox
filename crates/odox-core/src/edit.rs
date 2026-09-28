@@ -17,10 +17,14 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod format;
+
 use std::fmt;
 use std::ops::Range;
 
 use crate::xml::{Attribute, Element, Name, Node, Ns};
+
+pub use format::{Mark, format, marked};
 
 /// Why an edit was not made. Each is a state of the document rather than a
 /// failure, and the window says which.
@@ -30,6 +34,8 @@ pub enum Refused {
     Covered,
     /// The cell holds a formula, which this version does not edit.
     Formula,
+    /// The document does not declare a namespace the edit would write in.
+    Namespace,
     /// There is no such sheet, slide, shape or paragraph.
     NotFound,
     /// An end of the range is inside a table, a cell or a frame the range
@@ -42,6 +48,7 @@ impl fmt::Display for Refused {
         match self {
             Self::Covered => write!(f, "the cell is covered by a neighbour's span"),
             Self::Formula => write!(f, "the cell holds a formula"),
+            Self::Namespace => write!(f, "the document does not declare the namespace needed"),
             Self::NotFound => write!(f, "nothing is there to edit"),
             Self::Structure => write!(f, "the range crosses a table or a frame"),
         }

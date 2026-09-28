@@ -36,6 +36,7 @@ pub mod settings;
 pub mod shapes;
 pub mod shell;
 pub mod system_theme;
+pub mod toolbar;
 
 pub use edit::{Caret, Editing};
 pub use flow::{Flow, Pictures};

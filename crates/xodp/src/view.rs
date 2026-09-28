@@ -174,22 +174,8 @@ impl View for SlideView {
         let dragging = self.drag.is_some();
         let mut action = None;
 
-        // What was typed goes into the tree before it is drawn, kept to the
-        // one shape the caret is in.
-        if edit_mode
-            && let Some(document) = &mut self.document
-            && let Some(position) = document.slides().get(slide_index).map(|s| s.position)
-            && let Some(root) = document.page_path(position)
-        {
-            let scope = self
-                .page_editor
-                .selection()
-                .and_then(|selection| selection.focus.paragraph.first().copied())
-                .into_iter()
-                .collect();
-            let mut model =
-                FlowModel::new(&mut document.document.content, root, editing).within(scope);
-            self.page_editor.input(ui, &mut model);
+        if edit_mode {
+            self.edit(ui, editing);
         }
 
         let Some(document) = &self.document else {
@@ -303,6 +289,37 @@ impl View for SlideView {
 }
 
 impl SlideView {
+    /// The toolbar, and what was typed, which goes into the tree before it is
+    /// drawn, kept to the one shape the caret is in.
+    fn edit(&mut self, ui: &mut Ui, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(root) = document
+            .slides()
+            .get(self.slide)
+            .map(|s| s.position)
+            .and_then(|position| document.page_path(position))
+        else {
+            return;
+        };
+        let scope = self
+            .page_editor
+            .selection()
+            .and_then(|selection| selection.focus.paragraph.first().copied())
+            .into_iter()
+            .collect();
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, editing).within(scope);
+        if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page_editor, &model) {
+            self.page_editor.toggle(&mut model, mark);
+        }
+        ui.separator();
+        self.page_editor.input(ui, &mut model);
+    }
+
     /// Apply what the slide asked for.
     fn act(&mut self, action: Action, scale: f32, editing: &mut Editing) {
         match action {

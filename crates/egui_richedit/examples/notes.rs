@@ -65,6 +65,8 @@ impl Model for Notes {
                 self.paragraphs.insert(at.paragraph + 1, second);
                 Some(Position::new(at.paragraph + 1, 0))
             }
+            // Plain notes keep no formatting.
+            Edit::Format { .. } => None,
         }
     }
 }

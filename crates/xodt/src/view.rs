@@ -112,13 +112,27 @@ impl View for TextView {
         let page = document.text_width() * zoom;
         let margin = 24.0 * zoom;
 
+        if edit_mode && let Some(root) = document.body_path() {
+            let Document {
+                content, styles, ..
+            } = &mut document.document;
+            let mut model = FlowModel::new(content, styles, root, editing);
+            if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page, &model) {
+                self.page.toggle(&mut model, mark);
+            }
+            ui.separator();
+        }
+
         egui::ScrollArea::both()
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 // What was typed goes into the tree before it is laid out, so
                 // this frame already draws it.
                 if edit_mode && let Some(root) = document.body_path() {
-                    let mut model = FlowModel::new(&mut document.document.content, root, editing);
+                    let Document {
+                        content, styles, ..
+                    } = &mut document.document;
+                    let mut model = FlowModel::new(content, styles, root, editing);
                     self.page.input(ui, &mut model);
                 }
                 let Some(body) = document.body() else {

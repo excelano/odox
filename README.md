@@ -26,8 +26,9 @@ ODF is a document they are meant to open, whichever application wrote it.
 
 Editing means changing what is there, not authoring. You can type and delete
 text, split a paragraph and join two, enter a value in a cell, move a shape on a
-slide and resize it, undo any of that, and save. You cannot apply formatting,
-insert a table or a picture, edit a formula, or find and replace. What you did
+slide and resize it, make text bold, italic, underlined or struck through,
+undo any of that, and save. You cannot apply other formatting, insert a table or
+a picture, edit a formula, or find and replace. What you did
 not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
@@ -96,7 +97,10 @@ as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
 before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
-processor. Undo puts the caret back where the edit was.
+processor. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+selection bold, italic or underlined, or what you type next when nothing is
+selected; strikethrough is a button. Undo puts the caret back where the edit
+was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, one tab per sheet, and shows the formula behind whichever cell you pick.
