@@ -6,6 +6,11 @@
 # name means the event launched the application without the document.
 # Not reached: the sandbox, a high-density display, the Dock icon and Finder's
 # rendering of the types.
+#
+# What's build/test/clippy/fmt/bundle/release-binary lives in excelano/.github's
+# mac-desktop-ci.yml, shared with the fleet's other Mac desktop repos - only
+# this repo's own bundles and documents are here.
+#
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
@@ -27,326 +32,163 @@ on:
         description: 'Tag to build the release binaries for (e.g. v0.5.0)'
         required: false
         type: string
-      # A choice rather than a boolean, because there is a third thing to ask
-      # for: `reference` takes the one plain frame a coordinate gets measured
-      # off, and `full` takes the set.
-      screenshots:
-        description: 'Store screenshots'
-        required: false
-        default: 'no'
-        type: choice
-        options: ['no', 'reference', 'full']
-      # Which of the three applications a screenshots run photographs. odox
-      # ships three bundles from one workspace, so - unlike a single-application
-      # repo, where the recipes already know what to open - a set has to say
-      # which one; ship's own dispatch sends this whenever it asks for a set.
-      app:
-        description: 'Application to photograph (with screenshots): xodt, xods or xodp'
-        required: false
-        type: choice
-        options: ['', 'xodt', 'xods', 'xodp']
-
-permissions:
-  contents: write
-
-concurrency:
-  # Keyed by the tag when this is releasing and by the ref when it is
-  # checking, so the two never share a group and a push to main cannot cancel
-  # a dispatched run that is building a release's binaries.
-  group: apple-silicon-${{ github.event.release.tag_name || inputs.tag || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-
-env:
-  # The bundle declares 11.0 and `build-app.sh` refuses a binary built for another floor.
-  MACOSX_DEPLOYMENT_TARGET: "11.0"
 
 jobs:
-  arm64:
-    runs-on: macos-15
+  mac:
+    uses: excelano/.github/.github/workflows/mac-desktop-ci.yml@main
+    with:
+      tag: ${{ inputs.tag }}
+      workspace: true
+      fmt: true
+      # The bundle declares 11.0 and build-app.sh refuses a binary built for
+      # another floor.
+      deployment-target: "11.0"
+      binary-1: xodt
+      binary-2: xods
+      binary-3: xodp
+      keep-artifact-name: arm64-crashes
+      keep-artifact-path: crashes
+      # The bundle is the unit: a bare executable has no bundle identifier and
+      # no Apple Event reaches it. Debug binaries, because the question does
+      # not depend on optimisation; build-app.sh also runs the private-symbol
+      # check. `open` delivers the Apple Event a double-click does, once per
+      # application.
+      bundle-script: |
+        target=$(cargo metadata --format-version 1 --no-deps |
+            sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+        for app in xodt xods xodp; do
+          ./packaging/macos/build-app.sh "$app" --binary "${target}/debug/${app}"
+        done
+        for bundle in dist/*.app; do
+          echo "== ${bundle}"
+          plutil -lint "${bundle}/Contents/Info.plist"
+          lipo -info "${bundle}/Contents/MacOS/"*
+          ls "${bundle}/Contents/Resources"
+        done
 
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+        lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+        swiftc -O packaging/macos/window-probe.swift -o "${RUNNER_TEMP}/window-probe"
 
-      - name: The runner is Apple silicon
-        uses: excelano/.github/.github/actions/mac-arch-check@main
+        set -- "xodt:Odox Text:corpus/libreoffice/text.odt" \
+               "xods:Odox Grid:corpus/libreoffice/calc.ods" \
+               "xodp:Odox Deck:corpus/libreoffice/growing-liberty.odp"
 
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal --component clippy
+        # A window that never appeared has two very different causes and the
+        # probe cannot tell them apart: the application died before it drew,
+        # or it drew nothing because the Apple Event never reached it. This
+        # separates them. Running the bundle's own executable with the
+        # document as an ordinary argument takes Launch Services out of the
+        # picture entirely, so a window here and none through `open` is the
+        # Apple Event, while no window either way is the application.
+        diagnose() {
+          app=$1 ; product=$2 ; document=$3
+          echo "--- diagnosing ${app}"
 
-      - uses: Swatinem/rust-cache@v2
-
-      - name: What is installed
-        run: rustc -V && cargo -V && xcodebuild -version | head -1
-
-      # DESIGN.md §2 forbids compiling C; `cargo tree -i cc` cannot answer that,
-      # so this checks the outcome.
-      - name: Build, and nothing compiled C
-        run: |
-          cargo build --workspace --all-targets
-          target=$(cargo metadata --format-version 1 --no-deps |
-              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
-          objects=$(find "${target}" -path '*/build/*' \( -name '*.o' -o -name '*.a' \) -print)
-          [ -z "$objects" ] || { echo "a build script produced object files:"; echo "$objects"; exit 1; }
-
-      - name: Test
-        run: cargo test --workspace
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Format
-        run: cargo fmt --all --check
-
-      # The bundle is the unit: a bare executable has no bundle identifier and no
-      # Apple Event reaches it. Debug binaries, because the question does not
-      # depend on optimisation; `build-app.sh` also runs the private-symbol check.
-      - name: Assemble the three bundles
-        run: |
-          target=$(cargo metadata --format-version 1 --no-deps |
-              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
-          for app in xodt xods xodp; do
-            ./packaging/macos/build-app.sh "$app" --binary "${target}/debug/${app}"
-          done
-          for bundle in dist/*.app; do
-            echo "== ${bundle}"
-            plutil -lint "${bundle}/Contents/Info.plist"
-            lipo -info "${bundle}/Contents/MacOS/"*
-            ls "${bundle}/Contents/Resources"
-          done
-
-      # `open` delivers the Apple Event a double-click does, once per application.
-      - name: A document opens, and a window appears
-        run: |
-          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-          swiftc -O packaging/macos/window-probe.swift -o "${RUNNER_TEMP}/window-probe"
-
-          set -- "xodt:Odox Text:corpus/libreoffice/text.odt" \
-                 "xods:Odox Grid:corpus/libreoffice/calc.ods" \
-                 "xodp:Odox Deck:corpus/libreoffice/growing-liberty.odp"
-
-          # A window that never appeared has two very different causes and the
-          # probe cannot tell them apart: the application died before it drew,
-          # or it drew nothing because the Apple Event never reached it. This
-          # separates them. Running the bundle's own executable with the
-          # document as an ordinary argument takes Launch Services out of the
-          # picture entirely, so a window here and none through `open` is the
-          # Apple Event, while no window either way is the application.
-          diagnose() {
-            app=$1 ; product=$2 ; document=$3
-            echo "--- diagnosing ${app}"
-
-            # An `.ips` is two JSON documents: a one-line header and then the
-            # body. Everything worth reading is in the body, and the first forty
-            # lines of it are the machine's description of itself, so this asks
-            # for the three things that say what happened instead of printing
-            # from the top. The whole file is kept as an artefact either way.
-            reports=$HOME/Library/Logs/DiagnosticReports
-            mkdir -p "${RUNNER_TEMP}/crashes"
-            found=$(ls -t "$reports" 2>/dev/null | grep -i "^${app}" | head -2 || true)
-            if [ -n "$found" ]; then
-              for report in $found; do
-                echo "--- crash report ${report}"
-                cp "${reports}/${report}" "${RUNNER_TEMP}/crashes/" || true
-                tail -n +2 "${reports}/${report}" | jq -r '
-                  "exception:   \(.exception // "none")",
-                  "termination: \(.termination // "none")",
-                  "asi:         \(.asi // "none")",
-                  "faulting thread \(.faultingThread // 0):",
-                  ( .usedImages as $images
-                    | .threads[.faultingThread // 0].frames[]?
-                    | "  \($images[.imageIndex].name // "?")  \(.symbol // .imageOffset)" )
-                ' || echo "    (jq could not read it; the artefact has the whole file)"
-              done
-            else
-              echo "--- no crash report, so it did not die the way a crash is recorded"
-            fi
-
-            # The panic message itself, which the crash report does not carry:
-            # a bundled application's stderr goes to the unified log rather than
-            # to the terminal that started it.
-            echo "--- what it said on standard error"
-            if [ -s "${RUNNER_TEMP}/${app}-open.err" ]; then
-              cat "${RUNNER_TEMP}/${app}-open.err"
-            else
-              echo "    (nothing)"
-            fi
-
-            echo "--- what the unified log caught"
-            log show --last 3m --predicate "process == \"${app}\"" --style compact 2>/dev/null \
-              | grep -iE "panic|assert|borrow|already|unwind" | head -10 \
-              || echo "    (nothing in the log)"
-
-            # The control, and the question it settles: is the Apple Event
-            # involved at all? Launch Services with no document to deliver runs
-            # every line of the launch path except the event. A crash here too
-            # means the handler is not implicated and the fault is in the launch;
-            # a clean run here and a crash with a document means it is.
-            echo "--- the same launch, with no document to deliver"
-            open -a "$PWD/dist/${product}.app"
-            sleep 6
-            if "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1; then
-              echo "    a window appeared with no document, so the launch path is fine"
-              echo "    and the Apple Event is what this crash is about"
-            else
-              echo "    no window even with no document, so this is the launch and"
-              echo "    not the Apple Event"
-            fi
-            osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
-
-            echo "--- launching the executable directly, with the document as argv"
-            "dist/${product}.app/Contents/MacOS/${app}" "$PWD/${document}" \
-              >"${RUNNER_TEMP}/${app}-direct.log" 2>&1 &
-            direct=$!
-            sleep 8
-            if kill -0 "$direct" 2>/dev/null; then
-              "${RUNNER_TEMP}/window-probe" "$product" "$app" || true
-              kill "$direct" 2>/dev/null || true
-              echo "--- it stayed up when launched directly"
-            else
-              wait "$direct" 2>/dev/null
-              echo "--- it exited on its own; output follows"
-            fi
-            sed -n '1,40p' "${RUNNER_TEMP}/${app}-direct.log"
-          }
-
-          failed=0
-          for entry in "$@"; do
-            app=${entry%%:*}
-            rest=${entry#*:}
-            product=${rest%%:*}
-            document=${rest#*:}
-            echo "== ${product} (${app}) with ${document}"
-
-            "$lsregister" -f "$PWD/dist/${product}.app"
-            # `--stderr` because a bundled application's standard error goes
-            # nowhere a shell can see it, and a Rust panic writes its message
-            # there and nowhere else. The crash report records that an abort
-            # happened and not what was said before it.
-            open --stderr "${RUNNER_TEMP}/${app}-open.err" \
-                 -a "$PWD/dist/${product}.app" "$PWD/${document}"
-
-            # Cold launch, a window server, and a first frame. Polled rather
-            # than slept at; 30 seconds is far past anything measured by hand.
-            for _ in $(seq 1 15); do
-              sleep 2
-              "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1 && break
+          reports=$HOME/Library/Logs/DiagnosticReports
+          mkdir -p "${RUNNER_TEMP}/crashes"
+          found=$(ls -t "$reports" 2>/dev/null | grep -i "^${app}" | head -2 || true)
+          if [ -n "$found" ]; then
+            for report in $found; do
+              echo "--- crash report ${report}"
+              cp "${reports}/${report}" "${RUNNER_TEMP}/crashes/" || true
+              tail -n +2 "${reports}/${report}" | jq -r '
+                "exception:   \(.exception // "none")",
+                "termination: \(.termination // "none")",
+                "asi:         \(.asi // "none")",
+                "faulting thread \(.faultingThread // 0):",
+                ( .usedImages as $images
+                  | .threads[.faultingThread // 0].frames[]?
+                  | "  \($images[.imageIndex].name // "?")  \(.symbol // .imageOffset)" )
+              ' || echo "    (jq could not read it; the artefact has the whole file)"
             done
+          else
+            echo "--- no crash report, so it did not die the way a crash is recorded"
+          fi
 
-            set +e
-            report=$("${RUNNER_TEMP}/window-probe" "$product" "$app")
-            verdict=$?
-            set -e
-            echo "$report"
+          echo "--- what it said on standard error"
+          if [ -s "${RUNNER_TEMP}/${app}-open.err" ]; then
+            cat "${RUNNER_TEMP}/${app}-open.err"
+          else
+            echo "    (nothing)"
+          fi
 
-            case "$verdict" in
-              0) echo "  ${app} drew a window for a document opened through Launch Services" ;;
-              2)
-                # Not a failure of the application, and deliberately not a pass
-                # either: a check that can quietly not check is the thing this
-                # fleet keeps getting caught by.
-                echo "::error::The window server listed nothing, so this run answered nothing about ${app}."
-                failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
-              *)
-                echo "::error::No window appeared for a document opened through Launch Services on arm64 (${app}). This is odox-ui's opened_document, the only unsafe in the workspace."
-                failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
-            esac
+          echo "--- what the unified log caught"
+          log show --last 3m --predicate "process == \"${app}\"" --style compact 2>/dev/null \
+            | grep -iE "panic|assert|borrow|already|unwind" | head -10 \
+            || echo "    (nothing in the log)"
 
-            # A title that is exactly the application name means the event
-            # launched the application and did not hand over the document,
-            # which is the refusal this whole step exists to catch. Any other
-            # title names a document, because the window titles itself from the
-            # document's own title or its filename.
-            case "$report" in
-              *"titled \"${app}\""*)
-                echo "::error::${app} opened a window titled with nothing but its own name, so the Apple Event launched it without delivering the document."
-                failed=1 ;;
-              *'titled "'*)
-                echo "  and the window names a document, so the Apple Event delivered it" ;;
-              *)
-                echo "::warning::The window server withheld ${app}'s title, so whether the document was delivered rather than merely the application launched is not answered here." ;;
-            esac
+          echo "--- the same launch, with no document to deliver"
+          open -a "$PWD/dist/${product}.app"
+          sleep 6
+          if "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1; then
+            echo "    a window appeared with no document, so the launch path is fine"
+            echo "    and the Apple Event is what this crash is about"
+          else
+            echo "    no window even with no document, so this is the launch and"
+            echo "    not the Apple Event"
+          fi
+          osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
 
-            osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
+          echo "--- launching the executable directly, with the document as argv"
+          "dist/${product}.app/Contents/MacOS/${app}" "$PWD/${document}" \
+            >"${RUNNER_TEMP}/${app}-direct.log" 2>&1 &
+          direct=$!
+          sleep 8
+          if kill -0 "$direct" 2>/dev/null; then
+            "${RUNNER_TEMP}/window-probe" "$product" "$app" || true
+            kill "$direct" 2>/dev/null || true
+            echo "--- it stayed up when launched directly"
+          else
+            wait "$direct" 2>/dev/null
+            echo "--- it exited on its own; output follows"
+          fi
+          sed -n '1,40p' "${RUNNER_TEMP}/${app}-direct.log"
+        }
+
+        failed=0
+        for entry in "$@"; do
+          app=${entry%%:*}
+          rest=${entry#*:}
+          product=${rest%%:*}
+          document=${rest#*:}
+          echo "== ${product} (${app}) with ${document}"
+
+          "$lsregister" -f "$PWD/dist/${product}.app"
+          open --stderr "${RUNNER_TEMP}/${app}-open.err" \
+               -a "$PWD/dist/${product}.app" "$PWD/${document}"
+
+          for _ in $(seq 1 15); do
+            sleep 2
+            "${RUNNER_TEMP}/window-probe" "$product" "$app" >/dev/null 2>&1 && break
           done
-          exit "$failed"
 
-      - name: Photograph it, for a person
-        if: always()
-        uses: excelano/.github/.github/actions/mac-photograph@main
-        with:
-          if-no-files-found: ignore
+          set +e
+          report=$("${RUNNER_TEMP}/window-probe" "$product" "$app")
+          verdict=$?
+          set -e
+          echo "$report"
 
-      # Whole files, because a crash report is cheap to keep.
-      - name: Keep any crash reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: arm64-crashes
-          path: ${{ runner.temp }}/crashes
-          if-no-files-found: ignore
-
-      # Three release binaries rather than one: odox ships three applications
-      # from one workspace, each its own bundle and its own Store listing, so
-      # each gets its own signed package on the Mac and its own asset here.
-      # The step is excelano/.github's, because it is the same one in every
-      # repository that has this target; building the whole workspace for the
-      # first application makes the other two's builds a cache hit rather than
-      # three full compiles.
-      - name: The release binary, Odox Text
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
-        uses: excelano/.github/.github/actions/mac-release-binary@main
-        with:
-          binary: xodt
-          tag: ${{ github.event.release.tag_name || inputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: The release binary, Odox Grid
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
-        uses: excelano/.github/.github/actions/mac-release-binary@main
-        with:
-          binary: xods
-          tag: ${{ github.event.release.tag_name || inputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: The release binary, Odox Deck
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
-        uses: excelano/.github/.github/actions/mac-release-binary@main
-        with:
-          binary: xodp
-          tag: ${{ github.event.release.tag_name || inputs.tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Off unless asked for. A bug fix should not pay for a set of Store
-      # screenshots, and a set nobody asked for is a set nobody looks at.
-      # `shots.sh` carries the recipes and is the same command that retakes
-      # them by hand on the Mac.
-      #
-      # One application, because the driver photographs a bundle and odox has
-      # three: `app` says which, and ship's own dispatch always sends it -
-      # anderix/ship#103. The bundle is the debug one "Assemble the three
-      # bundles" already built; a Store package cannot be launched off the
-      # Store, so this is the closest any Mac screenshot can get, same as the
-      # Windows lane.
-      - name: Which bundle this dispatch photographs
-        id: bundle
-        if: inputs.screenshots && inputs.screenshots != 'no'
-        run: |
-          case "${{ inputs.app }}" in
-            xodt) echo "path=dist/Odox Text.app" >> "$GITHUB_OUTPUT" ;;
-            xods) echo "path=dist/Odox Grid.app" >> "$GITHUB_OUTPUT" ;;
-            xodp) echo "path=dist/Odox Deck.app" >> "$GITHUB_OUTPUT" ;;
+          case "$verdict" in
+            0) echo "  ${app} drew a window for a document opened through Launch Services" ;;
+            2)
+              echo "::error::The window server listed nothing, so this run answered nothing about ${app}."
+              failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
             *)
-              echo "::error::screenshots need app naming which bundle: xodt, xods or xodp" >&2
-              exit 1
-              ;;
+              echo "::error::No window appeared for a document opened through Launch Services on arm64 (${app}). This is odox-ui's opened_document, the only unsafe in the workspace."
+              failed=1 ; diagnose "$app" "$product" "$document" ; continue ;;
           esac
 
-      - name: The Store screenshots
-        if: inputs.screenshots && inputs.screenshots != 'no'
-        uses: excelano/.github/.github/actions/mac-store-screenshots@main
-        with:
-          app: ${{ steps.bundle.outputs.path }}
-          mode: ${{ inputs.screenshots }}
-          languages: en de
+          case "$report" in
+            *"titled \"${app}\""*)
+              echo "::error::${app} opened a window titled with nothing but its own name, so the Apple Event launched it without delivering the document."
+              failed=1 ;;
+            *'titled "'*)
+              echo "  and the window names a document, so the Apple Event delivered it" ;;
+            *)
+              echo "::warning::The window server withheld ${app}'s title, so whether the document was delivered rather than merely the application launched is not answered here." ;;
+          esac
+
+          osascript -e "tell application \"${product}\" to quit" >/dev/null 2>&1 || true
+        done
+        exit "$failed"
+    secrets: inherit

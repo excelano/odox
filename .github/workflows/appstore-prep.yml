@@ -1,0 +1,104 @@
+# Mac App Store prep, for all three applications: open/reuse each version,
+# push the listing text and release notes, confirm screenshots. What stays
+# here is this repo's own bundle identifiers, keyed the way
+# packaging/macos/identity.toml keys them, and locales; the sequence itself
+# lives in excelano/.github so every App Store repo runs the same one.
+#
+# One product per call, matrixed here rather than looped inside the shared
+# workflow — the same reasoning windows.yml and apple-silicon.yml already
+# apply to odox's three release binaries.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: appstore-prep
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version being released, e.g. v0.5.0'
+        required: true
+        type: string
+      product:
+        description: 'One application to prep, or empty for all three'
+        required: false
+        default: ''
+        type: choice
+        options: ['', 'xodt', 'xods', 'xodp']
+      screenshots-run-id:
+        description: 'Run ID of a mac-screenshots.yml dispatch to place frames from (gh run list gives it). Empty confirms existing coverage only.'
+        required: false
+        default: ''
+        type: string
+      dry-run:
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    outputs:
+      products: ${{ steps.matrix.outputs.products }}
+      locales: ${{ steps.conf.outputs.locales }}
+      version: ${{ steps.version.outputs.version }}
+      xodt: ${{ steps.ids.outputs.xodt }}
+      xods: ${{ steps.ids.outputs.xods }}
+      xodp: ${{ steps.ids.outputs.xodp }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: matrix
+        name: Which application(s) this dispatch preps
+        env:
+          PRODUCT: ${{ inputs.product }}
+        run: |
+          set -eu
+          if [ -n "$PRODUCT" ]; then
+            echo "products=[\"$PRODUCT\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo 'products=["xodt","xods","xodp"]' >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: ids
+        name: Every application's bundle identifier, from identity.toml
+        run: |
+          set -eu
+          for app in xodt xods xodp; do
+            id=$(sed -n "/^\[$app\]/,/^\[/{s/^bundle_id *= *\"\(.*\)\"/\1/p}" packaging/macos/identity.toml)
+            [ -n "$id" ] || { echo "::error::no bundle_id for $app in packaging/macos/identity.toml" >&2; exit 1; }
+            echo "$app=$id" >> "$GITHUB_OUTPUT"
+          done
+
+      - id: conf
+        name: The store locales, from ship.conf
+        run: |
+          set -eu
+          locales=$(sed -n 's/^store_locales=//p' ship.conf)
+          [ -n "$locales" ] || { echo "::error::no store_locales= in ship.conf" >&2; exit 1; }
+          echo "locales=$locales" >> "$GITHUB_OUTPUT"
+
+      - id: version
+        name: The version, without the tag's leading v
+        env:
+          TAG: ${{ inputs.tag }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+  prep:
+    needs: read
+    strategy:
+      matrix:
+        product: ${{ fromJson(needs.read.outputs.products) }}
+    uses: excelano/.github/.github/workflows/appstore-prep.yml@main
+    with:
+      bundle-id: ${{ matrix.product == 'xodt' && needs.read.outputs.xodt || matrix.product == 'xods' && needs.read.outputs.xods || needs.read.outputs.xodp }}
+      version: ${{ needs.read.outputs.version }}
+      product-key: ${{ matrix.product }}
+      locales: ${{ needs.read.outputs.locales }}
+      screenshots-run-id: ${{ inputs.screenshots-run-id }}
+      dry-run: ${{ inputs.dry-run }}
+    secrets: inherit

@@ -1,0 +1,24 @@
+# Tag and publish the release, dispatched by hand once the version-bump commit's
+# checks are green. See excelano/.github's tag-release.yml for the mechanics.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: tag-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Explicit tag, e.g. v1.2.3. Empty reads the version from Cargo.toml.'
+        required: false
+        type: string
+
+jobs:
+  tag:
+    uses: excelano/.github/.github/workflows/tag-release.yml@main
+    with:
+      tag: ${{ inputs.tag }}
+      manifest-path: Cargo.toml
+      release-kind: published
+    secrets: inherit

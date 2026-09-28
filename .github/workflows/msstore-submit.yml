@@ -1,0 +1,110 @@
+# Microsoft Store submit, for all three applications: push listing text and
+# notes, stage screenshots, upload each .msix, submit for certification.
+# What stays here is this repo's own Store IDs, keyed the way
+# packaging/windows/identity.psd1's Applications map is, and locales; the
+# sequence itself lives in excelano/.github so every Store repo runs the
+# same one.
+#
+# One product per call, matrixed here rather than looped inside the shared
+# workflow — the same reasoning windows.yml and appstore-prep.yml already
+# apply to odox's three applications.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: msstore-submit
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag carrying the .msix files to submit, e.g. v0.5.0'
+        required: true
+        type: string
+      product:
+        description: 'One application to submit, or empty for all three'
+        required: false
+        default: ''
+        type: choice
+        options: ['', 'xodt', 'xods', 'xodp']
+      screenshots-run-id:
+        description: 'Run ID of a windows-screenshots.yml dispatch to stage and upload frames from (gh run list gives it). Empty submits with the pictures the listing already has.'
+        required: false
+        default: ''
+        type: string
+      dry-run:
+        description: 'Prepare and then discard rather than submit.'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    outputs:
+      products: ${{ steps.matrix.outputs.products }}
+      locales: ${{ steps.conf.outputs.locales }}
+      xodt-store-id: ${{ steps.identity.outputs.xodt-store-id }}
+      xods-store-id: ${{ steps.identity.outputs.xods-store-id }}
+      xodp-store-id: ${{ steps.identity.outputs.xodp-store-id }}
+      xodt-prefix: ${{ steps.identity.outputs.xodt-prefix }}
+      xods-prefix: ${{ steps.identity.outputs.xods-prefix }}
+      xodp-prefix: ${{ steps.identity.outputs.xodp-prefix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: matrix
+        name: Which application(s) this dispatch submits
+        env:
+          PRODUCT: ${{ inputs.product }}
+        run: |
+          set -eu
+          if [ -n "$PRODUCT" ]; then
+            echo "products=[\"$PRODUCT\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo 'products=["xodt","xods","xodp"]' >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: identity
+        name: Every application's Store ID and package prefix, from identity.psd1
+        shell: pwsh
+        run: |
+          $data = Import-PowerShellDataFile packaging/windows/identity.psd1
+          foreach ($app in 'xodt', 'xods', 'xodp') {
+            $entry = $data.Applications[$app]
+            if (-not $entry) { throw "no Applications.$app in packaging/windows/identity.psd1" }
+            # build-msix.ps1 names the file after the Application Id, the part
+            # of Package/Identity/Name after the publisher - "Excelano.OdoxText"
+            # becomes "OdoxText" - because the product name carries a space a
+            # file name should not.
+            $prefix = $entry.Name.Substring($entry.Name.IndexOf('.') + 1)
+            "$app-store-id=$($entry.StoreId)" >> $env:GITHUB_OUTPUT
+            "$app-prefix=$prefix" >> $env:GITHUB_OUTPUT
+          }
+
+      - id: conf
+        name: The store locales, from ship.conf
+        run: |
+          set -eu
+          locales=$(sed -n 's/^store_locales=//p' ship.conf)
+          [ -n "$locales" ] || { echo "::error::no store_locales= in ship.conf" >&2; exit 1; }
+          echo "locales=$locales" >> "$GITHUB_OUTPUT"
+
+  submit:
+    needs: read
+    strategy:
+      matrix:
+        product: ${{ fromJson(needs.read.outputs.products) }}
+    uses: excelano/.github/.github/workflows/msstore-submit.yml@main
+    with:
+      tag: ${{ inputs.tag }}
+      store-id: ${{ matrix.product == 'xodt' && needs.read.outputs.xodt-store-id || matrix.product == 'xods' && needs.read.outputs.xods-store-id || needs.read.outputs.xodp-store-id }}
+      package-prefix: ${{ matrix.product == 'xodt' && needs.read.outputs.xodt-prefix || matrix.product == 'xods' && needs.read.outputs.xods-prefix || needs.read.outputs.xodp-prefix }}
+      product-key: ${{ matrix.product }}
+      locales: ${{ needs.read.outputs.locales }}
+      screenshots-run-id: ${{ inputs.screenshots-run-id }}
+      dry-run: ${{ inputs.dry-run }}
+    secrets: inherit

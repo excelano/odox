@@ -1,0 +1,40 @@
+# On-demand Store screenshots, Windows. Split from windows.yml so a
+# screenshot dispatch doesn't build the DLL, icon and association checks it
+# doesn't need - see excelano/.github's windows-screenshots.yml.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: screenshots (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'reference takes one plain frame; full takes the set.'
+        required: true
+        type: choice
+        options: ['reference', 'full']
+      # odox ships three executables from one workspace, so - unlike a
+      # single-application repo, where the recipes already know what to open -
+      # a set has to say which one; ship's own dispatch sends this whenever it
+      # asks for a set. Empty takes all three's frames.
+      app:
+        description: 'Application to photograph: xodt, xods or xodp. Empty takes all three.'
+        required: false
+        type: choice
+        options: ['', 'xodt', 'xods', 'xodp']
+
+jobs:
+  screenshots:
+    uses: excelano/.github/.github/workflows/windows-screenshots.yml@main
+    with:
+      mode: ${{ inputs.mode }}
+      workspace: true
+      # `-Only app` narrows the set to one application. No pre-screenshot-script:
+      # this repository's frames launch the release executables by name with
+      # the document as an argument, because an install here never writes
+      # UserChoice and on a machine with an office suite the shell would open
+      # the office suite.
+      shot-args: ${{ inputs.app && format('-Only {0}', inputs.app) || '' }}
+    secrets: inherit
