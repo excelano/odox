@@ -1,3 +1,6 @@
 /target
 /dist
 
+ship.toml
+packaging/windows/screenshots/
+packaging/macos/screenshots/
