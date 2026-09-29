@@ -1,3 +1,13 @@
+odox (0.4.2) unstable; urgency=low
+
+  * Releases are the apps in excelano/shipping
+  * Release notes for 0.4.2
+  * Retire the release workflows
+  * mac-screenshots.yml: pass deployment-target 11.0
+  * appstore-prep.yml, msstore-submit.yml: grant actions: read to the caller
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 29 Sep 2026 13:10:39 -0500
+
 odox (0.4.0) unstable; urgency=low
 
   * Refresh dependencies and write real release notes for 0.4.0
