@@ -49,6 +49,9 @@ jobs:
     with:
       mode: ${{ inputs.mode }}
       app-path: ${{ needs.resolve.outputs.app-path }}
+      # The bundle declares 11.0 and build-app.sh refuses a binary built for
+      # another floor - same reasoning as apple-silicon.yml's own mac job.
+      deployment-target: "11.0"
       # The bundle is the debug one no longer - this builds a release binary
       # for just the requested application. Building the whole workspace
       # keeps a later screenshots run of a different application a cache hit
