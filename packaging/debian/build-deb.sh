@@ -33,7 +33,7 @@ target=$(cargo metadata --format-version 1 --no-deps 2>/dev/null |
     sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
 [ -n "$target" ] || target="${CARGO_TARGET_DIR:-$root/target}"
 version="$("$here/../version.sh")"
-arch="$(dpkg --print-architecture)"
+arch="$(dpkg-architecture -qDEB_HOST_ARCH)"
 out="$root/dist"
 
 # Written by hand from what `packaging/linux/check-libraries.sh` reports, run
