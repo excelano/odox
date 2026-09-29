@@ -13,7 +13,7 @@ built; cite its sections.
     crates/odox-ui/po/update-po.sh          # after changing a user-visible string
     ./packaging/debian/build-deb.sh         # one .deb per application, into dist/
 
-Releases: run `ship odox`. There is no release document.
+Releases: the apps in excelano/shipping, run from this directory. There is no release document.
 
 `odox-core` takes bytes and returns bytes: no egui, no paths, no dialogs, and
 `forbid(unsafe_code)`. A format question goes into the library; drawing goes into

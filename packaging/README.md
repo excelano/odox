@@ -7,7 +7,7 @@ application from a release build. `windows/` and `macos/` each carry
 their platform's manifest, build script, install check and screenshot script,
 with a README saying how to run that lane. `store-listing.toml` is the text
 both stores take, and `release-notes.toml` is what a release says changed.
-Releases are `ship odox`.
+Releases are the apps in excelano/shipping, run from this directory.
 
 `version.sh` is the only thing that reads the version, from the workspace
 `Cargo.toml`, in whichever spelling a caller needs: plain, `--appx` for the
