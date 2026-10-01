@@ -19,11 +19,20 @@
 #
 # WHAT IS PHOTOGRAPHED
 #
-# A document opened reading, which is what all three do at rest: none of them
-# has a control to drive into a more interesting state yet. Something is open
-# in every shot regardless - a screenshot of an empty window is what guideline
-# 2.3.3 sends back - and a click or a key recipe belongs here the day one of
-# them has a panel worth showing selected.
+# The applications being used, which is what guideline 2.3.3 asks for: edit mode
+# with something selected or half typed, and Find with its matches lit, after
+# the document at rest. Something is open in every shot regardless - a
+# screenshot of an empty window is what that guideline sends back.
+#
+# Every coordinate is read off a reference frame (`--reference`) taken through
+# the same driver at the same size, in the frame's own pixels, title bar
+# included. The driver quits and relaunches the application for every frame, so
+# each one repeats what it needs: the zoom, which is `EVERY_SHOT` and so is in
+# the reference frame as well, and edit mode, which is the Edit menu's second
+# item. The Edit menu's items are the shell's and sit in the same place in all
+# three applications: Find at 68,116 and Edit mode at 95,146, both under the
+# menu button at 53,39. Typing into a cell goes in two goes because the first
+# character opens the cell and the next two arrive before it has.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -60,21 +69,53 @@ app_document() {
 # document does not vary by language - none of the three carries translated
 # content - only the window's own language does, which `screenshot.sh` sets
 # through `--lang`.
+#
+# Every shot of an application is zoomed the same way, so a reference frame
+# shows what a coordinate is measured against. The deck is not: a slide is
+# already fitted to the window. Set here and not at the top because the
+# bundle is not known until the arguments have been read.
 for_language() {
     document=$(app_document "$(app_key)")
+    case "$(app_key)" in
+        xodt) EVERY_SHOT="--key cmd+plus --key cmd+plus --key cmd+plus --key cmd+plus --key cmd+plus" ;;
+        xods) EVERY_SHOT="--key cmd+plus --key cmd+plus --key cmd+plus --key cmd+plus --key cmd+plus --key cmd+plus" ;;
+    esac
 }
 
-# One frame: the document at rest. Named with the application's own key first,
+EDIT_MENU="--click 53,39"
+EDIT_MODE="--click 53,39 --click 95,146"
+FIND="--click 53,39 --click 68,116"
+
+# One application's frames. Named with the application's own key first,
 # because all three land in the same locale directory and only the prefix
 # tells their frames apart.
 #
 # A deck whose slides carry pictures is still decoding them when a document of
 # a few pages has settled, so xodp waits longer than the driver's default.
 shots() {
+    appearance light
     key=$(app_key)
     case "$key" in
-        xodp) shot "${key}-01-document" --settle 8 ;;
-        *) shot "${key}-01-document" ;;
+        xodt)
+            shot "${key}-01-document"
+            # A word chosen and made bold and italic: the selection, and the
+            # two buttons lit.
+            shot "${key}-02-editing" $EDIT_MODE --double 483,218 --click 236,69 --click 257,69
+            # A paragraph made a heading, which the outline then lists.
+            shot "${key}-03-heading" $EDIT_MODE --click 840,755 --click 401,69
+            shot "${key}-04-find" $FIND --type and --key return
+            ;;
+        xods)
+            shot "${key}-01-document"
+            shot "${key}-02-cell" --click 127,169 --type H --settle 1 --type "ex nut M6"
+            shot "${key}-03-range" --click 188,147 --key shift+down --key shift+down --key shift+down --key shift+right
+            shot "${key}-04-find" $FIND --type TRUE --key return
+            ;;
+        xodp)
+            shot "${key}-01-document" --settle 8
+            shot "${key}-02-editing" --settle 8 $EDIT_MODE --click 40,116 --double 654,428 --click 234,74 --click 256,74
+            shot "${key}-03-find" --settle 8 $FIND --type 70 --key return
+            ;;
     esac
 }
 
