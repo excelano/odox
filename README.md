@@ -109,7 +109,11 @@ Enter commits and moves down, Tab commits and moves right, Escape puts it back,
 and Delete clears it. A number is a number, `true` and `false` are booleans,
 anything else is text. A cell that holds a formula is not edited, and once
 anything in the sheet has changed every formula's result is drawn faint until a
-spreadsheet application recalculates it.
+spreadsheet application recalculates it. Dragging, or Shift with the arrows,
+selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
+show it, Ctrl+V puts such text down from the picked cell, as the values typing
+would make, and Delete empties it. A paste or a delete that reaches a cell it
+cannot write, a formula or one under a merge, changes nothing.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,

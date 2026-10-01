@@ -277,6 +277,16 @@ evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
 does not retype it as a number.
 
+**A selection is a range, and the clipboard carries it as text.** A press picks
+the cell under it, Shift or a drag stretches the selection to another, and the
+range is the rectangle between the two corners. Copy and cut hand over the cells
+as tab separated rows, each as it is displayed, which is what every other
+program can read; paste reads the same shape back, each cell as a typed value
+would be read, from the top left of the selection. A paste, a cut or a delete is
+one undo step and is all or nothing: if any cell it reaches holds a formula or
+lies under a merge, none is written and the cell bar says which. Emptying a
+range leaves cells the document never wrote unwritten.
+
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
 bytes touch the disk they are read back and compared with the tree they were

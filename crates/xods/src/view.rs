@@ -23,6 +23,11 @@ pub struct SheetView {
     document: Option<SheetDocument>,
     sheet: usize,
     selected: (usize, usize),
+    /// The corner of the selection opposite `selected`, which is where it was
+    /// begun: the two are the corners of the range a copy takes.
+    anchor: (usize, usize),
+    /// The grid is to scroll to `selected` when it is next drawn.
+    follow: bool,
     metrics: Option<Metrics>,
     /// What the metrics were measured for, so that they are measured again when
     /// the sheet or the zoom changes and not on every frame.
@@ -93,7 +98,7 @@ impl View for SheetView {
             .position(|s| s.visible)
             .unwrap_or(0);
         self.document = Some(document);
-        self.selected = (0, 0);
+        self.pick((0, 0));
         self.metrics = None;
         self.editor = None;
         self.notice = None;
@@ -149,7 +154,7 @@ impl View for SheetView {
             self.editor = None;
         }
         if let [row, column] = found.paragraph[..] {
-            self.selected = (row, column);
+            self.pick((row, column));
         }
         self.notice = None;
     }
@@ -189,6 +194,31 @@ impl View for SheetView {
 }
 
 impl SheetView {
+    /// Select one cell, which is then the whole selection.
+    fn pick(&mut self, cell: (usize, usize)) {
+        self.selected = cell;
+        self.anchor = cell;
+        self.follow = true;
+        self.notice = None;
+    }
+
+    /// Stretch the selection from where it began to a cell.
+    fn extend(&mut self, cell: (usize, usize)) {
+        self.selected = cell;
+        self.follow = true;
+        self.notice = None;
+    }
+
+    /// The selected cells as the first and last row and the first and last
+    /// column, each counted in.
+    fn range(&self) -> ((usize, usize), (usize, usize)) {
+        let ((a_row, a_column), (row, column)) = (self.anchor, self.selected);
+        (
+            (a_row.min(row), a_column.min(column)),
+            (a_row.max(row), a_column.max(column)),
+        )
+    }
+
     /// The bar above the grid: which cell is picked, and what is in it.
     fn cell_bar(&mut self, ui: &mut Ui) {
         let Some(document) = &self.document else {
@@ -200,8 +230,14 @@ impl SheetView {
         let (row, column) = self.selected;
         let cell = document.cell(sheet, row, column);
 
+        let (first, last) = self.range();
+        let label = if first == last {
+            address(row, column)
+        } else {
+            format!("{}:{}", address(first.0, first.1), address(last.0, last.1))
+        };
         ui.horizontal(|ui| {
-            ui.monospace(address(row, column));
+            ui.monospace(label);
             ui.separator();
             let text = cell
                 .as_ref()
@@ -247,7 +283,7 @@ impl SheetView {
                         let picked = index == self.sheet;
                         if ui.selectable_label(picked, name).clicked() {
                             self.sheet = index;
-                            self.selected = (0, 0);
+                            self.pick((0, 0));
                             self.metrics = None;
                             self.editor = None;
                             self.notice = None;
@@ -283,7 +319,9 @@ impl SheetView {
         let faint = palette.ink.gamma_multiply(0.18);
         let header_fill = ui.visuals().faint_bg_color;
         let header_text = ui.visuals().text_color();
-        let mut clicked = None;
+        let mut pointed = None;
+        let follow = std::mem::take(&mut self.follow);
+        let (range_start, range_end) = self.range();
         let highlights = self.found.highlights(self.sheet);
         let editor = &mut self.editor;
         let mut outcome = None;
@@ -294,7 +332,7 @@ impl SheetView {
                 let (width, height) = metrics.size();
                 let (area, response) = ui.allocate_exact_size(
                     vec2(width + header_width, height + header_height),
-                    Sense::click(),
+                    Sense::click_and_drag(),
                 );
                 let origin = area.min + vec2(header_width, header_height);
                 let painter = ui.painter().clone();
@@ -446,8 +484,40 @@ impl SheetView {
                     }
                 }
 
+                // The selected range, tinted over the cells in it.
+                if range_start != range_end {
+                    let (top, _) = metrics.row(range_start.0);
+                    let (left, _) = metrics.column(range_start.1);
+                    let (bottom, bottom_height) = metrics.row(range_end.0);
+                    let (right, right_width) = metrics.column(range_end.1);
+                    painter.rect_filled(
+                        Rect::from_min_max(
+                            pos2(origin.x + left, origin.y + top),
+                            pos2(
+                                origin.x + right + right_width,
+                                origin.y + bottom + bottom_height,
+                            ),
+                        ),
+                        0.0,
+                        ui.visuals().selection.bg_fill.gamma_multiply(0.35),
+                    );
+                }
+
                 // The picked cell, over everything in it.
                 let (row, column) = (self.selected.0, self.selected.1);
+                if follow {
+                    let (top, height) = metrics.row(row);
+                    let (left, width) = metrics.column(column);
+                    // Out from under the headers, which cover the grid's edge.
+                    ui.scroll_to_rect(
+                        Rect::from_min_size(
+                            pos2(origin.x + left, origin.y + top)
+                                - vec2(header_width, header_height),
+                            vec2(width + header_width, height + header_height),
+                        ),
+                        None,
+                    );
+                }
                 if rows.contains(&row) && columns.contains(&column) {
                     let (top, row_height) = metrics.row(row);
                     let (left, column_width) = metrics.column(column);
@@ -559,15 +629,39 @@ impl SheetView {
                     header_fill,
                 );
 
-                if response.clicked()
-                    && let Some(at) = response.interact_pointer_pos()
-                    && at.x > origin.x
-                    && at.y > origin.y
+                // A press picks the cell under it, or with Shift stretches the
+                // selection to it, and a drag goes on stretching it. The cell
+                // is the one under where the button went down: a frame can
+                // see the press and the pointer's travel together.
+                let cell_at = |at: egui::Pos2| {
+                    (at.x > origin.x && at.y > origin.y).then(|| {
+                        (
+                            metrics.row_at(at.y - origin.y),
+                            metrics.column_at(at.x - origin.x),
+                        )
+                    })
+                };
+                let (pressed, press_origin, shift) = ui.input(|input| {
+                    (
+                        input.pointer.primary_pressed(),
+                        input.pointer.press_origin(),
+                        input.modifiers.shift,
+                    )
+                });
+                let at = response.interact_pointer_pos();
+                if response.is_pointer_button_down_on()
+                    && pressed
+                    && let Some(cell) = press_origin.and_then(cell_at)
                 {
-                    clicked = Some((
-                        metrics.row_at(at.y - origin.y),
-                        metrics.column_at(at.x - origin.x),
-                    ));
+                    pointed = Some((cell, shift));
+                } else if response.clicked()
+                    && let Some(cell) = at.and_then(cell_at)
+                {
+                    pointed = Some((cell, shift));
+                } else if response.dragged()
+                    && let Some(cell) = at.and_then(cell_at)
+                {
+                    pointed = Some((cell, true));
                 }
             });
 
@@ -575,16 +669,16 @@ impl SheetView {
         if let Some(outcome) = outcome {
             self.finish_editing(outcome, editing);
         }
-        if let Some(cell) = clicked
-            && cell != self.selected
-        {
-            self.selected = cell;
-            self.notice = None;
+        match pointed {
+            Some((cell, true)) if cell != self.selected => self.extend(cell),
+            Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
+            _ => {}
         }
         if self.editor.is_some() || editing.asking {
             return;
         }
         if !was_editing {
+            self.clipboard(ui, editing);
             self.begin_editing(ui, editing);
         }
         if self.editor.is_none() {
@@ -617,12 +711,12 @@ impl SheetView {
         let Some(document) = &self.document else {
             return;
         };
-        if let Err(refused) = document.can_edit(self.sheet, row, column) {
-            self.notice = Some(notice(&refused));
+        if delete {
+            self.clear_range(editing);
             return;
         }
-        if delete {
-            self.write(row, column, &Value::Empty, editing);
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
             return;
         }
         let original = document
@@ -659,11 +753,126 @@ impl SheetView {
                 editing,
             );
         }
-        self.selected = match step {
+        self.pick(match step {
             Step::Stay => (editor.row, editor.column),
             Step::Down => (editor.row + 1, editor.column),
             Step::Right => (editor.row, editor.column + 1),
+        });
+    }
+
+    /// Copy, cut and paste, which go through the selected cells as tab
+    /// separated text, the way every spreadsheet's clipboard does.
+    fn clipboard(&mut self, ui: &Ui, editing: &mut Editing) {
+        if ui.ctx().egui_wants_keyboard_input() {
+            return;
+        }
+        let events: Vec<Event> = ui.input(|input| {
+            input
+                .events
+                .iter()
+                .filter(|event| matches!(event, Event::Copy | Event::Cut | Event::Paste(_)))
+                .cloned()
+                .collect()
+        });
+        for event in events {
+            match event {
+                Event::Copy => self.copy(ui),
+                Event::Cut => {
+                    self.copy(ui);
+                    self.clear_range(editing);
+                }
+                Event::Paste(text) => self.paste(&text, editing),
+                _ => {}
+            }
+        }
+    }
+
+    /// Put what the selected cells show on the clipboard.
+    fn copy(&self, ui: &Ui) {
+        let Some(document) = &self.document else {
+            return;
         };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let ((top, left), (bottom, right)) = self.range();
+        ui.ctx()
+            .copy_text(text_of(document, sheet, top..bottom + 1, left..right + 1));
+    }
+
+    /// Empty the selected cells. A cell under a merged neighbour holds nothing
+    /// to empty and is left; a formula refuses the whole of it.
+    fn clear_range(&mut self, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let block: Vec<Vec<Value>> = (top..=bottom)
+            .map(|_| (left..=right).map(|_| Value::Empty).collect())
+            .collect();
+        self.write_block((top, left), &block, true, editing);
+    }
+
+    /// Put copied cells down with their top left corner at the selection's,
+    /// and select them.
+    fn paste(&mut self, text: &str, editing: &mut Editing) {
+        let block = cells_of(text);
+        let ((top, left), _) = self.range();
+        if self.write_block((top, left), &block, false, editing) {
+            let width = block.iter().map(Vec::len).max().unwrap_or(1);
+            self.pick((top, left));
+            self.extend((top + block.len() - 1, left + width - 1));
+        }
+    }
+
+    /// Write a block of values with its top left corner at a cell, as one
+    /// step to undo. Nothing is written unless every cell can be: the first
+    /// one that cannot is what the notice says. A block of empty values leaves
+    /// alone a cell that is not there, and with `leave_covered` one that is
+    /// under a merge. Answers whether anything was written.
+    fn write_block(
+        &mut self,
+        (top, left): (usize, usize),
+        block: &[Vec<Value>],
+        leave_covered: bool,
+        editing: &mut Editing,
+    ) -> bool {
+        let Some(document) = &mut self.document else {
+            return false;
+        };
+        let sheet = self.sheet;
+        let mut writes = Vec::new();
+        for (down, row) in block.iter().enumerate() {
+            for (across, value) in row.iter().enumerate() {
+                let (r, c) = (top + down, left + across);
+                let existing = document
+                    .sheets()
+                    .get(sheet)
+                    .and_then(|sheet| document.cell(sheet, r, c));
+                if matches!(value, Value::Empty)
+                    && existing
+                        .as_ref()
+                        .is_none_or(|cell| leave_covered && cell.covered)
+                {
+                    continue;
+                }
+                if let Err(refused) = document.can_edit(sheet, r, c) {
+                    self.notice = Some(notice(&refused));
+                    return false;
+                }
+                writes.push((r, c, value));
+            }
+        }
+        if writes.is_empty() {
+            return false;
+        }
+        editing.record(&document.document.content);
+        for (r, c, value) in writes {
+            if let Err(refused) = document.set_cell(sheet, r, c, value) {
+                self.notice = Some(notice(&refused));
+                break;
+            }
+        }
+        self.metrics = None;
+        self.notice = None;
+        true
     }
 
     /// Put a value in a cell, recording the tree first so that it can be
@@ -687,9 +896,13 @@ impl SheetView {
     /// sheet without reaching for the pointer.
     fn arrow_keys(&mut self, ui: &Ui, (rows, columns): (usize, usize)) {
         let (mut row, mut column) = self.selected;
-        let last_row = rows.saturating_sub(1);
-        let last_column = columns.saturating_sub(1);
+        // The keys stop at the last cell the document wrote, unless the pick
+        // is already past it, as a click on an empty cell can leave it.
+        let last_row = rows.saturating_sub(1).max(row);
+        let last_column = columns.saturating_sub(1).max(column);
+        let mut extend = false;
         ui.input(|input| {
+            extend = input.modifiers.shift;
             if input.key_pressed(egui::Key::ArrowDown) {
                 row = row.saturating_add(1);
             }
@@ -709,7 +922,14 @@ impl SheetView {
                 column = last_column;
             }
         });
-        self.selected = (row.min(last_row), column.min(last_column));
+        let cell = (row.min(last_row), column.min(last_column));
+        if cell != self.selected {
+            if extend {
+                self.extend(cell);
+            } else {
+                self.pick(cell);
+            }
+        }
     }
 }
 
@@ -726,14 +946,24 @@ fn notice(refused: &Refused) -> String {
 }
 
 /// A sheet as text, for handing to something else.
+fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
+    text_of(document, sheet, 0..sheet.used_rows, 0..sheet.used_columns)
+}
+
+/// Some rows and columns of a sheet as text.
 ///
 /// Tab separated and taking each cell as the document displays it, because that
 /// is the string the producing application formatted and the one a person sees.
-fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
+fn text_of(
+    document: &SheetDocument,
+    sheet: &Sheet,
+    rows: std::ops::Range<usize>,
+    columns: std::ops::Range<usize>,
+) -> String {
     let mut out = String::new();
-    for row in 0..sheet.used_rows {
-        for column in 0..sheet.used_columns {
-            if column > 0 {
+    for row in rows {
+        for (at, column) in columns.clone().enumerate() {
+            if at > 0 {
                 out.push('\t');
             }
             if let Some(cell) = document.cell(sheet, row, column) {
@@ -745,6 +975,16 @@ fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
         out.push('\n');
     }
     out
+}
+
+/// What the clipboard held, as rows of cells: a line is a row and a tab ends a
+/// cell. A final newline ends the last row and does not begin another.
+fn cells_of(text: &str) -> Vec<Vec<Value>> {
+    let text = text.replace("\r\n", "\n");
+    let text = text.strip_suffix('\n').unwrap_or(&text);
+    text.split('\n')
+        .map(|line| line.split('\t').map(Value::from_input).collect())
+        .collect()
 }
 
 /// Every place a query occurs in the cells of the sheets a person can see.
@@ -773,4 +1013,102 @@ fn matches_in(document: &SheetDocument, query: &str) -> Vec<Match> {
         }
     }
     found
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn opened() -> (SheetView, Editing) {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/calc.ods"),
+        )
+        .expect("the corpus sheet");
+        let view = SheetView {
+            document: Some(SheetDocument::read(&bytes).expect("it reads")),
+            ..SheetView::default()
+        };
+        let mut editing = Editing::default();
+        editing.reset();
+        (view, editing)
+    }
+
+    fn text_at(view: &SheetView, row: usize, column: usize) -> String {
+        let document = view.document.as_ref().expect("open");
+        let sheet = &document.sheets()[0];
+        document
+            .cell(sheet, row, column)
+            .map(|cell| cell.text())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn clipboard_text_is_rows_of_cells() {
+        let block = cells_of("a\t1\r\nTRUE\t\n");
+        assert_eq!(block.len(), 2);
+        assert!(matches!(&block[0][0], Value::Text(t) if t == "a"));
+        assert!(matches!(block[0][1], Value::Number(n) if (n - 1.0).abs() < f64::EPSILON));
+        assert!(matches!(block[1][0], Value::Boolean(true)));
+        assert!(matches!(block[1][1], Value::Empty));
+    }
+
+    #[test]
+    fn a_paste_lands_at_the_selection_as_one_undo_step() {
+        let (mut view, mut editing) = opened();
+        view.pick((6, 1));
+        view.paste("x\t7\ny\t8\n", &mut editing);
+        assert_eq!(text_at(&view, 6, 1), "x");
+        assert_eq!(text_at(&view, 7, 2), "8");
+        assert_eq!(view.range(), ((6, 1), (7, 2)));
+        assert!(editing.modified());
+        let document = view.document.as_mut().expect("open");
+        let (previous, _) = editing
+            .undo(&document.document.content, None)
+            .expect("one step");
+        document.document.content = previous;
+        document.reindex();
+        assert!(!editing.can_undo(), "the paste was a single step");
+        assert_eq!(text_at(&view, 6, 1), "");
+    }
+
+    #[test]
+    fn a_paste_over_a_formula_writes_nothing() {
+        let (mut view, mut editing) = opened();
+        let (row, column) = (1..5)
+            .flat_map(|r| (0..6).map(move |c| (r, c)))
+            .find(|&(r, c)| {
+                let document = view.document.as_ref().expect("open");
+                document
+                    .cell(&document.sheets()[0], r, c)
+                    .is_some_and(|cell| cell.formula().is_some())
+            })
+            .expect("the sheet has a formula");
+        view.pick((row, column - 1));
+        let before = text_at(&view, row, column - 1);
+        view.paste("changed\tchanged\n", &mut editing);
+        assert_eq!(text_at(&view, row, column - 1), before);
+        assert!(!editing.modified());
+        assert!(view.notice.is_some());
+    }
+
+    #[test]
+    fn deleting_a_range_empties_each_cell_in_it() {
+        let (mut view, mut editing) = opened();
+        view.pick((1, 0));
+        view.extend((2, 1));
+        view.clear_range(&mut editing);
+        for (row, column) in [(1, 0), (1, 1), (2, 0), (2, 1)] {
+            assert_eq!(text_at(&view, row, column), "", "{row},{column}");
+        }
+        assert!(editing.can_undo());
+    }
+
+    #[test]
+    fn the_selection_is_the_rectangle_between_its_corners() {
+        let (mut view, _) = opened();
+        view.pick((4, 3));
+        view.extend((1, 5));
+        assert_eq!(view.range(), ((1, 3), (4, 5)));
+    }
 }

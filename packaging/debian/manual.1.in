@@ -37,6 +37,9 @@ Save over the open file; save somewhere else.
 .B Ctrl+F, F3, Shift+F3
 Search the document; go to the next match; go to the one before.
 .TP
+.B Ctrl+C, Ctrl+X, Ctrl+V
+In a spreadsheet, copy, cut and paste the selected cells as tab separated text.
+.TP
 .B F5, Shift+F5
 In a presentation, start the slideshow at the first slide; at the one in view.
 Escape ends it.
