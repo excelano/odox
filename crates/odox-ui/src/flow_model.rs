@@ -14,9 +14,9 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Mark, Model, Position, RichEdit};
+use egui_richedit::{Edit, Mark, Model, Position, RichEdit, Selection};
 use odox_core::edit::{self, is_paragraph};
-use odox_core::{Element, Ns, Refused, Styles};
+use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
 use crate::flow::is_block_container;
@@ -35,6 +35,20 @@ pub fn page_editor() -> PageEditor {
     RichEdit::new(page_editor_id())
 }
 
+/// What a button for a kind of paragraph asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Block {
+    /// A heading of a level, or body text again where the paragraphs already
+    /// are one.
+    Heading(u8),
+    /// Body text.
+    Body,
+    /// A bulleted list, or no list where the paragraphs already are one.
+    Bullets,
+    /// A numbered list, or no list where the paragraphs already are one.
+    Numbers,
+}
+
 /// The paragraphs under a root in a content tree, for one frame's editing.
 pub struct FlowModel<'a> {
     content: &'a mut Element,
@@ -45,6 +59,9 @@ pub struct FlowModel<'a> {
     /// The part of the root the paragraphs are kept to, as a path under it:
     /// on a slide, the one shape being typed into.
     scope: Vec<usize>,
+    /// Put in front of every path an undo step remembers, for a view whose
+    /// paths mean something only with it: on a deck, which slide.
+    tag: Vec<usize>,
     /// Every editable paragraph in drawing order, found when first asked for
     /// and forgotten when an edit changes it.
     order: OnceCell<Vec<Vec<usize>>>,
@@ -65,8 +82,17 @@ impl<'a> FlowModel<'a> {
             root,
             editing,
             scope: Vec::new(),
+            tag: Vec::new(),
             order: OnceCell::new(),
         }
+    }
+
+    /// Have the caret an undo step remembers begin with these indices, which
+    /// the view takes off again when it is asked to put the caret back.
+    #[must_use]
+    pub fn tagged(mut self, tag: Vec<usize>) -> Self {
+        self.tag = tag;
+        self
     }
 
     /// Keep to the paragraphs under one element beneath the root, so that
@@ -91,10 +117,7 @@ impl<'a> FlowModel<'a> {
 
     fn order(&self) -> &[Vec<usize>] {
         self.order.get_or_init(|| {
-            let mut out = Vec::new();
-            if let Some(root) = self.root() {
-                blocks(root, &mut Vec::new(), &mut out);
-            }
+            let mut out = self.root().map(paragraph_paths).unwrap_or_default();
             out.retain(|path| path.starts_with(&self.scope));
             out
         })
@@ -174,6 +197,131 @@ impl<'a> FlowModel<'a> {
                 })
                 .collect(),
         )
+    }
+
+    /// The paragraphs a selection runs over, in the order they are drawn.
+    fn selected_paragraphs(&self, selection: &Selection<Vec<usize>>) -> Option<Vec<Vec<usize>>> {
+        let order = self.order();
+        let anchor = order
+            .iter()
+            .position(|p| *p == selection.anchor.paragraph)?;
+        let focus = order.iter().position(|p| *p == selection.focus.paragraph)?;
+        Some(order[anchor.min(focus)..=anchor.max(focus)].to_vec())
+    }
+
+    /// Whether a block is what every paragraph a selection runs over already
+    /// is, which is when its button is lit and pressing it takes it off.
+    pub fn is_block(&self, selection: &Selection<Vec<usize>>, block: Block) -> bool {
+        let Some(paragraphs) = self.selected_paragraphs(selection) else {
+            return false;
+        };
+        paragraphs.iter().all(|paragraph| {
+            let path = [self.root.as_slice(), paragraph].concat();
+            let (heading, list) = edit::block_state(self.content, &path, self.styles);
+            match block {
+                Block::Heading(level) => heading == Some(level),
+                Block::Body => heading.is_none(),
+                Block::Bullets => list == Some(ListKind::Bullet),
+                Block::Numbers => list == Some(ListKind::Number),
+            }
+        })
+    }
+
+    /// Make the paragraphs a selection runs over a kind of paragraph, or take
+    /// them out of it where they already are one, as one step to undo, and put
+    /// the selection back over the same paragraphs. Answers whether the
+    /// document changed.
+    pub fn apply_block(&mut self, editor: &mut PageEditor, block: Block) -> bool {
+        let Some(selection) = editor.selection().cloned() else {
+            return false;
+        };
+        let Some(paragraphs) = self.selected_paragraphs(&selection) else {
+            return false;
+        };
+        let place = |path: &Vec<usize>, order: &[Vec<usize>]| order.iter().position(|p| p == path);
+        let (Some(anchor), Some(focus)) = (
+            place(&selection.anchor.paragraph, self.order()),
+            place(&selection.focus.paragraph, self.order()),
+        ) else {
+            return false;
+        };
+        let lit = self.is_block(&selection, block);
+        let before = self.content.clone();
+        let done = match block {
+            Block::Heading(_) | Block::Body => {
+                let level = match block {
+                    Block::Heading(level) if !lit => Some(level),
+                    _ => None,
+                };
+                self.set_headings(&paragraphs, level)
+            }
+            Block::Bullets | Block::Numbers => {
+                let kind = match block {
+                    Block::Bullets => ListKind::Bullet,
+                    _ => ListKind::Number,
+                };
+                self.set_lists(&paragraphs, (!lit).then_some(kind))
+            }
+        };
+        if done.is_none() || *self.content == before {
+            *self.content = before;
+            return false;
+        }
+        self.order = OnceCell::new();
+        let begins = Position::new(
+            [self.tag.as_slice(), &selection.focus.paragraph].concat(),
+            selection.focus.offset,
+        );
+        self.editing.touch();
+        self.editing.record_snapshot(before, Some(begins));
+        let order = self.order().to_vec();
+        if let (Some(a), Some(f)) = (order.get(anchor), order.get(focus)) {
+            editor.select(Selection {
+                anchor: Position::new(a.clone(), selection.anchor.offset),
+                focus: Position::new(f.clone(), selection.focus.offset),
+            });
+        }
+        true
+    }
+
+    fn set_headings(&mut self, paragraphs: &[Vec<usize>], level: Option<u8>) -> Option<()> {
+        let automatic =
+            |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
+        for paragraph in paragraphs {
+            let had = automatic(self.content);
+            let path = [self.root.as_slice(), paragraph].concat();
+            edit::set_heading(self.content, &path, level, self.styles).ok()?;
+            self.follow_styles(had);
+        }
+        Some(())
+    }
+
+    fn set_lists(&mut self, paragraphs: &[Vec<usize>], kind: Option<ListKind>) -> Option<()> {
+        let had = self
+            .content
+            .child(&Ns::Office, "automatic-styles")
+            .is_some();
+        let paths: Vec<Vec<usize>> = paragraphs
+            .iter()
+            .map(|paragraph| [self.root.as_slice(), paragraph].concat())
+            .collect();
+        edit::set_list(self.content, &paths, kind, self.styles).ok()?;
+        self.follow_styles(had);
+        Some(())
+    }
+
+    /// Styles written into a document that had nowhere to keep them go before
+    /// its body, and move the body, and the root, one along.
+    fn follow_styles(&mut self, had: bool) {
+        if !had
+            && self
+                .content
+                .child(&Ns::Office, "automatic-styles")
+                .is_some()
+            && let Some(first) = self.root.first_mut()
+        {
+            *first += 1;
+        }
     }
 
     /// Give the text from one position to another a mark, or take it off,
@@ -286,9 +434,13 @@ impl Model for FlowModel<'_> {
         // Where the edit begins is where an undo of it puts the caret.
         let before = new_step.then(|| self.content.clone());
         let begins = match &edit {
-            Edit::Replace { from, .. } | Edit::Format { from, .. } => from.clone(),
-            Edit::Split { at } => at.clone(),
+            Edit::Replace { from, .. } | Edit::Format { from, .. } => from,
+            Edit::Split { at } => at,
         };
+        let begins = Position::new(
+            [self.tag.as_slice(), &begins.paragraph].concat(),
+            begins.offset,
+        );
         let at = match edit {
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
@@ -304,6 +456,7 @@ impl Model for FlowModel<'_> {
             }
         };
         if at.is_some() {
+            self.editing.touch();
             if let Some(before) = before {
                 self.editing.record_snapshot(before, Some(begins));
             }
@@ -311,6 +464,14 @@ impl Model for FlowModel<'_> {
         }
         at
     }
+}
+
+/// Every paragraph under a root, in the order [`crate::Flow`] draws them, by
+/// the paths it reports them under.
+pub(crate) fn paragraph_paths(root: &Element) -> Vec<Vec<usize>> {
+    let mut out = Vec::new();
+    blocks(root, &mut Vec::new(), &mut out);
+    out
 }
 
 /// The paragraphs among a run of blocks, in the order [`crate::Flow`] draws
@@ -495,6 +656,25 @@ mod tests {
         assert_eq!(model.text(&vec![0]).as_deref(), Some("oneitem"));
         // The list had one item, and went with it.
         assert_eq!(model.text(&vec![1, 0, 0, 0]).as_deref(), Some("cell"));
+    }
+
+    #[test]
+    fn a_tagged_model_remembers_the_caret_under_its_tag() {
+        let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model =
+            FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing).tagged(vec![7]);
+        model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 1),
+            },
+            true,
+        );
+        let current = content.clone();
+        let (_, caret) = editing.undo(&current, None).expect("a step to undo");
+        assert_eq!(caret, Some(Position::new(vec![7, 0], 1)));
     }
 
     #[test]

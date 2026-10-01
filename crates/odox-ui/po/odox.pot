@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-09-27 17:57-0500\n"
+"POT-Creation-Date: 2026-10-01 14:08-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,154 +17,202 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: crates/odox-ui/src/find_bar.rs:83
+msgid "Find"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:107
+msgid "Previous"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:110
+msgid "Next"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:115
+msgid "No matches"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:118
+msgid "{current} of {count}"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:126 crates/odox-ui/src/shell.rs:571
+msgid "Close"
+msgstr ""
+
 #: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
-#: crates/odox-ui/src/shell.rs:499 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/shell.rs:557 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:92
-#: crates/xods/src/view.rs:69 crates/xodt/src/view.rs:41
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:103
+#: crates/xods/src/view.rs:77 crates/xodt/src/view.rs:51
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:182
+#: crates/odox-ui/src/shell.rs:213
 msgid "{file} could not be read: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:290
+#: crates/odox-ui/src/shell.rs:321
 msgid "{file} could not be saved: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:351
+#: crates/odox-ui/src/shell.rs:382
 msgid "Save changes to {file}?"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:352
+#: crates/odox-ui/src/shell.rs:383
 msgid "The document has changes that are not saved."
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:355 crates/odox-ui/src/shell.rs:522
+#: crates/odox-ui/src/shell.rs:386 crates/odox-ui/src/shell.rs:580
 msgid "Save"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:358
+#: crates/odox-ui/src/shell.rs:389
 msgid "Discard"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:361
+#: crates/odox-ui/src/shell.rs:392
 msgid "Cancel"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:426
+#: crates/odox-ui/src/shell.rs:524
 msgid "Dismiss"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:500 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:558 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:506 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:564 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:513
-msgid "Close"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:529
+#: crates/odox-ui/src/shell.rs:587
 msgid "Save as…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:536
+#: crates/odox-ui/src/shell.rs:594
 msgid "Quit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:541
+#: crates/odox-ui/src/shell.rs:599
 msgid "Edit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:543
-msgid "Undo"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:550
-msgid "Redo"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:557
-msgid "Edit mode"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:561
-msgid "Open documents in edit mode"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:567
-msgid "The setting could not be saved: {reason}"
-msgstr ""
-
-#: crates/odox-ui/src/shell.rs:572
+#: crates/odox-ui/src/shell.rs:600
 msgid "View"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:573
+#: crates/odox-ui/src/shell.rs:601
 msgid "Zoom in"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:576
+#: crates/odox-ui/src/shell.rs:604
 msgid "Zoom out"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:579
+#: crates/odox-ui/src/shell.rs:607
 msgid "Actual size"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:583
+#: crates/odox-ui/src/shell.rs:611
 msgid "Show the side panel"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:589
+#: crates/odox-ui/src/shell.rs:617
 msgid "{percent}%"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:592
+#: crates/odox-ui/src/shell.rs:620
 msgid "Editing"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:608
+#: crates/odox-ui/src/shell.rs:630
+msgid "Undo"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:637
+msgid "Redo"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:645
+msgid "Find…"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:652
+msgid "Edit mode"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:656
+msgid "Open documents in edit mode"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:662
+msgid "The setting could not be saved: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:723
 msgid "Open a document…"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:26
+#: crates/odox-ui/src/toolbar.rs:47
+msgid "Body text"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:48
+msgid "Heading 1"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:49
+msgid "Heading 2"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:50
+msgid "Heading 3"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:51
+msgid "Bulleted list"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:52
+msgid "Numbered list"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:79
 msgid "B"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:26
+#: crates/odox-ui/src/toolbar.rs:79
 msgid "Bold"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:27
+#: crates/odox-ui/src/toolbar.rs:80
 msgid "I"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:27
+#: crates/odox-ui/src/toolbar.rs:80
 msgid "Italic"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:29
+#: crates/odox-ui/src/toolbar.rs:82
 msgid "U"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:30
+#: crates/odox-ui/src/toolbar.rs:83
 msgid "Underline"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:34
+#: crates/odox-ui/src/toolbar.rs:87
 msgid "S"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:35
+#: crates/odox-ui/src/toolbar.rs:88
 msgid "Strikethrough"
 msgstr ""
 
@@ -176,39 +224,47 @@ msgstr ""
 msgid "OpenDocument Presentation"
 msgstr ""
 
-#: crates/xodp/src/view.rs:149
+#: crates/xodp/src/view.rs:221
 msgid "This presentation has no slides."
 msgstr ""
 
-#: crates/xodp/src/view.rs:264
+#: crates/xodp/src/view.rs:336
 msgid "Slides"
 msgstr ""
 
-#: crates/xodp/src/view.rs:287
+#: crates/xodp/src/view.rs:360
 msgid "Show the speaker's notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:534
+#: crates/xodp/src/view.rs:362
+msgid "Start the slideshow"
+msgstr ""
+
+#: crates/xodp/src/view.rs:367
+msgid "Start the slideshow from this slide"
+msgstr ""
+
+#: crates/xodp/src/view.rs:737
 msgid "Notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:541
+#: crates/xodp/src/view.rs:746
 msgid "This slide has no notes."
 msgstr ""
 
-#: crates/xods/src/view.rs:151
+#: crates/xods/src/view.rs:187
 msgid "Copy the sheet as tab-separated text"
 msgstr ""
 
-#: crates/xods/src/view.rs:676
+#: crates/xods/src/view.rs:939
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 
-#: crates/xods/src/view.rs:677
+#: crates/xods/src/view.rs:940
 msgid "This cell is covered by the one that spans it."
 msgstr ""
 
-#: crates/xods/src/view.rs:680
+#: crates/xods/src/view.rs:943
 msgid "There is no cell there."
 msgstr ""
 
@@ -216,18 +272,18 @@ msgstr ""
 msgid "OpenDocument Text"
 msgstr ""
 
-#: crates/xodt/src/view.rs:103
+#: crates/xodt/src/view.rs:131
 msgid "This document has no text in it."
 msgstr ""
 
-#: crates/xodt/src/view.rs:167
+#: crates/xodt/src/view.rs:206
 msgid "Outline"
 msgstr ""
 
-#: crates/xodt/src/view.rs:176
+#: crates/xodt/src/view.rs:215
 msgid "(untitled)"
 msgstr ""
 
-#: crates/xodt/src/view.rs:200
+#: crates/xodt/src/view.rs:239
 msgid "Copy the document as text"
 msgstr ""

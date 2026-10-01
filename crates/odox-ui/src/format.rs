@@ -182,6 +182,16 @@ pub fn color32(color: Color) -> Color32 {
     Color32::from_rgb(color.r, color.g, color.b)
 }
 
+/// What a match of a search is painted over: the current one in orange and the
+/// rest in yellow, both light enough for black text, whatever the theme.
+pub fn match_fill(current: bool) -> Color32 {
+    if current {
+        Color32::from_rgb(255, 150, 40)
+    } else {
+        Color32::from_rgb(250, 220, 90)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

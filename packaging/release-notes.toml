@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.4.2"
+version = "0.5.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Maintenance release: updated dependencies. Nothing about what Odox Text does has changed."
+whats-new = "Editing now happens on the page itself: click where the caret should go and type, select across paragraphs, copy and paste. Make text bold, italic, underlined or struck through, and make a paragraph a heading or a list item, with the buttons above the page. Find text with Ctrl+F. Clicking a link opens it in your browser. Enter on an empty list item ends the list, and numbered lists draw their full stop."
 
 [products.xodt.locales.de-de]
-whats-new = "Wartungsversion: aktualisierte Abhängigkeiten. Keine Änderung an dem, was Odox Text tut."
+whats-new = "Das Bearbeiten geschieht jetzt auf der Seite selbst: Klicken Sie, wohin der Cursor soll, und tippen Sie, markieren Sie über Absätze hinweg, kopieren und fügen Sie ein. Machen Sie Text fett, kursiv, unterstrichen oder durchgestrichen und einen Absatz zur Überschrift oder zum Listeneintrag, mit den Schaltflächen über der Seite. Suchen Sie Text mit Strg+F. Ein Klick auf einen Link öffnet ihn im Browser. Enter auf einem leeren Listeneintrag beendet die Liste, und nummerierte Listen zeigen ihren Punkt."
 
 [products.xods.locales.en-us]
-whats-new = "Maintenance release: updated dependencies. Nothing about what Odox Grid does has changed."
+whats-new = "Select a range of cells by dragging, then copy, cut, paste or clear it. Find text in any sheet with Ctrl+F. Clicking a cell below the data no longer jumps back to the last row."
 
 [products.xods.locales.de-de]
-whats-new = "Wartungsversion: aktualisierte Abhängigkeiten. Keine Änderung an dem, was Odox Grid tut."
+whats-new = "Wählen Sie einen Zellbereich durch Ziehen, dann können Sie ihn kopieren, ausschneiden, einfügen oder leeren. Suchen Sie Text in jedem Blatt mit Strg+F. Ein Klick auf eine Zelle unter den Daten springt nicht mehr zur letzten Zeile zurück."
 
 [products.xodp.locales.en-us]
-whats-new = "Maintenance release: updated dependencies. Nothing about what Odox Deck does has changed."
+whats-new = "Present your deck: F5 starts a slideshow and Shift+F5 starts it at the slide in view. Change the text in a slide's shapes where it sits, with bold, italic, underline and strikethrough. Find text across slides and notes with Ctrl+F. Undo returns to the slide an edit was made on."
 
 [products.xodp.locales.de-de]
-whats-new = "Wartungsversion: aktualisierte Abhängigkeiten. Keine Änderung an dem, was Odox Deck tut."
+whats-new = "Präsentieren Sie Ihre Folien: F5 startet die Bildschirmpräsentation, Umschalt+F5 beginnt bei der angezeigten Folie. Ändern Sie Text in den Formen einer Folie an Ort und Stelle, mit Fett, Kursiv, Unterstrichen und Durchgestrichen. Suchen Sie Text über Folien und Notizen mit Strg+F. Rückgängig kehrt zu der Folie zurück, auf der eine Änderung gemacht wurde."

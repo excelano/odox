@@ -9,8 +9,11 @@ use eframe::egui::{self, Ui};
 use egui_richedit::Selection;
 use odox_core::Document;
 use odox_core::doc::TextDocument;
+use odox_ui::find::in_paragraphs;
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
+use odox_ui::{
+    Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
+};
 
 /// A text document, open or not.
 pub struct TextView {
@@ -19,8 +22,13 @@ pub struct TextView {
     /// The heading the outline asked to be shown, answered on the next frame
     /// while the body is laid out.
     scroll_to: Option<usize>,
+    /// The bookmark or heading a link inside the document asked for, answered
+    /// on the next frame as `scroll_to` is.
+    place: Option<String>,
     /// The caret, in edit mode.
     page: PageEditor,
+    /// What a search found.
+    found: Found,
 }
 
 impl Default for TextView {
@@ -29,7 +37,9 @@ impl Default for TextView {
             document: None,
             pictures: Pictures::default(),
             scroll_to: None,
+            place: None,
             page: page_editor(),
+            found: Found::default(),
         }
     }
 }
@@ -51,7 +61,9 @@ impl View for TextView {
         self.pictures.clear();
         self.document = Some(document);
         self.scroll_to = None;
+        self.place = None;
         self.page.clear();
+        self.found.clear();
         self.load_fonts(ctx);
         Ok(())
     }
@@ -60,6 +72,7 @@ impl View for TextView {
         self.document = None;
         self.pictures.clear();
         self.page.clear();
+        self.found.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -86,6 +99,21 @@ impl View for TextView {
 
     fn restore_caret(&mut self, caret: Caret) {
         self.page.select(Selection::caret(caret));
+    }
+
+    fn find(&mut self, query: &str) -> usize {
+        let matches = self
+            .document
+            .as_ref()
+            .and_then(TextDocument::body)
+            .map(|body| in_paragraphs(body, 0, query))
+            .unwrap_or_default();
+        self.found.set(matches);
+        self.found.len()
+    }
+
+    fn show_match(&mut self, index: usize) {
+        self.found.show(index);
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
@@ -117,8 +145,12 @@ impl View for TextView {
                 content, styles, ..
             } = &mut document.document;
             let mut model = FlowModel::new(content, styles, root, editing);
-            if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page, &model) {
+            let pressed = odox_ui::toolbar::text(ui, &self.page, &model);
+            if let Some(mark) = pressed.mark {
                 self.page.toggle(&mut model, mark);
+            }
+            if let Some(block) = pressed.block {
+                model.apply_block(&mut self.page, block);
             }
             ui.separator();
         }
@@ -149,11 +181,18 @@ impl View for TextView {
                             let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
                             flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();
+                            flow.scroll_to_place = self.place.take();
                             flow.page = edit_mode.then_some(&mut self.page);
+                            flow.find = self.found.highlights(0);
                             flow.blocks(ui, body, width);
+                            if flow.followed.is_some() {
+                                self.place = flow.followed.take();
+                                ui.ctx().request_repaint();
+                            }
                         });
                 });
             });
+        self.found.drawn();
     }
 
     fn side(&mut self, ui: &mut Ui) -> bool {

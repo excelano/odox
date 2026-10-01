@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::edit::{
-    apply, join, join_with_previous, replace, replace_range, rewrite, split, split_at, text,
+    apply, join, join_with_previous, links, replace, replace_range, rewrite, split, split_at, text,
 };
 use odox_core::{Element, Node, Ns, Package, xml};
 
@@ -423,7 +423,7 @@ fn a_join_does_not_reach_over_a_table() {
 /// A body of blocks written as XML, with the namespaces declared.
 fn body(inner: &str) -> Element {
     let source = format!(
-        r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{inner}</office:text>"#
+        r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">{inner}</office:text>"#
     );
     xml::parse(source.as_bytes(), "test").expect("a body")
 }
@@ -508,5 +508,50 @@ fn a_split_in_a_list_item_begins_a_new_item_with_what_followed() {
     assert_eq!(
         inner(&root),
         "<text:list><text:list-item text:start-value=\"4\"><text:p>one</text:p></text:list-item><text:list-item><text:p>two</text:p><text:list><text:list-item><text:p>nested</text:p></text:list-item></text:list></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn enter_on_an_empty_item_leaves_the_list_and_splits_it_around_the_paragraph() {
+    let mut root = body(
+        "<text:list xml:id=\"l1\"><text:list-item><text:p>a</text:p></text:list-item><text:list-item><text:p/></text:list-item><text:list-item><text:p>c</text:p></text:list-item></text:list>",
+    );
+    assert_eq!(split_at(&mut root, &[0, 1, 0], 0), Ok(vec![1]));
+    assert_eq!(
+        inner(&root),
+        "<text:list xml:id=\"l1\"><text:list-item><text:p>a</text:p></text:list-item></text:list><text:p/><text:list text:continue-numbering=\"true\"><text:list-item><text:p>c</text:p></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn enter_on_the_only_empty_item_replaces_the_list_with_its_paragraph() {
+    let mut root =
+        body("<text:p>x</text:p><text:list><text:list-item><text:p/></text:list-item></text:list>");
+    assert_eq!(split_at(&mut root, &[1, 0, 0], 0), Ok(vec![1]));
+    assert_eq!(inner(&root), "<text:p>x</text:p><text:p/>");
+}
+
+#[test]
+fn enter_on_an_empty_nested_item_leaves_the_inner_list_only() {
+    let mut root = body(
+        "<text:list><text:list-item><text:p>a</text:p><text:list><text:list-item><text:p/></text:list-item></text:list></text:list-item></text:list>",
+    );
+    assert_eq!(split_at(&mut root, &[0, 0, 1, 0, 0], 0), Ok(vec![0, 0, 1]));
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item><text:p>a</text:p><text:p/></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn a_link_covers_the_characters_inside_it_and_says_where_it_points() {
+    let root = body(
+        "<text:p>go <text:a xlink:href=\"https://example.com/\">to <text:span>the</text:span> site</text:a>,<text:s text:c=\"2\"/><text:a xlink:href=\"#top\">up</text:a><text:a>bare</text:a></text:p>",
+    );
+    let paragraph = root.at(&[0]).expect("a paragraph");
+    assert_eq!(text(paragraph), "go to the site,  upbare");
+    assert_eq!(
+        links(paragraph),
+        vec![(3..14, "https://example.com/"), (17..19, "#top")]
     );
 }

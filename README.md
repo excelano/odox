@@ -26,9 +26,10 @@ ODF is a document they are meant to open, whichever application wrote it.
 
 Editing means changing what is there, not authoring. You can type and delete
 text, split a paragraph and join two, enter a value in a cell, move a shape on a
-slide and resize it, make text bold, italic, underlined or struck through,
-undo any of that, and save. You cannot apply other formatting, insert a table or
-a picture, edit a formula, or find and replace. What you did
+slide and resize it, make text bold, italic, underlined or struck through, make
+a paragraph a heading or a list item, undo any of that, and save. You cannot
+apply other formatting, insert a table or a picture, edit a formula, or replace
+text. What you did
 not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
@@ -99,7 +100,10 @@ before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
 processor. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
-selected; strikethrough is a button. Undo puts the caret back where the edit
+selected; strikethrough is a button. Beside them are buttons that make the
+paragraphs the selection runs over body text, a heading of the first, second or
+third level, a bulleted list or a numbered one, and pressing a lit one takes it
+off. Undo puts the caret back where the edit
 was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
@@ -109,12 +113,29 @@ Enter commits and moves down, Tab commits and moves right, Escape puts it back,
 and Delete clears it. A number is a number, `true` and `false` are booleans,
 anything else is text. A cell that holds a formula is not edited, and once
 anything in the sheet has changed every formula's result is drawn faint until a
-spreadsheet application recalculates it.
+spreadsheet application recalculates it. Dragging, or Shift with the arrows,
+selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
+show it, Ctrl+V puts such text down from the picked cell, as the values typing
+would make, and Delete empties it. A paste or a delete that reaches a cell it
+cannot write, a formula or one under a merge, changes nothing.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
-there to type into it as in `xodt`, within that shape.
+there to type into it as in `xodt`, within that shape. F5 starts the slideshow
+at the first slide and Shift+F5 at the one in view: the slide fills the screen
+on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
+or a right click go back, and Escape ends it. The notes are not shown.
+
+In `xodt`, a click on a link opens a web or mail address in the desktop's own
+browser or mail program, or scrolls to a bookmark or heading in the document;
+while editing it takes Ctrl and a click, a plain click being the caret. No other
+kind of link is followed, whatever the document says.
+
+Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
+Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
+and Escape closes it. Every match is lit, `xodp` searches the notes as well as
+the slides, and `xods` searches every sheet.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

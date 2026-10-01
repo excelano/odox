@@ -254,6 +254,9 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             return false;
         }
         ui.memory_mut(|memory| memory.set_focus_lock_filter(self.id, FILTER));
+        if self.dragging {
+            scroll_toward_pointer(ui);
+        }
         self.settle(model);
 
         let events = ui.input(|input| input.filtered_events(&FILTER));
@@ -1013,4 +1016,24 @@ fn word_around(text: &str, index: usize) -> (usize, usize) {
         end += 1;
     }
     (start, end)
+}
+
+/// A drag that has left the view scrolls it, faster the further out the
+/// pointer is, so that a selection can be taken on to where the pointer cannot
+/// reach.
+fn scroll_toward_pointer(ui: &Ui) {
+    const SPEED: f32 = 0.2;
+    const SLOWEST: f32 = 2.0;
+    const FASTEST: f32 = 30.0;
+    let Some(pointer) = ui.input(|input| input.pointer.latest_pos()) else {
+        return;
+    };
+    let view = ui.clip_rect();
+    let past = (pointer.y - view.bottom()).max(0.0) - (view.top() - pointer.y).max(0.0);
+    if past == 0.0 {
+        return;
+    }
+    let step = (past.abs() * SPEED).clamp(SLOWEST, FASTEST);
+    ui.scroll_with_delta(vec2(0.0, -step.copysign(past)));
+    ui.ctx().request_repaint();
 }

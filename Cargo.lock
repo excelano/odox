@@ -4268,6 +4268,7 @@ name = "xodp"
 version = "0.4.2"
 dependencies = [
  "eframe",
+ "egui_richedit",
  "odox-core",
  "odox-ui",
 ]

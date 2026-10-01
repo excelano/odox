@@ -14,6 +14,7 @@ use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use odox_core::Document;
 
 use crate::edit::{Caret, Editing};
+use crate::find_bar::{FindBar, Step};
 use crate::i18n::{fill, t};
 use crate::settings::Settings;
 
@@ -85,6 +86,24 @@ pub trait View {
     /// [`Self::reindex`].
     fn restore_caret(&mut self, _caret: Caret) {}
 
+    /// Whether the view is showing the document full screen and nothing else,
+    /// as a slideshow does: the shell takes its menu, its panels and its keys
+    /// away until it is not.
+    fn presenting(&self) -> bool {
+        false
+    }
+
+    /// Look for text in the document and keep what is found, to draw
+    /// highlighted; an empty query forgets the search. Answers how many
+    /// matches there are. Asked again whenever the query or the text changes,
+    /// and the current match is kept if there are still that many.
+    fn find(&mut self, _query: &str) -> usize {
+        0
+    }
+
+    /// Make one of the matches the current one, and bring it into view.
+    fn show_match(&mut self, _index: usize) {}
+
     /// Draw the document. The shell has already put a scroll area or a panel
     /// around whatever this needs. The editing state says whether edit mode is
     /// on and takes the snapshot an edit records before it changes the tree.
@@ -114,12 +133,22 @@ pub struct Shell<V: View> {
     show_side: bool,
     editing: Editing,
     settings: Settings,
+    find: FindBar,
+    /// Whether the window has been made to fill the screen for a slideshow.
+    screen: Screen,
     /// What was asked for while the document had unsaved changes, waiting on
     /// the person's answer.
     pending: Option<Pending>,
     /// The person has answered that the window may close, so the next request
     /// to close it is not asked about again.
     closing: bool,
+}
+
+/// How much of the screen the window has.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Screen {
+    Window,
+    Full,
 }
 
 /// Something that would throw away unsaved changes, held until the person
@@ -150,6 +179,8 @@ impl<V: View> Shell<V> {
             show_side: true,
             editing: Editing::default(),
             settings: Settings::load(),
+            find: FindBar::default(),
+            screen: Screen::Window,
             pending: None,
             closing: false,
         }
@@ -398,11 +429,24 @@ impl<V: View> eframe::App for Shell<V> {
         // has the focus, so Ctrl+Z inside a cell undoes the typing and not the
         // document. The page editor is not such a field: its typing is the
         // document's, and so is its Ctrl+Z.
+        let presenting = self.view.presenting();
+        let screen = if presenting {
+            Screen::Full
+        } else {
+            Screen::Window
+        };
+        if screen != self.screen {
+            self.screen = screen;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(presenting));
+        }
         self.editing.asking = self.pending.is_some();
         let field_focused = ctx
             .memory(egui::Memory::focused)
             .is_some_and(|id| id != crate::flow_model::page_editor_id());
-        if self.pending.is_none() && !field_focused {
+        if self.pending.is_none() && !presenting {
+            self.find_keys(&ctx);
+        }
+        if self.pending.is_none() && !field_focused && !presenting {
             self.keys(&ctx);
         }
 
@@ -416,7 +460,61 @@ impl<V: View> eframe::App for Shell<V> {
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
 
-        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, &ctx));
+        if !presenting {
+            self.chrome(ui, &ctx);
+        }
+
+        // **A document opened during this frame is not drawn until the next
+        // one.** Opening one registers the font families it names, and
+        // `Context::set_fonts` takes effect at the start of the following pass,
+        // so laying the document out now would ask for a family the definitions
+        // still in force do not carry. egui does not fall back for that: it
+        // panics, and a panic inside the macOS event callback cannot unwind, so
+        // the process aborts.
+        //
+        // Every way of opening a document but one goes through a frame:
+        // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
+        // command line, which is opened in eframe's creation closure before any
+        // pass has begun, and is why this went unnoticed until a runner opened a
+        // document through Launch Services. `tests/fonts_midframe.rs` pins the
+        // hazard.
+        //
+        // One frame, and the repaint is asked for rather than waited for, so
+        // the document appears immediately rather than when the pointer next
+        // moves.
+        let settling = self.settling;
+        if settling {
+            self.settling = false;
+            ctx.request_repaint();
+        }
+
+        let central = if presenting {
+            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(egui::Color32::BLACK))
+        } else {
+            egui::CentralPanel::default_margins()
+        };
+        central.show(ui, |ui| {
+            if settling {
+                // Deliberately blank, and for one frame. Drawing the
+                // nothing-open message here instead would flash it between a
+                // double-click and the document.
+            } else if self.view.is_open() {
+                self.view.central(ui, self.zoom, &mut self.editing);
+            } else {
+                self.nothing_open(ui);
+            }
+        });
+
+        self.ask_about_changes(&ctx);
+    }
+}
+
+impl<V: View> Shell<V> {
+    /// What is around the document: the menu, the search bar, an error and
+    /// the view's side panel.
+    fn chrome(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, ctx));
+        self.search(ui);
 
         if let Some(message) = self.error.clone() {
             egui::Panel::bottom("error").show(ui, |ui| {
@@ -448,48 +546,8 @@ impl<V: View> eframe::App for Shell<V> {
                 self.show_side = false;
             }
         }
-
-        // **A document opened during this frame is not drawn until the next
-        // one.** Opening one registers the font families it names, and
-        // `Context::set_fonts` takes effect at the start of the following pass,
-        // so laying the document out now would ask for a family the definitions
-        // still in force do not carry. egui does not fall back for that: it
-        // panics, and a panic inside the macOS event callback cannot unwind, so
-        // the process aborts.
-        //
-        // Every way of opening a document but one goes through a frame:
-        // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
-        // command line, which is opened in eframe's creation closure before any
-        // pass has begun, and is why this went unnoticed until a runner opened a
-        // document through Launch Services. `tests/fonts_midframe.rs` pins the
-        // hazard.
-        //
-        // One frame, and the repaint is asked for rather than waited for, so
-        // the document appears immediately rather than when the pointer next
-        // moves.
-        let settling = self.settling;
-        if settling {
-            self.settling = false;
-            ctx.request_repaint();
-        }
-
-        egui::CentralPanel::default_margins().show(ui, |ui| {
-            if settling {
-                // Deliberately blank, and for one frame. Drawing the
-                // nothing-open message here instead would flash it between a
-                // double-click and the document.
-            } else if self.view.is_open() {
-                self.view.central(ui, self.zoom, &mut self.editing);
-            } else {
-                self.nothing_open(ui);
-            }
-        });
-
-        self.ask_about_changes(&ctx);
     }
-}
 
-impl<V: View> Shell<V> {
     /// The menu bar: the File and Edit menus that are the same in every
     /// application, the View menu with the application's own items after the
     /// shell's, and on the right what mode the window is in and how far it is
@@ -538,37 +596,7 @@ impl<V: View> Shell<V> {
                     self.request(ctx, Pending::Quit);
                 }
             });
-            ui.menu_button(t("Edit"), |ui| {
-                if ui
-                    .add_enabled(self.editing.can_undo(), egui::Button::new(t("Undo")))
-                    .clicked()
-                {
-                    ui.close();
-                    self.undo();
-                }
-                if ui
-                    .add_enabled(self.editing.can_redo(), egui::Button::new(t("Redo")))
-                    .clicked()
-                {
-                    ui.close();
-                    self.redo();
-                }
-                ui.separator();
-                ui.checkbox(&mut self.editing.on, t("Edit mode"));
-                if ui
-                    .checkbox(
-                        &mut self.settings.open_in_edit_mode,
-                        t("Open documents in edit mode"),
-                    )
-                    .changed()
-                    && let Err(e) = self.settings.save()
-                {
-                    self.error = Some(fill(
-                        t("The setting could not be saved: {reason}"),
-                        &[("reason", &e.to_string())],
-                    ));
-                }
-            });
+            ui.menu_button(t("Edit"), |ui| self.edit_menu(ui));
             ui.menu_button(t("View"), |ui| {
                 if ui.button(t("Zoom in")).clicked() {
                     self.zoom = (self.zoom * ZOOM_STEP).min(ZOOM_MAX);
@@ -595,6 +623,93 @@ impl<V: View> Shell<V> {
         });
     }
 
+    /// The Edit menu: undo and redo, search, and the two preferences about
+    /// editing.
+    fn edit_menu(&mut self, ui: &mut Ui) {
+        if ui
+            .add_enabled(self.editing.can_undo(), egui::Button::new(t("Undo")))
+            .clicked()
+        {
+            ui.close();
+            self.undo();
+        }
+        if ui
+            .add_enabled(self.editing.can_redo(), egui::Button::new(t("Redo")))
+            .clicked()
+        {
+            ui.close();
+            self.redo();
+        }
+        ui.separator();
+        if ui
+            .add_enabled(self.view.is_open(), egui::Button::new(t("Find…")))
+            .clicked()
+        {
+            ui.close();
+            self.find.open();
+        }
+        ui.separator();
+        ui.checkbox(&mut self.editing.on, t("Edit mode"));
+        if ui
+            .checkbox(
+                &mut self.settings.open_in_edit_mode,
+                t("Open documents in edit mode"),
+            )
+            .changed()
+            && let Err(e) = self.settings.save()
+        {
+            self.error = Some(fill(
+                t("The setting could not be saved: {reason}"),
+                &[("reason", &e.to_string())],
+            ));
+        }
+    }
+
+    /// The search bar, when it is open, and the view's matches kept in step
+    /// with what it says and with the document.
+    fn search(&mut self, ui: &mut Ui) {
+        if !self.find.is_open() || !self.view.is_open() {
+            if self.find.searching {
+                self.find.searching = false;
+                self.find.count = 0;
+                self.view.find("");
+            }
+            return;
+        }
+        let mut step = None;
+        egui::Panel::top("find").show(ui, |ui| step = self.find.ui(ui));
+        if !self.find.is_open() {
+            return;
+        }
+        if let Some(query_changed) = self.find.due(self.editing.revision()) {
+            self.find.searching = true;
+            self.find.count = self.view.find(self.find.query());
+            if query_changed {
+                self.find.current = 0;
+                if self.find.count > 0 {
+                    self.view.show_match(0);
+                }
+            } else {
+                self.find.current = self.find.current.min(self.find.count.saturating_sub(1));
+            }
+        }
+        if let Some(step) = step {
+            self.step_match(step);
+        }
+    }
+
+    fn step_match(&mut self, step: Step) {
+        let count = self.find.count;
+        if count == 0 {
+            return;
+        }
+        self.find.current = match step {
+            Step::Next => (self.find.current + 1) % count,
+            Step::Previous => (self.find.current + count - 1) % count,
+        };
+        self.view.show_match(self.find.current);
+    }
+
     /// What the window says before a document is opened.
     fn nothing_open(&mut self, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
@@ -610,6 +725,30 @@ impl<V: View> Shell<V> {
                 self.ask_for_a_file(&ctx);
             }
         });
+    }
+
+    /// Ctrl+F and F3, which a text field has no use for and so are taken
+    /// whether or not one has the keyboard.
+    fn find_keys(&mut self, ctx: &egui::Context) {
+        if !self.view.is_open() {
+            return;
+        }
+        let pressed = |modifiers, key| {
+            ctx.input_mut(|input| input.consume_shortcut(&KeyboardShortcut::new(modifiers, key)))
+        };
+        if pressed(Modifiers::COMMAND, Key::F) {
+            self.find.open();
+        }
+        if pressed(Modifiers::SHIFT, Key::F3) {
+            self.step_match(Step::Previous);
+        }
+        if pressed(Modifiers::NONE, Key::F3) {
+            if self.find.is_open() {
+                self.step_match(Step::Next);
+            } else {
+                self.find.open();
+            }
+        }
     }
 
     fn keys(&mut self, ctx: &egui::Context) {

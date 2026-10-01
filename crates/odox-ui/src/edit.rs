@@ -44,6 +44,9 @@ pub struct Editing {
     /// which is the state the file on disk holds. `None` once that state can no
     /// longer be reached by undoing, because a new edit was made below it.
     saved_at: Option<usize>,
+    /// Counts every change to the content, including the ones an undo step
+    /// absorbs, so that whatever is derived from the text can tell it is stale.
+    revision: u64,
 }
 
 impl Editing {
@@ -52,6 +55,17 @@ impl Editing {
         self.undo.clear();
         self.redo.clear();
         self.saved_at = Some(0);
+        self.touch();
+    }
+
+    /// The content changed, in a way that need not have begun an undo step.
+    pub fn touch(&mut self) {
+        self.revision += 1;
+    }
+
+    /// A number that is different whenever the text may be.
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     /// Take a snapshot of the content tree before an edit changes it.
@@ -72,6 +86,7 @@ impl Editing {
             self.saved_at = None;
         }
         self.redo.clear();
+        self.touch();
         self.undo.push(Snapshot { content, caret });
         if self.undo.len() > DEPTH {
             self.undo.remove(0);
@@ -88,6 +103,7 @@ impl Editing {
         caret: Option<Caret>,
     ) -> Option<(Element, Option<Caret>)> {
         let previous = self.undo.pop()?;
+        self.touch();
         self.redo.push(Snapshot {
             content: current.clone(),
             caret,
@@ -102,6 +118,7 @@ impl Editing {
         caret: Option<Caret>,
     ) -> Option<(Element, Option<Caret>)> {
         let next = self.redo.pop()?;
+        self.touch();
         self.undo.push(Snapshot {
             content: current.clone(),
             caret,

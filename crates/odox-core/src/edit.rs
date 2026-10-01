@@ -17,6 +17,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod block;
 mod format;
 
 use std::fmt;
@@ -24,6 +25,7 @@ use std::ops::Range;
 
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
+pub use block::{block_state, heading_level, set_heading, set_list};
 pub use format::{Mark, format, marked};
 
 /// Why an edit was not made. Each is a state of the document rather than a
@@ -190,6 +192,43 @@ fn write_text(parent: &Element, out: &mut String) {
     }
 }
 
+/// The hyperlinks in a paragraph: the characters each covers, in the same
+/// count as [`text`], and where it points. A link with no `xlink:href` is not
+/// one.
+pub fn links(paragraph: &Element) -> Vec<(Range<usize>, &str)> {
+    let mut found = Vec::new();
+    collect_links(paragraph, &mut 0, &mut found);
+    found
+}
+
+fn collect_links<'a>(
+    parent: &'a Element,
+    at: &mut usize,
+    found: &mut Vec<(Range<usize>, &'a str)>,
+) {
+    for child in &parent.children {
+        match child {
+            Node::Text(t) | Node::CData(t) => *at += t.chars().count(),
+            Node::Element(e) if e.is(&Ns::Text, "s") => {
+                *at += e.attr_usize(&Ns::Text, "c").unwrap_or(1);
+            }
+            Node::Element(e) if e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") => {
+                *at += 1;
+            }
+            Node::Element(e) if is_inline_container(e) => {
+                let start = *at;
+                collect_links(e, at, found);
+                if e.is(&Ns::Text, "a")
+                    && let Some(href) = e.attr(&Ns::Xlink, "href")
+                {
+                    found.push((start..*at, href));
+                }
+            }
+            Node::Element(_) | Node::Comment(_) | Node::ProcessingInstruction(_) => {}
+        }
+    }
+}
+
 /// Replace a range of the paragraph's text, in characters, with new text.
 ///
 /// The characters are removed from the nodes that hold them and the new text
@@ -332,6 +371,9 @@ pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, 
 /// In a list item the second half begins a new item after it, as Enter does
 /// in a list, and whatever followed the paragraph in the item goes with it.
 ///
+/// An item holding one empty paragraph is taken out of its list instead: the
+/// paragraph stands where the item was, between the two halves of the list.
+///
 /// # Errors
 ///
 /// The path leads to nothing, or to something that is not a paragraph.
@@ -344,7 +386,14 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     if !is_paragraph(paragraph) {
         return Err(Refused::NotFound);
     }
+    if parent.is(&Ns::Text, "list-item")
+        && parent.children.len() == 1
+        && paragraph.children.is_empty()
+    {
+        return take_out_of_list(root, above);
+    }
     let (first, second) = split(paragraph, at);
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
     if !parent.is(&Ns::Text, "list-item") {
         parent
             .children
@@ -371,6 +420,53 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     let mut second_at = list_path.to_vec();
     second_at.extend([item_at + 1, 0]);
     Ok(second_at)
+}
+
+/// Take an item out of its list: the list is split around it, and what the
+/// item held stands between the halves. The half after the item continues the
+/// numbering, and a half left with no items is dropped. Answers the path of
+/// what the item held first.
+///
+/// This is how Enter on an empty item leaves a list, and how a paragraph stops
+/// being one.
+pub(crate) fn take_out_of_list(
+    root: &mut Element,
+    item_path: &[usize],
+) -> Result<Vec<usize>, Refused> {
+    let (item_at, list_path) = item_path.split_last().ok_or(Refused::NotFound)?;
+    let (list_at, container_path) = list_path.split_last().ok_or(Refused::NotFound)?;
+    let continue_numbering = root.name_for(&Ns::Text, "continue-numbering");
+    let list = root.at(list_path).ok_or(Refused::NotFound)?;
+    let Some(Node::Element(item)) = list.children.get(*item_at) else {
+        return Err(Refused::NotFound);
+    };
+    let contents = item.children.clone();
+    let mut before = list.clone();
+    before.children.truncate(*item_at);
+    let mut after = list.clone();
+    after.children.drain(..=*item_at);
+    let before_holds_items = before.elements().next().is_some();
+    let after_holds_items = after.elements().next().is_some();
+    after.attrs.retain(|a| {
+        !(a.name.is(&Ns::Text, "id")
+            || a.name.local.as_ref() == "id" && a.name.prefix.as_deref() == Some("xml"))
+    });
+    after.set_attr(continue_numbering, "true");
+
+    let container = root.at_mut(container_path).ok_or(Refused::NotFound)?;
+    let mut replacement = Vec::new();
+    if before_holds_items {
+        replacement.push(Node::Element(before));
+    }
+    let first_at = *list_at + replacement.len();
+    replacement.extend(contents);
+    if after_holds_items {
+        replacement.push(Node::Element(after));
+    }
+    container.children.splice(*list_at..=*list_at, replacement);
+    let mut at = container_path.to_vec();
+    at.push(first_at);
+    Ok(at)
 }
 
 /// Replace the text from one position to another with new text, and join

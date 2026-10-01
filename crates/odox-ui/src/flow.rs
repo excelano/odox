@@ -14,18 +14,24 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use eframe::egui::{
-    Align, ColorImage, Context, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, TextureHandle,
-    TextureOptions, Ui, pos2, text::LayoutJob, text_selection::LabelSelectionState, vec2,
+    Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Sense, Stroke,
+    StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, pos2,
+    text::{CCursor, CCursorRange, LayoutJob},
+    text_selection::{LabelSelectionState, visuals::paint_text_selection},
+    vec2,
 };
-use egui_richedit::{Laid, ParagraphJob};
+use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
     Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties, edit,
 };
 
+use crate::find::Highlights;
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
+use crate::links;
 
 /// Pictures already decoded, kept for as long as the document is open.
 ///
@@ -82,11 +88,20 @@ pub struct Flow<'a> {
     /// body is drawn, because the only moment a heading's position is known is
     /// the moment it is laid out.
     pub scroll_to_heading: Option<usize>,
+    /// A place in the document to bring into view: a bookmark's name, or a
+    /// heading's text written `Name|outline`. Answered while the body is drawn,
+    /// for the same reason `scroll_to_heading` is.
+    pub scroll_to_place: Option<String>,
+    /// A place in the document that a link just followed asked for, for the
+    /// view to set `scroll_to_place` to on the next frame.
+    pub followed: Option<String>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
     /// The page editor, which puts a caret in every paragraph under the root
     /// and paints them. Outside edit mode there is none.
     pub page: Option<&'a mut PageEditor>,
+    /// The matches of a search, drawn behind the text they are in.
+    pub find: Option<Highlights<'a>>,
     /// Whether text in the page can be dragged over to select it. Off on a
     /// slide in edit mode, where a drag moves the shape instead.
     pub selectable: bool,
@@ -94,7 +109,9 @@ pub struct Flow<'a> {
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
     /// Inside a frame anchored in a paragraph, which is reached by a clone
-    /// and not by a path, so nothing in it can be edited in place.
+    /// and not by a path, or in the second and later copies of a repeated
+    /// cell, whose copies share one path: nothing in either can be edited in
+    /// place.
     detached: bool,
 }
 
@@ -107,8 +124,11 @@ impl<'a> Flow<'a> {
             zoom,
             palette: format::Palette::default(),
             scroll_to_heading: None,
+            scroll_to_place: None,
+            followed: None,
             headings_seen: 0,
             page: None,
+            find: None,
             selectable: true,
             path: Vec::new(),
             detached: false,
@@ -256,6 +276,87 @@ impl Flow<'_> {
         self.document.styles.resolve(family, name)
     }
 
+    /// Colour the matches of a search in a paragraph, and scroll to the current
+    /// one when a search has just moved to it.
+    fn show_matches(&self, ui: &Ui, galley: &mut Arc<Galley>, map: &OffsetMap, origin: Pos2) {
+        let Some(find) = self.find.as_ref().filter(|_| !self.detached) else {
+            return;
+        };
+        let hits = find.within(&self.path);
+        if hits.is_empty() {
+            return;
+        }
+        let at = |offset: usize| CCursor::new(map.to_galley(offset.min(map.model_len())));
+        for (range, current) in hits {
+            let mut visuals = ui.visuals().clone();
+            visuals.selection.bg_fill = format::match_fill(current);
+            visuals.selection.stroke.color = Color32::BLACK;
+            let cursors = CCursorRange::two(at(range.start), at(range.end));
+            paint_text_selection(galley, &visuals, &cursors, None);
+            if current && find.reveal() {
+                let start = galley.pos_from_cursor(at(range.start));
+                let end = galley.pos_from_cursor(at(range.end));
+                ui.scroll_to_rect(
+                    start.union(end).translate(origin.to_vec2()),
+                    Some(Align::Center),
+                );
+            }
+        }
+    }
+
+    /// A link under the pointer shows where it goes, and is followed by a click
+    /// where the text is being read and by Ctrl and a click where it is being
+    /// edited, a plain click there being how the caret is put down.
+    #[allow(clippy::too_many_arguments)]
+    fn follow_link(
+        &mut self,
+        ui: &Ui,
+        response: &Response,
+        links: &[(std::ops::Range<usize>, &str)],
+        galley: &Galley,
+        map: &OffsetMap,
+        origin: Pos2,
+        editing: bool,
+    ) {
+        let Some(pointer) = response
+            .hover_pos()
+            .or_else(|| response.interact_pointer_pos())
+        else {
+            return;
+        };
+        let cursor = galley.cursor_from_pos(pointer - origin);
+        let caret = galley.pos_from_cursor(cursor).center().x + origin.x;
+        let character = if pointer.x < caret {
+            cursor.index.0.saturating_sub(1)
+        } else {
+            cursor.index.0
+        };
+        let offset = map.to_model(character);
+        let Some(href) = links
+            .iter()
+            .find(|(range, _)| range.contains(&offset))
+            .map(|&(_, href)| href)
+        else {
+            return;
+        };
+        let Some(target) = links::target(href) else {
+            return;
+        };
+        let reaching = !editing || ui.input(|input| input.modifiers.command);
+        if reaching {
+            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        }
+        if response.hovered() {
+            response.clone().on_hover_text(href);
+        }
+        if reaching && response.clicked() {
+            match target {
+                links::Target::External(address) => links::open(ui.ctx(), address),
+                links::Target::Within(place) => self.followed = Some(place.to_owned()),
+            }
+        }
+    }
+
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
         let properties = self.style_of(element, &Family::Paragraph);
@@ -309,6 +410,11 @@ impl Flow<'_> {
             }
             self.headings_seen += 1;
         }
+        if let Some(place) = &self.scroll_to_place
+            && holds_place(element, place)
+        {
+            ui.scroll_to_rect(rect, Some(Align::TOP));
+        }
 
         if let Some(fill) = properties.paragraph.background {
             ui.painter().rect_filled(rect, 0.0, format::color32(fill));
@@ -332,6 +438,10 @@ impl Flow<'_> {
         // not see this frame, and the editor moves Up and Down through where
         // each paragraph was drawn.
         let origin = pos2(anchor, rect.top());
+        let mut galley = galley;
+        self.show_matches(ui, &mut galley, &map, origin);
+        let links = edit::links(element);
+        let hit = (!links.is_empty()).then(|| (Arc::clone(&galley), map.clone()));
         if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
             let laid = Laid {
                 galley,
@@ -348,6 +458,10 @@ impl Flow<'_> {
                 base.color,
                 Stroke::NONE,
             );
+        }
+
+        if let Some((galley, map)) = hit {
+            self.follow_link(ui, &response, &links, &galley, &map, origin, edited);
         }
 
         if let Some(label) = label {
@@ -642,8 +756,8 @@ impl Flow<'_> {
         }
         if style.is(&Ns::Text, "list-level-style-number") {
             let format = style.attr(&Ns::Style, "num-format").unwrap_or("1");
-            let prefix = style.attr(&Ns::Text, "num-prefix").unwrap_or_default();
-            let suffix = style.attr(&Ns::Text, "num-suffix").unwrap_or_default();
+            let prefix = style.attr(&Ns::Style, "num-prefix").unwrap_or_default();
+            let suffix = style.attr(&Ns::Style, "num-suffix").unwrap_or_default();
             // `text:display-levels` is how 1.2.3 is written: the level's own
             // number preceded by its ancestors'.
             let display = style
@@ -711,7 +825,7 @@ impl Flow<'_> {
                     .attr_usize(&Ns::Table, "number-columns-spanned")
                     .unwrap_or(1)
                     .max(1);
-                for _ in 0..repeat {
+                for copy in 0..repeat {
                     // The width covers every column the cell spans; the position
                     // advances by one. ODF writes a `table:covered-table-cell`
                     // for each further column a span reaches, so advancing by the
@@ -741,7 +855,10 @@ impl Flow<'_> {
                                     ui.set_max_width(width);
                                     let content = (width - padding * 2.0).max(8.0);
                                     self.path.push(cell_index);
+                                    let was_detached = self.detached;
+                                    self.detached |= copy > 0;
                                     self.blocks(ui, cell, content);
+                                    self.detached = was_detached;
                                     self.path.pop();
                                     ui.add_space(padding);
                                 },
@@ -1053,6 +1170,18 @@ fn roman(number: usize) -> String {
         }
     }
     out
+}
+
+/// Whether a paragraph is what an internal link names: a bookmark in it, by
+/// name, or a heading by its text, which `LibreOffice` writes `Name|outline`.
+fn holds_place(element: &Element, place: &str) -> bool {
+    if let Some(name) = place.strip_suffix("|outline") {
+        return element.is(&Ns::Text, "h") && element.plain_text().trim() == name.trim();
+    }
+    element.elements().any(|e| {
+        let marks = e.is(&Ns::Text, "bookmark") || e.is(&Ns::Text, "bookmark-start");
+        (marks && e.attr(&Ns::Text, "name") == Some(place)) || holds_place(e, place)
+    })
 }
 
 /// Whether an element holds blocks on the body's behalf rather than being one.

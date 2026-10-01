@@ -190,6 +190,12 @@ on Linux, because `winit` returns `None` from `system_theme()` there;
 `src/system_theme.rs` is slipcase-desktop's module, unchanged but for the
 thread's name.
 
+A view can take the whole window. `View::presenting` is the slideshow's flag:
+while it is true the shell draws no menu, no panel and no bar, takes none of
+its keys, puts the window full screen and fills the central panel with black,
+and the view draws one slide as large as the screen allows, keeping its shape.
+It is the view's own mode, so the keys that move through a show are the view's.
+
 ## §8 Language
 
 Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.
@@ -271,6 +277,16 @@ evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
 does not retype it as a number.
 
+**A selection is a range, and the clipboard carries it as text.** A press picks
+the cell under it, Shift or a drag stretches the selection to another, and the
+range is the rectangle between the two corners. Copy and cut hand over the cells
+as tab separated rows, each as it is displayed, which is what every other
+program can read; paste reads the same shape back, each cell as a typed value
+would be read, from the top left of the selection. A paste, a cut or a delete is
+one undo step and is all or nothing: if any cell it reaches holds a formula or
+lies under a merge, none is written and the cell bar says which. Emptying a
+range leaves cells the document never wrote unwritten.
+
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
 bytes touch the disk they are read back and compared with the tree they were
@@ -323,7 +339,8 @@ Replacing a selection, or Backspace at a paragraph's start, joins what is
 left of the last paragraph onto the first and removes what lay between,
 list items and lists emptied by that included; the first paragraph keeps its
 style and its place. Enter in a list item begins a new item after it, taking
-what followed in the item. A table or a frame the range wholly contains goes
+what followed in the item, and Enter in an empty one takes it out of the
+list, which is split around the paragraph left in its place. A table or a frame the range wholly contains goes
 with the rest. A range with an end inside a table, a cell or a frame it does
 not wholly contain takes the selected text out of each paragraph it covers
 and leaves every paragraph and cell standing, so Backspace at the start of a
@@ -392,3 +409,48 @@ it had when the file was last read or written, so undoing back to that depth
 is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a
 modified document is thrown away.
+
+**Find is a view of the text and not an edit.** Ctrl+F opens a bar under the
+menu in any of the three windows, in reading or in edit mode; Enter and F3
+move to the next match, Shift+Enter and Shift+F3 to the one before, and Escape
+closes the bar. Case is not significant and the query is not a pattern. A
+match is a range of characters in a paragraph's flat text, the string the
+segment map reads and the page editor's offsets count in, so the characters
+lit are the ones an edit there would change. The view answers how many there
+are and draws them: a flow paints each behind its text, the current one in
+orange and the rest in yellow, and scrolls to the current one when the search
+has just moved to it. A sheet tints the cells that hold the query and picks
+the current one; a deck searches every slide's labels and every slide's notes,
+and moves to the slide, and opens the notes, that the current match is in.
+The matches are looked for again when the query changes or the text does, and
+at no other time.
+
+**A link is followed only to places a person means by one.** A paragraph's
+links are the `text:a` elements in it, each covering a range of the flat text
+the page editor counts in; the character under the pointer, found through the
+same offset map the caret uses, says which. Reading, a click follows it;
+editing, Ctrl and a click do, because a plain click puts the caret down. The
+address is shown in a tooltip before anything is done. `http`, `https` and
+`mailto` are handed to the desktop's own handler, and `#Name` scrolls to the
+bookmark of that name, or to the heading whose text is `Name` where it is
+written `Name|outline`. Every other scheme, `file:` and the desktop's
+registered handlers among them, is ignored, because a document is not trusted
+with what the machine will run. The application makes no request itself.
+
+**A paragraph's kind is changed, never its text.** `edit::set_heading` turns a
+`text:p` into a `text:h` with an outline level, or back, and `edit::set_list`
+wraps paragraphs in `text:list-item`s or takes them out; neither adds or
+removes a paragraph, so a paragraph keeps its place in the order the flow draws
+them in, and that ordinal is how the selection is found again afterwards. A
+heading takes the paragraph style the document gives its level, by
+`style:default-outline-level` and then by the name `Heading_20_N`; a document
+with none is given an automatic style in `content.xml` that says size and
+weight, shared by every heading of the level. A heading taken off becomes
+a `text:p` in the style most of the body's paragraphs have. A list takes a list
+style the document already has of the kind, bulleted or numbered, and failing
+that one is written, six levels with the usual indents. Paragraphs side by side,
+layout whitespace between them aside, become one list so that numbers run on;
+taking a paragraph out of a list splits the list around it, the half after
+continuing the numbering, and anything else its item held, a nested list,
+stands beside it. One pass over the selection is one undo step, and the buttons
+are lit where every paragraph in the selection is one.
