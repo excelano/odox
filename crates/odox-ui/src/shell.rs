@@ -86,6 +86,13 @@ pub trait View {
     /// [`Self::reindex`].
     fn restore_caret(&mut self, _caret: Caret) {}
 
+    /// Whether the view is showing the document full screen and nothing else,
+    /// as a slideshow does: the shell takes its menu, its panels and its keys
+    /// away until it is not.
+    fn presenting(&self) -> bool {
+        false
+    }
+
     /// Look for text in the document and keep what is found, to draw
     /// highlighted; an empty query forgets the search. Answers how many
     /// matches there are. Asked again whenever the query or the text changes,
@@ -127,12 +134,21 @@ pub struct Shell<V: View> {
     editing: Editing,
     settings: Settings,
     find: FindBar,
+    /// Whether the window has been made to fill the screen for a slideshow.
+    screen: Screen,
     /// What was asked for while the document had unsaved changes, waiting on
     /// the person's answer.
     pending: Option<Pending>,
     /// The person has answered that the window may close, so the next request
     /// to close it is not asked about again.
     closing: bool,
+}
+
+/// How much of the screen the window has.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Screen {
+    Window,
+    Full,
 }
 
 /// Something that would throw away unsaved changes, held until the person
@@ -164,6 +180,7 @@ impl<V: View> Shell<V> {
             editing: Editing::default(),
             settings: Settings::load(),
             find: FindBar::default(),
+            screen: Screen::Window,
             pending: None,
             closing: false,
         }
@@ -412,14 +429,24 @@ impl<V: View> eframe::App for Shell<V> {
         // has the focus, so Ctrl+Z inside a cell undoes the typing and not the
         // document. The page editor is not such a field: its typing is the
         // document's, and so is its Ctrl+Z.
+        let presenting = self.view.presenting();
+        let screen = if presenting {
+            Screen::Full
+        } else {
+            Screen::Window
+        };
+        if screen != self.screen {
+            self.screen = screen;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(presenting));
+        }
         self.editing.asking = self.pending.is_some();
         let field_focused = ctx
             .memory(egui::Memory::focused)
             .is_some_and(|id| id != crate::flow_model::page_editor_id());
-        if self.pending.is_none() {
+        if self.pending.is_none() && !presenting {
             self.find_keys(&ctx);
         }
-        if self.pending.is_none() && !field_focused {
+        if self.pending.is_none() && !field_focused && !presenting {
             self.keys(&ctx);
         }
 
@@ -433,7 +460,60 @@ impl<V: View> eframe::App for Shell<V> {
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
 
-        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, &ctx));
+        if !presenting {
+            self.chrome(ui, &ctx);
+        }
+
+        // **A document opened during this frame is not drawn until the next
+        // one.** Opening one registers the font families it names, and
+        // `Context::set_fonts` takes effect at the start of the following pass,
+        // so laying the document out now would ask for a family the definitions
+        // still in force do not carry. egui does not fall back for that: it
+        // panics, and a panic inside the macOS event callback cannot unwind, so
+        // the process aborts.
+        //
+        // Every way of opening a document but one goes through a frame:
+        // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
+        // command line, which is opened in eframe's creation closure before any
+        // pass has begun, and is why this went unnoticed until a runner opened a
+        // document through Launch Services. `tests/fonts_midframe.rs` pins the
+        // hazard.
+        //
+        // One frame, and the repaint is asked for rather than waited for, so
+        // the document appears immediately rather than when the pointer next
+        // moves.
+        let settling = self.settling;
+        if settling {
+            self.settling = false;
+            ctx.request_repaint();
+        }
+
+        let central = if presenting {
+            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(egui::Color32::BLACK))
+        } else {
+            egui::CentralPanel::default_margins()
+        };
+        central.show(ui, |ui| {
+            if settling {
+                // Deliberately blank, and for one frame. Drawing the
+                // nothing-open message here instead would flash it between a
+                // double-click and the document.
+            } else if self.view.is_open() {
+                self.view.central(ui, self.zoom, &mut self.editing);
+            } else {
+                self.nothing_open(ui);
+            }
+        });
+
+        self.ask_about_changes(&ctx);
+    }
+}
+
+impl<V: View> Shell<V> {
+    /// What is around the document: the menu, the search bar, an error and
+    /// the view's side panel.
+    fn chrome(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, ctx));
         self.search(ui);
 
         if let Some(message) = self.error.clone() {
@@ -466,48 +546,8 @@ impl<V: View> eframe::App for Shell<V> {
                 self.show_side = false;
             }
         }
-
-        // **A document opened during this frame is not drawn until the next
-        // one.** Opening one registers the font families it names, and
-        // `Context::set_fonts` takes effect at the start of the following pass,
-        // so laying the document out now would ask for a family the definitions
-        // still in force do not carry. egui does not fall back for that: it
-        // panics, and a panic inside the macOS event callback cannot unwind, so
-        // the process aborts.
-        //
-        // Every way of opening a document but one goes through a frame:
-        // Ctrl+O, Reload, and the Apple Event. The exception is the path on the
-        // command line, which is opened in eframe's creation closure before any
-        // pass has begun, and is why this went unnoticed until a runner opened a
-        // document through Launch Services. `tests/fonts_midframe.rs` pins the
-        // hazard.
-        //
-        // One frame, and the repaint is asked for rather than waited for, so
-        // the document appears immediately rather than when the pointer next
-        // moves.
-        let settling = self.settling;
-        if settling {
-            self.settling = false;
-            ctx.request_repaint();
-        }
-
-        egui::CentralPanel::default_margins().show(ui, |ui| {
-            if settling {
-                // Deliberately blank, and for one frame. Drawing the
-                // nothing-open message here instead would flash it between a
-                // double-click and the document.
-            } else if self.view.is_open() {
-                self.view.central(ui, self.zoom, &mut self.editing);
-            } else {
-                self.nothing_open(ui);
-            }
-        });
-
-        self.ask_about_changes(&ctx);
     }
-}
 
-impl<V: View> Shell<V> {
     /// The menu bar: the File and Edit menus that are the same in every
     /// application, the View menu with the application's own items after the
     /// shell's, and on the right what mode the window is in and how far it is

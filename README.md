@@ -114,7 +114,10 @@ spreadsheet application recalculates it.
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
-there to type into it as in `xodt`, within that shape.
+there to type into it as in `xodt`, within that shape. F5 starts the slideshow
+at the first slide and Shift+F5 at the one in view: the slide fills the screen
+on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
+or a right click go back, and Escape ends it. The notes are not shown.
 
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,

@@ -37,6 +37,8 @@ pub struct SlideView {
     /// What a search found. A slide's own labels are scope `n` and its notes
     /// scope `slides + n`.
     found: Found,
+    /// The slideshow is on: one slide, filling the screen, and nothing else.
+    presenting: bool,
 }
 
 impl Default for SlideView {
@@ -50,6 +52,7 @@ impl Default for SlideView {
             drag: None,
             page_editor: page_editor(),
             found: Found::default(),
+            presenting: false,
         }
     }
 }
@@ -120,6 +123,7 @@ impl View for SlideView {
         self.drag = None;
         self.page_editor.clear();
         self.found.clear();
+        self.presenting = false;
         Ok(())
     }
 
@@ -130,6 +134,7 @@ impl View for SlideView {
         self.drag = None;
         self.page_editor.clear();
         self.found.clear();
+        self.presenting = false;
     }
 
     fn is_open(&self) -> bool {
@@ -201,29 +206,24 @@ impl View for SlideView {
             .select(Selection::caret(Caret::new(within.to_vec(), caret.offset)));
     }
 
+    fn presenting(&self) -> bool {
+        self.presenting
+    }
+
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         let count = self
             .document
             .as_ref()
             .map_or(0, |document| document.slides().len());
         if count == 0 {
+            self.presenting = false;
             ui.centered_and_justified(|ui| {
                 ui.weak(t("This presentation has no slides."));
             });
             return;
         }
-        // The arrows and the page keys step through the slides unless
-        // something has the keyboard, as the caret in a label does.
-        if !ui.ctx().egui_wants_keyboard_input() {
-            self.step_keys(ui, count);
-        }
-        if ui.input(|input| input.key_pressed(Key::Escape)) {
-            self.picked = None;
-            self.drag = None;
-            self.page_editor.clear();
-        }
-        if !editing.on {
-            self.page_editor.clear();
+        if self.keys_before_drawing(ui, editing, count) {
+            return;
         }
 
         // The document and the picture cache are taken as separate borrows of
@@ -358,6 +358,18 @@ impl View for SlideView {
     fn view_menu(&mut self, ui: &mut Ui) {
         ui.separator();
         ui.checkbox(&mut self.show_notes, t("Show the speaker's notes"));
+        ui.separator();
+        if ui.button(t("Start the slideshow")).clicked() {
+            self.start_show(0);
+            ui.close();
+        }
+        if ui
+            .button(t("Start the slideshow from this slide"))
+            .clicked()
+        {
+            self.start_show(self.slide);
+            ui.close();
+        }
     }
 }
 
@@ -462,6 +474,116 @@ impl SlideView {
                 );
             }
             Action::End => self.drag = None,
+        }
+    }
+
+    /// What the keys and the modes settle before a slide is drawn. Answers
+    /// whether the slideshow has taken the frame, and nothing more is to be
+    /// drawn.
+    fn keys_before_drawing(&mut self, ui: &mut Ui, editing: &Editing, count: usize) -> bool {
+        if self.presenting {
+            self.present(ui, count);
+            return true;
+        }
+        if !editing.asking {
+            self.start_keys(ui);
+        }
+        // The arrows and the page keys step through the slides unless
+        // something has the keyboard, as the caret in a label does.
+        if !ui.ctx().egui_wants_keyboard_input() {
+            self.step_keys(ui, count);
+        }
+        if ui.input(|input| input.key_pressed(Key::Escape)) {
+            self.picked = None;
+            self.drag = None;
+            self.page_editor.clear();
+        }
+        if !editing.on {
+            self.page_editor.clear();
+        }
+        false
+    }
+
+    /// F5 starts the slideshow at the first slide and Shift+F5 at this one.
+    fn start_keys(&mut self, ui: &Ui) {
+        let (from_start, from_here) = ui.input_mut(|input| {
+            (
+                input.consume_key(egui::Modifiers::NONE, Key::F5),
+                input.consume_key(egui::Modifiers::SHIFT, Key::F5),
+            )
+        });
+        if from_start {
+            self.start_show(0);
+        } else if from_here {
+            self.start_show(self.slide);
+        }
+    }
+
+    fn start_show(&mut self, from: usize) {
+        self.presenting = true;
+        self.slide = from;
+        self.picked = None;
+        self.drag = None;
+        self.page_editor.clear();
+    }
+
+    /// The slideshow: the slide on a black screen, as large as it will go,
+    /// and the keys and the mouse that move through it. Escape ends it.
+    fn present(&mut self, ui: &mut Ui, count: usize) {
+        let area = ui.max_rect();
+        let response = ui.allocate_rect(area, Sense::click());
+        let (forward, back, leave) = ui.input_mut(|input| {
+            let none = egui::Modifiers::NONE;
+            (
+                input.consume_key(none, Key::Space)
+                    || input.consume_key(none, Key::Enter)
+                    || response.clicked(),
+                input.consume_key(none, Key::Backspace) || response.secondary_clicked(),
+                input.consume_key(none, Key::Escape),
+            )
+        });
+        self.step_keys(ui, count);
+        let last = count.saturating_sub(1);
+        if forward {
+            self.slide = (self.slide + 1).min(last);
+        }
+        if back {
+            self.slide = self.slide.saturating_sub(1);
+        }
+        if leave {
+            self.presenting = false;
+            return;
+        }
+        let Some(document) = &self.document else {
+            return;
+        };
+        let slides = document.slides();
+        let Some(slide) = slides.get(self.slide) else {
+            return;
+        };
+        let layout = document.page_layout(slide);
+        let (width, height) = (layout.width.points(), layout.height.points());
+        let fit = (area.width() / width).min(area.height() / height).max(0.01);
+        let page = Rect::from_center_size(area.center(), vec2(width * fit, height * fit));
+        let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
+        ui.painter().rect_filled(page, 0.0, palette.paper);
+        let mut canvas = Canvas::new(&document.document, &mut self.pictures, page, fit, palette);
+        canvas.background(ui, &document.background(slide));
+        for shape in &document.background_objects(slide) {
+            canvas.shape(ui, shape);
+        }
+        for (index, shape) in slide.shapes_indexed() {
+            canvas.slide_shape(ui, index, shape);
+        }
+
+        // The pointer is in the way of a slide, and is put away when it has
+        // been still for a moment.
+        let idle = ui.input(|input| input.pointer.time_since_last_movement());
+        if idle > 2.0 {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+        } else {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs(2));
         }
     }
 

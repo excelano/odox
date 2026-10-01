@@ -37,6 +37,10 @@ Save over the open file; save somewhere else.
 .B Ctrl+F, F3, Shift+F3
 Search the document; go to the next match; go to the one before.
 .TP
+.B F5, Shift+F5
+In a presentation, start the slideshow at the first slide; at the one in view.
+Escape ends it.
+.TP
 .B Ctrl+Z, Ctrl+Shift+Z
 Take an edit back; put it back.
 .TP

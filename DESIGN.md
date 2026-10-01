@@ -190,6 +190,12 @@ on Linux, because `winit` returns `None` from `system_theme()` there;
 `src/system_theme.rs` is slipcase-desktop's module, unchanged but for the
 thread's name.
 
+A view can take the whole window. `View::presenting` is the slideshow's flag:
+while it is true the shell draws no menu, no panel and no bar, takes none of
+its keys, puts the window full screen and fills the central panel with black,
+and the view draws one slide as large as the screen allows, keeping its shape.
+It is the view's own mode, so the keys that move through a show are the view's.
+
 ## §8 Language
 
 Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.
