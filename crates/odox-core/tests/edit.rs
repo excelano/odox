@@ -510,3 +510,34 @@ fn a_split_in_a_list_item_begins_a_new_item_with_what_followed() {
         "<text:list><text:list-item text:start-value=\"4\"><text:p>one</text:p></text:list-item><text:list-item><text:p>two</text:p><text:list><text:list-item><text:p>nested</text:p></text:list-item></text:list></text:list-item></text:list>"
     );
 }
+
+#[test]
+fn enter_on_an_empty_item_leaves_the_list_and_splits_it_around_the_paragraph() {
+    let mut root = body(
+        "<text:list xml:id=\"l1\"><text:list-item><text:p>a</text:p></text:list-item><text:list-item><text:p/></text:list-item><text:list-item><text:p>c</text:p></text:list-item></text:list>",
+    );
+    assert_eq!(split_at(&mut root, &[0, 1, 0], 0), Ok(vec![1]));
+    assert_eq!(
+        inner(&root),
+        "<text:list xml:id=\"l1\"><text:list-item><text:p>a</text:p></text:list-item></text:list><text:p/><text:list text:continue-numbering=\"true\"><text:list-item><text:p>c</text:p></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn enter_on_the_only_empty_item_replaces_the_list_with_its_paragraph() {
+    let mut root = body("<text:p>x</text:p><text:list><text:list-item><text:p/></text:list-item></text:list>");
+    assert_eq!(split_at(&mut root, &[1, 0, 0], 0), Ok(vec![1]));
+    assert_eq!(inner(&root), "<text:p>x</text:p><text:p/>");
+}
+
+#[test]
+fn enter_on_an_empty_nested_item_leaves_the_inner_list_only() {
+    let mut root = body(
+        "<text:list><text:list-item><text:p>a</text:p><text:list><text:list-item><text:p/></text:list-item></text:list></text:list-item></text:list>",
+    );
+    assert_eq!(split_at(&mut root, &[0, 0, 1, 0, 0], 0), Ok(vec![0, 0, 1]));
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item><text:p>a</text:p><text:p/></text:list-item></text:list>"
+    );
+}

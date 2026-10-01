@@ -332,6 +332,9 @@ pub fn apply(root: &mut Element, path: &[usize], edited: &str) -> Result<usize, 
 /// In a list item the second half begins a new item after it, as Enter does
 /// in a list, and whatever followed the paragraph in the item goes with it.
 ///
+/// An item holding one empty paragraph is taken out of its list instead: the
+/// paragraph stands where the item was, between the two halves of the list.
+///
 /// # Errors
 ///
 /// The path leads to nothing, or to something that is not a paragraph.
@@ -344,7 +347,14 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     if !is_paragraph(paragraph) {
         return Err(Refused::NotFound);
     }
+    if parent.is(&Ns::Text, "list-item")
+        && parent.children.len() == 1
+        && paragraph.children.is_empty()
+    {
+        return leave_list(root, above);
+    }
     let (first, second) = split(paragraph, at);
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
     if !parent.is(&Ns::Text, "list-item") {
         parent
             .children
@@ -371,6 +381,51 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     let mut second_at = list_path.to_vec();
     second_at.extend([item_at + 1, 0]);
     Ok(second_at)
+}
+
+/// Take an item that holds one empty paragraph out of its list: the list is
+/// split around it and the paragraph stands between the halves, as Enter on
+/// an empty item leaves the list in any word processor. A list left with no
+/// items is dropped, and the half after the item continues the numbering.
+fn leave_list(root: &mut Element, item_path: &[usize]) -> Result<Vec<usize>, Refused> {
+    let (item_at, list_path) = item_path.split_last().ok_or(Refused::NotFound)?;
+    let (list_at, container_path) = list_path.split_last().ok_or(Refused::NotFound)?;
+    let continue_numbering = root.name_for(&Ns::Text, "continue-numbering");
+    let list = root.at(list_path).ok_or(Refused::NotFound)?;
+    let Some(Node::Element(item)) = list.children.get(*item_at) else {
+        return Err(Refused::NotFound);
+    };
+    let Some(Node::Element(paragraph)) = item.children.first().cloned() else {
+        return Err(Refused::NotFound);
+    };
+    let mut before = list.clone();
+    before.children.truncate(*item_at);
+    let mut after = list.clone();
+    after.children.drain(..=*item_at);
+    let before_holds_items = before.elements().next().is_some();
+    let after_holds_items = after.elements().next().is_some();
+    after.attrs.retain(|a| {
+        !(a.name.is(&Ns::Text, "id")
+            || a.name.local.as_ref() == "id" && a.name.prefix.as_deref() == Some("xml"))
+    });
+    after.set_attr(continue_numbering, "true");
+
+    let container = root.at_mut(container_path).ok_or(Refused::NotFound)?;
+    let mut replacement = Vec::new();
+    if before_holds_items {
+        replacement.push(Node::Element(before));
+    }
+    let paragraph_at = *list_at + replacement.len();
+    replacement.push(Node::Element(paragraph));
+    if after_holds_items {
+        replacement.push(Node::Element(after));
+    }
+    container
+        .children
+        .splice(*list_at..=*list_at, replacement);
+    let mut at = container_path.to_vec();
+    at.push(paragraph_at);
+    Ok(at)
 }
 
 /// Replace the text from one position to another with new text, and join
