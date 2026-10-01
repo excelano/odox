@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn metric_substitutes_is_empty_for_a_family_with_no_known_substitute() {
-        assert!(metric_substitutes("Comic Sans MS").is_empty());
+        assert_eq!(metric_substitutes("Comic Sans MS"), &[] as &[&str]);
     }
 
     /// The order this checks in is load-bearing: `Liberation Mono` contains

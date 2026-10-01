@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn an_empty_query_matches_nothing() {
-        assert!(ranges("anything", "").is_empty());
+        assert_eq!(ranges("anything", ""), Vec::<Range<usize>>::new());
     }
 
     #[test]
@@ -252,7 +252,7 @@ mod tests {
         found.show(2);
         let highlights = found.highlights(0).expect("there are matches");
         assert_eq!(highlights.within(&[1]), vec![(0..3, false), (5..8, true)]);
-        assert!(highlights.within(&[3]).is_empty());
+        assert_eq!(highlights.within(&[3]), Vec::<(Range<usize>, bool)>::new());
     }
 
     #[test]
