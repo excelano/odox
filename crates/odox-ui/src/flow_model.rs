@@ -14,9 +14,9 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Mark, Model, Position, RichEdit};
+use egui_richedit::{Edit, Mark, Model, Position, RichEdit, Selection};
 use odox_core::edit::{self, is_paragraph};
-use odox_core::{Element, Ns, Refused, Styles};
+use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
 use crate::flow::is_block_container;
@@ -33,6 +33,20 @@ pub(crate) fn page_editor_id() -> Id {
 /// A page editor with nothing selected.
 pub fn page_editor() -> PageEditor {
     RichEdit::new(page_editor_id())
+}
+
+/// What a button for a kind of paragraph asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Block {
+    /// A heading of a level, or body text again where the paragraphs already
+    /// are one.
+    Heading(u8),
+    /// Body text.
+    Body,
+    /// A bulleted list, or no list where the paragraphs already are one.
+    Bullets,
+    /// A numbered list, or no list where the paragraphs already are one.
+    Numbers,
 }
 
 /// The paragraphs under a root in a content tree, for one frame's editing.
@@ -183,6 +197,131 @@ impl<'a> FlowModel<'a> {
                 })
                 .collect(),
         )
+    }
+
+    /// The paragraphs a selection runs over, in the order they are drawn.
+    fn selected_paragraphs(&self, selection: &Selection<Vec<usize>>) -> Option<Vec<Vec<usize>>> {
+        let order = self.order();
+        let anchor = order
+            .iter()
+            .position(|p| *p == selection.anchor.paragraph)?;
+        let focus = order.iter().position(|p| *p == selection.focus.paragraph)?;
+        Some(order[anchor.min(focus)..=anchor.max(focus)].to_vec())
+    }
+
+    /// Whether a block is what every paragraph a selection runs over already
+    /// is, which is when its button is lit and pressing it takes it off.
+    pub fn is_block(&self, selection: &Selection<Vec<usize>>, block: Block) -> bool {
+        let Some(paragraphs) = self.selected_paragraphs(selection) else {
+            return false;
+        };
+        paragraphs.iter().all(|paragraph| {
+            let path = [self.root.as_slice(), paragraph].concat();
+            let (heading, list) = edit::block_state(self.content, &path, self.styles);
+            match block {
+                Block::Heading(level) => heading == Some(level),
+                Block::Body => heading.is_none(),
+                Block::Bullets => list == Some(ListKind::Bullet),
+                Block::Numbers => list == Some(ListKind::Number),
+            }
+        })
+    }
+
+    /// Make the paragraphs a selection runs over a kind of paragraph, or take
+    /// them out of it where they already are one, as one step to undo, and put
+    /// the selection back over the same paragraphs. Answers whether the
+    /// document changed.
+    pub fn apply_block(&mut self, editor: &mut PageEditor, block: Block) -> bool {
+        let Some(selection) = editor.selection().cloned() else {
+            return false;
+        };
+        let Some(paragraphs) = self.selected_paragraphs(&selection) else {
+            return false;
+        };
+        let place = |path: &Vec<usize>, order: &[Vec<usize>]| order.iter().position(|p| p == path);
+        let (Some(anchor), Some(focus)) = (
+            place(&selection.anchor.paragraph, self.order()),
+            place(&selection.focus.paragraph, self.order()),
+        ) else {
+            return false;
+        };
+        let lit = self.is_block(&selection, block);
+        let before = self.content.clone();
+        let done = match block {
+            Block::Heading(_) | Block::Body => {
+                let level = match block {
+                    Block::Heading(level) if !lit => Some(level),
+                    _ => None,
+                };
+                self.set_headings(&paragraphs, level)
+            }
+            Block::Bullets | Block::Numbers => {
+                let kind = match block {
+                    Block::Bullets => ListKind::Bullet,
+                    _ => ListKind::Number,
+                };
+                self.set_lists(&paragraphs, (!lit).then_some(kind))
+            }
+        };
+        if done.is_none() || *self.content == before {
+            *self.content = before;
+            return false;
+        }
+        self.order = OnceCell::new();
+        let begins = Position::new(
+            [self.tag.as_slice(), &selection.focus.paragraph].concat(),
+            selection.focus.offset,
+        );
+        self.editing.touch();
+        self.editing.record_snapshot(before, Some(begins));
+        let order = self.order().to_vec();
+        if let (Some(a), Some(f)) = (order.get(anchor), order.get(focus)) {
+            editor.select(Selection {
+                anchor: Position::new(a.clone(), selection.anchor.offset),
+                focus: Position::new(f.clone(), selection.focus.offset),
+            });
+        }
+        true
+    }
+
+    fn set_headings(&mut self, paragraphs: &[Vec<usize>], level: Option<u8>) -> Option<()> {
+        let automatic =
+            |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
+        for paragraph in paragraphs {
+            let had = automatic(self.content);
+            let path = [self.root.as_slice(), paragraph].concat();
+            edit::set_heading(self.content, &path, level, self.styles).ok()?;
+            self.follow_styles(had);
+        }
+        Some(())
+    }
+
+    fn set_lists(&mut self, paragraphs: &[Vec<usize>], kind: Option<ListKind>) -> Option<()> {
+        let had = self
+            .content
+            .child(&Ns::Office, "automatic-styles")
+            .is_some();
+        let paths: Vec<Vec<usize>> = paragraphs
+            .iter()
+            .map(|paragraph| [self.root.as_slice(), paragraph].concat())
+            .collect();
+        edit::set_list(self.content, &paths, kind, self.styles).ok()?;
+        self.follow_styles(had);
+        Some(())
+    }
+
+    /// Styles written into a document that had nowhere to keep them go before
+    /// its body, and move the body, and the root, one along.
+    fn follow_styles(&mut self, had: bool) {
+        if !had
+            && self
+                .content
+                .child(&Ns::Office, "automatic-styles")
+                .is_some()
+            && let Some(first) = self.root.first_mut()
+        {
+            *first += 1;
+        }
     }
 
     /// Give the text from one position to another a mark, or take it off,

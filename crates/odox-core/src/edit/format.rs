@@ -308,7 +308,7 @@ fn automatic_text_styles(content: &Element) -> Vec<Element> {
 
 /// The content root's `office:automatic-styles`, written before the body where
 /// the document has none.
-fn automatic_styles(content: &mut Element) -> &mut Element {
+pub(super) fn automatic_styles(content: &mut Element) -> &mut Element {
     let found = |local: &'static str| move |n: &Node| matches!(n, Node::Element(e) if e.is(&Ns::Office, local));
     let at = if let Some(at) = content.children.iter().position(found("automatic-styles")) {
         at
@@ -329,7 +329,7 @@ fn automatic_styles(content: &mut Element) -> &mut Element {
     container
 }
 
-fn element(name: Name) -> Element {
+pub(super) fn element(name: Name) -> Element {
     Element {
         name,
         attrs: Vec::new(),
@@ -638,7 +638,7 @@ impl Formatter<'_> {
 }
 
 /// A style with its name taken off, to compare with another by what it says.
-fn unnamed(style: &Element) -> Element {
+pub(super) fn unnamed(style: &Element) -> Element {
     let mut style = style.clone();
     style.remove_attr(&Ns::Style, "name");
     style

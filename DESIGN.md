@@ -436,3 +436,21 @@ bookmark of that name, or to the heading whose text is `Name` where it is
 written `Name|outline`. Every other scheme, `file:` and the desktop's
 registered handlers among them, is ignored, because a document is not trusted
 with what the machine will run. The application makes no request itself.
+
+**A paragraph's kind is changed, never its text.** `edit::set_heading` turns a
+`text:p` into a `text:h` with an outline level, or back, and `edit::set_list`
+wraps paragraphs in `text:list-item`s or takes them out; neither adds or
+removes a paragraph, so a paragraph keeps its place in the order the flow draws
+them in, and that ordinal is how the selection is found again afterwards. A
+heading takes the paragraph style the document gives its level, by
+`style:default-outline-level` and then by the name `Heading_20_N`; a document
+with none is given an automatic style in `content.xml` that says size and
+weight, shared by every heading of the level. A heading taken off becomes
+a `text:p` in the style most of the body's paragraphs have. A list takes a list
+style the document already has of the kind, bulleted or numbered, and failing
+that one is written, six levels with the usual indents. Paragraphs side by side,
+layout whitespace between them aside, become one list so that numbers run on;
+taking a paragraph out of a list splits the list around it, the half after
+continuing the numbering, and anything else its item held, a nested list,
+stands beside it. One pass over the selection is one undo step, and the buttons
+are lit where every paragraph in the selection is one.

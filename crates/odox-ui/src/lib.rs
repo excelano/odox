@@ -44,7 +44,7 @@ pub mod toolbar;
 pub use edit::{Caret, Editing};
 pub use find::{Found, Highlights};
 pub use flow::{Flow, Pictures};
-pub use flow_model::{FlowModel, PageEditor, page_editor};
+pub use flow_model::{Block, FlowModel, PageEditor, page_editor};
 pub use i18n::mark;
 pub use settings::Settings;
 pub use shapes::Canvas;

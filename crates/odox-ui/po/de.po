@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-01 13:53-0500\n"
+"POT-Creation-Date: 2026-10-01 14:08-0500\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -48,7 +48,7 @@ msgstr "Datei"
 
 #: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:103
-#: crates/xods/src/view.rs:72 crates/xodt/src/view.rs:47
+#: crates/xods/src/view.rs:77 crates/xodt/src/view.rs:51
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
@@ -160,35 +160,59 @@ msgstr "Die Einstellung konnte nicht gespeichert werden: {reason}"
 msgid "Open a document…"
 msgstr "Ein Dokument öffnen …"
 
-#: crates/odox-ui/src/toolbar.rs:26
+#: crates/odox-ui/src/toolbar.rs:47
+msgid "Body text"
+msgstr "Fließtext"
+
+#: crates/odox-ui/src/toolbar.rs:48
+msgid "Heading 1"
+msgstr "Überschrift 1"
+
+#: crates/odox-ui/src/toolbar.rs:49
+msgid "Heading 2"
+msgstr "Überschrift 2"
+
+#: crates/odox-ui/src/toolbar.rs:50
+msgid "Heading 3"
+msgstr "Überschrift 3"
+
+#: crates/odox-ui/src/toolbar.rs:51
+msgid "Bulleted list"
+msgstr "Aufzählung"
+
+#: crates/odox-ui/src/toolbar.rs:52
+msgid "Numbered list"
+msgstr "Nummerierte Liste"
+
+#: crates/odox-ui/src/toolbar.rs:79
 msgid "B"
 msgstr "F"
 
-#: crates/odox-ui/src/toolbar.rs:26
+#: crates/odox-ui/src/toolbar.rs:79
 msgid "Bold"
 msgstr "Fett"
 
-#: crates/odox-ui/src/toolbar.rs:27
+#: crates/odox-ui/src/toolbar.rs:80
 msgid "I"
 msgstr "K"
 
-#: crates/odox-ui/src/toolbar.rs:27
+#: crates/odox-ui/src/toolbar.rs:80
 msgid "Italic"
 msgstr "Kursiv"
 
-#: crates/odox-ui/src/toolbar.rs:29
+#: crates/odox-ui/src/toolbar.rs:82
 msgid "U"
 msgstr "U"
 
-#: crates/odox-ui/src/toolbar.rs:30
+#: crates/odox-ui/src/toolbar.rs:83
 msgid "Underline"
 msgstr "Unterstrichen"
 
-#: crates/odox-ui/src/toolbar.rs:34
+#: crates/odox-ui/src/toolbar.rs:87
 msgid "S"
 msgstr "D"
 
-#: crates/odox-ui/src/toolbar.rs:35
+#: crates/odox-ui/src/toolbar.rs:88
 msgid "Strikethrough"
 msgstr "Durchgestrichen"
 
@@ -204,44 +228,44 @@ msgstr "OpenDocument-Präsentation"
 msgid "This presentation has no slides."
 msgstr "Diese Präsentation hat keine Folien."
 
-#: crates/xodp/src/view.rs:353
+#: crates/xodp/src/view.rs:336
 msgid "Slides"
 msgstr "Folien"
 
-#: crates/xodp/src/view.rs:377
+#: crates/xodp/src/view.rs:360
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
 
-#: crates/xodp/src/view.rs:379
+#: crates/xodp/src/view.rs:362
 msgid "Start the slideshow"
 msgstr "Bildschirmpräsentation starten"
 
-#: crates/xodp/src/view.rs:383
+#: crates/xodp/src/view.rs:367
 msgid "Start the slideshow from this slide"
 msgstr "Bildschirmpräsentation ab dieser Folie starten"
 
-#: crates/xodp/src/view.rs:724
+#: crates/xodp/src/view.rs:737
 msgid "Notes"
 msgstr "Notizen"
 
-#: crates/xodp/src/view.rs:733
+#: crates/xodp/src/view.rs:746
 msgid "This slide has no notes."
 msgstr "Diese Folie hat keine Notizen."
 
-#: crates/xods/src/view.rs:182
+#: crates/xods/src/view.rs:187
 msgid "Copy the sheet as tab-separated text"
 msgstr "Tabellenblatt als tabulatorgetrennten Text kopieren"
 
-#: crates/xods/src/view.rs:719
+#: crates/xods/src/view.rs:939
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 "Diese Zelle enthält eine Formel; diese Version bearbeitet keine Formeln."
 
-#: crates/xods/src/view.rs:720
+#: crates/xods/src/view.rs:940
 msgid "This cell is covered by the one that spans it."
 msgstr "Diese Zelle wird von der Zelle verdeckt, die sich über sie erstreckt."
 
-#: crates/xods/src/view.rs:723
+#: crates/xods/src/view.rs:943
 msgid "There is no cell there."
 msgstr "Dort ist keine Zelle."
 
@@ -249,19 +273,19 @@ msgstr "Dort ist keine Zelle."
 msgid "OpenDocument Text"
 msgstr "OpenDocument-Textdokument"
 
-#: crates/xodt/src/view.rs:126
+#: crates/xodt/src/view.rs:131
 msgid "This document has no text in it."
 msgstr "Dieses Dokument enthält keinen Text."
 
-#: crates/xodt/src/view.rs:192
+#: crates/xodt/src/view.rs:206
 msgid "Outline"
 msgstr "Gliederung"
 
-#: crates/xodt/src/view.rs:201
+#: crates/xodt/src/view.rs:215
 msgid "(untitled)"
 msgstr "(ohne Titel)"
 
-#: crates/xodt/src/view.rs:225
+#: crates/xodt/src/view.rs:239
 msgid "Copy the document as text"
 msgstr "Dokument als Text kopieren"
 

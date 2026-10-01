@@ -756,8 +756,8 @@ impl Flow<'_> {
         }
         if style.is(&Ns::Text, "list-level-style-number") {
             let format = style.attr(&Ns::Style, "num-format").unwrap_or("1");
-            let prefix = style.attr(&Ns::Text, "num-prefix").unwrap_or_default();
-            let suffix = style.attr(&Ns::Text, "num-suffix").unwrap_or_default();
+            let prefix = style.attr(&Ns::Style, "num-prefix").unwrap_or_default();
+            let suffix = style.attr(&Ns::Style, "num-suffix").unwrap_or_default();
             // `text:display-levels` is how 1.2.3 is written: the level's own
             // number preceded by its ancestors'.
             let display = style

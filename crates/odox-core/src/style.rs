@@ -25,6 +25,15 @@ use std::rc::Rc;
 use crate::value::{Color, Length, Measure, Percent};
 use crate::xml::{Element, Ns};
 
+/// How a list marks its items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListKind {
+    /// A bullet, or a picture standing for one.
+    Bullet,
+    /// A number or a letter.
+    Number,
+}
+
 /// Which kind of thing a style applies to.
 ///
 /// ODF calls this the style family, and it is what makes a style name
@@ -641,6 +650,59 @@ impl Styles {
     /// Where the picture of a named fill image lives inside the package.
     pub fn fill_image(&self, name: &str) -> Option<&str> {
         self.fill_images.get(name).map(String::as_str)
+    }
+
+    /// The paragraph style a document gives headings of a level: the one that
+    /// declares `style:default-outline-level` as that level, and failing that
+    /// the one `LibreOffice` names `Heading_20_{level}`.
+    pub fn heading_style(&self, level: u8) -> Option<&str> {
+        let wanted = level.to_string();
+        let declared = self
+            .by_name
+            .iter()
+            .filter(|((family, _), style)| {
+                *family == Family::Paragraph
+                    && style.element.attr(&Ns::Style, "default-outline-level")
+                        == Some(wanted.as_str())
+            })
+            .map(|((_, name), _)| name.as_str())
+            .min();
+        declared.or_else(|| {
+            let conventional = format!("Heading_20_{level}");
+            self.by_name
+                .get_key_value(&(Family::Paragraph, conventional))
+                .map(|((_, name), _)| name.as_str())
+        })
+    }
+
+    /// Whether a style of a family and name is in the document.
+    pub fn has_style(&self, family: &Family, name: &str) -> bool {
+        self.by_name
+            .contains_key(&(family.clone(), name.to_owned()))
+    }
+
+    /// Whether a list style numbers its items or marks them, by the first of
+    /// its levels that says.
+    pub fn list_kind(&self, name: &str) -> Option<ListKind> {
+        self.lists.get(name)?.elements().find_map(|level| {
+            if level.name.ns != Ns::Text {
+                return None;
+            }
+            match &*level.name.local {
+                "list-level-style-number" => Some(ListKind::Number),
+                "list-level-style-bullet" | "list-level-style-image" => Some(ListKind::Bullet),
+                _ => None,
+            }
+        })
+    }
+
+    /// A list style of a kind the document already has, the first by name.
+    pub fn list_style_for(&self, kind: ListKind) -> Option<&str> {
+        self.lists
+            .keys()
+            .filter(|name| self.list_kind(name) == Some(kind))
+            .map(String::as_str)
+            .min()
     }
 
     /// A list style by name, as the `text:list-style-name` of a list refers to

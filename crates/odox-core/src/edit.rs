@@ -17,6 +17,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod block;
 mod format;
 
 use std::fmt;
@@ -24,6 +25,7 @@ use std::ops::Range;
 
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
+pub use block::{block_state, heading_level, set_heading, set_list};
 pub use format::{Mark, format, marked};
 
 /// Why an edit was not made. Each is a state of the document rather than a
@@ -388,7 +390,7 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
         && parent.children.len() == 1
         && paragraph.children.is_empty()
     {
-        return leave_list(root, above);
+        return take_out_of_list(root, above);
     }
     let (first, second) = split(paragraph, at);
     let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
@@ -420,11 +422,17 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     Ok(second_at)
 }
 
-/// Take an item that holds one empty paragraph out of its list: the list is
-/// split around it and the paragraph stands between the halves, as Enter on
-/// an empty item leaves the list in any word processor. A list left with no
-/// items is dropped, and the half after the item continues the numbering.
-fn leave_list(root: &mut Element, item_path: &[usize]) -> Result<Vec<usize>, Refused> {
+/// Take an item out of its list: the list is split around it, and what the
+/// item held stands between the halves. The half after the item continues the
+/// numbering, and a half left with no items is dropped. Answers the path of
+/// what the item held first.
+///
+/// This is how Enter on an empty item leaves a list, and how a paragraph stops
+/// being one.
+pub(crate) fn take_out_of_list(
+    root: &mut Element,
+    item_path: &[usize],
+) -> Result<Vec<usize>, Refused> {
     let (item_at, list_path) = item_path.split_last().ok_or(Refused::NotFound)?;
     let (list_at, container_path) = list_path.split_last().ok_or(Refused::NotFound)?;
     let continue_numbering = root.name_for(&Ns::Text, "continue-numbering");
@@ -432,9 +440,7 @@ fn leave_list(root: &mut Element, item_path: &[usize]) -> Result<Vec<usize>, Ref
     let Some(Node::Element(item)) = list.children.get(*item_at) else {
         return Err(Refused::NotFound);
     };
-    let Some(Node::Element(paragraph)) = item.children.first().cloned() else {
-        return Err(Refused::NotFound);
-    };
+    let contents = item.children.clone();
     let mut before = list.clone();
     before.children.truncate(*item_at);
     let mut after = list.clone();
@@ -452,14 +458,14 @@ fn leave_list(root: &mut Element, item_path: &[usize]) -> Result<Vec<usize>, Ref
     if before_holds_items {
         replacement.push(Node::Element(before));
     }
-    let paragraph_at = *list_at + replacement.len();
-    replacement.push(Node::Element(paragraph));
+    let first_at = *list_at + replacement.len();
+    replacement.extend(contents);
     if after_holds_items {
         replacement.push(Node::Element(after));
     }
     container.children.splice(*list_at..=*list_at, replacement);
     let mut at = container_path.to_vec();
-    at.push(paragraph_at);
+    at.push(first_at);
     Ok(at)
 }
 

@@ -145,8 +145,12 @@ impl View for TextView {
                 content, styles, ..
             } = &mut document.document;
             let mut model = FlowModel::new(content, styles, root, editing);
-            if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page, &model) {
+            let pressed = odox_ui::toolbar::text(ui, &self.page, &model);
+            if let Some(mark) = pressed.mark {
                 self.page.toggle(&mut model, mark);
+            }
+            if let Some(block) = pressed.block {
+                model.apply_block(&mut self.page, block);
             }
             ui.separator();
         }
