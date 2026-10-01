@@ -323,7 +323,8 @@ Replacing a selection, or Backspace at a paragraph's start, joins what is
 left of the last paragraph onto the first and removes what lay between,
 list items and lists emptied by that included; the first paragraph keeps its
 style and its place. Enter in a list item begins a new item after it, taking
-what followed in the item. A table or a frame the range wholly contains goes
+what followed in the item, and Enter in an empty one takes it out of the
+list, which is split around the paragraph left in its place. A table or a frame the range wholly contains goes
 with the rest. A range with an end inside a table, a cell or a frame it does
 not wholly contain takes the selected text out of each paragraph it covers
 and leaves every paragraph and cell standing, so Backspace at the start of a
