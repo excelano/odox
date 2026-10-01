@@ -123,6 +123,11 @@ at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
 or a right click go back, and Escape ends it. The notes are not shown.
 
+In `xodt`, a click on a link opens a web or mail address in the desktop's own
+browser or mail program, or scrolls to a bookmark or heading in the document;
+while editing it takes Ctrl and a click, a plain click being the caret. No other
+kind of link is followed, whatever the document says.
+
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
 and Escape closes it. Every match is lit, `xodp` searches the notes as well as

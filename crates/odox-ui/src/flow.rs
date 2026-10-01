@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use eframe::egui::{
-    Align, Color32, ColorImage, Context, Galley, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat,
-    TextureHandle, TextureOptions, Ui, pos2,
+    Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Sense, Stroke,
+    StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, pos2,
     text::{CCursor, CCursorRange, LayoutJob},
     text_selection::{LabelSelectionState, visuals::paint_text_selection},
     vec2,
@@ -31,6 +31,7 @@ use odox_core::{
 use crate::find::Highlights;
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
+use crate::links;
 
 /// Pictures already decoded, kept for as long as the document is open.
 ///
@@ -87,6 +88,13 @@ pub struct Flow<'a> {
     /// body is drawn, because the only moment a heading's position is known is
     /// the moment it is laid out.
     pub scroll_to_heading: Option<usize>,
+    /// A place in the document to bring into view: a bookmark's name, or a
+    /// heading's text written `Name|outline`. Answered while the body is drawn,
+    /// for the same reason `scroll_to_heading` is.
+    pub scroll_to_place: Option<String>,
+    /// A place in the document that a link just followed asked for, for the
+    /// view to set `scroll_to_place` to on the next frame.
+    pub followed: Option<String>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
     /// The page editor, which puts a caret in every paragraph under the root
@@ -116,6 +124,8 @@ impl<'a> Flow<'a> {
             zoom,
             palette: format::Palette::default(),
             scroll_to_heading: None,
+            scroll_to_place: None,
+            followed: None,
             headings_seen: 0,
             page: None,
             find: None,
@@ -294,6 +304,59 @@ impl Flow<'_> {
         }
     }
 
+    /// A link under the pointer shows where it goes, and is followed by a click
+    /// where the text is being read and by Ctrl and a click where it is being
+    /// edited, a plain click there being how the caret is put down.
+    #[allow(clippy::too_many_arguments)]
+    fn follow_link(
+        &mut self,
+        ui: &Ui,
+        response: &Response,
+        links: &[(std::ops::Range<usize>, &str)],
+        galley: &Galley,
+        map: &OffsetMap,
+        origin: Pos2,
+        editing: bool,
+    ) {
+        let Some(pointer) = response
+            .hover_pos()
+            .or_else(|| response.interact_pointer_pos())
+        else {
+            return;
+        };
+        let cursor = galley.cursor_from_pos(pointer - origin);
+        let caret = galley.pos_from_cursor(cursor).center().x + origin.x;
+        let character = if pointer.x < caret {
+            cursor.index.0.saturating_sub(1)
+        } else {
+            cursor.index.0
+        };
+        let offset = map.to_model(character);
+        let Some(href) = links
+            .iter()
+            .find(|(range, _)| range.contains(&offset))
+            .map(|&(_, href)| href)
+        else {
+            return;
+        };
+        let Some(target) = links::target(href) else {
+            return;
+        };
+        let reaching = !editing || ui.input(|input| input.modifiers.command);
+        if reaching {
+            ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        }
+        if response.hovered() {
+            response.clone().on_hover_text(href);
+        }
+        if reaching && response.clicked() {
+            match target {
+                links::Target::External(address) => links::open(ui.ctx(), address),
+                links::Target::Within(place) => self.followed = Some(place.to_owned()),
+            }
+        }
+    }
+
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
         let properties = self.style_of(element, &Family::Paragraph);
@@ -347,6 +410,11 @@ impl Flow<'_> {
             }
             self.headings_seen += 1;
         }
+        if let Some(place) = &self.scroll_to_place
+            && holds_place(element, place)
+        {
+            ui.scroll_to_rect(rect, Some(Align::TOP));
+        }
 
         if let Some(fill) = properties.paragraph.background {
             ui.painter().rect_filled(rect, 0.0, format::color32(fill));
@@ -372,6 +440,8 @@ impl Flow<'_> {
         let origin = pos2(anchor, rect.top());
         let mut galley = galley;
         self.show_matches(ui, &mut galley, &map, origin);
+        let links = edit::links(element);
+        let hit = (!links.is_empty()).then(|| (Arc::clone(&galley), map.clone()));
         if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
             let laid = Laid {
                 galley,
@@ -388,6 +458,10 @@ impl Flow<'_> {
                 base.color,
                 Stroke::NONE,
             );
+        }
+
+        if let Some((galley, map)) = hit {
+            self.follow_link(ui, &response, &links, &galley, &map, origin, edited);
         }
 
         if let Some(label) = label {
@@ -1096,6 +1170,18 @@ fn roman(number: usize) -> String {
         }
     }
     out
+}
+
+/// Whether a paragraph is what an internal link names: a bookmark in it, by
+/// name, or a heading by its text, which `LibreOffice` writes `Name|outline`.
+fn holds_place(element: &Element, place: &str) -> bool {
+    if let Some(name) = place.strip_suffix("|outline") {
+        return element.is(&Ns::Text, "h") && element.plain_text().trim() == name.trim();
+    }
+    element.elements().any(|e| {
+        let marks = e.is(&Ns::Text, "bookmark") || e.is(&Ns::Text, "bookmark-start");
+        (marks && e.attr(&Ns::Text, "name") == Some(place)) || holds_place(e, place)
+    })
 }
 
 /// Whether an element holds blocks on the body's behalf rather than being one.

@@ -22,6 +22,9 @@ pub struct TextView {
     /// The heading the outline asked to be shown, answered on the next frame
     /// while the body is laid out.
     scroll_to: Option<usize>,
+    /// The bookmark or heading a link inside the document asked for, answered
+    /// on the next frame as `scroll_to` is.
+    place: Option<String>,
     /// The caret, in edit mode.
     page: PageEditor,
     /// What a search found.
@@ -34,6 +37,7 @@ impl Default for TextView {
             document: None,
             pictures: Pictures::default(),
             scroll_to: None,
+            place: None,
             page: page_editor(),
             found: Found::default(),
         }
@@ -57,6 +61,7 @@ impl View for TextView {
         self.pictures.clear();
         self.document = Some(document);
         self.scroll_to = None;
+        self.place = None;
         self.page.clear();
         self.found.clear();
         self.load_fonts(ctx);
@@ -172,9 +177,14 @@ impl View for TextView {
                             let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
                             flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();
+                            flow.scroll_to_place = self.place.take();
                             flow.page = edit_mode.then_some(&mut self.page);
                             flow.find = self.found.highlights(0);
                             flow.blocks(ui, body, width);
+                            if flow.followed.is_some() {
+                                self.place = flow.followed.take();
+                                ui.ctx().request_repaint();
+                            }
                         });
                 });
             });

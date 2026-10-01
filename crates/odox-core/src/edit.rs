@@ -190,6 +190,43 @@ fn write_text(parent: &Element, out: &mut String) {
     }
 }
 
+/// The hyperlinks in a paragraph: the characters each covers, in the same
+/// count as [`text`], and where it points. A link with no `xlink:href` is not
+/// one.
+pub fn links(paragraph: &Element) -> Vec<(Range<usize>, &str)> {
+    let mut found = Vec::new();
+    collect_links(paragraph, &mut 0, &mut found);
+    found
+}
+
+fn collect_links<'a>(
+    parent: &'a Element,
+    at: &mut usize,
+    found: &mut Vec<(Range<usize>, &'a str)>,
+) {
+    for child in &parent.children {
+        match child {
+            Node::Text(t) | Node::CData(t) => *at += t.chars().count(),
+            Node::Element(e) if e.is(&Ns::Text, "s") => {
+                *at += e.attr_usize(&Ns::Text, "c").unwrap_or(1);
+            }
+            Node::Element(e) if e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") => {
+                *at += 1;
+            }
+            Node::Element(e) if is_inline_container(e) => {
+                let start = *at;
+                collect_links(e, at, found);
+                if e.is(&Ns::Text, "a")
+                    && let Some(href) = e.attr(&Ns::Xlink, "href")
+                {
+                    found.push((start..*at, href));
+                }
+            }
+            Node::Element(_) | Node::Comment(_) | Node::ProcessingInstruction(_) => {}
+        }
+    }
+}
+
 /// Replace a range of the paragraph's text, in characters, with new text.
 ///
 /// The characters are removed from the nodes that hold them and the new text

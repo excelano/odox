@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::edit::{
-    apply, join, join_with_previous, replace, replace_range, rewrite, split, split_at, text,
+    apply, join, join_with_previous, links, replace, replace_range, rewrite, split, split_at, text,
 };
 use odox_core::{Element, Node, Ns, Package, xml};
 
@@ -423,7 +423,7 @@ fn a_join_does_not_reach_over_a_table() {
 /// A body of blocks written as XML, with the namespaces declared.
 fn body(inner: &str) -> Element {
     let source = format!(
-        r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{inner}</office:text>"#
+        r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">{inner}</office:text>"#
     );
     xml::parse(source.as_bytes(), "test").expect("a body")
 }
@@ -540,5 +540,18 @@ fn enter_on_an_empty_nested_item_leaves_the_inner_list_only() {
     assert_eq!(
         inner(&root),
         "<text:list><text:list-item><text:p>a</text:p><text:p/></text:list-item></text:list>"
+    );
+}
+
+#[test]
+fn a_link_covers_the_characters_inside_it_and_says_where_it_points() {
+    let root = body(
+        "<text:p>go <text:a xlink:href=\"https://example.com/\">to <text:span>the</text:span> site</text:a>,<text:s text:c=\"2\"/><text:a xlink:href=\"#top\">up</text:a><text:a>bare</text:a></text:p>",
+    );
+    let paragraph = root.at(&[0]).expect("a paragraph");
+    assert_eq!(text(paragraph), "go to the site,  upbare");
+    assert_eq!(
+        links(paragraph),
+        vec![(3..14, "https://example.com/"), (17..19, "#top")]
     );
 }

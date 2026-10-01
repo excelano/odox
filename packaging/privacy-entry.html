@@ -26,7 +26,7 @@
 <p><strong>The clipboard, when you ask.</strong> Selecting text and pressing Ctrl+C puts that text on your clipboard, and each window has a command that copies the whole document or the current sheet as plain text. That is your clipboard on your machine, it happens only when you press the key or the button, and Odox never reads the clipboard except to paste into a text box you are typing in.</p>
 
 <h4>What leaves your device</h4>
-<p><strong>Nothing.</strong> Odox makes no network request. It has no update check, no license check, no analytics service, no crash reporter and no remote logging. There is no HTTP client, no socket and no URL anywhere in the dependency tree. It hands nothing to another application either: the windows draw no web links and open nothing.</p>
+<p><strong>Nothing.</strong> Odox makes no network request. It has no update check, no license check, no analytics service, no crash reporter and no remote logging. There is no HTTP client, no socket and no URL anywhere in the dependency tree. The one thing it hands to another application is a web or mail address, and only when you click a link in a document: the address goes to your own browser or mail program, which then does what it does, and Odox itself still makes no request. It follows no other kind of link.</p>
 <p>What it does open on your own machine are the things any window opens: the display server, so there is something to draw on; the session message bus, which is how the file dialogs are shown and how Odox asks whether your desktop is set to light or dark; and your installed font files, read so that a document asking for a typeface gets one. All of that stays on the machine.</p>
 
 <h4>What Odox does not collect</h4>

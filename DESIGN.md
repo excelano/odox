@@ -424,3 +424,15 @@ the current one; a deck searches every slide's labels and every slide's notes,
 and moves to the slide, and opens the notes, that the current match is in.
 The matches are looked for again when the query changes or the text does, and
 at no other time.
+
+**A link is followed only to places a person means by one.** A paragraph's
+links are the `text:a` elements in it, each covering a range of the flat text
+the page editor counts in; the character under the pointer, found through the
+same offset map the caret uses, says which. Reading, a click follows it;
+editing, Ctrl and a click do, because a plain click puts the caret down. The
+address is shown in a tooltip before anything is done. `http`, `https` and
+`mailto` are handed to the desktop's own handler, and `#Name` scrolls to the
+bookmark of that name, or to the heading whose text is `Name` where it is
+written `Name|outline`. Every other scheme, `file:` and the desktop's
+registered handlers among them, is ignored, because a document is not trusted
+with what the machine will run. The application makes no request itself.
