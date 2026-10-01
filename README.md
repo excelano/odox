@@ -28,7 +28,7 @@ Editing means changing what is there, not authoring. You can type and delete
 text, split a paragraph and join two, enter a value in a cell, move a shape on a
 slide and resize it, make text bold, italic, underlined or struck through,
 undo any of that, and save. You cannot apply other formatting, insert a table or
-a picture, edit a formula, or find and replace. What you did
+a picture, edit a formula, or replace text. What you did
 not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
@@ -115,6 +115,11 @@ spreadsheet application recalculates it.
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
 there to type into it as in `xodt`, within that shape.
+
+Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
+Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
+and Escape closes it. Every match is lit, `xodp` searches the notes as well as
+the slides, and `xods` searches every sheet.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

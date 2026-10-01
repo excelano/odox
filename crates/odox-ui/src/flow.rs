@@ -14,16 +14,21 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use eframe::egui::{
-    Align, ColorImage, Context, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, TextureHandle,
-    TextureOptions, Ui, pos2, text::LayoutJob, text_selection::LabelSelectionState, vec2,
+    Align, Color32, ColorImage, Context, Galley, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat,
+    TextureHandle, TextureOptions, Ui, pos2,
+    text::{CCursor, CCursorRange, LayoutJob},
+    text_selection::{LabelSelectionState, visuals::paint_text_selection},
+    vec2,
 };
-use egui_richedit::{Laid, ParagraphJob};
+use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
     Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties, edit,
 };
 
+use crate::find::Highlights;
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
 
@@ -87,6 +92,8 @@ pub struct Flow<'a> {
     /// The page editor, which puts a caret in every paragraph under the root
     /// and paints them. Outside edit mode there is none.
     pub page: Option<&'a mut PageEditor>,
+    /// The matches of a search, drawn behind the text they are in.
+    pub find: Option<Highlights<'a>>,
     /// Whether text in the page can be dragged over to select it. Off on a
     /// slide in edit mode, where a drag moves the shape instead.
     pub selectable: bool,
@@ -111,6 +118,7 @@ impl<'a> Flow<'a> {
             scroll_to_heading: None,
             headings_seen: 0,
             page: None,
+            find: None,
             selectable: true,
             path: Vec::new(),
             detached: false,
@@ -258,6 +266,34 @@ impl Flow<'_> {
         self.document.styles.resolve(family, name)
     }
 
+    /// Colour the matches of a search in a paragraph, and scroll to the current
+    /// one when a search has just moved to it.
+    fn show_matches(&self, ui: &Ui, galley: &mut Arc<Galley>, map: &OffsetMap, origin: Pos2) {
+        let Some(find) = self.find.as_ref().filter(|_| !self.detached) else {
+            return;
+        };
+        let hits = find.within(&self.path);
+        if hits.is_empty() {
+            return;
+        }
+        let at = |offset: usize| CCursor::new(map.to_galley(offset.min(map.model_len())));
+        for (range, current) in hits {
+            let mut visuals = ui.visuals().clone();
+            visuals.selection.bg_fill = format::match_fill(current);
+            visuals.selection.stroke.color = Color32::BLACK;
+            let cursors = CCursorRange::two(at(range.start), at(range.end));
+            paint_text_selection(galley, &visuals, &cursors, None);
+            if current && find.reveal() {
+                let start = galley.pos_from_cursor(at(range.start));
+                let end = galley.pos_from_cursor(at(range.end));
+                ui.scroll_to_rect(
+                    start.union(end).translate(origin.to_vec2()),
+                    Some(Align::Center),
+                );
+            }
+        }
+    }
+
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
         let properties = self.style_of(element, &Family::Paragraph);
@@ -334,6 +370,8 @@ impl Flow<'_> {
         // not see this frame, and the editor moves Up and Down through where
         // each paragraph was drawn.
         let origin = pos2(anchor, rect.top());
+        let mut galley = galley;
+        self.show_matches(ui, &mut galley, &map, origin);
         if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
             let laid = Laid {
                 galley,

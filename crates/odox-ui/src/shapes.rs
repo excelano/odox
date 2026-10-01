@@ -25,6 +25,7 @@ use odox_core::{
     Properties, Transform,
 };
 
+use crate::find::Highlights;
 use crate::flow::{Flow, Pictures};
 use crate::flow_model::PageEditor;
 use crate::format::{self, Palette};
@@ -45,6 +46,8 @@ pub struct Canvas<'a> {
     /// through it, each paragraph named by its path from the page, which is
     /// the shape's index among the page's children and then the way down.
     pub page_editor: Option<&'a mut PageEditor>,
+    /// The matches of a search, drawn in the slide's own labels.
+    pub find: Option<Highlights<'a>>,
     /// The index among the page's children of the shape being drawn, where it
     /// is one of the slide's own; a master page's decoration has none and
     /// nothing in it is edited.
@@ -121,6 +124,7 @@ impl<'a> Canvas<'a> {
             scale,
             palette,
             page_editor: None,
+            find: None,
             at: None,
         }
     }
@@ -531,6 +535,7 @@ impl Canvas<'_> {
             flow.palette = palette;
             flow.selectable = !edit_mode;
             flow.page = page_editor;
+            flow.find = self.find.clone().filter(|_| prefix.is_some() && !measuring);
             if let Some(prefix) = prefix {
                 flow.start_at(prefix.clone());
             }

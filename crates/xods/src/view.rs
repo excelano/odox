@@ -10,9 +10,10 @@ use eframe::egui::{
 };
 use odox_core::doc::{Sheet, SheetDocument, Value};
 use odox_core::{Document, Refused};
+use odox_ui::find::{Match, ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Editing, View, fonts};
+use odox_ui::{Editing, Found, View, fonts};
 
 use crate::grid::{Metrics, address, column_name};
 
@@ -30,6 +31,8 @@ pub struct SheetView {
     editor: Option<CellEditor>,
     /// Why the picked cell could not be edited, shown until the pick moves.
     notice: Option<String>,
+    /// What a search found, by sheet and by the cell's row and column.
+    found: Found,
 }
 
 /// A cell being typed into.
@@ -94,6 +97,7 @@ impl View for SheetView {
         self.metrics = None;
         self.editor = None;
         self.notice = None;
+        self.found.clear();
         Ok(())
     }
 
@@ -102,6 +106,7 @@ impl View for SheetView {
         self.metrics = None;
         self.editor = None;
         self.notice = None;
+        self.found.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -124,6 +129,31 @@ impl View for SheetView {
         self.editor = None;
     }
 
+    fn find(&mut self, query: &str) -> usize {
+        let matches = self
+            .document
+            .as_ref()
+            .map(|document| matches_in(document, query))
+            .unwrap_or_default();
+        self.found.set(matches);
+        self.found.len()
+    }
+
+    fn show_match(&mut self, index: usize) {
+        let Some(found) = self.found.show(index).cloned() else {
+            return;
+        };
+        if found.scope != self.sheet {
+            self.sheet = found.scope;
+            self.metrics = None;
+            self.editor = None;
+        }
+        if let [row, column] = found.paragraph[..] {
+            self.selected = (row, column);
+        }
+        self.notice = None;
+    }
+
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         if self.document.is_none() {
             return;
@@ -131,6 +161,7 @@ impl View for SheetView {
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
         self.grid(ui, zoom, editing);
+        self.found.drawn();
     }
 
     fn side(&mut self, _ui: &mut Ui) -> bool {
@@ -253,6 +284,7 @@ impl SheetView {
         let header_fill = ui.visuals().faint_bg_color;
         let header_text = ui.visuals().text_color();
         let mut clicked = None;
+        let highlights = self.found.highlights(self.sheet);
         let editor = &mut self.editor;
         let mut outcome = None;
 
@@ -362,6 +394,17 @@ impl SheetView {
 
                         let mut format =
                             format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+                        if let Some(highlights) = &highlights {
+                            let hits = highlights.within(&[row, column]);
+                            if !hits.is_empty() {
+                                let current = hits.iter().any(|&(_, current)| current);
+                                painter.rect_filled(drawn, 0.0, format::match_fill(current));
+                                format.color = egui::Color32::BLACK;
+                                if current && highlights.reveal() {
+                                    ui.scroll_to_rect(drawn, Some(Align::Center));
+                                }
+                            }
+                        }
                         // A formula's cached result may be out of date once
                         // anything has changed, and which ones are cannot be
                         // told without evaluating them; every one is drawn
@@ -702,4 +745,32 @@ fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
         out.push('\n');
     }
     out
+}
+
+/// Every place a query occurs in the cells of the sheets a person can see.
+fn matches_in(document: &SheetDocument, query: &str) -> Vec<Match> {
+    let mut found = Vec::new();
+    if query.is_empty() {
+        return found;
+    }
+    for (scope, sheet) in document.sheets().iter().enumerate() {
+        if !sheet.visible {
+            continue;
+        }
+        for row in 0..sheet.used_rows {
+            for column in 0..sheet.used_columns {
+                let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) else {
+                    continue;
+                };
+                for range in ranges(&cell.text(), query) {
+                    found.push(Match {
+                        scope,
+                        paragraph: vec![row, column],
+                        range,
+                    });
+                }
+            }
+        }
+    }
+    found
 }

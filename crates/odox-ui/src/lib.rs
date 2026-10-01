@@ -23,6 +23,8 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod edit;
+pub mod find;
+pub mod find_bar;
 pub mod flow;
 pub mod flow_model;
 pub mod fonts;
@@ -39,6 +41,7 @@ pub mod system_theme;
 pub mod toolbar;
 
 pub use edit::{Caret, Editing};
+pub use find::{Found, Highlights};
 pub use flow::{Flow, Pictures};
 pub use flow_model::{FlowModel, PageEditor, page_editor};
 pub use i18n::mark;

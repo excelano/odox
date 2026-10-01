@@ -9,8 +9,11 @@ use eframe::egui::{self, Ui};
 use egui_richedit::Selection;
 use odox_core::Document;
 use odox_core::doc::TextDocument;
+use odox_ui::find::in_paragraphs;
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
+use odox_ui::{
+    Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
+};
 
 /// A text document, open or not.
 pub struct TextView {
@@ -21,6 +24,8 @@ pub struct TextView {
     scroll_to: Option<usize>,
     /// The caret, in edit mode.
     page: PageEditor,
+    /// What a search found.
+    found: Found,
 }
 
 impl Default for TextView {
@@ -30,6 +35,7 @@ impl Default for TextView {
             pictures: Pictures::default(),
             scroll_to: None,
             page: page_editor(),
+            found: Found::default(),
         }
     }
 }
@@ -52,6 +58,7 @@ impl View for TextView {
         self.document = Some(document);
         self.scroll_to = None;
         self.page.clear();
+        self.found.clear();
         self.load_fonts(ctx);
         Ok(())
     }
@@ -60,6 +67,7 @@ impl View for TextView {
         self.document = None;
         self.pictures.clear();
         self.page.clear();
+        self.found.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -86,6 +94,21 @@ impl View for TextView {
 
     fn restore_caret(&mut self, caret: Caret) {
         self.page.select(Selection::caret(caret));
+    }
+
+    fn find(&mut self, query: &str) -> usize {
+        let matches = self
+            .document
+            .as_ref()
+            .and_then(TextDocument::body)
+            .map(|body| in_paragraphs(body, 0, query))
+            .unwrap_or_default();
+        self.found.set(matches);
+        self.found.len()
+    }
+
+    fn show_match(&mut self, index: usize) {
+        self.found.show(index);
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
@@ -150,10 +173,12 @@ impl View for TextView {
                             flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();
                             flow.page = edit_mode.then_some(&mut self.page);
+                            flow.find = self.found.highlights(0);
                             flow.blocks(ui, body, width);
                         });
                 });
             });
+        self.found.drawn();
     }
 
     fn side(&mut self, ui: &mut Ui) -> bool {

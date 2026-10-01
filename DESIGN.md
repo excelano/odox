@@ -393,3 +393,18 @@ it had when the file was last read or written, so undoing back to that depth
 is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a
 modified document is thrown away.
+
+**Find is a view of the text and not an edit.** Ctrl+F opens a bar under the
+menu in any of the three windows, in reading or in edit mode; Enter and F3
+move to the next match, Shift+Enter and Shift+F3 to the one before, and Escape
+closes the bar. Case is not significant and the query is not a pattern. A
+match is a range of characters in a paragraph's flat text, the string the
+segment map reads and the page editor's offsets count in, so the characters
+lit are the ones an edit there would change. The view answers how many there
+are and draws them: a flow paints each behind its text, the current one in
+orange and the rest in yellow, and scrolls to the current one when the search
+has just moved to it. A sheet tints the cells that hold the query and picks
+the current one; a deck searches every slide's labels and every slide's notes,
+and moves to the slide, and opens the notes, that the current match is in.
+The matches are looked for again when the query changes or the text does, and
+at no other time.

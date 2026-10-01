@@ -103,10 +103,7 @@ impl<'a> FlowModel<'a> {
 
     fn order(&self) -> &[Vec<usize>] {
         self.order.get_or_init(|| {
-            let mut out = Vec::new();
-            if let Some(root) = self.root() {
-                blocks(root, &mut Vec::new(), &mut out);
-            }
+            let mut out = self.root().map(paragraph_paths).unwrap_or_default();
             out.retain(|path| path.starts_with(&self.scope));
             out
         })
@@ -320,6 +317,7 @@ impl Model for FlowModel<'_> {
             }
         };
         if at.is_some() {
+            self.editing.touch();
             if let Some(before) = before {
                 self.editing.record_snapshot(before, Some(begins));
             }
@@ -327,6 +325,14 @@ impl Model for FlowModel<'_> {
         }
         at
     }
+}
+
+/// Every paragraph under a root, in the order [`crate::Flow`] draws them, by
+/// the paths it reports them under.
+pub(crate) fn paragraph_paths(root: &Element) -> Vec<Vec<usize>> {
+    let mut out = Vec::new();
+    blocks(root, &mut Vec::new(), &mut out);
+    out
 }
 
 /// The paragraphs among a run of blocks, in the order [`crate::Flow`] draws

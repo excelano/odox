@@ -15,9 +15,10 @@ use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, v
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
+use odox_ui::find::{Highlights, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{
-    Canvas, Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor,
+    Canvas, Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
 };
 
 /// A presentation, open or not.
@@ -33,6 +34,9 @@ pub struct SlideView {
     /// The caret in a label, in edit mode, its paragraphs named by their
     /// path from the page.
     page_editor: PageEditor,
+    /// What a search found. A slide's own labels are scope `n` and its notes
+    /// scope `slides + n`.
+    found: Found,
 }
 
 impl Default for SlideView {
@@ -45,6 +49,7 @@ impl Default for SlideView {
             picked: None,
             drag: None,
             page_editor: page_editor(),
+            found: Found::default(),
         }
     }
 }
@@ -114,6 +119,7 @@ impl View for SlideView {
         self.picked = None;
         self.drag = None;
         self.page_editor.clear();
+        self.found.clear();
         Ok(())
     }
 
@@ -123,6 +129,7 @@ impl View for SlideView {
         self.picked = None;
         self.drag = None;
         self.page_editor.clear();
+        self.found.clear();
     }
 
     fn is_open(&self) -> bool {
@@ -148,6 +155,40 @@ impl View for SlideView {
             [&[self.slide][..], &focus.paragraph].concat(),
             focus.offset,
         ))
+    }
+
+    fn find(&mut self, query: &str) -> usize {
+        let matches = self.document.as_ref().map(|document| {
+            let slides = document.slides();
+            let mut found = Vec::new();
+            for (index, slide) in slides.iter().enumerate() {
+                found.extend(in_paragraphs(slide.element, index, query));
+            }
+            for (index, slide) in slides.iter().enumerate() {
+                if let Some(notes) = slide.notes() {
+                    found.extend(in_paragraphs(notes, slides.len() + index, query));
+                }
+            }
+            found
+        });
+        self.found.set(matches.unwrap_or_default());
+        self.found.len()
+    }
+
+    fn show_match(&mut self, index: usize) {
+        let Some(found) = self.found.show(index).cloned() else {
+            return;
+        };
+        let count = self
+            .document
+            .as_ref()
+            .map_or(0, |document| document.slides().len());
+        if found.scope >= count {
+            self.show_notes = true;
+            self.show_slide(found.scope - count);
+        } else {
+            self.show_slide(found.scope);
+        }
     }
 
     fn restore_caret(&mut self, caret: Caret) {
@@ -210,7 +251,15 @@ impl View for SlideView {
         };
 
         if show_notes {
-            notes_panel(ui, &document.document, pictures, slide, zoom);
+            let notes_at = slides.len() + slide_index;
+            notes_panel(
+                ui,
+                &document.document,
+                pictures,
+                slide,
+                zoom,
+                self.found.highlights(notes_at),
+            );
         }
 
         let layout = document.page_layout(slide);
@@ -244,6 +293,7 @@ impl View for SlideView {
 
                 let mut canvas = Canvas::new(&document.document, pictures, page, fit, palette);
                 canvas.page_editor = page_editor;
+                canvas.find = self.found.highlights(slide_index);
                 // Back to front: the ground, then what the master page draws on
                 // every slide, then the slide's own.
                 canvas.background(ui, &background);
@@ -269,6 +319,7 @@ impl View for SlideView {
             });
         });
 
+        self.found.drawn();
         if let Some(action) = action {
             self.act(action, fit, editing);
         }
@@ -554,6 +605,7 @@ fn notes_panel(
     pictures: &mut Pictures,
     slide: &odox_core::doc::Slide<'_>,
     zoom: f32,
+    find: Option<Highlights<'_>>,
 ) {
     let notes = slide.notes();
     egui::Panel::bottom("notes")
@@ -564,7 +616,9 @@ fn notes_panel(
             egui::ScrollArea::vertical().show(ui, |ui| match notes {
                 Some(notes) => {
                     let width = ui.available_width();
-                    Flow::new(document, pictures, zoom).blocks(ui, notes, width);
+                    let mut flow = Flow::new(document, pictures, zoom);
+                    flow.find = find;
+                    flow.blocks(ui, notes, width);
                 }
                 None => {
                     ui.weak(t("This slide has no notes."));

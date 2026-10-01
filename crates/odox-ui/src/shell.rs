@@ -14,6 +14,7 @@ use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use odox_core::Document;
 
 use crate::edit::{Caret, Editing};
+use crate::find_bar::{FindBar, Step};
 use crate::i18n::{fill, t};
 use crate::settings::Settings;
 
@@ -85,6 +86,17 @@ pub trait View {
     /// [`Self::reindex`].
     fn restore_caret(&mut self, _caret: Caret) {}
 
+    /// Look for text in the document and keep what is found, to draw
+    /// highlighted; an empty query forgets the search. Answers how many
+    /// matches there are. Asked again whenever the query or the text changes,
+    /// and the current match is kept if there are still that many.
+    fn find(&mut self, _query: &str) -> usize {
+        0
+    }
+
+    /// Make one of the matches the current one, and bring it into view.
+    fn show_match(&mut self, _index: usize) {}
+
     /// Draw the document. The shell has already put a scroll area or a panel
     /// around whatever this needs. The editing state says whether edit mode is
     /// on and takes the snapshot an edit records before it changes the tree.
@@ -114,6 +126,7 @@ pub struct Shell<V: View> {
     show_side: bool,
     editing: Editing,
     settings: Settings,
+    find: FindBar,
     /// What was asked for while the document had unsaved changes, waiting on
     /// the person's answer.
     pending: Option<Pending>,
@@ -150,6 +163,7 @@ impl<V: View> Shell<V> {
             show_side: true,
             editing: Editing::default(),
             settings: Settings::load(),
+            find: FindBar::default(),
             pending: None,
             closing: false,
         }
@@ -402,6 +416,9 @@ impl<V: View> eframe::App for Shell<V> {
         let field_focused = ctx
             .memory(egui::Memory::focused)
             .is_some_and(|id| id != crate::flow_model::page_editor_id());
+        if self.pending.is_none() {
+            self.find_keys(&ctx);
+        }
         if self.pending.is_none() && !field_focused {
             self.keys(&ctx);
         }
@@ -417,6 +434,7 @@ impl<V: View> eframe::App for Shell<V> {
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
 
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, &ctx));
+        self.search(ui);
 
         if let Some(message) = self.error.clone() {
             egui::Panel::bottom("error").show(ui, |ui| {
@@ -538,37 +556,7 @@ impl<V: View> Shell<V> {
                     self.request(ctx, Pending::Quit);
                 }
             });
-            ui.menu_button(t("Edit"), |ui| {
-                if ui
-                    .add_enabled(self.editing.can_undo(), egui::Button::new(t("Undo")))
-                    .clicked()
-                {
-                    ui.close();
-                    self.undo();
-                }
-                if ui
-                    .add_enabled(self.editing.can_redo(), egui::Button::new(t("Redo")))
-                    .clicked()
-                {
-                    ui.close();
-                    self.redo();
-                }
-                ui.separator();
-                ui.checkbox(&mut self.editing.on, t("Edit mode"));
-                if ui
-                    .checkbox(
-                        &mut self.settings.open_in_edit_mode,
-                        t("Open documents in edit mode"),
-                    )
-                    .changed()
-                    && let Err(e) = self.settings.save()
-                {
-                    self.error = Some(fill(
-                        t("The setting could not be saved: {reason}"),
-                        &[("reason", &e.to_string())],
-                    ));
-                }
-            });
+            ui.menu_button(t("Edit"), |ui| self.edit_menu(ui));
             ui.menu_button(t("View"), |ui| {
                 if ui.button(t("Zoom in")).clicked() {
                     self.zoom = (self.zoom * ZOOM_STEP).min(ZOOM_MAX);
@@ -595,6 +583,93 @@ impl<V: View> Shell<V> {
         });
     }
 
+    /// The Edit menu: undo and redo, search, and the two preferences about
+    /// editing.
+    fn edit_menu(&mut self, ui: &mut Ui) {
+        if ui
+            .add_enabled(self.editing.can_undo(), egui::Button::new(t("Undo")))
+            .clicked()
+        {
+            ui.close();
+            self.undo();
+        }
+        if ui
+            .add_enabled(self.editing.can_redo(), egui::Button::new(t("Redo")))
+            .clicked()
+        {
+            ui.close();
+            self.redo();
+        }
+        ui.separator();
+        if ui
+            .add_enabled(self.view.is_open(), egui::Button::new(t("Find…")))
+            .clicked()
+        {
+            ui.close();
+            self.find.open();
+        }
+        ui.separator();
+        ui.checkbox(&mut self.editing.on, t("Edit mode"));
+        if ui
+            .checkbox(
+                &mut self.settings.open_in_edit_mode,
+                t("Open documents in edit mode"),
+            )
+            .changed()
+            && let Err(e) = self.settings.save()
+        {
+            self.error = Some(fill(
+                t("The setting could not be saved: {reason}"),
+                &[("reason", &e.to_string())],
+            ));
+        }
+    }
+
+    /// The search bar, when it is open, and the view's matches kept in step
+    /// with what it says and with the document.
+    fn search(&mut self, ui: &mut Ui) {
+        if !self.find.is_open() || !self.view.is_open() {
+            if self.find.searching {
+                self.find.searching = false;
+                self.find.count = 0;
+                self.view.find("");
+            }
+            return;
+        }
+        let mut step = None;
+        egui::Panel::top("find").show(ui, |ui| step = self.find.ui(ui));
+        if !self.find.is_open() {
+            return;
+        }
+        if let Some(query_changed) = self.find.due(self.editing.revision()) {
+            self.find.searching = true;
+            self.find.count = self.view.find(self.find.query());
+            if query_changed {
+                self.find.current = 0;
+                if self.find.count > 0 {
+                    self.view.show_match(0);
+                }
+            } else {
+                self.find.current = self.find.current.min(self.find.count.saturating_sub(1));
+            }
+        }
+        if let Some(step) = step {
+            self.step_match(step);
+        }
+    }
+
+    fn step_match(&mut self, step: Step) {
+        let count = self.find.count;
+        if count == 0 {
+            return;
+        }
+        self.find.current = match step {
+            Step::Next => (self.find.current + 1) % count,
+            Step::Previous => (self.find.current + count - 1) % count,
+        };
+        self.view.show_match(self.find.current);
+    }
+
     /// What the window says before a document is opened.
     fn nothing_open(&mut self, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
@@ -610,6 +685,30 @@ impl<V: View> Shell<V> {
                 self.ask_for_a_file(&ctx);
             }
         });
+    }
+
+    /// Ctrl+F and F3, which a text field has no use for and so are taken
+    /// whether or not one has the keyboard.
+    fn find_keys(&mut self, ctx: &egui::Context) {
+        if !self.view.is_open() {
+            return;
+        }
+        let pressed = |modifiers, key| {
+            ctx.input_mut(|input| input.consume_shortcut(&KeyboardShortcut::new(modifiers, key)))
+        };
+        if pressed(Modifiers::COMMAND, Key::F) {
+            self.find.open();
+        }
+        if pressed(Modifiers::SHIFT, Key::F3) {
+            self.step_match(Step::Previous);
+        }
+        if pressed(Modifiers::NONE, Key::F3) {
+            if self.find.is_open() {
+                self.step_match(Step::Next);
+            } else {
+                self.find.open();
+            }
+        }
     }
 
     fn keys(&mut self, ctx: &egui::Context) {
