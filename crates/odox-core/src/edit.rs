@@ -420,9 +420,7 @@ fn leave_list(root: &mut Element, item_path: &[usize]) -> Result<Vec<usize>, Ref
     if after_holds_items {
         replacement.push(Node::Element(after));
     }
-    container
-        .children
-        .splice(*list_at..=*list_at, replacement);
+    container.children.splice(*list_at..=*list_at, replacement);
     let mut at = container_path.to_vec();
     at.push(paragraph_at);
     Ok(at)

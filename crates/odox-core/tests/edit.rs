@@ -525,7 +525,8 @@ fn enter_on_an_empty_item_leaves_the_list_and_splits_it_around_the_paragraph() {
 
 #[test]
 fn enter_on_the_only_empty_item_replaces_the_list_with_its_paragraph() {
-    let mut root = body("<text:p>x</text:p><text:list><text:list-item><text:p/></text:list-item></text:list>");
+    let mut root =
+        body("<text:p>x</text:p><text:list><text:list-item><text:p/></text:list-item></text:list>");
     assert_eq!(split_at(&mut root, &[1, 0, 0], 0), Ok(vec![1]));
     assert_eq!(inner(&root), "<text:p>x</text:p><text:p/>");
 }

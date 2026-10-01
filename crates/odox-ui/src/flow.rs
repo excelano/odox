@@ -94,7 +94,9 @@ pub struct Flow<'a> {
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
     /// Inside a frame anchored in a paragraph, which is reached by a clone
-    /// and not by a path, so nothing in it can be edited in place.
+    /// and not by a path, or in the second and later copies of a repeated
+    /// cell, whose copies share one path: nothing in either can be edited in
+    /// place.
     detached: bool,
 }
 
@@ -711,7 +713,7 @@ impl Flow<'_> {
                     .attr_usize(&Ns::Table, "number-columns-spanned")
                     .unwrap_or(1)
                     .max(1);
-                for _ in 0..repeat {
+                for copy in 0..repeat {
                     // The width covers every column the cell spans; the position
                     // advances by one. ODF writes a `table:covered-table-cell`
                     // for each further column a span reaches, so advancing by the
@@ -741,7 +743,10 @@ impl Flow<'_> {
                                     ui.set_max_width(width);
                                     let content = (width - padding * 2.0).max(8.0);
                                     self.path.push(cell_index);
+                                    let was_detached = self.detached;
+                                    self.detached |= copy > 0;
                                     self.blocks(ui, cell, content);
+                                    self.detached = was_detached;
                                     self.path.pop();
                                     ui.add_space(padding);
                                 },

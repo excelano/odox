@@ -16,7 +16,9 @@ use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Canvas, Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
+use odox_ui::{
+    Canvas, Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor,
+};
 
 /// A presentation, open or not.
 pub struct SlideView {

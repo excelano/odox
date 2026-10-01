@@ -519,8 +519,8 @@ mod tests {
         let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing)
-            .tagged(vec![7]);
+        let mut model =
+            FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing).tagged(vec![7]);
         model.apply(
             Edit::Split {
                 at: Position::new(vec![0], 1),
