@@ -82,6 +82,20 @@ if (-not $OutDir) { $OutDir = Join-Path $root 'dist\screenshots' }
 # a few pages has settled, so xodp waits longer than the driver's default.
 $DECK_SETTLE = 8
 
+# Coordinates, in the frame's own pixels, read off the reference frame after the
+# zoom. Empty until measured, and the driver refuses a click with none.
+$XODT_WORD = '486,206'
+$XODT_BOLD = '236,70'
+$XODT_ITALIC = '257,70'
+$XODT_CENTRED = '802,699'
+$XODT_H2 = '401,70'
+$XODS_A3 = '128,170'
+$XODS_D5 = '285,217'
+$XODP_SLIDE2 = '40,117'
+$XODP_LABEL = '630,403'
+$XODP_BOLD = '237,70'
+$XODP_ITALIC = '259,70'
+
 # --- finding the built executables ------------------------------------------
 
 # Cargo is asked where its target directory is rather than guessed at, because
@@ -124,18 +138,59 @@ function Opens([string] $app) {
 #   type TEXT     type
 #   key NAME      one key, optionally with modifiers: ctrl+a, return
 #
-# No actions yet. These three applications read a document and do not edit one,
-# so the document on screen is what they do; a frame wanting a pane opened or a
-# sheet selected takes a coordinate, and a coordinate is read off a reference
-# frame rather than guessed:
+# The applications being used, which is what guideline 2.3.3 asks for: edit mode
+# with something selected or half typed, and Find with its matches lit, after the
+# document at rest. Edit mode and Find are Ctrl+E and Ctrl+F here, so the only
+# coordinates are in the document. Every one is read off a reference frame taken
+# after the zoom, in the frame's own pixels with the title bar in them:
 #
 #     powershell -ExecutionPolicy Bypass -File packaging\windows\shots.ps1 -Reference -Only xods
 #
+# The driver quits and relaunches the application for every frame, so each frame
+# repeats what it needs. Typing into a cell goes in two goes because the first
+# character opens the cell and the next two arrive before it has.
+
+# Zoom, for a document read in a thumbnail: the Store renders a screenshot small.
+# The deck is not zoomed, because a slide is already fitted to the window. It is
+# `-EveryShot` when one application is taken and is put in front of every shot
+# when all three are, so a reference frame and a set are zoomed the same way.
+$ZOOM = @{
+    xodt = @('key ctrl+plus') * 4
+    xods = @('key ctrl+plus') * 6
+    xodp = @()
+}
+
 function Get-Shots {
     foreach ($app in $APPLICATIONS.Keys) {
         if ($Only -and $app -ne $Only) { continue }
         $settle = if ($app -eq 'xodp') { $DECK_SETTLE } else { 0 }
-        Shot "$app-01-document" -Launch (Opens $app) -Process $app -Settle $settle
+        $before = if ($Only) { @() } else { $ZOOM[$app] }
+        function Frame([string] $name, [string[]] $actions = @()) {
+            Shot "$app-$name" ($before + $actions) -Launch (Opens $app) -Process $app -Settle $settle
+        }
+        switch ($app) {
+            'xodt' {
+                Frame '01-document'
+                # A word chosen and made bold and italic: the selection, and the
+                # two buttons lit.
+                Frame '02-editing' @('key ctrl+e', "double $XODT_WORD", "click $XODT_BOLD", "click $XODT_ITALIC")
+                # A paragraph made a heading, which the outline then lists.
+                Frame '03-heading' @('key ctrl+e', "click $XODT_CENTRED", "click $XODT_H2")
+                Frame '04-find' @('key ctrl+f', 'type and', 'key return')
+            }
+            'xods' {
+                Frame '01-document'
+                Frame '02-cell' @("click $XODS_A3", 'type H', 'type ex nut M6')
+                # A formula's cell, with the formula shown above the grid.
+                Frame '03-formula' @("click $XODS_D5")
+                Frame '04-find' @('key ctrl+f', 'type TRUE', 'key return')
+            }
+            'xodp' {
+                Frame '01-document'
+                Frame '02-editing' @('key ctrl+e', "click $XODP_SLIDE2", "double $XODP_LABEL", "click $XODP_BOLD", "click $XODP_ITALIC")
+                Frame '03-find' @('key ctrl+f', 'type 70', 'key return')
+            }
+        }
     }
 }
 
@@ -145,4 +200,5 @@ if ($Reference -and -not $Only) {
 
 $first = if ($Only) { $Only } else { 'xodt' }
 Take-Shots -Launch (Opens $first) -Process $first `
-    -Width $WIDTH -Height $HEIGHT -OutDir $OutDir -Reference:$Reference -Lang $Lang
+    -Width $WIDTH -Height $HEIGHT -OutDir $OutDir -Reference:$Reference -Lang $Lang `
+    -EveryShot $(if ($Only) { $ZOOM[$Only] } else { @() })
