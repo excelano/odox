@@ -20,7 +20,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.4.2"
+version = "0.5.0"
 edition = "2024"
 authors = ["David M. Anderson"]
 license = "MIT"
@@ -40,12 +40,12 @@ rust-version = "1.95"
 # The two shared crates. A version requirement cannot inherit
 # `workspace.package.version` and crates.io rejects a path-only dependency, so
 # the number is written twice by necessity; flyleaf's manifest says the same.
-odox-core = { path = "crates/odox-core", version = "0.4.2" }
-odox-ui = { path = "crates/odox-ui", version = "0.4.2" }
+odox-core = { path = "crates/odox-core", version = "0.5.0" }
+odox-ui = { path = "crates/odox-ui", version = "0.5.0" }
 # The rich-text editing layer. It lives here while its model trait settles and
 # knows nothing of ODF: its manifest names egui and nothing from this
 # workspace, and its own tests hold it to that.
-egui_richedit = { path = "crates/egui_richedit", version = "0.4.2" }
+egui_richedit = { path = "crates/egui_richedit", version = "0.5.0" }
 
 # Reading XML. A pull parser rather than a DOM library, because the document
 # tree this crate keeps is its own and a second tree to copy out of would be
