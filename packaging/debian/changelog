@@ -1,3 +1,22 @@
+odox (0.5.0) unstable; urgency=low
+
+  * Windows screenshots show the applications being used: editing, formulas, Find
+  * macOS screenshots show the applications being used: editing, selecting, Find
+  * Tests compare against an empty value instead of asserting is_empty
+  * Store copy and release notes for 0.5.0
+  * xodt: headings and lists, from the toolbar; numbered items draw their suffix
+  * Links: a click follows a web, mail or in-document link, and nothing else
+  * xods: a selection is a range, with copy, cut, paste and delete over it
+  * xodp: a slideshow, F5
+  * Find in all three applications: Ctrl+F, next and previous, every match lit
+  * Only the first copy of a repeated cell takes the caret; fmt
+  * A drag that leaves the view scrolls it
+  * xodp puts the caret back on undo, on the slide the edit was made on
+  * DESIGN §11: Enter on an empty item
+  * Enter on an empty list item leaves the list
+
+ -- David M. Anderson <david.anderson@excelano.com>  Thu, 01 Oct 2026 18:58:44 -0500
+
 odox (0.4.2) unstable; urgency=low
 
   * Releases are the apps in excelano/shipping
