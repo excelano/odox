@@ -45,6 +45,9 @@ pub struct FlowModel<'a> {
     /// The part of the root the paragraphs are kept to, as a path under it:
     /// on a slide, the one shape being typed into.
     scope: Vec<usize>,
+    /// Put in front of every path an undo step remembers, for a view whose
+    /// paths mean something only with it: on a deck, which slide.
+    tag: Vec<usize>,
     /// Every editable paragraph in drawing order, found when first asked for
     /// and forgotten when an edit changes it.
     order: OnceCell<Vec<Vec<usize>>>,
@@ -65,8 +68,17 @@ impl<'a> FlowModel<'a> {
             root,
             editing,
             scope: Vec::new(),
+            tag: Vec::new(),
             order: OnceCell::new(),
         }
+    }
+
+    /// Have the caret an undo step remembers begin with these indices, which
+    /// the view takes off again when it is asked to put the caret back.
+    #[must_use]
+    pub fn tagged(mut self, tag: Vec<usize>) -> Self {
+        self.tag = tag;
+        self
     }
 
     /// Keep to the paragraphs under one element beneath the root, so that
@@ -286,9 +298,13 @@ impl Model for FlowModel<'_> {
         // Where the edit begins is where an undo of it puts the caret.
         let before = new_step.then(|| self.content.clone());
         let begins = match &edit {
-            Edit::Replace { from, .. } | Edit::Format { from, .. } => from.clone(),
-            Edit::Split { at } => at.clone(),
+            Edit::Replace { from, .. } | Edit::Format { from, .. } => from,
+            Edit::Split { at } => at,
         };
+        let begins = Position::new(
+            [self.tag.as_slice(), &begins.paragraph].concat(),
+            begins.offset,
+        );
         let at = match edit {
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
@@ -495,6 +511,25 @@ mod tests {
         assert_eq!(model.text(&vec![0]).as_deref(), Some("oneitem"));
         // The list had one item, and went with it.
         assert_eq!(model.text(&vec![1, 0, 0, 0]).as_deref(), Some("cell"));
+    }
+
+    #[test]
+    fn a_tagged_model_remembers_the_caret_under_its_tag() {
+        let mut content = content();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing)
+            .tagged(vec![7]);
+        model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 1),
+            },
+            true,
+        );
+        let current = content.clone();
+        let (_, caret) = editing.undo(&current, None).expect("a step to undo");
+        assert_eq!(caret, Some(Position::new(vec![7, 0], 1)));
     }
 
     #[test]

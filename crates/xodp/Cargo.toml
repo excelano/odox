@@ -18,3 +18,4 @@ path = "src/main.rs"
 odox-core.workspace = true
 odox-ui.workspace = true
 eframe.workspace = true
+egui_richedit.workspace = true

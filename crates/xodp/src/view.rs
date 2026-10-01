@@ -12,10 +12,11 @@
 use std::path::Path;
 
 use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Canvas, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
+use odox_ui::{Canvas, Caret, Editing, Flow, FlowModel, PageEditor, Pictures, View, fonts, page_editor};
 
 /// A presentation, open or not.
 pub struct SlideView {
@@ -137,6 +138,24 @@ impl View for SlideView {
     fn reindex(&mut self) {
         self.drag = None;
         self.page_editor.document_replaced();
+    }
+
+    fn caret(&self) -> Option<Caret> {
+        let focus = &self.page_editor.selection()?.focus;
+        Some(Caret::new(
+            [&[self.slide][..], &focus.paragraph].concat(),
+            focus.offset,
+        ))
+    }
+
+    fn restore_caret(&mut self, caret: Caret) {
+        let Some((&slide, within)) = caret.paragraph.split_first() else {
+            return;
+        };
+        self.show_slide(slide);
+        self.picked = within.first().copied();
+        self.page_editor
+            .select(Selection::caret(Caret::new(within.to_vec(), caret.offset)));
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
@@ -263,6 +282,7 @@ impl View for SlideView {
         }
         ui.heading(t("Slides"));
         ui.separator();
+        let mut chosen = None;
         for (index, slide) in slides.iter().enumerate() {
             // A slide's first line of text is what it is recognized by; its
             // `draw:name` is usually a number an application generated.
@@ -272,12 +292,12 @@ impl View for SlideView {
                 .find(|text| !text.trim().is_empty())
                 .unwrap_or_else(|| slide.name.unwrap_or_default().to_owned());
             let label = format!("{}. {}", index + 1, first_line(&heading));
-            if ui.selectable_label(index == self.slide, label).clicked() && index != self.slide {
-                self.slide = index;
-                self.picked = None;
-                self.drag = None;
-                self.page_editor.clear();
+            if ui.selectable_label(index == self.slide, label).clicked() {
+                chosen = Some(index);
             }
+        }
+        if let Some(index) = chosen {
+            self.show_slide(index);
         }
         true
     }
@@ -312,7 +332,9 @@ impl SlideView {
         let Document {
             content, styles, ..
         } = &mut document.document;
-        let mut model = FlowModel::new(content, styles, root, editing).within(scope);
+        let mut model = FlowModel::new(content, styles, root, editing)
+            .within(scope)
+            .tagged(vec![self.slide]);
         if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page_editor, &model) {
             self.page_editor.toggle(&mut model, mark);
         }
@@ -413,7 +435,12 @@ impl SlideView {
                 slide = count.saturating_sub(1);
             }
         });
-        let slide = slide.min(count.saturating_sub(1));
+        self.show_slide(slide.min(count.saturating_sub(1)));
+    }
+
+    /// Look at another slide, with nothing picked and no caret. The slide
+    /// already shown is left as it is.
+    fn show_slide(&mut self, slide: usize) {
         if slide != self.slide {
             self.slide = slide;
             self.picked = None;
