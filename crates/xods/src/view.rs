@@ -665,7 +665,11 @@ impl SheetView {
                 }
             });
 
-        let extent = (sheet.used_rows, sheet.used_columns);
+        let used = (sheet.used_rows, sheet.used_columns);
+        let grid = self
+            .metrics
+            .as_ref()
+            .map_or(used, |m| (m.rows.len() - 1, m.columns.len() - 1));
         if let Some(outcome) = outcome {
             self.finish_editing(outcome, editing);
         }
@@ -682,7 +686,7 @@ impl SheetView {
             self.begin_editing(ui, editing);
         }
         if self.editor.is_none() {
-            self.arrow_keys(ui, extent);
+            self.arrow_keys(ui, grid, used);
         }
     }
 
@@ -894,12 +898,14 @@ impl SheetView {
 
     /// Move the picked cell with the arrow keys, which is how a person walks a
     /// sheet without reaching for the pointer.
-    fn arrow_keys(&mut self, ui: &Ui, (rows, columns): (usize, usize)) {
+    fn arrow_keys(&mut self, ui: &Ui, grid: (usize, usize), used: (usize, usize)) {
         let (mut row, mut column) = self.selected;
-        // The keys stop at the last cell the document wrote, unless the pick
-        // is already past it, as a click on an empty cell can leave it.
-        let last_row = rows.saturating_sub(1).max(row);
-        let last_column = columns.saturating_sub(1).max(column);
+        // The arrows go as far as the grid is drawn, empty cells included, so
+        // that a person can walk to one to type in it. End is the last column
+        // the document wrote.
+        let last_row = grid.0.saturating_sub(1);
+        let last_column = grid.1.saturating_sub(1);
+        let last_written = used.1.saturating_sub(1);
         let mut extend = false;
         ui.input(|input| {
             extend = input.modifiers.shift;
@@ -919,7 +925,7 @@ impl SheetView {
                 column = 0;
             }
             if input.key_pressed(egui::Key::End) {
-                column = last_column;
+                column = last_written;
             }
         });
         let cell = (row.min(last_row), column.min(last_column));
@@ -1102,6 +1108,50 @@ mod tests {
             assert_eq!(text_at(&view, row, column), "", "{row},{column}");
         }
         assert!(editing.can_undo());
+    }
+
+    fn pressed(view: &mut SheetView, key: egui::Key, modifiers: egui::Modifiers) {
+        let ctx = egui::Context::default();
+        let events = vec![
+            Event::ModifiersChanged(modifiers),
+            Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers,
+            },
+        ];
+        let input = egui::RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(400.0, 400.0))),
+            ..egui::RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| view.arrow_keys(ui, (45, 44), (5, 7)));
+        output.textures_delta.clear();
+    }
+
+    #[test]
+    fn the_arrows_walk_past_the_data_into_the_empty_grid() {
+        let (mut view, _) = opened();
+        view.pick((4, 6));
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::NONE);
+        pressed(&mut view, Key::ArrowRight, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (5, 7));
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::SHIFT);
+        assert_eq!(
+            view.range(),
+            ((5, 7), (6, 7)),
+            "Shift stretches past the data too"
+        );
+    }
+
+    #[test]
+    fn end_goes_to_the_last_column_the_document_wrote() {
+        let (mut view, _) = opened();
+        view.pick((1, 0));
+        pressed(&mut view, Key::End, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (1, 6));
     }
 
     #[test]
