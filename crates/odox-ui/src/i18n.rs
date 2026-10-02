@@ -60,6 +60,14 @@ pub const fn mark(message: &'static str) -> &'static str {
     message
 }
 
+/// The language the person reads, as the platform says it, for what a
+/// document that declares none of its own is to be taken to be written in.
+pub fn reading_language() -> String {
+    potext::preferred()
+        .filter(|tag| tag != "c" && tag != "posix")
+        .unwrap_or_else(|| "en".to_owned())
+}
+
 /// Read the desktop's language and put a catalogue in force, once, at startup.
 pub fn start() {
     activate(LANGUAGES);

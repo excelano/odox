@@ -13,8 +13,10 @@ use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
-    Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
+    Caret, Editing, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, fonts, page_editor,
 };
+
+use crate::export::Export;
 
 /// A text document, open or not.
 pub struct TextView {
@@ -33,6 +35,7 @@ pub struct TextView {
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
+    export: Export,
 }
 
 impl Default for TextView {
@@ -46,6 +49,7 @@ impl Default for TextView {
             found: Found::default(),
             menu: MenuState::offering_blocks(true),
             command: None,
+            export: Export::default(),
         }
     }
 }
@@ -76,6 +80,7 @@ impl View for TextView {
 
     fn close(&mut self) {
         self.document = None;
+        self.export = Export::default();
         self.pictures.clear();
         self.page.clear();
         self.found.clear();
@@ -154,9 +159,13 @@ impl View for TextView {
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
+        if let Some(document) = &mut self.document {
+            self.export
+                .show(ui.ctx(), document, &mut self.pictures, editing);
+        }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let edit_mode = editing.on && !editing.asking;
+        let edit_mode = editing.on && !editing.asking && !self.export.asking();
         if !editing.on {
             self.page.clear();
         }
@@ -279,6 +288,15 @@ impl View for TextView {
             });
         }
         true
+    }
+
+    fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {
+        ui.separator();
+        self.export.menu(ui, path);
+    }
+
+    fn take_notice(&mut self) -> Option<Notice> {
+        self.export.take_notice()
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {

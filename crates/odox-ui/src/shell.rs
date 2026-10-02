@@ -135,6 +135,25 @@ pub trait View {
 
     /// Add the application's own items to the View menu.
     fn view_menu(&mut self, _ui: &mut Ui) {}
+
+    /// Add the application's own items to the File menu, after saving: what
+    /// the document can be written out as. Given the file the document was
+    /// read from, which is where such a file is offered to go.
+    fn file_menu(&mut self, _ui: &mut Ui, _path: Option<&Path>) {}
+
+    /// Something the view has to tell the person, for the bar at the foot of
+    /// the window, once.
+    fn take_notice(&mut self) -> Option<Notice> {
+        None
+    }
+}
+
+/// A message a view hands the window to show at its foot.
+pub enum Notice {
+    /// Something finished, and what came of it.
+    Done(String),
+    /// Something could not be done, and why.
+    Problem(String),
 }
 
 /// The window: chrome, keys, errors, and one view inside it.
@@ -143,6 +162,8 @@ pub struct Shell<V: View> {
     product: Product,
     path: Option<PathBuf>,
     error: Option<String>,
+    /// What the view last said had finished, until it is dismissed.
+    notice: Option<String>,
     /// Set when a document was opened during a frame, cleared at the end of it.
     ///
     /// See the comment where it is read in [`eframe::App::ui`].
@@ -192,6 +213,7 @@ impl<V: View> Shell<V> {
             product,
             path: None,
             error: None,
+            notice: None,
             settling: false,
             zoom: 1.0,
             show_side: true,
@@ -277,6 +299,7 @@ impl<V: View> Shell<V> {
         self.view.close();
         self.path = None;
         self.error = None;
+        self.notice = None;
         self.editing.reset();
     }
 
@@ -534,6 +557,27 @@ impl<V: View> Shell<V> {
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, ctx));
         self.search(ui);
 
+        match self.view.take_notice() {
+            Some(Notice::Done(message)) => {
+                self.notice = Some(message);
+                self.error = None;
+            }
+            Some(Notice::Problem(message)) => {
+                self.error = Some(message);
+                self.notice = None;
+            }
+            None => {}
+        }
+        if let Some(message) = self.notice.clone() {
+            egui::Panel::bottom("notice").show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(message);
+                    if ui.button(t("Dismiss")).clicked() {
+                        self.notice = None;
+                    }
+                });
+            });
+        }
         if let Some(message) = self.error.clone() {
             egui::Panel::bottom("error").show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
@@ -607,6 +651,9 @@ impl<V: View> Shell<V> {
                 {
                     ui.close();
                     self.save_as();
+                }
+                if self.view.is_open() {
+                    self.view.file_menu(ui, self.path.as_deref());
                 }
                 ui.separator();
                 if ui.button(t("Quit")).clicked() {
@@ -892,7 +939,11 @@ fn name_of(path: &Path) -> String {
 /// is refused with *Operation not permitted*. The safe rewrite there goes
 /// through `NSItemReplacementDirectory` and `replaceItemAtURL:`, which is a
 /// platform arm this build cannot verify and does not carry yet.
-fn replace_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+///
+/// # Errors
+///
+/// The file could not be written, or not renamed into place.
+pub fn replace_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     #[cfg(target_os = "macos")]
     {
         std::fs::write(path, bytes)

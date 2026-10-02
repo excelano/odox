@@ -4536,7 +4536,9 @@ dependencies = [
  "eframe",
  "egui_richedit",
  "odox-core",
+ "odox-pdf",
  "odox-ui",
+ "rfd",
 ]
 
 [[package]]
