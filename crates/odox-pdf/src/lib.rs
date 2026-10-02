@@ -383,6 +383,11 @@ fn draw(
                 }
             }
         }
+        Item::Empty { leaf, .. } => {
+            let id = surface.start_tagged(ContentTag::Other);
+            surface.end_tagged();
+            drawn.insert(*leaf, id);
+        }
         Item::Link {
             x,
             y,

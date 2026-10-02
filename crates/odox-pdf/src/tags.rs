@@ -60,6 +60,14 @@ impl Tree {
         id
     }
 
+    /// Whether anything drawn is read under a group.
+    pub(crate) fn holds_content(&self, id: NodeId) -> bool {
+        self.groups[id].children.iter().any(|child| match child {
+            Child::Node(node) => self.holds_content(*node),
+            Child::Leaf(_) => true,
+        })
+    }
+
     /// The tree krilla writes, given the identifier each piece of content was
     /// drawn under. A piece that was never drawn is left out, and so is a
     /// group left with nothing in it.

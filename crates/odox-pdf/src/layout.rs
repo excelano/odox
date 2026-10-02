@@ -84,6 +84,9 @@ pub(crate) enum Item {
         image: krilla::image::Image,
         leaf: Option<LeafId>,
     },
+    /// Nothing drawn, standing for content that is empty: a table cell with
+    /// no text in it, which is still a cell to a reader.
+    Empty { x: f32, y: f32, leaf: LeafId },
     /// The area of a link that a click follows.
     Link {
         x: f32,
@@ -102,7 +105,10 @@ impl Item {
                 *x += dx;
                 *baseline += dy;
             }
-            Self::Rect { x, y, .. } | Self::Image { x, y, .. } | Self::Link { x, y, .. } => {
+            Self::Rect { x, y, .. }
+            | Self::Image { x, y, .. }
+            | Self::Link { x, y, .. }
+            | Self::Empty { x, y, .. } => {
                 *x += dx;
                 *y += dy;
             }
@@ -134,6 +140,7 @@ impl Item {
             | Self::Image { y, height, .. }
             | Self::Link { y, height, .. } => (*y, y + height),
             Self::Rule { from, to, .. } => (from.1.min(to.1), from.1.max(to.1)),
+            Self::Empty { y, .. } => (*y, *y),
         }
     }
 }
@@ -770,6 +777,14 @@ impl<'a> Layout<'a> {
             )?;
             self.break_pending = pending;
             let mut items = Vec::new();
+            if !self.tree.holds_content(cell_node) {
+                let leaf = self.tree.leaf(cell_node);
+                items.push(Item::Empty {
+                    x: left + cell.padding,
+                    y: cell.padding,
+                    leaf,
+                });
+            }
             let mut y = cell.padding;
             for (index, piece) in pieces.into_iter().enumerate() {
                 if index > 0 {

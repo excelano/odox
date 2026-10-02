@@ -104,3 +104,22 @@ fn something_that_is_not_a_figure_is_refused() {
         Err(odox_core::Refused::NotFound)
     );
 }
+
+#[test]
+fn a_document_that_never_declared_libreoffices_namespace_is_given_it_to_mark_decoration() {
+    let mut document = open();
+    let root = &mut document.document.content;
+    root.attrs
+        .retain(|a| !(a.name.ns == odox_core::Ns::Xmlns && &*a.name.local == "loext"));
+    assert!(!root.declares(&odox_core::Ns::Loext));
+    let (chart, _) = described(&document).remove(0);
+    edit::set_decorative(
+        &mut document.document.content,
+        &chart,
+        &mut document.document.styles,
+    )
+    .expect("marked");
+    let bytes = document.document.write_verified().expect("saved");
+    let again = TextDocument::read(&bytes).expect("it reads");
+    assert_eq!(described(&again)[0].1, Description::Decorative);
+}

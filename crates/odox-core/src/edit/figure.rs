@@ -82,10 +82,12 @@ pub fn description(frame: &Element, styles: &Styles) -> Description {
 /// Give the figure at a path under the content root its alternative text,
 /// replacing what its `svg:title` said.
 ///
+/// The SVG namespace is declared on the content root where it is not.
+///
 /// # Errors
 ///
-/// The path does not lead to a figure, or the content root does not declare
-/// the SVG namespace. Each is refused before anything changes.
+/// The path does not lead to a figure, or the SVG namespace's prefix is taken
+/// by another. Each is refused before anything changes.
 pub fn set_alternative_text(
     content: &mut Element,
     path: &[usize],
@@ -95,7 +97,9 @@ pub fn set_alternative_text(
         .at(path)
         .filter(|e| is_figure(e))
         .ok_or(Refused::NotFound)?;
-    declares(content, &[Ns::Svg])?;
+    if !content.declare(&Ns::Svg) {
+        return Err(Refused::Namespace);
+    }
     let mut title = element(content.name_for(&Ns::Svg, "title"));
     title.children.push(Node::Text(text.to_owned()));
     title.self_closing = false;
@@ -128,6 +132,8 @@ pub fn set_alternative_text(
 
 /// Mark the figure at a path under the content root as decoration.
 ///
+/// `LibreOffice`'s namespace is declared on the content root where it is not,
+/// since a document another application wrote has no other way to say it.
 /// The frame is given an automatic graphic style that says so: a copy of the
 /// one it has where that one is automatic, so that nothing else it says is
 /// lost, and otherwise a style that inherits from the one it names. A document
@@ -137,8 +143,9 @@ pub fn set_alternative_text(
 ///
 /// # Errors
 ///
-/// The path does not lead to a figure, or the content root does not declare a
-/// namespace the edit writes in. Each is refused before anything changes.
+/// The path does not lead to a figure, the content root does not declare the
+/// style or drawing namespace, or `LibreOffice`'s prefix is another
+/// namespace's there. Each is refused before anything changes.
 pub fn set_decorative(
     content: &mut Element,
     path: &[usize],
@@ -151,8 +158,11 @@ pub fn set_decorative(
     if description(frame, styles) == Description::Decorative {
         return Ok(());
     }
-    declares(content, &[Ns::Draw, Ns::Style, Ns::Loext])?;
     let current = frame.attr(&Ns::Draw, "style-name").map(ToOwned::to_owned);
+    declares(content, &[Ns::Draw, Ns::Style])?;
+    if !content.declare(&Ns::Loext) {
+        return Err(Refused::Namespace);
+    }
 
     let automatic = current.as_deref().and_then(|name| {
         content

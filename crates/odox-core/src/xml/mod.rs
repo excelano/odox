@@ -100,6 +100,31 @@ impl Ns {
 }
 
 impl Ns {
+    /// The URI a namespace is declared with, for one this crate names.
+    pub fn uri(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::Office => "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+            Self::Text => "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+            Self::Style => "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
+            Self::Table => "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+            Self::Draw => "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
+            Self::Presentation => "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
+            Self::Chart => "urn:oasis:names:tc:opendocument:xmlns:chart:1.0",
+            Self::Fo => "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
+            Self::Svg => "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
+            Self::Number => "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
+            Self::Meta => "urn:oasis:names:tc:opendocument:xmlns:meta:1.0",
+            Self::Manifest => "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0",
+            Self::Config => "urn:oasis:names:tc:opendocument:xmlns:config:1.0",
+            Self::Of => "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
+            Self::Xlink => "http://www.w3.org/1999/xlink",
+            Self::Dc => "http://purl.org/dc/elements/1.1/",
+            Self::Loext => "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0",
+            Self::Calcext => "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0",
+            Self::Xmlns | Self::Other(_) | Self::None => return None,
+        })
+    }
+
     /// The prefix ODF spells a namespace with, for a name written into a
     /// document that does not declare one of its own.
     pub fn conventional_prefix(&self) -> &str {
@@ -326,6 +351,32 @@ impl Element {
         self.attrs
             .iter()
             .any(|a| a.name.ns == Ns::Xmlns && Ns::from_uri(&a.value) == *ns)
+    }
+
+    /// Declare a namespace on this element under its conventional prefix,
+    /// where it is not declared already. False where it cannot be: the
+    /// prefix is another namespace's here, or the namespace has no URI this
+    /// crate knows.
+    pub fn declare(&mut self, ns: &Ns) -> bool {
+        if self.declares(ns) {
+            return true;
+        }
+        let Some(uri) = ns.uri() else {
+            return false;
+        };
+        let prefix = ns.conventional_prefix();
+        if self
+            .attrs
+            .iter()
+            .any(|a| a.name.ns == Ns::Xmlns && &*a.name.local == prefix)
+        {
+            return false;
+        }
+        self.attrs.push(Attribute {
+            name: Name::new("xmlns", prefix, Ns::Xmlns),
+            value: uri.to_owned(),
+        });
+        true
     }
 
     /// The first child element with the given name.
