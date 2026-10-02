@@ -21,7 +21,7 @@ use egui::{
     Response, Sense, Ui, vec2,
 };
 
-use crate::{Edit, Mark, Model, OffsetMap, Position, Selection};
+use crate::{Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
 
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
@@ -84,6 +84,9 @@ pub struct RichEdit<P> {
     last_interaction: f64,
     /// Marks given or taken off at a caret, for the text typed there next.
     pending: Option<Pending<P>>,
+    /// The last copy, with the plain text it put on the clipboard: a paste of
+    /// that text is a paste of the copy, formatting and all.
+    clip: Option<(String, Fragment)>,
 }
 
 /// Marks given or taken off with a caret and nothing selected. The next text
@@ -145,6 +148,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             dragging: false,
             last_interaction: 0.0,
             pending: None,
+            clip: None,
         }
     }
 
@@ -170,6 +174,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.column = None;
         self.dragging = false;
         self.pending = None;
+        self.clip = None;
     }
 
     /// The document was changed or replaced by something other than this
@@ -447,16 +452,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             }
             Event::Paste(text) => (false, self.paste(model, text)),
             Event::Copy => {
-                if let Some(text) = self.selected_text(model) {
-                    ui.ctx().copy_text(text);
-                }
+                self.copy(ui, model);
                 (false, false)
             }
             Event::Cut => {
-                let Some(text) = self.selected_text(model) else {
+                if !self.copy(ui, model) {
                     return (false, false);
-                };
-                ui.ctx().copy_text(text);
+                }
                 self.group = None;
                 let cut = self.delete_selection(model, Group::Other);
                 self.group = None;
@@ -625,9 +627,49 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     /// Paste text, each of its lines after the first a paragraph of its own,
     /// in one undo step. It stops at the first part the model refuses, so a
     /// selection that cannot be replaced is left as it was.
+    /// Paste the last copy where the caret is, in place of the selection,
+    /// when the clipboard still holds the text it put there. `None` when it
+    /// does not or the model will not, and the paste is plain.
+    fn paste_copy<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> Option<bool> {
+        let fragment = self
+            .clip
+            .as_ref()
+            .filter(|(plain, _)| plain == text)
+            .map(|(_, fragment)| fragment.clone())?;
+        self.selection.as_ref()?;
+        let deleted = self.delete_selection(model, Group::Other);
+        let at = self.selection.as_ref().map(|s| s.focus.clone())?;
+        let after = model.paste_fragment(&at, &fragment, !deleted)?;
+        self.selection = Some(Selection::caret(after));
+        self.owed = Owed::Reveal;
+        Some(true)
+    }
+
+    /// Put the selection on the clipboard as text, and keep a copy of it that
+    /// has its formatting for a paste of that text. Answers whether there was a
+    /// selection.
+    fn copy<M: Model<Paragraph = P>>(&mut self, ui: &Ui, model: &M) -> bool {
+        let Some(text) = self.selected_text(model) else {
+            return false;
+        };
+        ui.ctx().copy_text(text.clone());
+        self.clip = self
+            .selection
+            .as_ref()
+            .map(|selection| self.ordered(selection))
+            .and_then(|(from, to)| model.fragment(&from, &to))
+            .map(|fragment| (text, fragment));
+        true
+    }
+
+    /// Paste what the clipboard holds, as the copy it came from if it is that.
     fn paste<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let text = text.replace("\r\n", "\n").replace('\r', "\n");
         self.group = None;
+        if let Some(changed) = self.paste_copy(model, &text) {
+            self.group = None;
+            return changed;
+        }
         let mut changed = false;
         for (index, line) in text.split('\n').enumerate() {
             if index > 0 {

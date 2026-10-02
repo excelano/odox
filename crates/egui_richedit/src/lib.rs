@@ -41,8 +41,10 @@ mod job;
 pub use editor::{Laid, RichEdit};
 pub use job::{OffsetMap, ParagraphJob};
 
+use std::any::Any;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::sync::Arc;
 
 /// Where a caret can stand: a paragraph, and a character offset into the
 /// model's text of it.
@@ -142,6 +144,24 @@ impl Mark {
     pub const ALL: [Self; 4] = [Self::Bold, Self::Italic, Self::Underline, Self::Strike];
 }
 
+/// A copy of part of the document that keeps what a string cannot: the
+/// formatting and the kinds of paragraph. Only the model that made one can read
+/// it, so it is whatever that model likes behind a type the editor never sees.
+#[derive(Clone)]
+pub struct Fragment(Arc<dyn Any + Send + Sync>);
+
+impl Fragment {
+    /// Wrap whatever a model carries a copy in.
+    pub fn new<T: Any + Send + Sync>(value: T) -> Self {
+        Self(Arc::new(value))
+    }
+
+    /// What was wrapped, if it is a `T`.
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        self.0.downcast_ref()
+    }
+}
+
 /// The document, as the editor sees it. The application implements this over
 /// whatever it keeps its document in.
 pub trait Model {
@@ -178,6 +198,33 @@ pub trait Model {
     ) -> Option<bool> {
         let _ = (from, to, mark);
         Some(false)
+    }
+
+    /// A copy of the text from one position to another that keeps what the
+    /// plain text of it cannot, for pasting back into this model. The editor
+    /// holds it beside the plain text it put on the clipboard and uses it only
+    /// while the clipboard still holds that text. A model that keeps no
+    /// formatting leaves this as it is and pastes are plain.
+    fn fragment(
+        &self,
+        from: &Position<Self::Paragraph>,
+        to: &Position<Self::Paragraph>,
+    ) -> Option<Fragment> {
+        let _ = (from, to);
+        None
+    }
+
+    /// Put a [`Fragment`] this model made in at a position, as one edit, and
+    /// answer where the caret stands after it. `new_step` is as for
+    /// [`Self::apply`]. `None` refuses it, and the paste is plain.
+    fn paste_fragment(
+        &mut self,
+        at: &Position<Self::Paragraph>,
+        fragment: &Fragment,
+        new_step: bool,
+    ) -> Option<Position<Self::Paragraph>> {
+        let _ = (at, fragment, new_step);
+        None
     }
 
     /// Make an edit, and answer where the caret stands after it: after the

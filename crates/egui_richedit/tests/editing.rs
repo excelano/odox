@@ -11,7 +11,9 @@
 use egui::output::OutputCommand;
 use egui::text::LayoutJob;
 use egui::{Context, Event, Id, Key, Modifiers, Pos2, RawInput, Rect, Sense, TextFormat, vec2};
-use egui_richedit::{Edit, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection};
+use egui_richedit::{
+    Edit, Fragment, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection,
+};
 
 /// Paragraphs of plain text, named by their index.
 struct Plain {
@@ -110,6 +112,35 @@ impl Model for Plain {
             .flat_map(|(p, range)| self.bold[p][range].to_vec());
         let first = chars.next()?;
         chars.all(|b| b == first).then_some(first)
+    }
+
+    fn fragment(&self, from: &Position<usize>, to: &Position<usize>) -> Option<Fragment> {
+        if from.paragraph != to.paragraph {
+            return None;
+        }
+        let text = self.paragraphs[from.paragraph]
+            .chars()
+            .skip(from.offset)
+            .take(to.offset - from.offset)
+            .collect::<String>();
+        let bold = self.bold[from.paragraph][from.offset..to.offset].to_vec();
+        Some(Fragment::new((text, bold)))
+    }
+
+    fn paste_fragment(
+        &mut self,
+        at: &Position<usize>,
+        fragment: &Fragment,
+        new_step: bool,
+    ) -> Option<Position<usize>> {
+        let (text, bold) = fragment.get::<(String, Vec<bool>)>()?;
+        if new_step {
+            self.steps += 1;
+        }
+        let paragraph = self.paragraphs.get_mut(at.paragraph)?;
+        paragraph.insert_str(byte(paragraph, at.offset), text);
+        self.bold[at.paragraph].splice(at.offset..at.offset, bold.iter().copied());
+        Some(Position::new(at.paragraph, at.offset + bold.len()))
     }
 
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
@@ -734,6 +765,54 @@ fn a_mark_on_a_selection_is_one_step_and_keeps_the_selection() {
     h.keys(&[command(Key::B)]);
     assert_eq!(h.model.bold_text(0), "");
     assert_eq!(h.model.steps, 2);
+}
+
+#[test]
+fn a_paste_of_what_was_copied_keeps_its_formatting_and_any_other_text_does_not() {
+    let mut h = Harness::new(&["Hello world"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 6),
+        focus: Position::new(0, 11),
+    });
+    h.keys(&[command(Key::B)]);
+    assert_eq!(h.model.bold_text(0), "world");
+    let copied = h
+        .frame(vec![Event::Copy])
+        .expect("it went on the clipboard");
+    assert_eq!(copied, "world");
+
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste(copied)]);
+    assert_eq!(h.model.paragraphs, ["worldHello world"]);
+    assert_eq!(
+        h.model.bold_text(0),
+        "worldworld",
+        "the pasted word is bold too"
+    );
+    assert_eq!(h.focus(), Position::new(0, 5), "the caret is after it");
+
+    // The clipboard held something else by then: a paste is plain, and typed
+    // text takes the character before it, which at the start is none.
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste("zz".to_owned())]);
+    assert_eq!(h.model.paragraphs, ["zzworldHello world"]);
+    assert_eq!(h.model.bold_text(0), "worldworld");
+}
+
+#[test]
+fn a_cut_can_be_pasted_back_with_its_formatting() {
+    let mut h = Harness::new(&["ab cd"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 3),
+        focus: Position::new(0, 5),
+    });
+    h.keys(&[command(Key::B)]);
+    let cut = h.frame(vec![Event::Cut]).expect("it went on the clipboard");
+    assert_eq!(h.model.paragraphs, ["ab "]);
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste(cut)]);
+    assert_eq!(h.model.paragraphs, ["cdab "]);
+    assert_eq!(h.model.bold_text(0), "cd");
 }
 
 #[test]

@@ -14,7 +14,7 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Mark, Model, Position, RichEdit, Selection};
+use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
 use odox_core::edit::{self, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
@@ -463,6 +463,36 @@ impl Model for FlowModel<'_> {
         answer
     }
 
+    fn fragment(&self, from: &Position<Vec<usize>>, to: &Position<Vec<usize>>) -> Option<Fragment> {
+        let root = self.root()?;
+        let items: Vec<Element> = self
+            .covered(from, to)?
+            .into_iter()
+            .filter_map(|(path, range)| Some(edit::slice(root.at(&path)?, range)))
+            .collect();
+        (!items.is_empty()).then(|| Fragment::new(items))
+    }
+
+    fn paste_fragment(
+        &mut self,
+        at: &Position<Vec<usize>>,
+        fragment: &Fragment,
+        new_step: bool,
+    ) -> Option<Position<Vec<usize>>> {
+        let items = fragment.get::<Vec<Element>>()?;
+        let new_step = new_step || !self.editing.modified();
+        let before = new_step.then(|| self.content.clone());
+        let root = self.content.at_mut(&self.root)?;
+        let (path, offset) = edit::paste_fragment(root, &at.paragraph, at.offset, items).ok()?;
+        self.editing.touch();
+        if let Some(before) = before {
+            let begins = Position::new([self.tag.as_slice(), &at.paragraph].concat(), at.offset);
+            self.editing.record_snapshot(before, Some(begins));
+        }
+        self.order = OnceCell::new();
+        Some(Position::new(path, offset))
+    }
+
     fn apply(
         &mut self,
         edit: Edit<'_, Vec<usize>>,
@@ -767,6 +797,35 @@ mod tests {
             undone += 1;
         }
         assert_eq!(undone, 1);
+    }
+
+    #[test]
+    fn a_copy_keeps_spans_and_a_paste_puts_them_back_in_one_step() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>one <text:span text:style-name="T1">two</text:span> three</text:p><text:p>x</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let fragment = model
+            .fragment(&Position::new(vec![0], 3), &Position::new(vec![0], 7))
+            .expect("a copy");
+        let after = model
+            .paste_fragment(&Position::new(vec![1], 1), &fragment, true)
+            .expect("it goes in");
+        assert_eq!(after, Position::new(vec![1], 5));
+        let written = String::from_utf8(odox_core::xml::serialize(&content)).expect("UTF-8");
+        assert!(
+            written.contains(
+                r#"<text:p>x<text:s/><text:span text:style-name="T1">two</text:span></text:p>"#
+            ),
+            "{written}"
+        );
+        assert_eq!(editing.undo(&content.clone(), None).map(|_| ()), Some(()));
+        assert!(!editing.can_undo(), "one step");
     }
 
     #[test]

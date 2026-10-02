@@ -475,3 +475,17 @@ offset map the caret uses. A selection that began in another paragraph is
 reported as a caret at its end here, because one node cannot name a position in
 another. Slide labels go through the same flow and so are told the same way. A
 sheet's grid is painted cell by cell and is not yet.
+
+**A copy keeps its formatting inside the window it was made in.** The system
+clipboard carries plain text, so the editor puts the selection there as text and
+keeps beside it a `Fragment` its model made: the covered paragraphs cut to the
+range, each with its own style and kind, and the spans and links in it, without
+the ids, bookmarks, frames and notes that name one place in a document and would
+then be there twice. A paste of exactly the text it put on the clipboard is a
+paste of the fragment; any other text, a copy from another program or from
+another window, is plain. The first pasted paragraph merges into the paragraph at
+the caret and takes its style, as typed text would; the ones between keep their
+own; the last merges with what followed the caret and keeps the paragraph's
+style; in a list each is an item. A model that keeps no formatting leaves the two
+`Model` methods as they are and every paste is plain. Across windows needs HTML
+on the system clipboard and is not done.

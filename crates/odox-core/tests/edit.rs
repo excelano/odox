@@ -13,7 +13,8 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::edit::{
-    apply, join, join_with_previous, links, replace, replace_range, rewrite, split, split_at, text,
+    apply, insert_inline, join, join_with_previous, links, paste_fragment, replace, replace_range,
+    rewrite, slice, split, split_at, text,
 };
 use odox_core::{Element, Node, Ns, Package, xml};
 
@@ -554,4 +555,84 @@ fn a_link_covers_the_characters_inside_it_and_says_where_it_points() {
         links(paragraph),
         vec![(3..14, "https://example.com/"), (17..19, "#top")]
     );
+}
+
+#[test]
+fn a_slice_keeps_the_text_in_the_range_with_its_spans_and_drops_what_names_a_place() {
+    let root = body(
+        "<text:p text:style-name=\"P1\" xml:id=\"p1\">ab <text:span text:style-name=\"T1\">cd<text:bookmark text:name=\"b\"/>ef</text:span> gh</text:p>",
+    );
+    let paragraph = root.at(&[0]).expect("a paragraph");
+    let kept = slice(paragraph, 1..6);
+    let written = String::from_utf8(odox_core::xml::serialize(&kept)).expect("UTF-8");
+    let written = written
+        .split_once('\n')
+        .map_or(written.as_str(), |(_, rest)| rest);
+    assert_eq!(
+        written,
+        "<text:p text:style-name=\"P1\">b <text:span text:style-name=\"T1\">cde</text:span></text:p>"
+    );
+}
+
+#[test]
+fn text_run_goes_in_at_an_offset_and_the_paragraph_keeps_its_style() {
+    let mut root = body("<text:p text:style-name=\"P1\">hello world</text:p>");
+    let carried = slice(
+        body("<text:p><text:span text:style-name=\"T1\">BIG</text:span></text:p>")
+            .at(&[0])
+            .expect("a paragraph"),
+        0..3,
+    );
+    let paragraph = root.at_mut(&[0]).expect("a paragraph");
+    insert_inline(paragraph, 5, &carried.children);
+    assert_eq!(
+        inner(&root),
+        "<text:p text:style-name=\"P1\">hello<text:span text:style-name=\"T1\">BIG</text:span><text:s/>world</text:p>"
+    );
+}
+
+fn fragment_of_two() -> Vec<odox_core::Element> {
+    let source = body(
+        "<text:p>first <text:span text:style-name=\"T1\">one</text:span></text:p><text:h text:outline-level=\"2\">second</text:h>",
+    );
+    vec![
+        slice(source.at(&[0]).expect("one"), 0..9),
+        slice(source.at(&[1]).expect("two"), 0..6),
+    ]
+}
+
+#[test]
+fn several_paragraphs_go_in_with_the_first_merging_and_the_last_merging_with_the_tail() {
+    let mut root = body("<text:p text:style-name=\"P1\">abcdef</text:p>");
+    let (caret, offset) =
+        paste_fragment(&mut root, &[0], 3, &fragment_of_two()).expect("it goes in");
+    assert_eq!(
+        inner(&root),
+        "<text:p text:style-name=\"P1\">abcfirst <text:span text:style-name=\"T1\">one</text:span></text:p><text:p text:style-name=\"P1\">seconddef</text:p>"
+    );
+    assert_eq!((caret, offset), (vec![1], 6));
+}
+
+#[test]
+fn three_paragraphs_keep_the_middle_one_s_own_kind() {
+    let mut root = body("<text:p>abcdef</text:p>");
+    let mut three = fragment_of_two();
+    three.push(three[1].clone());
+    paste_fragment(&mut root, &[0], 3, &three).expect("it goes in");
+    assert_eq!(
+        inner(&root),
+        "<text:p>abcfirst <text:span text:style-name=\"T1\">one</text:span></text:p><text:h text:outline-level=\"2\">second</text:h><text:p>seconddef</text:p>"
+    );
+}
+
+#[test]
+fn pasted_paragraphs_in_a_list_become_items_and_an_empty_item_stays_a_list() {
+    let mut root = body("<text:list><text:list-item><text:p/></text:list-item></text:list>");
+    let (caret, offset) =
+        paste_fragment(&mut root, &[0, 0, 0], 0, &fragment_of_two()).expect("it goes in");
+    assert_eq!(
+        inner(&root),
+        "<text:list><text:list-item><text:p>first <text:span text:style-name=\"T1\">one</text:span></text:p></text:list-item><text:list-item><text:p>second</text:p></text:list-item></text:list>"
+    );
+    assert_eq!((caret, offset), (vec![0, 1, 0], 6));
 }

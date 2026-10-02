@@ -98,7 +98,8 @@ as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
 before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
-processor. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+processor. Text copied in a window and pasted back into it keeps its bold, italic, underline,
+strikethrough and paragraph kinds; pasted anywhere else it is plain text. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
