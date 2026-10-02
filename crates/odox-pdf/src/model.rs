@@ -37,6 +37,7 @@ pub(crate) enum Block {
     Table(Table),
     Figure(Figure),
     TextBox(TextBox),
+    Note(Note),
 }
 
 /// A paragraph or a heading.
@@ -168,17 +169,35 @@ pub(crate) struct TextBox {
     pub blocks: Vec<Block>,
 }
 
-/// Read the blocks under an element, with its path from the content root.
+/// A footnote or an endnote, with the citation the text calls it by.
+pub(crate) struct Note {
+    pub citation: String,
+    pub blocks: Vec<Block>,
+}
+
+/// Read the blocks under an element, with its path from the content root, and
+/// the notes cited in them after the rest, in the order they are cited.
+///
+/// A PDF has pages and could hold a footnote at the foot of one, but laying
+/// one out there means taking room from the page the line citing it is on;
+/// the notes are gathered at the end of the document instead.
 pub(crate) fn read(document: &Document, root: &Element, path: Vec<usize>) -> Vec<Block> {
-    let mut reader = Reader { document, path };
+    let mut reader = Reader {
+        document,
+        path,
+        notes: Vec::new(),
+    };
     let mut blocks = Vec::new();
     reader.blocks(root, &mut blocks, &mut Counters::default());
+    blocks.extend(reader.notes.into_iter().map(Block::Note));
     blocks
 }
 
 struct Reader<'a> {
     document: &'a Document,
     path: Vec<usize>,
+    /// The notes cited so far.
+    notes: Vec<Note>,
 }
 
 /// Where a list's counters stand, one per level.
@@ -245,14 +264,14 @@ impl Reader<'_> {
             runs: Vec::new(),
             links: Vec::new(),
         };
-        let mut frames = Vec::new();
+        let mut anchored = Vec::new();
         self.runs(
             element,
             &properties.text,
             size,
             None,
             &mut text,
-            &mut frames,
+            &mut anchored,
             &mut self.path.clone(),
         );
         let points = |length: Option<Length>| length.map_or(0.0, Length::points);
@@ -275,15 +294,38 @@ impl Reader<'_> {
             page_before: p.break_before == Some(Break::Page),
             page_after: p.break_after == Some(Break::Page),
         }));
-        for (frame, path) in frames {
+        for (element, path) in anchored {
             let outer = std::mem::replace(&mut self.path, path);
-            self.frame(&frame, into);
+            if element.is(&Ns::Text, "note") {
+                self.note(&element);
+            } else {
+                self.frame(&element, into);
+            }
             self.path = outer;
         }
     }
 
+    /// A note's body, read into the notes for the end of the document.
+    fn note(&mut self, note: &Element) {
+        let citation = note
+            .child(&Ns::Text, "note-citation")
+            .map(Element::plain_text)
+            .unwrap_or_default();
+        let Some((index, body)) = note
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Text, "note-body"))
+        else {
+            return;
+        };
+        self.path.push(index);
+        let mut blocks = Vec::new();
+        self.blocks(body, &mut blocks, &mut Counters::default());
+        self.path.pop();
+        self.notes.push(Note { citation, blocks });
+    }
+
     /// Append the text of a paragraph's children, collecting the frames
-    /// anchored in it, each with its path.
+    /// anchored in it and the notes cited in it, each with its path.
     #[allow(clippy::too_many_arguments)]
     fn runs(
         &self,
@@ -292,7 +334,7 @@ impl Reader<'_> {
         size: f32,
         link: Option<usize>,
         text: &mut Text,
-        frames: &mut Vec<(Element, Vec<usize>)>,
+        anchored: &mut Vec<(Element, Vec<usize>)>,
         path: &mut Vec<usize>,
     ) {
         let current = style(inherited, size, link);
@@ -324,9 +366,9 @@ impl Reader<'_> {
                         } else {
                             link
                         };
-                        self.runs(element, &merged, inner, link, text, frames, path);
+                        self.runs(element, &merged, inner, link, text, anchored, path);
                     } else if element.is(&Ns::Draw, "frame") {
-                        frames.push((element.clone(), path.clone()));
+                        anchored.push((element.clone(), path.clone()));
                     } else if element.is(&Ns::Text, "note") {
                         if let Some(citation) = element.child(&Ns::Text, "note-citation") {
                             let mut raised = current.clone();
@@ -334,8 +376,9 @@ impl Reader<'_> {
                             raised.rise = size * 0.33;
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
+                        anchored.push((element.clone(), path.clone()));
                     } else if edit::is_inline_passthrough(element) {
-                        self.runs(element, inherited, size, link, text, frames, path);
+                        self.runs(element, inherited, size, link, text, anchored, path);
                     }
                     path.pop();
                 }

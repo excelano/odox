@@ -554,8 +554,12 @@ the test says it skipped the check where it is not installed;
 body into blocks with the same decisions the window's flow makes, which live in
 `odox-core` for both to call: which elements are blocks and which pass their
 text through, how a list level writes its numbers, a tab as four spaces, a
-footnote as its citation, a picture anchored in a paragraph after it. An object
-with no picture of its own, which the window shows as an empty box, is left out.
+picture anchored in a paragraph after it. An object with no picture of its own,
+which the window shows as an empty box, is left out. A note is the one thing
+the PDF holds that the window does not show: its citation stays in the text, and
+its own text goes to the end of the document with the other notes, in the order
+they are cited, below a short rule, each tagged as a Note with its citation as
+its label.
 
 **The window has no pages; an export does.** The body is laid out at the text
 width of the first page style and filled into pages of its size and margins.

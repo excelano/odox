@@ -21,12 +21,16 @@ use odox_core::{Border, Color, Edges, Measure, TextAlign};
 
 use crate::Refusal;
 use crate::fonts::Faces;
-use crate::model::{Block, Cell, Figure, List, Paragraph, Style, Table, TextBox};
+use crate::model::{Block, Cell, Figure, List, Note, Paragraph, Style, Table, TextBox};
 use crate::tags::{LeafId, NodeId, Tree};
 use crate::text::{self, Glyph};
 
 /// The gap between a list label and the text it belongs to.
 const LABEL_GAP: f32 = 5.0;
+/// How far a note's text is indented, leaving its citation the margin.
+const NOTE_INDENT: f32 = 20.0;
+/// The space above the notes, with the rule that sets them off half way.
+const NOTES_GAP: f32 = 18.0;
 /// The space a table keeps above and below it.
 const TABLE_GAP: f32 = 4.0;
 /// The space between a text box's edge and its text.
@@ -176,6 +180,8 @@ pub(crate) struct Layout<'a> {
     /// The levels of the headings the current one sits under, as the
     /// document numbers them.
     headings: Vec<u8>,
+    /// Whether the notes at the end have begun, and with them the rule above.
+    notes_begun: bool,
 }
 
 impl<'a> Layout<'a> {
@@ -186,6 +192,7 @@ impl<'a> Layout<'a> {
             page_height,
             break_pending: false,
             headings: Vec::new(),
+            notes_begun: false,
         }
     }
 
@@ -208,6 +215,7 @@ impl<'a> Layout<'a> {
                 Block::Table(table) => self.table(table, x, width, parent, out)?,
                 Block::Figure(figure) => self.figure(figure, x, width, parent, out),
                 Block::TextBox(text_box) => self.text_box(text_box, x, width, parent, out)?,
+                Block::Note(note) => self.note(note, x, width, parent, out)?,
             }
             // A break asked for after the block before goes before this one,
             // or on past it where it drew nothing.
@@ -562,6 +570,59 @@ impl<'a> Layout<'a> {
                     first = false;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// A note at the end of the document: its citation in the margin and its
+    /// text beside it, the first set off from the body by a short rule.
+    fn note(
+        &mut self,
+        note: &Note,
+        x: f32,
+        width: f32,
+        parent: Option<NodeId>,
+        out: &mut Vec<Piece>,
+    ) -> Result<(), Refusal> {
+        if !self.notes_begun {
+            self.notes_begun = true;
+            out.push(Piece {
+                height: NOTES_GAP,
+                items: vec![Item::Rule {
+                    from: (x, NOTES_GAP / 2.0),
+                    to: (x + width / 3.0, NOTES_GAP / 2.0),
+                    width: 0.5,
+                    color: INK,
+                }],
+                ..Piece::default()
+            });
+        }
+        let node = self.tree.group(parent, Tag::Note);
+        let label = self.tree.group(Some(node), Tag::Lbl);
+        let inner_x = x + NOTE_INDENT;
+        let inner_width = (width - NOTE_INDENT).max(1.0);
+        let mut first = true;
+        for block in &note.blocks {
+            match block {
+                Block::Paragraph(paragraph) if first => {
+                    self.paragraph(
+                        paragraph,
+                        inner_x,
+                        inner_width,
+                        Some(node),
+                        Some((&note.citation, label)),
+                        out,
+                    )?;
+                }
+                other => self.blocks(
+                    std::slice::from_ref(other),
+                    inner_x,
+                    inner_width,
+                    Some(node),
+                    out,
+                )?,
+            }
+            first = false;
         }
         Ok(())
     }

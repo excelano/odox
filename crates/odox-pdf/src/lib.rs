@@ -122,6 +122,7 @@ fn collect_undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
                 }
             }
             Block::TextBox(text_box) => collect_undescribed(&text_box.blocks, into),
+            Block::Note(note) => collect_undescribed(&note.blocks, into),
             _ => {}
         }
     }
