@@ -594,7 +594,7 @@ frame's graphic style, so a document says the same in either application. An
 export with a picture that says neither is refused, and `xodt` asks about each
 one first, with the picture beside a field for its text and a box for
 decoration; the answers are written into the document as one step to undo, and
-a document that never declared the SVG or `LibreOffice` namespace is given the
+a document that does not declare the SVG or `LibreOffice` namespace is given the
 declaration. Nothing unanswered is written under the PDF/UA label.
 
 **A font is embedded only where its licence allows it.** A face whose OS/2
