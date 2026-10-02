@@ -433,7 +433,7 @@ editing, Ctrl and a click do, because a plain click puts the caret down. The
 address is shown in a tooltip before anything is done. `http`, `https` and
 `mailto` are handed to the desktop's own handler, and `#Name` scrolls to the
 bookmark of that name, or to the heading whose text is `Name` where it is
-written `Name|outline`. Every other scheme, `file:` and the desktop's
+written `Name|outline`. In a deck `#Name` goes to the slide whose `draw:name` is `Name`. Every other scheme, `file:` and the desktop's
 registered handlers among them, is ignored, because a document is not trusted
 with what the machine will run. The application makes no request itself.
 

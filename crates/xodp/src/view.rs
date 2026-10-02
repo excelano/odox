@@ -235,6 +235,7 @@ impl View for SlideView {
         let picked = self.picked;
         let dragging = self.drag.is_some();
         let mut action = None;
+        let mut followed = None;
 
         if edit_mode {
             self.edit(ui, editing);
@@ -303,6 +304,7 @@ impl View for SlideView {
                 for (index, shape) in slide.shapes_indexed() {
                     canvas.slide_shape(ui, index, shape);
                 }
+                followed = canvas.followed.take();
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.
@@ -320,6 +322,9 @@ impl View for SlideView {
         });
 
         self.found.drawn();
+        if let Some(name) = followed {
+            self.go_to_slide_named(&name);
+        }
         if let Some(action) = action {
             self.act(action, fit, editing);
         }
@@ -611,6 +616,20 @@ impl SlideView {
             }
         });
         self.show_slide(slide.min(count.saturating_sub(1)));
+    }
+
+    /// Go to the slide a link names, which is the `draw:name` the link
+    /// carries after its `#`. A name no slide has leaves the view as it is.
+    fn go_to_slide_named(&mut self, name: &str) {
+        let Some(index) = self.document.as_ref().and_then(|document| {
+            document
+                .slides()
+                .iter()
+                .position(|slide| slide.name == Some(name))
+        }) else {
+            return;
+        };
+        self.show_slide(index);
     }
 
     /// Look at another slide, with nothing picked and no caret. The slide

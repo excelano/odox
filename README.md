@@ -127,8 +127,9 @@ at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
 or a right click go back, and Escape ends it. The notes are not shown.
 
-In `xodt`, a click on a link opens a web or mail address in the desktop's own
-browser or mail program, or scrolls to a bookmark or heading in the document;
+A click on a link, in `xodt` and in the text of a slide in `xodp`, opens a web or
+mail address in the desktop's own browser or mail program, or in `xodt` scrolls
+to a bookmark or heading and in `xodp` goes to the slide the link names;
 while editing it takes Ctrl and a click, a plain click being the caret. No other
 kind of link is followed, whatever the document says.
 
