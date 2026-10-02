@@ -103,7 +103,7 @@ selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
-off. Undo puts the caret back where the edit
+off. The Format menu offers the same commands, and in `xodp` the marks. Undo puts the caret back where the edit
 was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell

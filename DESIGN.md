@@ -463,5 +463,5 @@ layout whitespace between them aside, become one list so that numbers run on;
 taking a paragraph out of a list splits the list around it, the half after
 continuing the numbering, and anything else its item held, a nested list,
 stands beside it. One pass over the selection is one undo step, and the buttons
-are lit where every paragraph in the selection is one. Enter at the end of a heading starts body text, in the style a heading
+are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.

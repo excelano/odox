@@ -17,6 +17,7 @@ use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
 use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
 };
@@ -39,6 +40,9 @@ pub struct SlideView {
     found: Found,
     /// The slideshow is on: one slide, filling the screen, and nothing else.
     presenting: bool,
+    /// What the Format menu draws itself from, and what it last chose.
+    menu: MenuState,
+    command: Option<Command>,
 }
 
 impl Default for SlideView {
@@ -53,6 +57,8 @@ impl Default for SlideView {
             page_editor: page_editor(),
             found: Found::default(),
             presenting: false,
+            menu: MenuState::offering_blocks(false),
+            command: None,
         }
     }
 }
@@ -196,6 +202,16 @@ impl View for SlideView {
         }
     }
 
+    fn has_format_menu(&self) -> bool {
+        true
+    }
+
+    fn format_menu(&mut self, ui: &mut Ui) {
+        if let Some(command) = toolbar::menu(ui, &self.menu) {
+            self.command = Some(command);
+        }
+    }
+
     fn can_replace(&self, editing: &Editing) -> bool {
         editing.on && self.document.is_some()
     }
@@ -298,6 +314,9 @@ impl View for SlideView {
 
         if edit_mode {
             self.edit(ui, editing);
+        } else {
+            self.command = None;
+            self.menu = MenuState::offering_blocks(false);
         }
 
         let Some(document) = &self.document else {
@@ -464,9 +483,15 @@ impl SlideView {
         let mut model = FlowModel::new(content, styles, root, editing)
             .within(scope)
             .tagged(vec![self.slide]);
-        if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page_editor, &model) {
+        let command = self.command.take();
+        let mark = toolbar::marks(ui, &self.page_editor, &model).or(match command {
+            Some(Command::Mark(mark)) => Some(mark),
+            _ => None,
+        });
+        if let Some(mark) = mark {
             self.page_editor.toggle(&mut model, mark);
         }
+        self.menu = MenuState::of(&self.page_editor, &model, false);
         ui.separator();
         self.page_editor.input(ui, &mut model);
     }
