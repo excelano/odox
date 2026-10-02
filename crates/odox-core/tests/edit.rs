@@ -115,6 +115,10 @@ fn reads_back(paragraph: &Element) {
         name: odox_core::Name::new("xmlns", "xlink", Ns::Xmlns),
         value: "http://www.w3.org/1999/xlink".to_owned(),
     });
+    root.attrs.push(odox_core::xml::Attribute {
+        name: odox_core::Name::new("xmlns", "svg", Ns::Xmlns),
+        value: "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0".to_owned(),
+    });
     root.children.push(Node::Element(paragraph.clone()));
     root.self_closing = false;
     let written = xml::serialize(&root);
