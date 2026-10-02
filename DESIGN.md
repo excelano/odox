@@ -506,3 +506,26 @@ uses. A blank slide is not offered: it would hold only the master page's
 decorations, and nothing here adds a shape to fill it, so a duplicate is how a
 new slide is made. The Slide menu offers the four in edit mode, and each is one
 undo step with the view following the slide.
+
+**Rows and columns can be inserted and deleted, with the formulas that name
+them following.** A row or a column is not always one element, since
+`table:number-rows-repeated` and `table:number-columns-repeated` stand for many,
+so an insert splits a run and a delete shortens one. An inserted row or column
+is a copy of its neighbour with what it held cleared and its formats kept, and a
+covered cell in the copy is an ordinary one, because a merged region does not
+grow. The whole change is made to a copy of the content and replaces it only
+when all of it can be made. It is refused when its line goes through a merged
+region (one wholly inside a delete goes with it); when the document holds
+something that names a range of cells and is not moved (a non-empty
+conditional-formats, content-validations, database-ranges, data-pilot-tables or
+consolidation, a chart or object, a print range, a shape anchored to a cell); or
+when a formula cannot be moved. Formulas are text and every reference in one is
+inside square brackets, so moving one is shifting what is in them and leaving the
+rest alone: each end of a range on its own, so an insert inside a range grows it
+and one just below it does not, an end of a range deleted becomes the nearest row
+left, a reference to a cell that is deleted is refused, and so is a range with
+nothing left. Named ranges and the base cells of named expressions move the same
+way. A reference this reading cannot take, another document's or a range across
+sheets, is refused, because a wrong formula looks right and nothing here
+evaluates one. The rows or columns are changed before the formulas are shifted,
+so a formula that is deleted with its row is not asked about what it pointed at.

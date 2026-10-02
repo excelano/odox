@@ -8,7 +8,7 @@ use std::path::Path;
 use eframe::egui::{
     self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use odox_core::doc::{Sheet, SheetDocument, Value};
+use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
@@ -38,6 +38,8 @@ pub struct SheetView {
     notice: Option<String>,
     /// What a search found, by sheet and by the cell's row and column.
     found: Found,
+    /// What the Sheet menu last chose.
+    sheet_command: Option<SheetCommand>,
 }
 
 /// A cell being typed into.
@@ -55,6 +57,17 @@ struct CellEditor {
     original: String,
     /// The editor was opened this frame and has yet to take the focus.
     opened: bool,
+}
+
+/// What the Sheet menu asked for, applied when the grid is next drawn.
+#[derive(Clone, Copy)]
+enum SheetCommand {
+    RowAbove,
+    RowBelow,
+    ColumnLeft,
+    ColumnRight,
+    DeleteRows,
+    DeleteColumns,
 }
 
 /// What the editor asked for when it closed.
@@ -159,6 +172,26 @@ impl View for SheetView {
         self.notice = None;
     }
 
+    fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
+        let can = !editing.asking && self.editor.is_none();
+        ui.menu_button(t("Sheet"), |ui| {
+            let entries = [
+                (t("Insert row above"), SheetCommand::RowAbove),
+                (t("Insert row below"), SheetCommand::RowBelow),
+                (t("Insert column left"), SheetCommand::ColumnLeft),
+                (t("Insert column right"), SheetCommand::ColumnRight),
+                (t("Delete row"), SheetCommand::DeleteRows),
+                (t("Delete column"), SheetCommand::DeleteColumns),
+            ];
+            for (name, command) in entries {
+                if ui.add_enabled(can, egui::Button::new(name)).clicked() {
+                    self.sheet_command = Some(command);
+                    ui.close();
+                }
+            }
+        });
+    }
+
     fn can_replace(&self, _editing: &Editing) -> bool {
         self.document.is_some()
     }
@@ -220,6 +253,9 @@ impl View for SheetView {
         if self.document.is_none() {
             return;
         }
+        if let Some(command) = self.sheet_command.take() {
+            self.change_sheet(command, editing);
+        }
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
         self.grid(ui, zoom, editing);
@@ -251,6 +287,65 @@ impl View for SheetView {
 }
 
 impl SheetView {
+    /// Insert or delete the rows or columns the selection covers, as one step
+    /// to undo, and select what was put in; or say what is in the way.
+    fn change_sheet(&mut self, command: SheetCommand, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let (rows, columns) = (bottom - top + 1, right - left + 1);
+        let change = match command {
+            SheetCommand::RowAbove => Restructure::InsertRows {
+                at: top,
+                count: rows,
+            },
+            SheetCommand::RowBelow => Restructure::InsertRows {
+                at: bottom + 1,
+                count: rows,
+            },
+            SheetCommand::ColumnLeft => Restructure::InsertColumns {
+                at: left,
+                count: columns,
+            },
+            SheetCommand::ColumnRight => Restructure::InsertColumns {
+                at: right + 1,
+                count: columns,
+            },
+            SheetCommand::DeleteRows => Restructure::DeleteRows {
+                at: top,
+                count: rows,
+            },
+            SheetCommand::DeleteColumns => Restructure::DeleteColumns {
+                at: left,
+                count: columns,
+            },
+        };
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let before = document.document.content.clone();
+        if let Err(blocked) = document.restructure(self.sheet, change) {
+            self.notice = Some(blocked_notice(&blocked));
+            return;
+        }
+        editing.record_snapshot(before, None);
+        self.metrics = None;
+        self.editor = None;
+        let new = match command {
+            SheetCommand::RowAbove | SheetCommand::ColumnLeft => {
+                Some(((top, left), (bottom, right)))
+            }
+            SheetCommand::RowBelow => Some(((bottom + 1, left), (bottom + rows, right))),
+            SheetCommand::ColumnRight => Some(((top, right + 1), (bottom, right + columns))),
+            SheetCommand::DeleteRows | SheetCommand::DeleteColumns => None,
+        };
+        match new {
+            Some((from, to)) => {
+                self.pick(from);
+                self.extend(to);
+            }
+            None => self.pick((top, left)),
+        }
+    }
+
     /// Select one cell, which is then the whole selection.
     fn pick(&mut self, cell: (usize, usize)) {
         self.selected = cell;
@@ -996,6 +1091,39 @@ impl SheetView {
     }
 }
 
+/// What the cell bar says when rows or columns could not be inserted or
+/// deleted.
+fn blocked_notice(blocked: &Blocked) -> String {
+    match blocked {
+        Blocked::NotFound => t("There is nothing there to change.").to_owned(),
+        Blocked::Merged => t("A merged cell is in the way: this would cut through it.").to_owned(),
+        Blocked::Unreadable(reference) => fill(
+            t("A formula holds [{reference}], which this version cannot move."),
+            &[("reference", reference)],
+        ),
+        Blocked::Deleted(reference) => fill(
+            t("A formula points at [{reference}], which would be deleted."),
+            &[("reference", reference)],
+        ),
+        Blocked::Names(what) => {
+            let what = match *what {
+                "conditional formats" => t("conditional formats"),
+                "validations" => t("validations"),
+                "database ranges" => t("database ranges"),
+                "pivot tables" => t("pivot tables"),
+                "consolidations" => t("consolidations"),
+                "charts and objects" => t("charts and objects"),
+                "print ranges" => t("print ranges"),
+                _ => t("shapes anchored to cells"),
+            };
+            fill(
+                t("This document has {what}, which this version cannot move."),
+                &[("what", what)],
+            )
+        }
+    }
+}
+
 /// What the cell bar says about a cell that cannot be edited.
 fn notice(refused: &Refused) -> String {
     match refused {
@@ -1255,6 +1383,47 @@ mod tests {
         view.replace("X", false, &mut editing);
         assert_eq!(text_at(&view, 1, 0), "Bolt M6");
         assert_eq!(text_at(&view, 2, 0), "Nut X");
+    }
+
+    #[test]
+    fn rows_inserted_above_the_selection_are_selected_and_undo_takes_them_back() {
+        let (mut view, mut editing) = opened();
+        view.pick((1, 0));
+        view.extend((2, 1));
+        view.change_sheet(SheetCommand::RowAbove, &mut editing);
+        assert_eq!(text_at(&view, 1, 0), "");
+        assert_eq!(
+            text_at(&view, 3, 0),
+            "Bolt M6",
+            "the rows moved down by the two inserted"
+        );
+        assert_eq!(
+            view.range(),
+            ((1, 0), (2, 1)),
+            "the new rows are what is selected"
+        );
+        let document = view.document.as_mut().expect("open");
+        let (previous, _) = editing
+            .undo(&document.document.content, None)
+            .expect("one step");
+        document.document.content = previous;
+        document.reindex();
+        assert_eq!(text_at(&view, 1, 0), "Bolt M6");
+        assert!(!editing.can_undo());
+    }
+
+    #[test]
+    fn what_is_in_the_way_is_said_and_nothing_changes() {
+        let (mut view, mut editing) = opened();
+        view.pick((0, 1));
+        view.change_sheet(SheetCommand::DeleteColumns, &mut editing);
+        let notice = view.notice.clone().expect("a notice");
+        assert!(
+            notice.contains("[.B2]") || notice.contains("[."),
+            "{notice}"
+        );
+        assert!(!editing.modified());
+        assert_eq!(text_at(&view, 1, 1), "12");
     }
 
     #[test]

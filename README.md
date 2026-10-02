@@ -118,7 +118,7 @@ spreadsheet application recalculates it. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
 show it, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste or a delete that reaches a cell it
-cannot write, a formula or one under a merge, changes nothing.
+cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
