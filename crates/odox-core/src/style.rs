@@ -231,6 +231,28 @@ pub struct TextProperties {
     pub uppercase: Option<bool>,
 }
 
+impl TextProperties {
+    /// These over a parent's: a property this does not state is the parent's.
+    #[must_use]
+    pub fn over(&self, parent: &Self) -> Self {
+        Self {
+            font_family: self
+                .font_family
+                .clone()
+                .or_else(|| parent.font_family.clone()),
+            size: self.size.or(parent.size),
+            bold: self.bold.or(parent.bold),
+            italic: self.italic.or(parent.italic),
+            underline: self.underline.or(parent.underline),
+            strike: self.strike.or(parent.strike),
+            color: self.color.or(parent.color),
+            background: self.background.or(parent.background),
+            position: self.position.or(parent.position),
+            uppercase: self.uppercase.or(parent.uppercase),
+        }
+    }
+}
+
 /// Paragraph formatting.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ParagraphProperties {

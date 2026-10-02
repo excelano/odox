@@ -126,6 +126,136 @@ pub fn holds_text(element: &Element) -> bool {
     is_inline_container_name(element)
 }
 
+/// A number in the format a list level asks for.
+pub fn number_text(number: usize, format: &str) -> String {
+    match format.chars().next() {
+        Some('a') => alphabetic(number, b'a'),
+        Some('A') => alphabetic(number, b'A'),
+        Some('i') => roman(number).to_lowercase(),
+        Some('I') => roman(number),
+        // An empty format is a level that shows no number, which ODF uses for a
+        // list whose label is only its prefix and suffix.
+        None => String::new(),
+        _ => number.to_string(),
+    }
+}
+
+/// `a`, `b`, … `z`, `aa`, which is the spreadsheet column rule and ODF's.
+fn alphabetic(number: usize, first: u8) -> String {
+    let mut n = number;
+    let mut out = Vec::new();
+    while n > 0 {
+        let remainder = (n - 1) % 26;
+        out.push(first + u8::try_from(remainder).unwrap_or(0));
+        n = (n - 1) / 26;
+    }
+    out.reverse();
+    String::from_utf8(out).unwrap_or_default()
+}
+
+fn roman(number: usize) -> String {
+    const VALUES: [(usize, &str); 13] = [
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
+    ];
+    // Beyond what Roman numerals reach, the number itself is more use than a
+    // line of Ms.
+    if number == 0 || number > 3999 {
+        return number.to_string();
+    }
+    let mut left = number;
+    let mut out = String::new();
+    for (value, numeral) in VALUES {
+        while left >= value {
+            out.push_str(numeral);
+            left -= value;
+        }
+    }
+    out
+}
+
+/// Whether an element holds blocks on the body's behalf rather than being one.
+pub fn is_block_container(element: &Element) -> bool {
+    element.name.ns == Ns::Text
+        && matches!(
+            &*element.name.local,
+            "section"
+                | "index-body"
+                | "index-title"
+                | "table-of-content"
+                | "illustration-index"
+                | "table-index"
+                | "object-index"
+                | "user-index"
+                | "alphabetical-index"
+                | "bibliography"
+                | "tracked-changes"
+                | "deletion"
+        )
+}
+
+/// Whether an element is a wrapper around text rather than text of its own.
+///
+/// A bookmark, a reference mark and a change mark each sit inside a paragraph,
+/// carry no characters, and may have text inside them that does belong to the
+/// paragraph.
+pub fn is_inline_passthrough(element: &Element) -> bool {
+    element.name.ns == Ns::Text
+        && matches!(
+            &*element.name.local,
+            "bookmark"
+                | "bookmark-start"
+                | "bookmark-end"
+                | "reference-mark"
+                | "reference-mark-start"
+                | "reference-mark-end"
+                | "span"
+                | "bibliography-mark"
+                | "ruby"
+                | "ruby-base"
+                | "meta"
+                | "meta-field"
+                | "change-start"
+                | "change-end"
+                | "page-number"
+                | "page-count"
+                | "title"
+                | "subject"
+                | "author-name"
+                | "author-initials"
+                | "chapter"
+                | "file-name"
+                | "sheet-name"
+                | "date"
+                | "time"
+                | "creator"
+                | "description"
+                | "keywords"
+                | "sequence"
+                | "bookmark-ref"
+                | "sequence-ref"
+                | "reference-ref"
+                | "variable-get"
+                | "variable-set"
+                | "user-field-get"
+                | "placeholder"
+                | "conditional-text"
+                | "hidden-text"
+                | "text-input"
+        )
+}
+
 /// The containers above, whether or not they hold anything: what an edit may
 /// drop once it has emptied one.
 fn is_inline_container_name(element: &Element) -> bool {
