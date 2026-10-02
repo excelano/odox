@@ -1,3 +1,13 @@
+odox (0.6.0) unstable; urgency=low
+
+  * 0.6.0: Replace, Format menu, AccessKit, rich paste, slides, rows and columns (#42)
+  * Restore the 0.5.0 version bump that v0.5.0 was released from
+  * Revert "chore: bump to 0.5.0"
+  * Run CI by hand: workflow_dispatch instead of push and pull request
+  * Remove ship.conf; the release apps read ship.toml
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 02 Oct 2026 14:31:18 -0500
+
 odox (0.5.0) unstable; urgency=low
 
   * Windows screenshots show the applications being used: editing, formulas, Find
