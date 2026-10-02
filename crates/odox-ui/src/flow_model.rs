@@ -324,6 +324,27 @@ impl<'a> FlowModel<'a> {
         }
     }
 
+    /// Split a paragraph in two. What follows a heading's last character is
+    /// body text and not another heading, as it is in every word processor.
+    fn split(&mut self, at: &Position<Vec<usize>>) -> Option<Vec<usize>> {
+        let at_end_of_heading = self
+            .root()
+            .and_then(|root| root.at(&at.paragraph))
+            .is_some_and(|paragraph| {
+                edit::heading_level(paragraph).is_some()
+                    && at.offset >= edit::text(paragraph).chars().count()
+            });
+        let root = self.content.at_mut(&self.root)?;
+        let second = edit::split_at(root, &at.paragraph, at.offset).ok()?;
+        if at_end_of_heading {
+            let path = [self.root.as_slice(), &second].concat();
+            // A document that cannot be given the paragraph style keeps the
+            // heading, which is a split all the same.
+            let _ = edit::set_heading(self.content, &path, None, self.styles);
+        }
+        Some(second)
+    }
+
     /// Give the text from one position to another a mark, or take it off,
     /// paragraph by paragraph.
     fn format(
@@ -445,12 +466,7 @@ impl Model for FlowModel<'_> {
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
                 .map(|()| Position::new(from.paragraph, from.offset + text.chars().count())),
-            Edit::Split { at } => {
-                let root = self.content.at_mut(&self.root)?;
-                edit::split_at(root, &at.paragraph, at.offset)
-                    .ok()
-                    .map(|second| Position::new(second, 0))
-            }
+            Edit::Split { at } => self.split(&at).map(|second| Position::new(second, 0)),
             Edit::Format { from, to, mark, on } => {
                 self.format(&from, &to, core_mark(mark), on).map(|()| to)
             }
@@ -675,6 +691,60 @@ mod tests {
         let current = content.clone();
         let (_, caret) = editing.undo(&current, None).expect("a step to undo");
         assert_eq!(caret, Some(Position::new(vec![7, 0], 1)));
+    }
+
+    fn heading_document() -> Element {
+        odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:body><office:text><text:h text:outline-level="1" text:style-name="H">Title</text:h><text:p text:style-name="Body">a</text:p><text:p text:style-name="Body">b</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document")
+    }
+
+    #[test]
+    fn enter_at_the_end_of_a_heading_starts_body_text() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let at = model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 5),
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![1], 0)));
+        let second = content.at(&[0, 0, 1]).expect("the new paragraph");
+        assert!(second.is(&Ns::Text, "p"));
+        assert_eq!(second.attr(&Ns::Text, "style-name"), Some("Body"));
+        assert!(
+            content
+                .at(&[0, 0, 0])
+                .expect("the heading")
+                .is(&Ns::Text, "h")
+        );
+    }
+
+    #[test]
+    fn enter_in_the_middle_of_a_heading_leaves_two_headings() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 2),
+            },
+            true,
+        );
+        assert!(
+            content
+                .at(&[0, 0, 1])
+                .expect("the second half")
+                .is(&Ns::Text, "h")
+        );
     }
 
     #[test]
