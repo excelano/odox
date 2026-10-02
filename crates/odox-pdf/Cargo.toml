@@ -1,0 +1,15 @@
+[package]
+name = "odox-pdf"
+description = "Lay out an OpenDocument text document onto pages and write it as tagged PDF/UA"
+keywords = ["opendocument", "odf", "pdf", "pdf-ua", "accessibility"]
+categories = ["text-processing"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+odox-core.workspace = true
+krilla.workspace = true

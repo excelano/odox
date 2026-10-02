@@ -12,7 +12,9 @@ resolver = "3"
 members = [
     "crates/egui_richedit",
     "crates/odox-core",
+    "crates/odox-fonts",
     "crates/odox-ui",
+    "crates/odox-pdf",
     "crates/xodt",
     "crates/xods",
     "crates/xodp",
@@ -37,11 +39,13 @@ rust-version = "1.95"
 # published gets its own then, and not before.
 
 [workspace.dependencies]
-# The two shared crates. A version requirement cannot inherit
+# The shared crates. A version requirement cannot inherit
 # `workspace.package.version` and crates.io rejects a path-only dependency, so
 # the number is written twice by necessity; flyleaf's manifest says the same.
 odox-core = { path = "crates/odox-core", version = "0.6.0" }
 odox-ui = { path = "crates/odox-ui", version = "0.6.0" }
+odox-fonts = { path = "crates/odox-fonts", version = "0.6.0" }
+odox-pdf = { path = "crates/odox-pdf", version = "0.6.0" }
 # The rich-text editing layer. It lives here while its model trait settles and
 # knows nothing of ODF: its manifest names egui and nothing from this
 # workspace, and its own tests hold it to that.
@@ -78,6 +82,10 @@ rfd = "0.17"
 # for are ever loaded. DESIGN.md §6 says what the fallback chain is and why
 # nothing is embedded.
 fontdb = { version = "0.24", default-features = false, features = ["fs", "memmap", "fontconfig"] }
+# The PDF writer behind the export: tagged PDF, font subsets and a PDF/UA-1
+# mode that checks what it writes. Pure Rust. It does no layout; `odox-pdf`
+# hands it positioned glyphs. DESIGN.md §12.
+krilla = "0.8"
 # The pictures inside a package. PNG and JPEG are what office applications
 # write; everything else draws as a placeholder frame rather than growing the
 # decoder set. Both decoders are pure Rust.

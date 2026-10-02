@@ -1,6 +1,7 @@
-//! Resolving the font families a document names to faces on this machine.
+//! Handing egui the faces a document's font families resolve to on this
+//! machine; which face that is, is `odox-fonts`' answer.
 //!
-//! Nothing is embedded. A document names a family — `Liberation Serif`, `Times
+//! The applications carry no fonts. A document names a family — `Liberation Serif`, `Times
 //! New Roman`, `Arial` — and the machine is asked for it, because every platform
 //! this ships on carries a metrically compatible face for the families office
 //! documents use, and three applications carrying a megabyte of fonts each would
@@ -21,18 +22,7 @@ use std::sync::Arc;
 use eframe::egui::{FontData, FontDefinitions, FontFamily};
 use odox_core::{Element, Ns};
 
-/// The four faces a family is asked for.
-///
-/// ODF says bold and italic per run, and a renderer that synthesized them by
-/// skewing and thickening the regular face would be drawing something no font
-/// designer made. So each combination is its own face, and its own egui family.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Variant {
-    /// Bold.
-    pub bold: bool,
-    /// Italic.
-    pub italic: bool,
-}
+pub use odox_fonts::Variant;
 
 /// The egui font family a document's family name and variant resolve to.
 ///
@@ -63,29 +53,10 @@ pub fn definitions(families: &BTreeSet<String>) -> FontDefinitions {
         .cloned()
         .unwrap_or_default();
 
-    let mut database = fontdb::Database::new();
-    database.load_system_fonts();
-    set_generics(&mut database);
+    let database = odox_fonts::database();
 
     for family in families {
-        for variant in [
-            Variant {
-                bold: false,
-                italic: false,
-            },
-            Variant {
-                bold: true,
-                italic: false,
-            },
-            Variant {
-                bold: false,
-                italic: true,
-            },
-            Variant {
-                bold: true,
-                italic: true,
-            },
-        ] {
+        for variant in Variant::ALL {
             let key = match family_of(family, variant) {
                 FontFamily::Name(name) => name.to_string(),
                 // `family_of` builds a named family and nothing else; the other
@@ -107,36 +78,12 @@ pub fn definitions(families: &BTreeSet<String>) -> FontDefinitions {
 }
 
 /// Ask the machine for one face.
-fn load(database: &fontdb::Database, family: &str, variant: Variant) -> Option<FontData> {
-    let mut wanted = vec![fontdb::Family::Name(family)];
-    // The metrically compatible substitute, where the family is one of the
-    // handful that has a well-known one. A document laid out in Times New Roman
-    // on a machine that has Liberation Serif keeps its line breaks; the same
-    // document in whatever the generic serif happens to be does not.
-    wanted.extend(
-        metric_substitutes(family)
-            .iter()
-            .map(|name| fontdb::Family::Name(name)),
-    );
-    // A generic family last, so that a document naming something absent lands on
-    // a face of roughly the right shape rather than on the first font in
-    // alphabetical order.
-    wanted.push(generic(family));
-    let query = fontdb::Query {
-        families: &wanted,
-        weight: if variant.bold {
-            fontdb::Weight::BOLD
-        } else {
-            fontdb::Weight::NORMAL
-        },
-        stretch: fontdb::Stretch::Normal,
-        style: if variant.italic {
-            fontdb::Style::Italic
-        } else {
-            fontdb::Style::Normal
-        },
-    };
-    let id = database.query(&query)?;
+fn load(
+    database: &odox_fonts::fontdb::Database,
+    family: &str,
+    variant: Variant,
+) -> Option<FontData> {
+    let id = odox_fonts::find(database, family, variant)?;
     let index = database.face(id)?.index;
     database.with_face_data(id, |data, face_index| FontData {
         font: data.to_vec().into(),
@@ -146,108 +93,6 @@ fn load(database: &fontdb::Database, family: &str, variant: Variant) -> Option<F
         index: face_index.max(index),
         tweak: eframe::egui::FontTweak::default(),
     })
-}
-
-/// The families that are metrically compatible with the ones office documents
-/// name, in the order to try them.
-///
-/// Each pair here has the same advance widths as the family it stands in for, so
-/// a document laid out in one and drawn in the other breaks its lines in the same
-/// places. The list is short because that property is what earns a place on it:
-/// a face that merely looks similar belongs to the generic fallback below.
-fn metric_substitutes(family: &str) -> &'static [&'static str] {
-    match family.to_ascii_lowercase().as_str() {
-        "times new roman" | "times" | "timesnewroman" => &["Liberation Serif", "DejaVu Serif"],
-        "arial" | "helvetica" | "arialmt" => &["Liberation Sans", "DejaVu Sans"],
-        "courier new" | "courier" => &["Liberation Mono", "DejaVu Sans Mono"],
-        "calibri" => &["Carlito"],
-        "cambria" => &["Caladea"],
-        "liberation serif" => &["DejaVu Serif"],
-        "liberation sans" => &["DejaVu Sans"],
-        "liberation mono" => &["DejaVu Sans Mono"],
-        _ => &[],
-    }
-}
-
-/// Point the generic families at faces this machine has.
-///
-/// `fontdb` names Times New Roman, Arial and Courier New as its own defaults,
-/// which is right on Windows and wrong on every Linux box: the generic fallback
-/// resolves to nothing at all, and a document naming a family nobody has draws in
-/// egui's built-in face rather than in anything the document asked for. Measured
-/// on Debian 13, where none of the three exists.
-fn set_generics(database: &mut fontdb::Database) {
-    let present = |database: &fontdb::Database, name: &str| {
-        database
-            .query(&fontdb::Query {
-                families: &[fontdb::Family::Name(name)],
-                weight: fontdb::Weight::NORMAL,
-                stretch: fontdb::Stretch::Normal,
-                style: fontdb::Style::Normal,
-            })
-            .is_some()
-    };
-    let first = |database: &fontdb::Database, names: &[&str]| {
-        names
-            .iter()
-            .find(|name| present(database, name))
-            .map(|name| (*name).to_owned())
-    };
-
-    if let Some(name) = first(
-        database,
-        &[
-            "Liberation Serif",
-            "DejaVu Serif",
-            "Noto Serif",
-            "Times New Roman",
-            "Georgia",
-        ],
-    ) {
-        database.set_serif_family(name);
-    }
-    if let Some(name) = first(
-        database,
-        &[
-            "Liberation Sans",
-            "DejaVu Sans",
-            "Noto Sans",
-            "Arial",
-            "Helvetica",
-        ],
-    ) {
-        database.set_sans_serif_family(name);
-    }
-    if let Some(name) = first(
-        database,
-        &[
-            "Liberation Mono",
-            "DejaVu Sans Mono",
-            "Noto Sans Mono",
-            "Courier New",
-        ],
-    ) {
-        database.set_monospace_family(name);
-    }
-}
-
-/// The generic family a name suggests, for a machine that does not have it.
-///
-/// The names are the ones office documents actually carry. It is a short list on
-/// purpose: guessing from the name is what produces a serif document drawn in a
-/// sans face, so anything unrecognized asks for the default proportional family
-/// rather than for a shape.
-fn generic(family: &str) -> fontdb::Family<'static> {
-    let lower = family.to_ascii_lowercase();
-    if lower.contains("mono") || lower.contains("courier") || lower.contains("consol") {
-        return fontdb::Family::Monospace;
-    }
-    if lower.contains("times") || lower.contains("serif") || lower.contains("georgia") {
-        // `Liberation Sans` contains neither, and `Liberation Serif` contains
-        // `serif`, which is why the sans test comes second rather than first.
-        return fontdb::Family::Serif;
-    }
-    fontdb::Family::SansSerif
 }
 
 /// Every font family a document's styles name.
@@ -334,53 +179,5 @@ mod tests {
             family_of("Arial", both),
             FontFamily::Name("Arial:bolditalic".into())
         );
-    }
-
-    #[test]
-    fn metric_substitutes_matches_regardless_of_case_or_spaces() {
-        assert_eq!(
-            metric_substitutes("Times New Roman"),
-            ["Liberation Serif", "DejaVu Serif"]
-        );
-        assert_eq!(
-            metric_substitutes("TIMES NEW ROMAN"),
-            ["Liberation Serif", "DejaVu Serif"]
-        );
-        assert_eq!(
-            metric_substitutes("TimesNewRoman"),
-            ["Liberation Serif", "DejaVu Serif"]
-        );
-        assert_eq!(metric_substitutes("Calibri"), ["Carlito"]);
-    }
-
-    #[test]
-    fn metric_substitutes_is_empty_for_a_family_with_no_known_substitute() {
-        assert_eq!(metric_substitutes("Comic Sans MS"), &[] as &[&str]);
-    }
-
-    /// The order this checks in is load-bearing: `Liberation Mono` contains
-    /// neither "times" nor "serif", but a family named for a monospace face
-    /// still has to be caught before falling through to the serif check.
-    #[test]
-    fn generic_recognises_monospace_families() {
-        assert_eq!(generic("Liberation Mono"), fontdb::Family::Monospace);
-        assert_eq!(generic("Courier New"), fontdb::Family::Monospace);
-        assert_eq!(generic("Consolas"), fontdb::Family::Monospace);
-    }
-
-    #[test]
-    fn generic_recognises_serif_families() {
-        assert_eq!(generic("Times New Roman"), fontdb::Family::Serif);
-        assert_eq!(generic("Liberation Serif"), fontdb::Family::Serif);
-        assert_eq!(generic("Georgia"), fontdb::Family::Serif);
-    }
-
-    /// The case the comment on `generic` calls out by name: `Liberation Sans`
-    /// contains "sans", not "serif", so the serif check above must not catch
-    /// it - if it did, every sans-serif document would draw with serifs.
-    #[test]
-    fn generic_defaults_to_sans_serif_rather_than_matching_serif_by_accident() {
-        assert_eq!(generic("Liberation Sans"), fontdb::Family::SansSerif);
-        assert_eq!(generic("Wingdings"), fontdb::Family::SansSerif);
     }
 }
