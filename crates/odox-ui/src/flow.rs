@@ -16,6 +16,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use eframe::egui::accesskit::Role;
+use eframe::egui::emath::TSTransform;
+use eframe::egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use eframe::egui::{
     Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Sense, Stroke,
     StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, pos2,
@@ -440,6 +443,7 @@ impl Flow<'_> {
         let origin = pos2(anchor, rect.top());
         let mut galley = galley;
         self.show_matches(ui, &mut galley, &map, origin);
+        let readable = Arc::clone(&galley);
         let links = edit::links(element);
         let hit = (!links.is_empty()).then(|| (Arc::clone(&galley), map.clone()));
         if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
@@ -459,6 +463,8 @@ impl Flow<'_> {
                 Stroke::NONE,
             );
         }
+
+        expose(ui, &response, element, &readable, origin, edited);
 
         if let Some((galley, map)) = hit {
             self.follow_link(ui, &response, &links, &galley, &map, origin, edited);
@@ -1170,6 +1176,44 @@ fn roman(number: usize) -> String {
         }
     }
     out
+}
+
+/// Tell assistive technology what a paragraph is: its text, and a heading's
+/// level. Where the page editor draws the paragraph it has already said the
+/// text and where the caret is, and only the role is put right.
+fn expose(
+    ui: &Ui,
+    response: &Response,
+    element: &Element,
+    galley: &Galley,
+    origin: Pos2,
+    edited: bool,
+) {
+    let heading = edit::heading_level(element);
+    if !edited {
+        let to_global = ui
+            .ctx()
+            .layer_transform_to_global(ui.layer_id())
+            .unwrap_or_default();
+        update_accesskit_for_text_widget(
+            ui.ctx(),
+            response.id,
+            None,
+            if heading.is_some() {
+                Role::Heading
+            } else {
+                Role::Paragraph
+            },
+            to_global * TSTransform::from_translation(origin.to_vec2()),
+            galley,
+        );
+    }
+    if let Some(level) = heading {
+        ui.ctx().accesskit_node_builder(response.id, |node| {
+            node.set_role(Role::Heading);
+            node.set_level(usize::from(level));
+        });
+    }
 }
 
 /// Whether a paragraph is what an internal link names: a bookmark in it, by

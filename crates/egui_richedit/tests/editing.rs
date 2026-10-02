@@ -164,6 +164,8 @@ struct Harness {
     ctx: Context,
     editor: RichEdit<usize>,
     model: Plain,
+    /// The last tree handed to assistive technology, once it is switched on.
+    access: Option<egui::accesskit::TreeUpdate>,
 }
 
 impl Harness {
@@ -172,6 +174,7 @@ impl Harness {
             ctx: Context::default(),
             editor: RichEdit::new(Id::new("editor")),
             model: Plain::new(paragraphs),
+            access: None,
         };
         // One frame to lay the paragraphs out, which is what Up and Down move
         // through.
@@ -192,7 +195,12 @@ impl Harness {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
             ..RawInput::default()
         };
-        let Self { ctx, editor, model } = self;
+        let Self {
+            ctx,
+            editor,
+            model,
+            access,
+        } = self;
         let mut output = ctx.run_ui(input, |ui| {
             editor.input(ui, model);
             for (index, text) in model.paragraphs.iter().enumerate() {
@@ -216,6 +224,9 @@ impl Harness {
         // Nothing draws here, so the glyph atlas's updates go nowhere, and
         // egui asks that dropping them be said.
         output.textures_delta.clear();
+        if let Some(update) = output.platform_output.accesskit_update.take() {
+            *access = Some(update);
+        }
         output
             .platform_output
             .commands
@@ -494,6 +505,44 @@ fn a_click_whose_release_comes_a_frame_later_keeps_the_caret() {
     h.frame(Vec::new());
     h.typed(">");
     assert_eq!(h.model.paragraphs, [">Hello world"]);
+}
+
+#[test]
+fn a_screen_reader_reads_each_paragraph_and_where_the_caret_is() {
+    use egui::accesskit::Role;
+    let mut h = Harness::new(&["Hello", "world"]);
+    h.ctx.enable_accesskit();
+    h.caret(0, 2);
+    h.frame(Vec::new());
+    h.frame(Vec::new());
+    let update = h.access.take().expect("a tree update");
+    let paragraphs: Vec<_> = update
+        .nodes
+        .iter()
+        .filter(|(_, node)| node.role() == Role::Paragraph)
+        .collect();
+    assert_eq!(paragraphs.len(), 2, "one node a paragraph");
+    let reads = |text: &str| {
+        update
+            .nodes
+            .iter()
+            .any(|(_, node)| node.role() == Role::TextRun && node.value() == Some(text))
+    };
+    assert!(
+        reads("Hello") && reads("world"),
+        "the text is there to be read"
+    );
+    let selected: Vec<_> = paragraphs
+        .iter()
+        .filter_map(|(_, node)| node.text_selection())
+        .collect();
+    assert_eq!(
+        selected.len(),
+        1,
+        "only the paragraph holding the caret says where it is"
+    );
+    assert_eq!(selected[0].focus.character_index, 2);
+    assert_eq!(selected[0].anchor.character_index, 2);
 }
 
 #[test]

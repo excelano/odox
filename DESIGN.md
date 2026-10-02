@@ -465,3 +465,13 @@ continuing the numbering, and anything else its item held, a nested list,
 stands beside it. One pass over the selection is one undo step, and the buttons
 are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.
+
+**A page is told to assistive technology a paragraph at a time.** Each paragraph
+the flow draws is a node carrying its text as the rows the galley laid out, with
+the role of a heading and its level where the paragraph is a `text:h`, and
+paragraph otherwise; the page editor adds where the caret or the selection is in
+the paragraph that holds it, counted in the galley's characters through the same
+offset map the caret uses. A selection that began in another paragraph is
+reported as a caret at its end here, because one node cannot name a position in
+another. Slide labels go through the same flow and so are told the same way. A
+sheet's grid is painted cell by cell and is not yet.

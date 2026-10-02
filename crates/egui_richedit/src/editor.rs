@@ -7,8 +7,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use egui::accesskit::Role;
+use egui::emath::TSTransform;
 use egui::output::IMEOutput;
 use egui::text::{CCursor, CCursorRange, CharIndex};
+use egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use egui::text_selection::text_cursor_state::{
     ccursor_next_word, ccursor_previous_word, is_word_char,
 };
@@ -299,6 +302,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
         ui.painter()
             .galley(origin, galley.clone(), ui.visuals().text_color());
+        self.expose(ui, response, paragraph, &galley, &map, origin, focused);
 
         if focused
             && let Some(selection) = &self.selection
@@ -339,6 +343,48 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 origin,
                 index,
             },
+        );
+    }
+
+    /// Tell assistive technology what the paragraph says and where the caret
+    /// or the selection is in it, as a screen reader reads a paragraph of text.
+    /// A selection that began in another paragraph is reported as a caret at
+    /// its end here, because one node cannot name a position in another.
+    #[allow(clippy::too_many_arguments)]
+    fn expose(
+        &self,
+        ui: &Ui,
+        response: &Response,
+        paragraph: &P,
+        galley: &Galley,
+        map: &OffsetMap,
+        origin: Pos2,
+        focused: bool,
+    ) {
+        let cursor_range = self
+            .selection
+            .as_ref()
+            .filter(|selection| focused && selection.focus.paragraph == *paragraph)
+            .map(|selection| {
+                let at = |position: &Position<P>| CCursor::new(map.to_galley(position.offset));
+                let anchor = if selection.anchor.paragraph == *paragraph {
+                    &selection.anchor
+                } else {
+                    &selection.focus
+                };
+                CCursorRange::two(at(anchor), at(&selection.focus))
+            });
+        let to_global = ui
+            .ctx()
+            .layer_transform_to_global(ui.layer_id())
+            .unwrap_or_default();
+        update_accesskit_for_text_widget(
+            ui.ctx(),
+            response.id,
+            cursor_range,
+            Role::Paragraph,
+            to_global * TSTransform::from_translation(origin.to_vec2()),
+            galley,
         );
     }
 
