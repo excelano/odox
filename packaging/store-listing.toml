@@ -205,7 +205,7 @@ Open a document first. With nothing open the window is empty and there is nothin
     Odox Grid
     https://github.com/excelano/odox/raw/main/corpus/libreoffice/calc.ods
 
-It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Grid under Open With, or launch the application and use Open.
+Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Grid under Open With, or launch the application and use Open.
 
 Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited; once anything in the sheet has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere.
 
