@@ -18,6 +18,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod block;
+mod figure;
 mod format;
 
 use std::fmt;
@@ -26,6 +27,9 @@ use std::ops::Range;
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
 pub use block::{block_state, heading_level, set_heading, set_list};
+pub use figure::{
+    Description, description, figures, is_figure, set_alternative_text, set_decorative,
+};
 pub use format::{Mark, format, marked};
 
 /// Why an edit was not made. Each is a state of the document rather than a

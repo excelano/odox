@@ -372,6 +372,10 @@ pub struct GraphicProperties {
     pub opacity: Option<f32>,
     /// Where the shape's own label sits between its top and bottom edges.
     pub text_anchor: Option<Anchor>,
+    /// Whether the shape is decoration that says nothing, which an accessible
+    /// reading skips: `LibreOffice`'s `loext:decorative`, the one way ODF
+    /// producers write it.
+    pub decorative: Option<bool>,
 }
 
 /// Where a shape's label sits between its top and bottom edges.
@@ -1139,6 +1143,12 @@ impl GraphicProperties {
                 "bottom" => Anchor::Bottom,
                 _ => Anchor::Top,
             });
+        }
+        if let Some(decorative) = p
+            .attr(&Ns::Loext, "decorative")
+            .and_then(crate::value::boolean)
+        {
+            self.decorative = Some(decorative);
         }
     }
 }
