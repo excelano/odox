@@ -338,7 +338,7 @@ mod tests {
         let answers = [answer(&document, 0, "  Sales by quarter ", false)];
         describe(&mut document, &answers, &mut editing).expect("described");
         assert!(editing.can_undo());
-        assert!(odox_pdf::undescribed(&document).is_empty());
+        assert_eq!(odox_pdf::undescribed(&document), Vec::<Vec<usize>>::new());
         let body = document.body_path().expect("a body");
         let frame = document
             .document
