@@ -132,7 +132,7 @@ impl View for SlideView {
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);
         }
-        ctx.set_fonts(fonts::definitions(&fonts::families_used(&parts)));
+        ctx.set_fonts(fonts::for_document(&parts));
 
         self.pictures.clear();
         self.document = Some(document);

@@ -23,7 +23,7 @@ fn a_page_is_read_as_paragraphs_and_headings_with_their_levels() {
     if let Some(styles) = &document.document.styles_part {
         parts.push(styles);
     }
-    ctx.set_fonts(fonts::definitions(&fonts::families_used(&parts)));
+    ctx.set_fonts(fonts::for_document(&parts));
     let mut pictures = Pictures::default();
     let mut update = None;
     // One pass for the fonts to take effect, then the page itself.

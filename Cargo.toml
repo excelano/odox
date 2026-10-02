@@ -92,6 +92,9 @@ rustybuzz = "0.20"
 # Where a line of the export may break: the Unicode line breaking algorithm.
 # Pure Rust, no dependencies.
 unicode-linebreak = "0.1"
+# Reading a face's character map, to find which face has a character. The
+# version fontdb and rustybuzz already read faces with, so the tree holds one.
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "opentype-layout", "apple-layout", "variable-fonts", "glyph-names"] }
 # The pictures inside a package. PNG and JPEG are what office applications
 # write; everything else draws as a placeholder frame rather than growing the
 # decoder set. Both decoders are pure Rust.

@@ -118,71 +118,25 @@ impl Faces {
     /// Whether a face has a glyph for a character.
     pub(crate) fn covers(&mut self, face: usize, character: char) -> bool {
         let data = &self.faces[face];
-        *self.coverage.entry((face, character)).or_insert_with(|| {
-            ttf_parser::Face::parse(&data.data, data.index)
-                .ok()
-                .and_then(|parsed| parsed.glyph_index(character))
-                .is_some_and(|glyph| glyph.0 != 0)
-        })
+        *self
+            .coverage
+            .entry((face, character))
+            .or_insert_with(|| odox_fonts::covers(&data.data, data.index, character))
     }
 
-    /// The first face on the machine that has a character, preferring the
-    /// generic families' faces of the variant asked for.
+    /// The first face on the machine that has a character and may be
+    /// embedded, as `odox-fonts` orders them.
     pub(crate) fn fallback(&mut self, character: char, variant: Variant) -> Option<usize> {
         if let Some(&found) = self.fallbacks.get(&(character, variant)) {
             return found;
         }
-        let mut candidates: Vec<fontdb::ID> = [
-            fontdb::Family::SansSerif,
-            fontdb::Family::Serif,
-            fontdb::Family::Monospace,
-        ]
-        .iter()
-        .filter_map(|generic| {
-            self.database.query(&fontdb::Query {
-                families: std::slice::from_ref(generic),
-                weight: if variant.bold {
-                    fontdb::Weight::BOLD
-                } else {
-                    fontdb::Weight::NORMAL
-                },
-                stretch: fontdb::Stretch::Normal,
-                style: if variant.italic {
-                    fontdb::Style::Italic
-                } else {
-                    fontdb::Style::Normal
-                },
-            })
-        })
-        .collect();
-        candidates.extend(self.database.faces().map(|info| info.id));
-        let mut found = None;
-        for id in candidates {
-            if !self.might_cover(id, character) {
-                continue;
-            }
-            if let Some(face) = self.load(id)
-                && self.covers(face, character)
-            {
-                found = Some(face);
-                break;
-            }
-        }
+        let candidates: Vec<fontdb::ID> =
+            odox_fonts::faces_with(&self.database, character, variant)
+                .take(8)
+                .collect();
+        let found = candidates.into_iter().find_map(|id| self.load(id));
         self.fallbacks.insert((character, variant), found);
         found
-    }
-
-    /// Whether a face not yet loaded has a glyph for a character, read without
-    /// loading it.
-    fn might_cover(&self, id: fontdb::ID, character: char) -> bool {
-        self.database
-            .with_face_data(id, |data, index| {
-                ttf_parser::Face::parse(data, index)
-                    .ok()
-                    .and_then(|parsed| parsed.glyph_index(character))
-                    .is_some_and(|glyph| glyph.0 != 0)
-            })
-            .unwrap_or(false)
     }
 
     /// Load a face, once, unless it may not be embedded.

@@ -39,13 +39,22 @@ pub fn family_of(family: &str, variant: Variant) -> FontFamily {
     FontFamily::Name(format!("{family}{suffix}").into())
 }
 
+/// The font definitions for a document, from its parts: the families its
+/// styles name and the characters its text holds.
+pub fn for_document(parts: &[&Element]) -> FontDefinitions {
+    definitions(&families_used(parts), &characters_used(parts))
+}
+
 /// Build the font definitions for a document: egui's own, plus a face for every
 /// family the document names.
 ///
 /// The fallback chain behind each face is egui's built-in proportional font and
 /// its emoji fonts, so a glyph the document's own face lacks is still drawn
-/// rather than shown as a box.
-pub fn definitions(families: &BTreeSet<String>) -> FontDefinitions {
+/// rather than shown as a box. egui's own fonts are small and cover few
+/// scripts, so a character in `characters` that no face loaded so far has is
+/// drawn from the first face on the machine that has it, added at the end of
+/// every chain where it catches only what nothing before it draws.
+pub fn definitions(families: &BTreeSet<String>, characters: &BTreeSet<char>) -> FontDefinitions {
     let mut definitions = FontDefinitions::default();
     let fallback = definitions
         .families
@@ -64,7 +73,9 @@ pub fn definitions(families: &BTreeSet<String>) -> FontDefinitions {
                 other => format!("{other:?}"),
             };
             let mut chain = Vec::new();
-            if let Some(face) = load(&database, family, variant) {
+            if let Some(face) =
+                odox_fonts::find(&database, family, variant).and_then(|id| load(&database, id))
+            {
                 definitions.font_data.insert(key.clone(), Arc::new(face));
                 chain.push(key.clone());
             }
@@ -74,16 +85,37 @@ pub fn definitions(families: &BTreeSet<String>) -> FontDefinitions {
                 .insert(FontFamily::Name(key.into()), chain);
         }
     }
+
+    let mut added = Vec::new();
+    for &character in characters {
+        if character.is_whitespace() || character.is_control() {
+            continue;
+        }
+        let drawn = definitions
+            .font_data
+            .values()
+            .any(|face| odox_fonts::covers(&face.font, face.index, character));
+        if drawn {
+            continue;
+        }
+        let Some(face) = odox_fonts::faces_with(&database, character, Variant::default())
+            .next()
+            .and_then(|id| load(&database, id))
+        else {
+            continue;
+        };
+        let key = format!("machine fallback {}", added.len());
+        definitions.font_data.insert(key.clone(), Arc::new(face));
+        added.push(key);
+    }
+    for chain in definitions.families.values_mut() {
+        chain.extend(added.iter().cloned());
+    }
     definitions
 }
 
-/// Ask the machine for one face.
-fn load(
-    database: &odox_fonts::fontdb::Database,
-    family: &str,
-    variant: Variant,
-) -> Option<FontData> {
-    let id = odox_fonts::find(database, family, variant)?;
+/// One face of the machine's, read.
+fn load(database: &odox_fonts::fontdb::Database, id: odox_fonts::fontdb::ID) -> Option<FontData> {
     let index = database.face(id)?.index;
     database.with_face_data(id, |data, face_index| FontData {
         font: data.to_vec().into(),
@@ -93,6 +125,14 @@ fn load(
         index: face_index.max(index),
         tweak: eframe::egui::FontTweak::default(),
     })
+}
+
+/// Every character a document's parts hold as text.
+pub fn characters_used(parts: &[&Element]) -> BTreeSet<char> {
+    parts
+        .iter()
+        .flat_map(|part| part.plain_text().chars().collect::<Vec<_>>())
+        .collect()
 }
 
 /// Every font family a document's styles name.
@@ -179,5 +219,28 @@ mod tests {
             family_of("Arial", both),
             FontFamily::Name("Arial:bolditalic".into())
         );
+    }
+
+    #[test]
+    fn a_character_no_loaded_face_has_is_drawn_from_one_of_the_machines() {
+        let database = odox_fonts::database();
+        if odox_fonts::faces_with(&database, '日', Variant::default())
+            .next()
+            .is_none()
+        {
+            eprintln!("no face on this machine has 日: nothing to check");
+            return;
+        }
+        let families = BTreeSet::from(["Liberation Serif".to_owned()]);
+        let defs = definitions(&families, &BTreeSet::from(['日', 'a']));
+        let chain = &defs.families[&family_of("Liberation Serif", Variant::default())];
+        let added: Vec<&String> = chain
+            .iter()
+            .filter(|key| key.starts_with("machine fallback"))
+            .collect();
+        assert_eq!(added.len(), 1, "one face for the one character missing");
+        assert_eq!(chain.last(), Some(added[0]), "it comes last");
+        let face = &defs.font_data[added[0]];
+        assert!(odox_fonts::covers(&face.font, face.index, '日'));
     }
 }

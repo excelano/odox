@@ -109,6 +109,38 @@ fn query(
     })
 }
 
+/// Whether a face has a glyph for a character.
+pub fn covers(data: &[u8], index: u32, character: char) -> bool {
+    ttf_parser::Face::parse(data, index)
+        .ok()
+        .and_then(|face| face.glyph_index(character))
+        .is_some_and(|glyph| glyph.0 != 0)
+}
+
+/// The faces on the machine that have a glyph for a character, best first:
+/// the generic families' faces in the variant asked for, then every face in
+/// the order the machine lists them. What draws a character the face a
+/// document names does not have.
+pub fn faces_with(
+    database: &fontdb::Database,
+    character: char,
+    variant: Variant,
+) -> impl Iterator<Item = fontdb::ID> + '_ {
+    [
+        fontdb::Family::SansSerif,
+        fontdb::Family::Serif,
+        fontdb::Family::Monospace,
+    ]
+    .into_iter()
+    .filter_map(move |generic| query(database, &[generic], variant))
+    .chain(database.faces().map(|info| info.id))
+    .filter(move |&id| {
+        database
+            .with_face_data(id, |data, index| covers(data, index, character))
+            .unwrap_or(false)
+    })
+}
+
 /// The families that are metrically compatible with the ones office documents
 /// name, in the order to try them.
 ///

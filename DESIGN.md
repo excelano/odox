@@ -129,7 +129,11 @@ generic defaults resolve to nothing on Linux, so the generics are pointed at
 faces the machine has first, and the families with a metrically compatible
 substitute are named so that a document asking for Times New Roman keeps its
 line breaks under Liberation Serif. Both are in `crates/odox-fonts`, which an
-export asks too, and which embeds the face it answers (§12).
+export asks too, and which embeds the face it answers (§12). egui's own fonts,
+which every chain ends in, cover few scripts, so a character in the document
+that no face loaded has is drawn from the first face on the machine that has
+it, added at the end of every chain; the export draws it from the same face.
+The characters are read when the document opens, as the families are.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
