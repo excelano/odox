@@ -10,10 +10,7 @@ name: ci
 # with the rest of this platform's arm.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
