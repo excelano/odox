@@ -13,3 +13,6 @@ rust-version.workspace = true
 [dependencies]
 odox-core.workspace = true
 krilla.workspace = true
+odox-fonts.workspace = true
+rustybuzz.workspace = true
+unicode-linebreak.workspace = true

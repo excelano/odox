@@ -86,6 +86,12 @@ fontdb = { version = "0.24", default-features = false, features = ["fs", "memmap
 # mode that checks what it writes. Pure Rust. It does no layout; `odox-pdf`
 # hands it positioned glyphs. DESIGN.md §12.
 krilla = "0.8"
+# Shaping for the export, the same shaper krilla carries for its own simple
+# text, so the tree holds one copy. Pure Rust.
+rustybuzz = "0.20"
+# Where a line of the export may break: the Unicode line breaking algorithm.
+# Pure Rust, no dependencies.
+unicode-linebreak = "0.1"
 # The pictures inside a package. PNG and JPEG are what office applications
 # write; everything else draws as a placeholder frame rather than growing the
 # decoder set. Both decoders are pure Rust.
