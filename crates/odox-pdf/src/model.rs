@@ -66,6 +66,33 @@ pub(crate) struct Paragraph {
     pub page_after: bool,
 }
 
+impl Paragraph {
+    /// A line of text in one style and nothing else: a list label.
+    pub(crate) fn plain(text: &str, style: &Style) -> Self {
+        Self {
+            heading: None,
+            text: text.to_owned(),
+            runs: vec![Run {
+                range: 0..text.len(),
+                style: style.clone(),
+            }],
+            base: style.clone(),
+            links: Vec::new(),
+            align: TextAlign::Start,
+            left: 0.0,
+            right: 0.0,
+            indent: 0.0,
+            before: 0.0,
+            after: 0.0,
+            line_height: None,
+            background: None,
+            border: Edges::default(),
+            page_before: false,
+            page_after: false,
+        }
+    }
+}
+
 /// Characters in one style.
 pub(crate) struct Run {
     pub range: Range<usize>,

@@ -199,6 +199,7 @@ impl<'a> Layout<'a> {
     ) -> Result<(), Refusal> {
         for block in blocks {
             let first = out.len();
+            let pending = std::mem::take(&mut self.break_pending);
             match block {
                 Block::Paragraph(paragraph) => {
                     self.paragraph(paragraph, x, width, parent, None, out)?;
@@ -208,12 +209,13 @@ impl<'a> Layout<'a> {
                 Block::Figure(figure) => self.figure(figure, x, width, parent, out),
                 Block::TextBox(text_box) => self.text_box(text_box, x, width, parent, out)?,
             }
-            if self.break_pending
-                && let Some(piece) = out.get_mut(first)
-                && !matches!(block, Block::Paragraph(p) if p.page_after)
-            {
-                piece.page_before = true;
-                self.break_pending = false;
+            // A break asked for after the block before goes before this one,
+            // or on past it where it drew nothing.
+            if pending {
+                match out.get_mut(first) {
+                    Some(piece) => piece.page_before = true,
+                    None => self.break_pending = true,
+                }
             }
             if let Block::Paragraph(paragraph) = block
                 && paragraph.page_after
@@ -479,27 +481,7 @@ impl<'a> Layout<'a> {
             link: None,
             ..paragraph.base.clone()
         };
-        let shaped = Paragraph {
-            heading: None,
-            text: label.to_owned(),
-            runs: vec![crate::model::Run {
-                range: 0..label.len(),
-                style: style.clone(),
-            }],
-            base: style.clone(),
-            links: Vec::new(),
-            align: TextAlign::Start,
-            left: 0.0,
-            right: 0.0,
-            indent: 0.0,
-            before: 0.0,
-            after: 0.0,
-            line_height: None,
-            background: None,
-            border: Edges::default(),
-            page_before: false,
-            page_after: false,
-        };
+        let shaped = Paragraph::plain(label, &style);
         let glyphs = text::shape(&shaped, self.faces)?;
         let width: f32 = glyphs.iter().map(|g| g.advance).sum();
         let Some(face) = glyphs.first().map(|g| g.face) else {
