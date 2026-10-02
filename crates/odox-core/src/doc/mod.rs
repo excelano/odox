@@ -11,6 +11,7 @@
 
 mod pres;
 mod sheet;
+mod slides;
 mod text;
 
 pub use pres::{Presentation, Slide};

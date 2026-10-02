@@ -489,3 +489,20 @@ own; the last merges with what followed the caret and keeps the paragraph's
 style; in a list each is an item. A model that keeps no formatting leaves the two
 `Model` methods as they are and every paste is plain. Across windows needs HTML
 on the system clipboard and is not done.
+
+**A deck's slides can be duplicated, deleted and moved, and not added.** A slide
+is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and
+that name is what links, custom shows and the start page refer to it by. Moving
+swaps it with the neighbouring page and so changes nothing that refers to it.
+Deleting removes the page and takes its name out of the start page and the custom
+shows that list it, a show left with none going; the last slide is refused.
+Duplicating puts a copy after the original with a name no slide has (the
+original's and a number) and a new `xml:id` and `draw:id` for everything in it,
+the notes included, with the references that name those ids inside the copy
+(`draw:start-shape`, `draw:end-shape`, `smil:targetElement`) pointing at the
+copy's own. Styles are shared with the original, which is safe because a
+format edit picks or writes a style and never changes one that another span
+uses. A blank slide is not offered: it would hold only the master page's
+decorations, and nothing here adds a shape to fill it, so a duplicate is how a
+new slide is made. The Slide menu offers the four in edit mode, and each is one
+undo step with the view following the slide.

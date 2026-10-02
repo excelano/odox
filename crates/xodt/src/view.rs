@@ -122,14 +122,12 @@ impl View for TextView {
         self.found.show(index);
     }
 
-    fn has_format_menu(&self) -> bool {
-        true
-    }
-
-    fn format_menu(&mut self, ui: &mut Ui) {
-        if let Some(command) = toolbar::menu(ui, &self.menu) {
-            self.command = Some(command);
-        }
+    fn menus(&mut self, ui: &mut Ui, _editing: &Editing) {
+        ui.menu_button(t("Format"), |ui| {
+            if let Some(command) = toolbar::menu(ui, &self.menu) {
+                self.command = Some(command);
+            }
+        });
     }
 
     fn can_replace(&self, editing: &Editing) -> bool {

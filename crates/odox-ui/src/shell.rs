@@ -87,15 +87,10 @@ pub trait View {
     /// [`Self::reindex`].
     fn restore_caret(&mut self, _caret: Caret) {}
 
-    /// Whether the view has a Format menu, for the commands that change how
-    /// text looks or what a paragraph is.
-    fn has_format_menu(&self) -> bool {
-        false
-    }
-
-    /// Draw the Format menu's entries. A chosen one is kept by the view and
-    /// applied when it next draws its page, where the model is.
-    fn format_menu(&mut self, _ui: &mut Ui) {}
+    /// Draw the view's own menus, after Edit: each a `menu_button` of its
+    /// own. A command chosen is kept by the view and applied when it next
+    /// draws its page, where the document and the editing state are.
+    fn menus(&mut self, _ui: &mut Ui, _editing: &Editing) {}
 
     /// Whether the view is showing the document full screen and nothing else,
     /// as a slideshow does: the shell takes its menu, its panels and its keys
@@ -620,8 +615,8 @@ impl<V: View> Shell<V> {
                 }
             });
             ui.menu_button(t("Edit"), |ui| self.edit_menu(ui));
-            if self.view.is_open() && self.view.has_format_menu() {
-                ui.menu_button(t("Format"), |ui| self.view.format_menu(ui));
+            if self.view.is_open() {
+                self.view.menus(ui, &self.editing);
             }
             ui.menu_button(t("View"), |ui| {
                 if ui.button(t("Zoom in")).clicked() {

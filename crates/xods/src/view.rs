@@ -1003,7 +1003,9 @@ fn notice(refused: &Refused) -> String {
         Refused::Covered => t("This cell is covered by the one that spans it."),
         // A cell is never a range and is not formatted here, so a refusal
         // over structure or a namespace is not one a cell hears.
-        Refused::NotFound | Refused::Structure | Refused::Namespace => t("There is no cell there."),
+        Refused::NotFound | Refused::Structure | Refused::Namespace | Refused::LastOne => {
+            t("There is no cell there.")
+        }
     }
     .to_owned()
 }

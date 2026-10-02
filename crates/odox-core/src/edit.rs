@@ -43,6 +43,8 @@ pub enum Refused {
     /// An end of the range is inside a table, a cell or a frame the range
     /// does not wholly contain, which a join of text does not take apart.
     Structure,
+    /// It is the only slide, and a deck keeps one.
+    LastOne,
 }
 
 impl fmt::Display for Refused {
@@ -53,6 +55,7 @@ impl fmt::Display for Refused {
             Self::Namespace => write!(f, "the document does not declare the namespace needed"),
             Self::NotFound => write!(f, "nothing is there to edit"),
             Self::Structure => write!(f, "the range crosses a table or a frame"),
+            Self::LastOne => write!(f, "it is the only one"),
         }
     }
 }
