@@ -10,7 +10,7 @@ use eframe::egui::{
 };
 use odox_core::doc::{Sheet, SheetDocument, Value};
 use odox_core::{Document, Refused};
-use odox_ui::find::{Match, ranges};
+use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Found, View, fonts};
@@ -157,6 +157,63 @@ impl View for SheetView {
             self.pick((row, column));
         }
         self.notice = None;
+    }
+
+    fn can_replace(&self, _editing: &Editing) -> bool {
+        self.document.is_some()
+    }
+
+    /// Replace in the cells that hold text. A formula, and a cell holding a
+    /// number, a date or a boolean, would be read again as something else or
+    /// lose its format, so those are left and counted.
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        let mut done = Replaced::default();
+        let mut writes = Vec::new();
+        let mut at = 0;
+        while at < matches.len() {
+            let [row, column] = matches[at].paragraph[..] else {
+                at += 1;
+                continue;
+            };
+            let scope = matches[at].scope;
+            let mut cell_ranges = Vec::new();
+            while at < matches.len()
+                && matches[at].scope == scope
+                && matches[at].paragraph == [row, column]
+            {
+                cell_ranges.push(matches[at].range.clone());
+                at += 1;
+            }
+            let Some(sheet) = document.sheets().get(scope) else {
+                continue;
+            };
+            let Some(cell) = document.cell(sheet, row, column) else {
+                continue;
+            };
+            if cell.formula().is_some() || !matches!(cell.value(), Value::Text(_)) {
+                done.skipped += cell_ranges.len();
+                continue;
+            }
+            let text = replace_ranges(&cell.text(), &cell_ranges, with);
+            done.replaced += cell_ranges.len();
+            writes.push((scope, row, column, Value::Text(text)));
+        }
+        if !writes.is_empty() {
+            editing.record(&document.document.content);
+            for (sheet, row, column, value) in &writes {
+                let _ = document.set_cell(*sheet, *row, *column, value);
+            }
+            self.metrics = None;
+        }
+        done
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
@@ -1152,6 +1209,50 @@ mod tests {
         view.pick((1, 0));
         pressed(&mut view, Key::End, egui::Modifiers::NONE);
         assert_eq!(view.selected, (1, 6));
+    }
+
+    #[test]
+    fn replace_all_changes_text_cells_in_one_step_and_leaves_the_rest() {
+        let (mut view, mut editing) = opened();
+        assert_eq!(view.find("m6"), 2, "Bolt M6 and Nut M6");
+        let done = view.replace("M8", true, &mut editing);
+        assert_eq!(
+            done,
+            Replaced {
+                replaced: 2,
+                skipped: 0
+            }
+        );
+        assert_eq!(text_at(&view, 1, 0), "Bolt M8");
+        assert_eq!(text_at(&view, 2, 0), "Nut M8");
+        assert_eq!(text_at(&view, 3, 0), "Washer");
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&document.document.content, None)
+            .expect("one step");
+        assert!(!editing.can_undo(), "both cells were one step");
+    }
+
+    #[test]
+    fn replace_leaves_numbers_and_formulas_alone_and_says_so() {
+        let (mut view, mut editing) = opened();
+        let found = view.find("1");
+        assert!(found > 0);
+        let done = view.replace("9", true, &mut editing);
+        assert_eq!(done.replaced, 0);
+        assert_eq!(done.skipped, found);
+        assert!(!editing.modified(), "nothing was written");
+        assert_eq!(text_at(&view, 4, 3), "136.4");
+    }
+
+    #[test]
+    fn replace_one_takes_the_current_match_only() {
+        let (mut view, mut editing) = opened();
+        view.find("m6");
+        view.show_match(1);
+        view.replace("X", false, &mut editing);
+        assert_eq!(text_at(&view, 1, 0), "Bolt M6");
+        assert_eq!(text_at(&view, 2, 0), "Nut X");
     }
 
     #[test]

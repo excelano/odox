@@ -18,17 +18,47 @@ pub enum Step {
     Previous,
 }
 
+/// Which replace button was pressed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Replace {
+    /// The current match.
+    One,
+    /// Every match.
+    All,
+}
+
+/// What was pressed on the bar this frame.
+#[derive(Default)]
+pub struct Pressed {
+    /// A way to move among the matches.
+    pub step: Option<Step>,
+    /// A replace.
+    pub replace: Option<Replace>,
+}
+
+/// Which field of the bar is owed the keyboard.
+#[derive(Default, PartialEq, Eq)]
+enum Focus {
+    #[default]
+    Nowhere,
+    Query,
+    Replacement,
+}
+
 /// The state of the search bar.
 #[derive(Default)]
 pub struct FindBar {
     open: bool,
     query: String,
-    /// The field is to take the keyboard, and what it holds be selected, on
-    /// the next frame it is drawn.
-    focus: bool,
+    /// The field that is to take the keyboard on the next frame it is drawn,
+    /// with what it holds selected.
+    focus: Focus,
     /// What the view was last asked, so that it is asked again only when the
     /// query or the document is not what it was.
     asked: Option<(String, u64)>,
+    /// What replaces a match, and what the last replace said.
+    replacement: String,
+    message: Option<String>,
     /// How many matches the view reported for what it was last asked.
     pub(crate) count: usize,
     /// Which of them is current, counted from zero.
@@ -41,7 +71,26 @@ impl FindBar {
     /// Show the bar and put the keyboard in it.
     pub fn open(&mut self) {
         self.open = true;
-        self.focus = true;
+        self.focus = Focus::Query;
+    }
+
+    /// Show the bar and put the keyboard in the replacement, where there is a
+    /// query to replace.
+    pub fn open_replacing(&mut self) {
+        self.open();
+        if !self.query.is_empty() {
+            self.focus = Focus::Replacement;
+        }
+    }
+
+    /// What replaces a match.
+    pub fn replacement(&self) -> &str {
+        &self.replacement
+    }
+
+    /// Say what a replace did, until the search changes.
+    pub fn say(&mut self, message: String) {
+        self.message = Some(message);
     }
 
     /// Hide the bar. The query stays for the next time.
@@ -69,13 +118,17 @@ impl FindBar {
             return None;
         }
         self.asked = Some((self.query.clone(), revision));
+        if !same_query {
+            self.message = None;
+        }
         Some(!same_query)
     }
 
-    /// Draw the bar.
-    pub fn ui(&mut self, ui: &mut Ui) -> Option<Step> {
+    /// Draw the bar, with a row for replacing where the view can.
+    pub fn ui(&mut self, ui: &mut Ui, can_replace: bool) -> Pressed {
         let (count, current) = (self.count, self.current);
-        let mut step = None;
+        let mut pressed = Pressed::default();
+        let step = &mut pressed.step;
         ui.horizontal(|ui| {
             let id = egui::Id::new("odox-find");
             let mut output = egui::TextEdit::singleline(&mut self.query)
@@ -83,8 +136,8 @@ impl FindBar {
                 .hint_text(t("Find"))
                 .desired_width(240.0)
                 .show(ui);
-            if self.focus {
-                self.focus = false;
+            if self.focus == Focus::Query {
+                self.focus = Focus::Nowhere;
                 output.response.request_focus();
                 output.state.cursor.set_char_range(Some(CCursorRange::two(
                     CCursor::new(0),
@@ -93,7 +146,7 @@ impl FindBar {
                 output.state.store(ui.ctx(), id);
             }
             if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
-                step = Some(if ui.input(|input| input.modifiers.shift) {
+                *step = Some(if ui.input(|input| input.modifiers.shift) {
                     Step::Previous
                 } else {
                     Step::Next
@@ -105,10 +158,10 @@ impl FindBar {
                 return;
             }
             if ui.button(t("Previous")).clicked() {
-                step = Some(Step::Previous);
+                *step = Some(Step::Previous);
             }
             if ui.button(t("Next")).clicked() {
-                step = Some(Step::Next);
+                *step = Some(Step::Next);
             }
             if self.query.is_empty() {
             } else if count == 0 {
@@ -128,6 +181,45 @@ impl FindBar {
                 }
             });
         });
-        step
+        if can_replace && self.open {
+            ui.horizontal(|ui| self.replace_row(ui, count, &mut pressed));
+        }
+        pressed
+    }
+
+    fn replace_row(&mut self, ui: &mut Ui, count: usize, pressed: &mut Pressed) {
+        let id = egui::Id::new("odox-replace");
+        let output = egui::TextEdit::singleline(&mut self.replacement)
+            .id(id)
+            .hint_text(t("Replace with"))
+            .desired_width(240.0)
+            .show(ui);
+        if self.focus == Focus::Replacement {
+            self.focus = Focus::Nowhere;
+            output.response.request_focus();
+        }
+        if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
+            pressed.replace = Some(Replace::One);
+            output.response.request_focus();
+        }
+        if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Escape)) {
+            self.close();
+            return;
+        }
+        if ui
+            .add_enabled(count > 0, egui::Button::new(t("Replace")))
+            .clicked()
+        {
+            pressed.replace = Some(Replace::One);
+        }
+        if ui
+            .add_enabled(count > 0, egui::Button::new(t("Replace all")))
+            .clicked()
+        {
+            pressed.replace = Some(Replace::All);
+        }
+        if let Some(message) = &self.message {
+            ui.label(message);
+        }
     }
 }

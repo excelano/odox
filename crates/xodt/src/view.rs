@@ -9,7 +9,7 @@ use eframe::egui::{self, Ui};
 use egui_richedit::Selection;
 use odox_core::Document;
 use odox_core::doc::TextDocument;
-use odox_ui::find::in_paragraphs;
+use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{
     Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
@@ -114,6 +114,29 @@ impl View for TextView {
 
     fn show_match(&mut self, index: usize) {
         self.found.show(index);
+    }
+
+    fn can_replace(&self, editing: &Editing) -> bool {
+        editing.on && self.document.is_some()
+    }
+
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        let Some(root) = document.body_path() else {
+            return Replaced::default();
+        };
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, editing);
+        model.replace_matches(&matches.iter().collect::<Vec<_>>(), with, true)
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {

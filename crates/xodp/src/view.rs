@@ -15,7 +15,7 @@ use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, v
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
-use odox_ui::find::{Highlights, in_paragraphs};
+use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{
     Canvas, Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
@@ -194,6 +194,65 @@ impl View for SlideView {
         } else {
             self.show_slide(found.scope);
         }
+    }
+
+    fn can_replace(&self, editing: &Editing) -> bool {
+        editing.on && self.document.is_some()
+    }
+
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        // Where each scope's paragraphs are rooted, found before the document
+        // is changed: the slides borrow it.
+        let count = document.slides().len();
+        let mut roots: Vec<(usize, usize, Vec<usize>)> = Vec::new();
+        for found in &matches {
+            if roots.iter().any(|(scope, ..)| *scope == found.scope) {
+                continue;
+            }
+            let (slide, notes) = if found.scope >= count {
+                (found.scope - count, true)
+            } else {
+                (found.scope, false)
+            };
+            let slides = document.slides();
+            let Some(this) = slides.get(slide) else {
+                continue;
+            };
+            let Some(mut root) = document.page_path(this.position) else {
+                continue;
+            };
+            if notes {
+                let Some((at, _)) = this
+                    .element
+                    .elements_indexed()
+                    .find(|(_, e)| e.is(&Ns::Presentation, "notes"))
+                else {
+                    continue;
+                };
+                root.push(at);
+            }
+            roots.push((found.scope, slide, root));
+        }
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut total = Replaced::default();
+        for (scope, slide, root) in roots {
+            let group: Vec<&Match> = matches.iter().filter(|m| m.scope == scope).collect();
+            let mut model = FlowModel::new(content, styles, root, editing).tagged(vec![slide]);
+            let done = model.replace_matches(&group, with, total.replaced == 0);
+            total.replaced += done.replaced;
+            total.skipped += done.skipped;
+        }
+        total
     }
 
     fn restore_caret(&mut self, caret: Caret) {

@@ -19,6 +19,7 @@ use odox_core::edit::{self, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
+use crate::find::{Match, Replaced};
 use crate::flow::is_block_container;
 
 /// The editor over a flow's paragraphs.
@@ -225,6 +226,27 @@ impl<'a> FlowModel<'a> {
                 Block::Numbers => list == Some(ListKind::Number),
             }
         })
+    }
+
+    /// Replace each match of a search with a text, last first so that the
+    /// offsets of the ones before hold. The first replacement begins an undo
+    /// step when `new_step` says so and the rest join it. Answers how many
+    /// were replaced.
+    pub fn replace_matches(&mut self, matches: &[&Match], with: &str, new_step: bool) -> Replaced {
+        let mut done = Replaced::default();
+        for found in matches.iter().rev() {
+            let edit = Edit::Replace {
+                from: Position::new(found.paragraph.clone(), found.range.start),
+                to: Position::new(found.paragraph.clone(), found.range.end),
+                text: with,
+            };
+            if self.apply(edit, new_step && done.replaced == 0).is_some() {
+                done.replaced += 1;
+            } else {
+                done.skipped += 1;
+            }
+        }
+        done
     }
 
     /// Make the paragraphs a selection runs over a kind of paragraph, or take
@@ -724,6 +746,27 @@ mod tests {
                 .expect("the heading")
                 .is(&Ns::Text, "h")
         );
+    }
+
+    #[test]
+    fn replacing_every_match_is_one_step_and_the_offsets_hold() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let matches = crate::find::in_paragraphs(content.at(&[0, 0]).expect("the body"), 0, "t");
+        assert_eq!(matches.len(), 2, "the two t of Title");
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let done = model.replace_matches(&matches.iter().collect::<Vec<_>>(), "TT", true);
+        assert_eq!(done.replaced, 2);
+        assert_eq!(model.text(&vec![0]).as_deref(), Some("TTiTTle"));
+        let mut undone = 0;
+        let mut current = content.clone();
+        while let Some((previous, _)) = editing.undo(&current, None) {
+            current = previous;
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
     }
 
     #[test]

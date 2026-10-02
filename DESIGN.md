@@ -425,6 +425,16 @@ and moves to the slide, and opens the notes, that the current match is in.
 The matches are looked for again when the query changes or the text does, and
 at no other time.
 
+**Replace is an edit over the matches Find holds.** Where the document can be
+changed, the bar has a second row: Replace takes the current match and Replace
+all every one, each as a single step to undo. A text document and a deck replace
+through the page editor's own replacement, last match first so the offsets of
+the ones before hold, so what replaces a match takes its formatting. A sheet
+replaces only in cells whose value is text: a number, a date or a boolean would
+be read again as something else or lose its format, and a formula is never
+edited, so those matches are left and the bar says how many. A replacement that
+still matches the query is passed over, so Replace moves on.
+
 **A link is followed only to places a person means by one.** A paragraph's
 links are the `text:a` elements in it, each covering a range of the flat text
 the page editor counts in; the character under the pointer, found through the

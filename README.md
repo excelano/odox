@@ -28,8 +28,8 @@ Editing means changing what is there, not authoring. You can type and delete
 text, split a paragraph and join two, enter a value in a cell, move a shape on a
 slide and resize it, make text bold, italic, underlined or struck through, make
 a paragraph a heading or a list item, undo any of that, and save. You cannot
-apply other formatting, insert a table or a picture, edit a formula, or replace
-text. What you did
+apply other formatting, insert a table or a picture, or edit a formula. What you
+did
 not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
@@ -136,7 +136,9 @@ kind of link is followed, whatever the document says.
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
 and Escape closes it. Every match is lit, `xodp` searches the notes as well as
-the slides, and `xods` searches every sheet.
+the slides, and `xods` searches every sheet. In edit mode, and always in `xods`, Ctrl+H adds a row to replace the
+current match or every match, as one step to undo; `xods` replaces in cells that
+hold text and says how many it left, formulas and numbers among them.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

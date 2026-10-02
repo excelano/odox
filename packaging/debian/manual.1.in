@@ -12,7 +12,7 @@ changing what is there, not authoring: text can be typed and deleted, a
 paragraph split or joined, a cell given a value, a shape moved or resized, any
 of it undone, and the document saved; in a text document or on a slide, text
 can be made bold, italic, underlined or struck through. Other formatting,
-inserting, formulas and replacing text are an office suite's. What was not touched is written back as it
+inserting and formulas are an office suite's. What was not touched is written back as it
 was read, element for element, so the saved document is the opened one with the
 change in it. Nothing is written until Save, and then only the file that was
 opened or the one named; before it is, what is about to be written is read back
@@ -36,6 +36,9 @@ Save over the open file; save somewhere else.
 .TP
 .B Ctrl+F, F3, Shift+F3
 Search the document; go to the next match; go to the one before.
+.TP
+.B Ctrl+H
+Search and replace, where the document can be changed.
 .TP
 .B Ctrl+C, Ctrl+X, Ctrl+V
 In a spreadsheet, copy, cut and paste the selected cells as tab separated text.
