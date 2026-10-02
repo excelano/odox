@@ -1,3 +1,10 @@
+odox (0.7.0) unstable; urgency=low
+
+  * 0.7.0: export a text document as PDF/UA (#43)
+  * Trim Odox Grid's Microsoft review notes under the Store's 2,000-character limit
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 02 Oct 2026 18:44:36 -0500
+
 odox (0.6.0) unstable; urgency=low
 
   * 0.6.0: Replace, Format menu, AccessKit, rich paste, slides, rows and columns (#42)
