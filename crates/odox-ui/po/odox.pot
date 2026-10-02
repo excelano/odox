@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-02 11:03-0500\n"
+"POT-Creation-Date: 2026-10-02 17:49-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -37,7 +37,7 @@ msgstr ""
 msgid "{current} of {count}"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:179 crates/odox-ui/src/shell.rs:589
+#: crates/odox-ui/src/find_bar.rs:179 crates/odox-ui/src/shell.rs:633
 msgid "Close"
 msgstr ""
 
@@ -53,134 +53,134 @@ msgstr ""
 msgid "Replace all"
 msgstr ""
 
-#: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
-#: crates/odox-ui/src/shell.rs:575 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/i18n.rs:97 crates/odox-ui/src/i18n.rs:101
+#: crates/odox-ui/src/shell.rs:619 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr ""
 
-#: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
+#: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:121
-#: crates/xods/src/view.rs:90 crates/xodt/src/view.rs:57
+#: crates/xods/src/view.rs:90 crates/xodt/src/view.rs:61
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:231
+#: crates/odox-ui/src/shell.rs:253
 msgid "{file} could not be read: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:339
+#: crates/odox-ui/src/shell.rs:362 crates/xodt/src/export.rs:182
 msgid "{file} could not be saved: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:400
+#: crates/odox-ui/src/shell.rs:423
 msgid "Save changes to {file}?"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:401
+#: crates/odox-ui/src/shell.rs:424
 msgid "The document has changes that are not saved."
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:404 crates/odox-ui/src/shell.rs:598
+#: crates/odox-ui/src/shell.rs:427 crates/odox-ui/src/shell.rs:642
 msgid "Save"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:407
+#: crates/odox-ui/src/shell.rs:430
 msgid "Discard"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:410
+#: crates/odox-ui/src/shell.rs:433 crates/xodt/src/export.rs:273
 msgid "Cancel"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:542
+#: crates/odox-ui/src/shell.rs:575 crates/odox-ui/src/shell.rs:586
 msgid "Dismiss"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:576 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:620 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:582 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:626 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:605
+#: crates/odox-ui/src/shell.rs:649
 msgid "Save as…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:612
+#: crates/odox-ui/src/shell.rs:659
 msgid "Quit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:617
+#: crates/odox-ui/src/shell.rs:664
 msgid "Edit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:621
+#: crates/odox-ui/src/shell.rs:668
 msgid "View"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:622
+#: crates/odox-ui/src/shell.rs:669
 msgid "Zoom in"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:625
+#: crates/odox-ui/src/shell.rs:672
 msgid "Zoom out"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:628
+#: crates/odox-ui/src/shell.rs:675
 msgid "Actual size"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:632
+#: crates/odox-ui/src/shell.rs:679
 msgid "Show the side panel"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:638
+#: crates/odox-ui/src/shell.rs:685
 msgid "{percent}%"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:641
+#: crates/odox-ui/src/shell.rs:688
 msgid "Editing"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:651
+#: crates/odox-ui/src/shell.rs:698
 msgid "Undo"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:658
+#: crates/odox-ui/src/shell.rs:705
 msgid "Redo"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:666
+#: crates/odox-ui/src/shell.rs:713
 msgid "Find…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:675
+#: crates/odox-ui/src/shell.rs:722
 msgid "Replace…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:683
+#: crates/odox-ui/src/shell.rs:730
 msgid "Edit mode"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:687
+#: crates/odox-ui/src/shell.rs:734
 msgid "Open documents in edit mode"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:693
+#: crates/odox-ui/src/shell.rs:740
 msgid "The setting could not be saved: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:751
+#: crates/odox-ui/src/shell.rs:798
 msgid "{replaced} replaced"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:754
+#: crates/odox-ui/src/shell.rs:801
 msgid "{replaced} replaced, {skipped} left"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:785
+#: crates/odox-ui/src/shell.rs:832
 msgid "Open a document…"
 msgstr ""
 
@@ -248,7 +248,7 @@ msgstr ""
 msgid "OpenDocument Presentation"
 msgstr ""
 
-#: crates/xodp/src/view.rs:224 crates/xodt/src/view.rs:126
+#: crates/xodp/src/view.rs:224 crates/xodt/src/view.rs:131
 msgid "Format"
 msgstr ""
 
@@ -396,22 +396,89 @@ msgstr ""
 msgid "There is no cell there."
 msgstr ""
 
-#: crates/xodt/src/main.rs:27
+#: crates/xodt/src/export.rs:64
+msgid "Export as PDF/UA…"
+msgstr ""
+
+#: crates/xodt/src/export.rs:127
+msgid "The pictures could not be described: {reason}"
+msgstr ""
+
+#: crates/xodt/src/export.rs:142
+msgid "Untitled"
+msgstr ""
+
+#: crates/xodt/src/export.rs:146
+msgid "PDF/UA document"
+msgstr ""
+
+#: crates/xodt/src/export.rs:168
+msgid "Exported {file} as PDF/UA."
+msgstr ""
+
+#: crates/xodt/src/export.rs:172
+msgid "{family} may not be embedded, so {used} was used instead."
+msgstr ""
+
+#: crates/xodt/src/export.rs:195
+msgid "{count} pictures still say nothing in place of what they show."
+msgstr ""
+
+#: crates/xodt/src/export.rs:199
+msgid "No font for {family} on this computer may be embedded in a PDF."
+msgstr ""
+
+#: crates/xodt/src/export.rs:203
+msgid "No font on this computer has the character {character}."
+msgstr ""
+
+#: crates/xodt/src/export.rs:207
+msgid "The PDF could not be written: {reason}"
+msgstr ""
+
+#: crates/xodt/src/export.rs:223
+msgid "Describe the pictures"
+msgstr ""
+
+#: crates/xodt/src/export.rs:225
+msgid ""
+"A PDF/UA file says what each picture shows to someone who cannot see it, or "
+"that it is decoration and shows nothing they need. These pictures say "
+"neither yet."
+msgstr ""
+
+#: crates/xodt/src/export.rs:247
+msgid "What the picture shows"
+msgstr ""
+
+#: crates/xodt/src/export.rs:250
+msgid "Decoration only"
+msgstr ""
+
+#: crates/xodt/src/export.rs:261
+msgid "Export"
+msgstr ""
+
+#: crates/xodt/src/export.rs:266
+msgid "Mark the rest as decoration"
+msgstr ""
+
+#: crates/xodt/src/main.rs:28
 msgid "OpenDocument Text"
 msgstr ""
 
-#: crates/xodt/src/view.rs:168
+#: crates/xodt/src/view.rs:177
 msgid "This document has no text in it."
 msgstr ""
 
-#: crates/xodt/src/view.rs:256
+#: crates/xodt/src/view.rs:265
 msgid "Outline"
 msgstr ""
 
-#: crates/xodt/src/view.rs:265
+#: crates/xodt/src/view.rs:274
 msgid "(untitled)"
 msgstr ""
 
-#: crates/xodt/src/view.rs:289
+#: crates/xodt/src/view.rs:307
 msgid "Copy the document as text"
 msgstr ""

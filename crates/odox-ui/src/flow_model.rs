@@ -20,7 +20,7 @@ use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
 use crate::find::{Match, Replaced};
-use crate::flow::is_block_container;
+use odox_core::edit::is_block_container;
 
 /// The editor over a flow's paragraphs.
 pub type PageEditor = RichEdit<Vec<usize>>;

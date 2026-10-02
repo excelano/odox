@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.6.0"
+version = "0.7.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Replace: Ctrl+H replaces the current match or every match, as one step to undo. A Format menu offers bold, italic, underline, strikethrough, headings and lists by name. Text you copy and paste inside the window keeps its formatting. Enter at the end of a heading starts body text, and a drag past the last paragraph selects to its end. The page's paragraphs and headings are now exposed to assistive technology."
+whats-new = "Export as PDF/UA: File > Export as PDF/UA… writes the document as a PDF that conforms to PDF/UA-1, the standard for accessible PDF, with its headings, lists, tables, links and pictures tagged in reading order and its fonts embedded. The window keeps its one continuous page; the PDF is laid out on the paper and margins of the document's own page style. A picture with no description is asked about first, and the answer is saved into the document."
 
 [products.xodt.locales.de-de]
-whats-new = "Ersetzen: Strg+H ersetzt den aktuellen Treffer oder alle Treffer, in einem Schritt rückgängig zu machen. Ein Menü Format bietet Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften und Listen mit Namen an. Text, den Sie im Fenster kopieren und einfügen, behält seine Formatierung. Enter am Ende einer Überschrift beginnt einen Fließtext, und ein Ziehen über den letzten Absatz hinaus markiert bis zu seinem Ende. Absätze und Überschriften der Seite stehen jetzt Hilfstechnologien zur Verfügung."
+whats-new = "Export als PDF/UA: Datei > Als PDF/UA exportieren… schreibt das Dokument als PDF nach PDF/UA-1, der Norm für barrierefreies PDF, mit Überschriften, Listen, Tabellen, Links und Bildern in Lesereihenfolge ausgezeichnet und eingebetteten Schriften. Das Fenster behält seine eine durchgehende Seite; das PDF wird auf Papier und Ränder der eigenen Seitenvorlage gesetzt. Nach einem Bild ohne Beschreibung wird zuerst gefragt, und die Antwort wird im Dokument gespeichert."
 
 [products.xods.locales.en-us]
-whats-new = "Insert and delete rows and columns from the new Sheet menu: formulas that name the cells it moves follow them, and a change that would break one is refused with the reason. Ctrl+H replaces text in the cells that hold text and says how many it left. The arrow keys now walk past the data into the empty grid."
+whats-new = "Built with this release's shared library. Nothing in Odox Grid changes."
 
 [products.xods.locales.de-de]
-whats-new = "Zeilen und Spalten einfügen und löschen im neuen Menü Blatt: Formeln, die auf die verschobenen Zellen verweisen, folgen ihnen, und eine Änderung, die eine zerstören würde, wird mit Begründung abgelehnt. Strg+H ersetzt Text in den Zellen mit Text und sagt, wie viele es ausgelassen hat. Die Pfeiltasten gehen jetzt über die Daten hinaus in das leere Gitter."
+whats-new = "Mit der gemeinsamen Bibliothek dieser Version gebaut. An Odox Grid ändert sich nichts."
 
 [products.xodp.locales.en-us]
-whats-new = "A Slide menu duplicates, moves and deletes slides, each one step to undo. Ctrl+H replaces text across the slides and their notes. A link in a slide's text goes to the slide it names. A Format menu offers bold, italic, underline and strikethrough, and text you copy and paste inside the window keeps its formatting."
+whats-new = "Built with this release's shared library. Nothing in Odox Deck changes."
 
 [products.xodp.locales.de-de]
-whats-new = "Ein Menü Folie dupliziert, verschiebt und löscht Folien, jedes in einem Schritt rückgängig zu machen. Strg+H ersetzt Text in den Folien und ihren Notizen. Ein Verweis im Text einer Folie führt zur Folie, die er nennt. Ein Menü Format bietet Fett, Kursiv, Unterstrichen und Durchgestrichen an, und Text, den Sie im Fenster kopieren und einfügen, behält seine Formatierung."
+whats-new = "Mit der gemeinsamen Bibliothek dieser Version gebaut. An Odox Deck ändert sich nichts."

@@ -19,3 +19,5 @@ odox-core.workspace = true
 odox-ui.workspace = true
 egui_richedit.workspace = true
 eframe.workspace = true
+odox-pdf.workspace = true
+rfd.workspace = true

@@ -101,3 +101,10 @@ for template in Blue_Curve Focus Growing_Liberty; do
 	printf '%s\n' "$target"
 done
 
+
+# A text document for the PDF export: several pages, headings, nested lists, a
+# table with a header row, a link, a footnote, a picture with alternative text,
+# a decorative one, a text box and a little text outside Latin. Written as flat
+# ODF by hand, because no text format LibreOffice imports carries alternative
+# text and the decorative flag; LibreOffice still writes the package.
+convert odt:writer8 export.odt "OpenDocument Text Flat XML" export.fodt

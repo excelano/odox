@@ -261,7 +261,7 @@ impl Flow<'_> {
                 () if element.is(&Ns::Table, "table") => self.table(ui, element, width),
                 () if element.is(&Ns::Draw, "frame") => self.frame(ui, element, width),
                 () if element.is(&Ns::Text, "soft-page-break") => self.page_break(ui, width),
-                () if is_block_container(element) => {
+                () if edit::is_block_container(element) => {
                     self.blocks_with(ui, element, width, counters);
                 }
                 () => {}
@@ -598,7 +598,7 @@ impl Flow<'_> {
                         put(job, "\n", 1);
                     } else if element.is(&Ns::Text, "span") {
                         let style = self.style_of(element, &Family::Text);
-                        let merged = merge(inherited, &style.text);
+                        let merged = style.text.over(inherited);
                         let inner_size = format::size_of(&merged, size);
                         let inner = format::text_format(&merged, size, self.zoom, palette);
                         let run = Run {
@@ -611,7 +611,7 @@ impl Flow<'_> {
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Text, "a") {
                         let style = self.style_of(element, &Family::Text);
-                        let merged = merge(inherited, &style.text);
+                        let merged = style.text.over(inherited);
                         let inner_size = format::size_of(&merged, size);
                         let inner = format::link_format(&merged, size, self.zoom, palette);
                         let run = Run {
@@ -634,7 +634,7 @@ impl Flow<'_> {
                             raised.valign = Align::TOP;
                             job.atom(&citation.plain_text(), 0, raised);
                         }
-                    } else if is_inline_passthrough(element) {
+                    } else if edit::is_inline_passthrough(element) {
                         // A mark's contents are the paragraph's text; a field's
                         // are its value, which the paragraph's text does not
                         // hold.
@@ -773,9 +773,9 @@ impl Flow<'_> {
             let mut numbers = Vec::new();
             let first = (level + 1).saturating_sub(display);
             for ancestor in first..level {
-                numbers.push(number_text(counters.at(ancestor), format));
+                numbers.push(edit::number_text(counters.at(ancestor), format));
             }
-            numbers.push(number_text(number, format));
+            numbers.push(edit::number_text(number, format));
             return format!("{prefix}{}{suffix}", numbers.join("."));
         }
         // A level drawn with an image, which is a picture this does not fetch.
@@ -1001,26 +1001,6 @@ impl Flow<'_> {
     }
 }
 
-/// A child style over its parent: a property the child does not state is the
-/// parent's.
-fn merge(parent: &TextProperties, child: &TextProperties) -> TextProperties {
-    TextProperties {
-        font_family: child
-            .font_family
-            .clone()
-            .or_else(|| parent.font_family.clone()),
-        size: child.size.or(parent.size),
-        bold: child.bold.or(parent.bold),
-        italic: child.italic.or(parent.italic),
-        underline: child.underline.or(parent.underline),
-        strike: child.strike.or(parent.strike),
-        color: child.color.or(parent.color),
-        background: child.background.or(parent.background),
-        position: child.position.or(parent.position),
-        uppercase: child.uppercase.or(parent.uppercase),
-    }
-}
-
 /// Which edge of a cell a border belongs to.
 #[derive(Clone, Copy)]
 enum Edge {
@@ -1119,65 +1099,6 @@ fn collect_columns(document: &Document, parent: &Element, into: &mut Vec<Option<
     }
 }
 
-/// A number in the format a list level asks for.
-fn number_text(number: usize, format: &str) -> String {
-    match format.chars().next() {
-        Some('a') => alphabetic(number, b'a'),
-        Some('A') => alphabetic(number, b'A'),
-        Some('i') => roman(number).to_lowercase(),
-        Some('I') => roman(number),
-        // An empty format is a level that shows no number, which ODF uses for a
-        // list whose label is only its prefix and suffix.
-        None => String::new(),
-        _ => number.to_string(),
-    }
-}
-
-/// `a`, `b`, … `z`, `aa`, which is the spreadsheet column rule and ODF's.
-fn alphabetic(number: usize, first: u8) -> String {
-    let mut n = number;
-    let mut out = Vec::new();
-    while n > 0 {
-        let remainder = (n - 1) % 26;
-        out.push(first + u8::try_from(remainder).unwrap_or(0));
-        n = (n - 1) / 26;
-    }
-    out.reverse();
-    String::from_utf8(out).unwrap_or_default()
-}
-
-fn roman(number: usize) -> String {
-    const VALUES: [(usize, &str); 13] = [
-        (1000, "M"),
-        (900, "CM"),
-        (500, "D"),
-        (400, "CD"),
-        (100, "C"),
-        (90, "XC"),
-        (50, "L"),
-        (40, "XL"),
-        (10, "X"),
-        (9, "IX"),
-        (5, "V"),
-        (4, "IV"),
-        (1, "I"),
-    ];
-    // Beyond what Roman numerals reach, the number itself is more use than a
-    // line of Ms.
-    if number == 0 || number > 3999 {
-        return number.to_string();
-    }
-    let mut left = number;
-    let mut out = String::new();
-    for (value, numeral) in VALUES {
-        while left >= value {
-            out.push_str(numeral);
-            left -= value;
-        }
-    }
-    out
-}
-
 /// Tell assistive technology what a paragraph is: its text, and a heading's
 /// level. Where the page editor draws the paragraph it has already said the
 /// text and where the caret is, and only the role is put right.
@@ -1226,77 +1147,6 @@ fn holds_place(element: &Element, place: &str) -> bool {
         let marks = e.is(&Ns::Text, "bookmark") || e.is(&Ns::Text, "bookmark-start");
         (marks && e.attr(&Ns::Text, "name") == Some(place)) || holds_place(e, place)
     })
-}
-
-/// Whether an element holds blocks on the body's behalf rather than being one.
-pub(crate) fn is_block_container(element: &Element) -> bool {
-    element.name.ns == Ns::Text
-        && matches!(
-            &*element.name.local,
-            "section"
-                | "index-body"
-                | "index-title"
-                | "table-of-content"
-                | "illustration-index"
-                | "table-index"
-                | "object-index"
-                | "user-index"
-                | "alphabetical-index"
-                | "bibliography"
-                | "tracked-changes"
-                | "deletion"
-        )
-}
-
-/// Whether an element is a wrapper around text rather than text of its own.
-///
-/// A bookmark, a reference mark and a change mark each sit inside a paragraph,
-/// carry no characters, and may have text inside them that does belong to the
-/// paragraph.
-fn is_inline_passthrough(element: &Element) -> bool {
-    element.name.ns == Ns::Text
-        && matches!(
-            &*element.name.local,
-            "bookmark"
-                | "bookmark-start"
-                | "bookmark-end"
-                | "reference-mark"
-                | "reference-mark-start"
-                | "reference-mark-end"
-                | "span"
-                | "bibliography-mark"
-                | "ruby"
-                | "ruby-base"
-                | "meta"
-                | "meta-field"
-                | "change-start"
-                | "change-end"
-                | "page-number"
-                | "page-count"
-                | "title"
-                | "subject"
-                | "author-name"
-                | "author-initials"
-                | "chapter"
-                | "file-name"
-                | "sheet-name"
-                | "date"
-                | "time"
-                | "creator"
-                | "description"
-                | "keywords"
-                | "sequence"
-                | "bookmark-ref"
-                | "sequence-ref"
-                | "reference-ref"
-                | "variable-get"
-                | "variable-set"
-                | "user-field-get"
-                | "placeholder"
-                | "conditional-text"
-                | "hidden-text"
-                | "text-input"
-        )
 }
 
 #[cfg(test)]

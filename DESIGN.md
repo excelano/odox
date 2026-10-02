@@ -29,6 +29,13 @@ link egui, and does not open files: a document is made from a byte slice and
 turned back into a `Vec<u8>`, so one library serves a window, a sandboxed macOS
 application and a test that never reads a disk.
 
+`odox-fonts` answers which of the machine's faces a family a document names
+resolves to, and `odox-pdf` lays a text document out onto pages and writes it as
+tagged PDF (§12). Both sit beside `odox-ui` rather than under it: the window and
+an export ask `odox-fonts` the same question and so get the same face, and
+`odox-pdf` links neither egui nor anything that draws, which is how only `xodt`,
+the one application that exports, carries the PDF writer.
+
 `egui_richedit` sits below `odox-ui` and knows nothing of ODF: it is the caret,
 the selection and the keys over paragraphs an application lays out itself, and
 it reaches a document only through the `Model` trait the application implements.
@@ -115,13 +122,18 @@ slide's own frame of that class takes its place. The class is the test;
 
 ## §6 Drawing
 
-**Fonts are the machine's.** Nothing is embedded; a document names a family and
-the machine is asked for it once, when the document opens, because egui rebuilds
-its glyph atlas when the font definitions change. `fontdb`'s generic defaults
-resolve to nothing on Linux, so the generics are pointed at faces the machine
-has first, and the families with a metrically compatible substitute are named so
-that a document asking for Times New Roman keeps its line breaks under Liberation
-Serif. Both are in `crates/odox-ui/src/fonts.rs`.
+**Fonts are the machine's.** The applications carry none; a document names a
+family and the machine is asked for it once, when the document opens, because
+egui rebuilds its glyph atlas when the font definitions change. `fontdb`'s
+generic defaults resolve to nothing on Linux, so the generics are pointed at
+faces the machine has first, and the families with a metrically compatible
+substitute are named so that a document asking for Times New Roman keeps its
+line breaks under Liberation Serif. Both are in `crates/odox-fonts`, which an
+export asks too, and which embeds the face it answers (§12). egui's own fonts,
+which every chain ends in, cover few scripts, so a character in the document
+that no face loaded has is drawn from the first face on the machine that has
+it, added at the end of every chain; the export draws it from the same face.
+The characters are read when the document opens, as the families are.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
@@ -148,8 +160,9 @@ selection across paragraphs and scrolling because every paragraph reports to it
 whether or not it is on screen. Both begin a selection only on a response that
 senses drag, which a bare allocation does not.
 
-**What is not drawn.** Nothing paginates: a page layout gives a width, and page
-boxes, widows, floats and multiple columns are typesetting rather than reading.
+**What is not drawn.** The window does not paginate: a page layout gives a
+width, and page boxes, widows, floats and multiple columns are typesetting rather
+than reading. An export is where pages are made (§12).
 Tab stops advance by a fixed amount. Right-to-left text is drawn left to right.
 A `draw:measure` is undrawn. A radial, ellipsoidal, square or rectangular gradient
 is filled with the flat average of its two colours, and a tiled picture with
@@ -529,3 +542,72 @@ way. A reference this reading cannot take, another document's or a range across
 sheets, is refused, because a wrong formula looks right and nothing here
 evaluates one. The rows or columns are changed before the formulas are shifted,
 so a formula that is deleted with its row is not asked about what it pointed at.
+
+## §12 Export
+
+**A text document exports as PDF/UA-1**, the accessible profile of PDF, from
+`xodt`'s File menu and nowhere else. The label says PDF/UA because the output is
+checked: krilla, the writer, runs its PDF/UA-1 validation as it writes and fails
+the export rather than producing a file that only claims to conform, and
+`crates/odox-pdf/tests/conformance.rs` puts every `.odt` in the corpus through
+veraPDF's ua1 profile. veraPDF is a Java program and not a build dependency, so
+the test says it skipped the check where it is not installed;
+`packaging/verapdf.sh` runs the same check over any documents by hand.
+
+**The PDF holds what the window shows, in the same order.** `odox-pdf` reads the
+body into blocks with the same decisions the window's flow makes, which live in
+`odox-core` for both to call: which elements are blocks and which pass their
+text through, how a list level writes its numbers, a tab as four spaces, a
+picture anchored in a paragraph after it. An object with no picture of its own,
+which the window shows as an empty box, is left out. A note is the one thing
+the PDF holds that the window does not show: its citation stays in the text, and
+its own text goes to the end of the document with the other notes, in the order
+they are cited, below a short rule, each tagged as a Note with its citation as
+its label.
+
+**The window has no pages; an export does.** The body is laid out at the text
+width of the first page style and filled into pages of its size and margins.
+Text is shaped by rustybuzz in the faces `odox-fonts` resolves, a character the
+face lacks in the first face on the machine that has it, and left to right as the
+window draws it. Lines break where the Unicode line breaking algorithm allows, a
+word wider than the line where it has to. A proportional line height is a share
+of the face's own line height, which is what ODF means by it. A page is filled
+with whole pieces: a line, a table row, a picture. A heading stays on the page
+with the line after it, a page break the document asks for is taken, a table's
+header rows are drawn again above the rest of it on a new page, and only a piece
+taller than a page is cut. There are no headers, footers, widow control, floats
+or columns. The window and the PDF measure text with different shapers, so a
+paragraph can wrap a word differently in each; there are no page breaks in the
+window for the PDF's to disagree with.
+
+**Everything drawn is tagged as what it is, or marked as decoration.** The
+structure tree is built during layout, in reading order. Headings are H1 to H6,
+numbered by their depth among the headings above them, so that the first is a
+level 1 and none skips a level as PDF/UA asks; a document numbered without gaps
+keeps its own numbers, and what is drawn is not changed. Paragraphs are P;
+lists are L, LI, Lbl and LBody with their numbering; tables are Table, TR, TH
+for the header rows and TD, with column and row spans, and an empty cell is
+still a cell. A picture is a Figure with its alternative text. A link to an
+address outside the document is a Link with its annotation, whose text is the
+address; a link to a place inside it is read as its text. Backgrounds, borders,
+underlines, a repeated table header and a decorative picture are artifacts. The
+title is `dc:title`, or the file's name; the language is the default paragraph
+style's, then `dc:language`, then the language of the person exporting. The
+outline is the headings.
+
+**A picture has to say what it shows, or that it is decoration.** Its
+alternative text is the frame's `svg:title`, or failing that its `svg:desc`; a
+decorative one is marked as `LibreOffice` marks it, `loext:decorative` in the
+frame's graphic style, so a document says the same in either application. An
+export with a picture that says neither is refused, and `xodt` asks about each
+one first, with the picture beside a field for its text and a box for
+decoration; the answers are written into the document as one step to undo, and
+a document that does not declare the SVG or `LibreOffice` namespace is given the
+declaration. Nothing unanswered is written under the PDF/UA label.
+
+**A font is embedded only where its licence allows it.** A face whose OS/2
+flags restrict embedding or forbid subsetting is replaced by its metric
+substitute or the generic family, and the export says so when it finishes. A
+family with no embeddable face at all, and a character no face on the machine
+has, refuse the export by name, since a PDF/UA file may hold no glyph that stands
+for nothing.

@@ -107,6 +107,14 @@ third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, and in `xodp` the marks. Undo puts the caret back where the edit
 was.
 
+File > Export as PDF/UA… in `xodt` writes the document as a PDF that conforms
+to PDF/UA-1, the standard for accessible PDF: headings, lists, tables, links and
+pictures are tagged for a screen reader, and the fonts travel inside the file.
+The window has no pages and the PDF does, laid out on the paper and margins the
+document's page style gives. A picture that has neither alternative text nor a
+mark that it is decoration is asked about first, and what you answer is saved
+into the document, so the next export does not ask again.
+
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, one tab per sheet, and shows the formula behind whichever cell you pick.
 Typing on the picked cell replaces it, Enter or F2 opens it with what it holds,
@@ -150,7 +158,9 @@ The window draws in the desktop's language where it has one. German is there;
 ## Where things are
 
 `crates/odox-core` reads and writes the format and has no window in it.
-`crates/odox-ui` is everything a person sees, shared by all three. `crates/xodt`,
+`crates/odox-ui` is everything a person sees, shared by all three.
+`crates/odox-fonts` picks the face a document's font resolves to, for the window
+and the export alike, and `crates/odox-pdf` is the PDF/UA export. `crates/xodt`,
 `crates/xods` and `crates/xodp` are one screen each over that. `crates/odox` is
 the launcher, which draws nothing and links no toolkit. `corpus/` holds
 the documents the tests read. `packaging/` turns a build into something

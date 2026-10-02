@@ -33,6 +33,9 @@ pub struct Meta {
     pub modified: Option<String>,
     /// `meta:generator`, the application that wrote it.
     pub generator: Option<String>,
+    /// `dc:language`, the language the document is written in, as a BCP 47
+    /// tag.
+    pub language: Option<String>,
     /// Every `meta:keyword`, in order.
     pub keywords: Vec<String>,
 }
@@ -55,6 +58,7 @@ impl Meta {
                 () if element.is(&Ns::Meta, "creation-date") => &mut meta.created,
                 () if element.is(&Ns::Dc, "date") => &mut meta.modified,
                 () if element.is(&Ns::Meta, "generator") => &mut meta.generator,
+                () if element.is(&Ns::Dc, "language") => &mut meta.language,
                 () if element.is(&Ns::Meta, "keyword") => {
                     if !text.is_empty() {
                         meta.keywords.push(text);

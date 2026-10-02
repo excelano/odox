@@ -77,7 +77,7 @@ fn list_kind_of(content: &Element, path: &[usize], styles: &Styles) -> Option<Li
 }
 
 /// What the namespaces an edit writes in have to be declared.
-fn declares(content: &Element, spaces: &[Ns]) -> Result<(), Refused> {
+pub(super) fn declares(content: &Element, spaces: &[Ns]) -> Result<(), Refused> {
     spaces
         .iter()
         .all(|space| content.declares(space))
@@ -184,7 +184,7 @@ fn heading_style(
 /// The name of an automatic style that says what this one does: one the
 /// document already has, or this one written under the first name no style of
 /// the family has, which is answered as the style to write.
-fn name_for(
+pub(super) fn name_for(
     content: &Element,
     styles: &mut Styles,
     mut style: Element,

@@ -15,7 +15,7 @@ use eframe::egui;
 fn a_family_registered_this_frame_is_not_available_until_the_next() {
     let mut families = BTreeSet::new();
     families.insert("Liberation Serif".to_owned());
-    let definitions = odox_ui::fonts::definitions(&families);
+    let definitions = odox_ui::fonts::definitions(&families, &std::collections::BTreeSet::new());
 
     let ctx = egui::Context::default();
     let wanted = odox_ui::fonts::family_of(

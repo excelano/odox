@@ -48,4 +48,4 @@ pub use flow_model::{Block, FlowModel, PageEditor, page_editor};
 pub use i18n::mark;
 pub use settings::Settings;
 pub use shapes::Canvas;
-pub use shell::{Product, Shell, View, run};
+pub use shell::{Notice, Product, Shell, View, replace_file, run};
