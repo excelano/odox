@@ -10,6 +10,9 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod restructure;
+pub use restructure::{Blocked, Restructure};
+
 use super::Document;
 use crate::edit::Refused;
 use crate::media_type;

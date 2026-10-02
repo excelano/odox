@@ -10,12 +10,13 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod pres;
+mod refs;
 mod sheet;
 mod slides;
 mod text;
 
 pub use pres::{Presentation, Slide};
-pub use sheet::{Cell, Column, Sheet, SheetDocument, Value};
+pub use sheet::{Blocked, Cell, Column, Restructure, Sheet, SheetDocument, Value};
 pub use text::TextDocument;
 
 use crate::xml::{Element, Name, Ns};
