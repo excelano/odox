@@ -43,6 +43,8 @@ pub enum Refused {
     /// An end of the range is inside a table, a cell or a frame the range
     /// does not wholly contain, which a join of text does not take apart.
     Structure,
+    /// It is the only slide, and a deck keeps one.
+    LastOne,
 }
 
 impl fmt::Display for Refused {
@@ -53,6 +55,7 @@ impl fmt::Display for Refused {
             Self::Namespace => write!(f, "the document does not declare the namespace needed"),
             Self::NotFound => write!(f, "nothing is there to edit"),
             Self::Structure => write!(f, "the range crosses a table or a frame"),
+            Self::LastOne => write!(f, "it is the only one"),
         }
     }
 }
@@ -190,6 +193,152 @@ fn write_text(parent: &Element, out: &mut String) {
             Node::Element(_) | Node::Comment(_) | Node::ProcessingInstruction(_) => {}
         }
     }
+}
+
+/// A paragraph cut down to a range of its text, as it is carried to be put
+/// back elsewhere: the paragraph's own style and kind, the text in the range
+/// with its spans and links, and nothing that names one place in a document
+/// (an id, a bookmark, a frame, a note), which would then be there twice.
+pub fn slice(paragraph: &Element, range: Range<usize>) -> Element {
+    let len = text(paragraph).chars().count();
+    let (_, rest) = split(paragraph, range.start.min(len));
+    let (mut kept, _) = split(&rest, range.end.saturating_sub(range.start));
+    kept.attrs.retain(|a| !is_id(a));
+    keep_text_only(&mut kept);
+    normalize(&mut kept);
+    kept
+}
+
+fn is_id(attribute: &Attribute) -> bool {
+    attribute.name.is(&Ns::Text, "id")
+        || attribute.name.local.as_ref() == "id" && attribute.name.prefix.as_deref() == Some("xml")
+}
+
+/// Drop from a paragraph's contents everything that is not text or whitespace
+/// or a span or link holding some, and the ids of those that stay.
+fn keep_text_only(element: &mut Element) {
+    element.children.retain_mut(|child| match child {
+        Node::Text(_) | Node::CData(_) => true,
+        Node::Element(e)
+            if e.is(&Ns::Text, "s") || e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") =>
+        {
+            true
+        }
+        Node::Element(e) if is_inline_container_name(e) => {
+            e.attrs.retain(|a| !is_id(a));
+            keep_text_only(e);
+            true
+        }
+        _ => false,
+    });
+}
+
+/// Put a run of a paragraph's contents into another, at a character offset,
+/// as the text typed there would go: the paragraph keeps its own style.
+pub fn insert_inline(paragraph: &mut Element, at: usize, nodes: &[Node]) {
+    let len = text(paragraph).chars().count();
+    let (mut first, second) = split(paragraph, at.min(len));
+    first.children.extend(nodes.iter().cloned());
+    first.children.extend(second.children);
+    normalize(&mut first);
+    *paragraph = first;
+}
+
+/// Where a paragraph put after this one goes: beside it, or in a new item
+/// after its item where it is in a list.
+fn slot_after(root: &Element, path: &[usize]) -> Option<Vec<usize>> {
+    let (last, above) = path.split_last()?;
+    if root.at(above)?.is(&Ns::Text, "list-item") {
+        let (item_at, list_path) = above.split_last()?;
+        let mut slot = list_path.to_vec();
+        slot.extend([item_at + 1, 0]);
+        Some(slot)
+    } else {
+        let mut slot = above.to_vec();
+        slot.push(last + 1);
+        Some(slot)
+    }
+}
+
+/// Put a paragraph in after another, in an item of its own where the other is
+/// in a list, and answer its path. Nothing that follows the other moves.
+fn insert_paragraph_after(
+    root: &mut Element,
+    path: &[usize],
+    paragraph: Element,
+) -> Result<Vec<usize>, Refused> {
+    let slot = slot_after(root, path).ok_or(Refused::NotFound)?;
+    let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
+    let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
+    if parent.is(&Ns::Text, "list-item") {
+        let item = Element {
+            name: parent.name.clone(),
+            attrs: Vec::new(),
+            children: vec![Node::Element(paragraph)],
+            self_closing: false,
+        };
+        let (item_at, list_path) = above.split_last().ok_or(Refused::NotFound)?;
+        root.at_mut(list_path)
+            .ok_or(Refused::NotFound)?
+            .children
+            .insert(item_at + 1, Node::Element(item));
+    } else {
+        parent.children.insert(last + 1, Node::Element(paragraph));
+    }
+    Ok(slot)
+}
+
+/// Put paragraphs carried by [`slice`] in at a character offset of a
+/// paragraph, as one edit, and answer where the caret goes: the end of what
+/// was put in.
+///
+/// The first merges into the paragraph at the offset and takes its style, as
+/// text typed there would; the ones between keep their own; the last merges
+/// with what followed the offset, which keeps the paragraph's style. One
+/// paragraph is a run of text and no paragraph is added.
+///
+/// # Errors
+///
+/// The path does not lead to a paragraph.
+pub fn paste_fragment(
+    root: &mut Element,
+    path: &[usize],
+    offset: usize,
+    fragment: &[Element],
+) -> Result<(Vec<usize>, usize), Refused> {
+    let target = root
+        .at(path)
+        .filter(|e| is_paragraph(e))
+        .ok_or(Refused::NotFound)?;
+    let at = offset.min(text(target).chars().count());
+    let Some((first, rest)) = fragment.split_first() else {
+        return Ok((path.to_vec(), at));
+    };
+    let length = |e: &Element| text(e).chars().count();
+    let Some((last, middle)) = rest.split_last() else {
+        insert_inline(
+            root.at_mut(path).ok_or(Refused::NotFound)?,
+            at,
+            &first.children,
+        );
+        return Ok((path.to_vec(), at + length(first)));
+    };
+
+    split_keeping_item(root, path, at)?;
+    let head = root.at_mut(path).ok_or(Refused::NotFound)?;
+    head.children.extend(first.children.iter().cloned());
+    normalize(head);
+    let mut current = path.to_vec();
+    for paragraph in middle {
+        current = insert_paragraph_after(root, &current, paragraph.clone())?;
+    }
+    let tail_at = slot_after(root, &current).ok_or(Refused::NotFound)?;
+    let tail = root.at_mut(&tail_at).ok_or(Refused::NotFound)?;
+    let mut contents = last.children.clone();
+    contents.append(&mut tail.children);
+    tail.children = contents;
+    normalize(tail);
+    Ok((tail_at, length(last)))
 }
 
 /// The hyperlinks in a paragraph: the characters each covers, in the same
@@ -392,8 +541,30 @@ pub fn split_at(root: &mut Element, path: &[usize], at: usize) -> Result<Vec<usi
     {
         return take_out_of_list(root, above);
     }
-    let (first, second) = split(paragraph, at);
+    split_keeping_item(root, path, at)
+}
+
+/// Split a paragraph in two as [`split_at`] does, but never take an empty
+/// item out of its list: what a paste needs, where Enter on an empty item
+/// is the way out of one.
+///
+/// # Errors
+///
+/// The path leads to nothing, or to something that is not a paragraph.
+pub fn split_keeping_item(
+    root: &mut Element,
+    path: &[usize],
+    at: usize,
+) -> Result<Vec<usize>, Refused> {
+    let (last, above) = path.split_last().ok_or(Refused::NotFound)?;
     let parent = root.at_mut(above).ok_or(Refused::NotFound)?;
+    let Some(Node::Element(paragraph)) = parent.children.get(*last) else {
+        return Err(Refused::NotFound);
+    };
+    if !is_paragraph(paragraph) {
+        return Err(Refused::NotFound);
+    }
+    let (first, second) = split(paragraph, at);
     if !parent.is(&Ns::Text, "list-item") {
         parent
             .children

@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.5.0"
+version = "0.6.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Editing now happens on the page itself: click where the caret should go and type, select across paragraphs, copy and paste. Make text bold, italic, underlined or struck through, and make a paragraph a heading or a list item, with the buttons above the page. Find text with Ctrl+F. Clicking a link opens it in your browser. Enter on an empty list item ends the list, and numbered lists draw their full stop."
+whats-new = "Replace: Ctrl+H replaces the current match or every match, as one step to undo. A Format menu offers bold, italic, underline, strikethrough, headings and lists by name. Text you copy and paste inside the window keeps its formatting. Enter at the end of a heading starts body text, and a drag past the last paragraph selects to its end. The page's paragraphs and headings are now exposed to assistive technology."
 
 [products.xodt.locales.de-de]
-whats-new = "Das Bearbeiten geschieht jetzt auf der Seite selbst: Klicken Sie, wohin der Cursor soll, und tippen Sie, markieren Sie über Absätze hinweg, kopieren und fügen Sie ein. Machen Sie Text fett, kursiv, unterstrichen oder durchgestrichen und einen Absatz zur Überschrift oder zum Listeneintrag, mit den Schaltflächen über der Seite. Suchen Sie Text mit Strg+F. Ein Klick auf einen Link öffnet ihn im Browser. Enter auf einem leeren Listeneintrag beendet die Liste, und nummerierte Listen zeigen ihren Punkt."
+whats-new = "Ersetzen: Strg+H ersetzt den aktuellen Treffer oder alle Treffer, in einem Schritt rückgängig zu machen. Ein Menü Format bietet Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften und Listen mit Namen an. Text, den Sie im Fenster kopieren und einfügen, behält seine Formatierung. Enter am Ende einer Überschrift beginnt einen Fließtext, und ein Ziehen über den letzten Absatz hinaus markiert bis zu seinem Ende. Absätze und Überschriften der Seite stehen jetzt Hilfstechnologien zur Verfügung."
 
 [products.xods.locales.en-us]
-whats-new = "Select a range of cells by dragging, then copy, cut, paste or clear it. Find text in any sheet with Ctrl+F. Clicking a cell below the data no longer jumps back to the last row."
+whats-new = "Insert and delete rows and columns from the new Sheet menu: formulas that name the cells it moves follow them, and a change that would break one is refused with the reason. Ctrl+H replaces text in the cells that hold text and says how many it left. The arrow keys now walk past the data into the empty grid."
 
 [products.xods.locales.de-de]
-whats-new = "Wählen Sie einen Zellbereich durch Ziehen, dann können Sie ihn kopieren, ausschneiden, einfügen oder leeren. Suchen Sie Text in jedem Blatt mit Strg+F. Ein Klick auf eine Zelle unter den Daten springt nicht mehr zur letzten Zeile zurück."
+whats-new = "Zeilen und Spalten einfügen und löschen im neuen Menü Blatt: Formeln, die auf die verschobenen Zellen verweisen, folgen ihnen, und eine Änderung, die eine zerstören würde, wird mit Begründung abgelehnt. Strg+H ersetzt Text in den Zellen mit Text und sagt, wie viele es ausgelassen hat. Die Pfeiltasten gehen jetzt über die Daten hinaus in das leere Gitter."
 
 [products.xodp.locales.en-us]
-whats-new = "Present your deck: F5 starts a slideshow and Shift+F5 starts it at the slide in view. Change the text in a slide's shapes where it sits, with bold, italic, underline and strikethrough. Find text across slides and notes with Ctrl+F. Undo returns to the slide an edit was made on."
+whats-new = "A Slide menu duplicates, moves and deletes slides, each one step to undo. Ctrl+H replaces text across the slides and their notes. A link in a slide's text goes to the slide it names. A Format menu offers bold, italic, underline and strikethrough, and text you copy and paste inside the window keeps its formatting."
 
 [products.xodp.locales.de-de]
-whats-new = "Präsentieren Sie Ihre Folien: F5 startet die Bildschirmpräsentation, Umschalt+F5 beginnt bei der angezeigten Folie. Ändern Sie Text in den Formen einer Folie an Ort und Stelle, mit Fett, Kursiv, Unterstrichen und Durchgestrichen. Suchen Sie Text über Folien und Notizen mit Strg+F. Rückgängig kehrt zu der Folie zurück, auf der eine Änderung gemacht wurde."
+whats-new = "Ein Menü Folie dupliziert, verschiebt und löscht Folien, jedes in einem Schritt rückgängig zu machen. Strg+H ersetzt Text in den Folien und ihren Notizen. Ein Verweis im Text einer Folie führt zur Folie, die er nennt. Ein Menü Format bietet Fett, Kursiv, Unterstrichen und Durchgestrichen an, und Text, den Sie im Fenster kopieren und einfügen, behält seine Formatierung."

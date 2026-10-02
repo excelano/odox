@@ -425,6 +425,16 @@ and moves to the slide, and opens the notes, that the current match is in.
 The matches are looked for again when the query changes or the text does, and
 at no other time.
 
+**Replace is an edit over the matches Find holds.** Where the document can be
+changed, the bar has a second row: Replace takes the current match and Replace
+all every one, each as a single step to undo. A text document and a deck replace
+through the page editor's own replacement, last match first so the offsets of
+the ones before hold, so what replaces a match takes its formatting. A sheet
+replaces only in cells whose value is text: a number, a date or a boolean would
+be read again as something else or lose its format, and a formula is never
+edited, so those matches are left and the bar says how many. A replacement that
+still matches the query is passed over, so Replace moves on.
+
 **A link is followed only to places a person means by one.** A paragraph's
 links are the `text:a` elements in it, each covering a range of the flat text
 the page editor counts in; the character under the pointer, found through the
@@ -433,7 +443,7 @@ editing, Ctrl and a click do, because a plain click puts the caret down. The
 address is shown in a tooltip before anything is done. `http`, `https` and
 `mailto` are handed to the desktop's own handler, and `#Name` scrolls to the
 bookmark of that name, or to the heading whose text is `Name` where it is
-written `Name|outline`. Every other scheme, `file:` and the desktop's
+written `Name|outline`. In a deck `#Name` goes to the slide whose `draw:name` is `Name`. Every other scheme, `file:` and the desktop's
 registered handlers among them, is ignored, because a document is not trusted
 with what the machine will run. The application makes no request itself.
 
@@ -453,4 +463,69 @@ layout whitespace between them aside, become one list so that numbers run on;
 taking a paragraph out of a list splits the list around it, the half after
 continuing the numbering, and anything else its item held, a nested list,
 stands beside it. One pass over the selection is one undo step, and the buttons
-are lit where every paragraph in the selection is one.
+are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
+taken off takes; Enter inside one leaves two headings.
+
+**A page is told to assistive technology a paragraph at a time.** Each paragraph
+the flow draws is a node carrying its text as the rows the galley laid out, with
+the role of a heading and its level where the paragraph is a `text:h`, and
+paragraph otherwise; the page editor adds where the caret or the selection is in
+the paragraph that holds it, counted in the galley's characters through the same
+offset map the caret uses. A selection that began in another paragraph is
+reported as a caret at its end here, because one node cannot name a position in
+another. Slide labels go through the same flow and so are told the same way. A
+sheet's grid is painted cell by cell and is not yet.
+
+**A copy keeps its formatting inside the window it was made in.** The system
+clipboard carries plain text, so the editor puts the selection there as text and
+keeps beside it a `Fragment` its model made: the covered paragraphs cut to the
+range, each with its own style and kind, and the spans and links in it, without
+the ids, bookmarks, frames and notes that name one place in a document and would
+then be there twice. A paste of exactly the text it put on the clipboard is a
+paste of the fragment; any other text, a copy from another program or from
+another window, is plain. The first pasted paragraph merges into the paragraph at
+the caret and takes its style, as typed text would; the ones between keep their
+own; the last merges with what followed the caret and keeps the paragraph's
+style; in a list each is an item. A model that keeps no formatting leaves the two
+`Model` methods as they are and every paste is plain. Across windows needs HTML
+on the system clipboard and is not done.
+
+**A deck's slides can be duplicated, deleted and moved, and not added.** A slide
+is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and
+that name is what links, custom shows and the start page refer to it by. Moving
+swaps it with the neighbouring page and so changes nothing that refers to it.
+Deleting removes the page and takes its name out of the start page and the custom
+shows that list it, a show left with none going; the last slide is refused.
+Duplicating puts a copy after the original with a name no slide has (the
+original's and a number) and a new `xml:id` and `draw:id` for everything in it,
+the notes included, with the references that name those ids inside the copy
+(`draw:start-shape`, `draw:end-shape`, `smil:targetElement`) pointing at the
+copy's own. Styles are shared with the original, which is safe because a
+format edit picks or writes a style and never changes one that another span
+uses. A blank slide is not offered: it would hold only the master page's
+decorations, and nothing here adds a shape to fill it, so a duplicate is how a
+new slide is made. The Slide menu offers the four in edit mode, and each is one
+undo step with the view following the slide.
+
+**Rows and columns can be inserted and deleted, with the formulas that name
+them following.** A row or a column is not always one element, since
+`table:number-rows-repeated` and `table:number-columns-repeated` stand for many,
+so an insert splits a run and a delete shortens one. An inserted row or column
+is a copy of its neighbour with what it held cleared and its formats kept, and a
+covered cell in the copy is an ordinary one, because a merged region does not
+grow. The whole change is made to a copy of the content and replaces it only
+when all of it can be made. It is refused when its line goes through a merged
+region (one wholly inside a delete goes with it); when the document holds
+something that names a range of cells and is not moved (a non-empty
+conditional-formats, content-validations, database-ranges, data-pilot-tables or
+consolidation, a chart or object, a print range, a shape anchored to a cell); or
+when a formula cannot be moved. Formulas are text and every reference in one is
+inside square brackets, so moving one is shifting what is in them and leaving the
+rest alone: each end of a range on its own, so an insert inside a range grows it
+and one just below it does not, an end of a range deleted becomes the nearest row
+left, a reference to a cell that is deleted is refused, and so is a range with
+nothing left. Named ranges and the base cells of named expressions move the same
+way. A reference this reading cannot take, another document's or a range across
+sheets, is refused, because a wrong formula looks right and nothing here
+evaluates one. The rows or columns are changed before the formulas are shifted,
+so a formula that is deleted with its row is not asked about what it pointed at.

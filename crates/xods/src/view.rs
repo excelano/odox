@@ -8,9 +8,9 @@ use std::path::Path;
 use eframe::egui::{
     self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use odox_core::doc::{Sheet, SheetDocument, Value};
+use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::{Document, Refused};
-use odox_ui::find::{Match, ranges};
+use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Found, View, fonts};
@@ -38,6 +38,8 @@ pub struct SheetView {
     notice: Option<String>,
     /// What a search found, by sheet and by the cell's row and column.
     found: Found,
+    /// What the Sheet menu last chose.
+    sheet_command: Option<SheetCommand>,
 }
 
 /// A cell being typed into.
@@ -55,6 +57,17 @@ struct CellEditor {
     original: String,
     /// The editor was opened this frame and has yet to take the focus.
     opened: bool,
+}
+
+/// What the Sheet menu asked for, applied when the grid is next drawn.
+#[derive(Clone, Copy)]
+enum SheetCommand {
+    RowAbove,
+    RowBelow,
+    ColumnLeft,
+    ColumnRight,
+    DeleteRows,
+    DeleteColumns,
 }
 
 /// What the editor asked for when it closed.
@@ -159,9 +172,89 @@ impl View for SheetView {
         self.notice = None;
     }
 
+    fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
+        let can = !editing.asking && self.editor.is_none();
+        ui.menu_button(t("Sheet"), |ui| {
+            let entries = [
+                (t("Insert row above"), SheetCommand::RowAbove),
+                (t("Insert row below"), SheetCommand::RowBelow),
+                (t("Insert column left"), SheetCommand::ColumnLeft),
+                (t("Insert column right"), SheetCommand::ColumnRight),
+                (t("Delete row"), SheetCommand::DeleteRows),
+                (t("Delete column"), SheetCommand::DeleteColumns),
+            ];
+            for (name, command) in entries {
+                if ui.add_enabled(can, egui::Button::new(name)).clicked() {
+                    self.sheet_command = Some(command);
+                    ui.close();
+                }
+            }
+        });
+    }
+
+    fn can_replace(&self, _editing: &Editing) -> bool {
+        self.document.is_some()
+    }
+
+    /// Replace in the cells that hold text. A formula, and a cell holding a
+    /// number, a date or a boolean, would be read again as something else or
+    /// lose its format, so those are left and counted.
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        let mut done = Replaced::default();
+        let mut writes = Vec::new();
+        let mut at = 0;
+        while at < matches.len() {
+            let [row, column] = matches[at].paragraph[..] else {
+                at += 1;
+                continue;
+            };
+            let scope = matches[at].scope;
+            let mut cell_ranges = Vec::new();
+            while at < matches.len()
+                && matches[at].scope == scope
+                && matches[at].paragraph == [row, column]
+            {
+                cell_ranges.push(matches[at].range.clone());
+                at += 1;
+            }
+            let Some(sheet) = document.sheets().get(scope) else {
+                continue;
+            };
+            let Some(cell) = document.cell(sheet, row, column) else {
+                continue;
+            };
+            if cell.formula().is_some() || !matches!(cell.value(), Value::Text(_)) {
+                done.skipped += cell_ranges.len();
+                continue;
+            }
+            let text = replace_ranges(&cell.text(), &cell_ranges, with);
+            done.replaced += cell_ranges.len();
+            writes.push((scope, row, column, Value::Text(text)));
+        }
+        if !writes.is_empty() {
+            editing.record(&document.document.content);
+            for (sheet, row, column, value) in &writes {
+                let _ = document.set_cell(*sheet, *row, *column, value);
+            }
+            self.metrics = None;
+        }
+        done
+    }
+
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         if self.document.is_none() {
             return;
+        }
+        if let Some(command) = self.sheet_command.take() {
+            self.change_sheet(command, editing);
         }
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
@@ -194,6 +287,65 @@ impl View for SheetView {
 }
 
 impl SheetView {
+    /// Insert or delete the rows or columns the selection covers, as one step
+    /// to undo, and select what was put in; or say what is in the way.
+    fn change_sheet(&mut self, command: SheetCommand, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let (rows, columns) = (bottom - top + 1, right - left + 1);
+        let change = match command {
+            SheetCommand::RowAbove => Restructure::InsertRows {
+                at: top,
+                count: rows,
+            },
+            SheetCommand::RowBelow => Restructure::InsertRows {
+                at: bottom + 1,
+                count: rows,
+            },
+            SheetCommand::ColumnLeft => Restructure::InsertColumns {
+                at: left,
+                count: columns,
+            },
+            SheetCommand::ColumnRight => Restructure::InsertColumns {
+                at: right + 1,
+                count: columns,
+            },
+            SheetCommand::DeleteRows => Restructure::DeleteRows {
+                at: top,
+                count: rows,
+            },
+            SheetCommand::DeleteColumns => Restructure::DeleteColumns {
+                at: left,
+                count: columns,
+            },
+        };
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let before = document.document.content.clone();
+        if let Err(blocked) = document.restructure(self.sheet, change) {
+            self.notice = Some(blocked_notice(&blocked));
+            return;
+        }
+        editing.record_snapshot(before, None);
+        self.metrics = None;
+        self.editor = None;
+        let new = match command {
+            SheetCommand::RowAbove | SheetCommand::ColumnLeft => {
+                Some(((top, left), (bottom, right)))
+            }
+            SheetCommand::RowBelow => Some(((bottom + 1, left), (bottom + rows, right))),
+            SheetCommand::ColumnRight => Some(((top, right + 1), (bottom, right + columns))),
+            SheetCommand::DeleteRows | SheetCommand::DeleteColumns => None,
+        };
+        match new {
+            Some((from, to)) => {
+                self.pick(from);
+                self.extend(to);
+            }
+            None => self.pick((top, left)),
+        }
+    }
+
     /// Select one cell, which is then the whole selection.
     fn pick(&mut self, cell: (usize, usize)) {
         self.selected = cell;
@@ -665,7 +817,11 @@ impl SheetView {
                 }
             });
 
-        let extent = (sheet.used_rows, sheet.used_columns);
+        let used = (sheet.used_rows, sheet.used_columns);
+        let grid = self
+            .metrics
+            .as_ref()
+            .map_or(used, |m| (m.rows.len() - 1, m.columns.len() - 1));
         if let Some(outcome) = outcome {
             self.finish_editing(outcome, editing);
         }
@@ -682,7 +838,7 @@ impl SheetView {
             self.begin_editing(ui, editing);
         }
         if self.editor.is_none() {
-            self.arrow_keys(ui, extent);
+            self.arrow_keys(ui, grid, used);
         }
     }
 
@@ -894,12 +1050,14 @@ impl SheetView {
 
     /// Move the picked cell with the arrow keys, which is how a person walks a
     /// sheet without reaching for the pointer.
-    fn arrow_keys(&mut self, ui: &Ui, (rows, columns): (usize, usize)) {
+    fn arrow_keys(&mut self, ui: &Ui, grid: (usize, usize), used: (usize, usize)) {
         let (mut row, mut column) = self.selected;
-        // The keys stop at the last cell the document wrote, unless the pick
-        // is already past it, as a click on an empty cell can leave it.
-        let last_row = rows.saturating_sub(1).max(row);
-        let last_column = columns.saturating_sub(1).max(column);
+        // The arrows go as far as the grid is drawn, empty cells included, so
+        // that a person can walk to one to type in it. End is the last column
+        // the document wrote.
+        let last_row = grid.0.saturating_sub(1);
+        let last_column = grid.1.saturating_sub(1);
+        let last_written = used.1.saturating_sub(1);
         let mut extend = false;
         ui.input(|input| {
             extend = input.modifiers.shift;
@@ -919,7 +1077,7 @@ impl SheetView {
                 column = 0;
             }
             if input.key_pressed(egui::Key::End) {
-                column = last_column;
+                column = last_written;
             }
         });
         let cell = (row.min(last_row), column.min(last_column));
@@ -933,6 +1091,39 @@ impl SheetView {
     }
 }
 
+/// What the cell bar says when rows or columns could not be inserted or
+/// deleted.
+fn blocked_notice(blocked: &Blocked) -> String {
+    match blocked {
+        Blocked::NotFound => t("There is nothing there to change.").to_owned(),
+        Blocked::Merged => t("A merged cell is in the way: this would cut through it.").to_owned(),
+        Blocked::Unreadable(reference) => fill(
+            t("A formula holds [{reference}], which this version cannot move."),
+            &[("reference", reference)],
+        ),
+        Blocked::Deleted(reference) => fill(
+            t("A formula points at [{reference}], which would be deleted."),
+            &[("reference", reference)],
+        ),
+        Blocked::Names(what) => {
+            let what = match *what {
+                "conditional formats" => t("conditional formats"),
+                "validations" => t("validations"),
+                "database ranges" => t("database ranges"),
+                "pivot tables" => t("pivot tables"),
+                "consolidations" => t("consolidations"),
+                "charts and objects" => t("charts and objects"),
+                "print ranges" => t("print ranges"),
+                _ => t("shapes anchored to cells"),
+            };
+            fill(
+                t("This document has {what}, which this version cannot move."),
+                &[("what", what)],
+            )
+        }
+    }
+}
+
 /// What the cell bar says about a cell that cannot be edited.
 fn notice(refused: &Refused) -> String {
     match refused {
@@ -940,7 +1131,9 @@ fn notice(refused: &Refused) -> String {
         Refused::Covered => t("This cell is covered by the one that spans it."),
         // A cell is never a range and is not formatted here, so a refusal
         // over structure or a namespace is not one a cell hears.
-        Refused::NotFound | Refused::Structure | Refused::Namespace => t("There is no cell there."),
+        Refused::NotFound | Refused::Structure | Refused::Namespace | Refused::LastOne => {
+            t("There is no cell there.")
+        }
     }
     .to_owned()
 }
@@ -1102,6 +1295,135 @@ mod tests {
             assert_eq!(text_at(&view, row, column), "", "{row},{column}");
         }
         assert!(editing.can_undo());
+    }
+
+    fn pressed(view: &mut SheetView, key: egui::Key, modifiers: egui::Modifiers) {
+        let ctx = egui::Context::default();
+        let events = vec![
+            Event::ModifiersChanged(modifiers),
+            Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers,
+            },
+        ];
+        let input = egui::RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(400.0, 400.0))),
+            ..egui::RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| view.arrow_keys(ui, (45, 44), (5, 7)));
+        output.textures_delta.clear();
+    }
+
+    #[test]
+    fn the_arrows_walk_past_the_data_into_the_empty_grid() {
+        let (mut view, _) = opened();
+        view.pick((4, 6));
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::NONE);
+        pressed(&mut view, Key::ArrowRight, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (5, 7));
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::SHIFT);
+        assert_eq!(
+            view.range(),
+            ((5, 7), (6, 7)),
+            "Shift stretches past the data too"
+        );
+    }
+
+    #[test]
+    fn end_goes_to_the_last_column_the_document_wrote() {
+        let (mut view, _) = opened();
+        view.pick((1, 0));
+        pressed(&mut view, Key::End, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (1, 6));
+    }
+
+    #[test]
+    fn replace_all_changes_text_cells_in_one_step_and_leaves_the_rest() {
+        let (mut view, mut editing) = opened();
+        assert_eq!(view.find("m6"), 2, "Bolt M6 and Nut M6");
+        let done = view.replace("M8", true, &mut editing);
+        assert_eq!(
+            done,
+            Replaced {
+                replaced: 2,
+                skipped: 0
+            }
+        );
+        assert_eq!(text_at(&view, 1, 0), "Bolt M8");
+        assert_eq!(text_at(&view, 2, 0), "Nut M8");
+        assert_eq!(text_at(&view, 3, 0), "Washer");
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&document.document.content, None)
+            .expect("one step");
+        assert!(!editing.can_undo(), "both cells were one step");
+    }
+
+    #[test]
+    fn replace_leaves_numbers_and_formulas_alone_and_says_so() {
+        let (mut view, mut editing) = opened();
+        let found = view.find("1");
+        assert!(found > 0);
+        let done = view.replace("9", true, &mut editing);
+        assert_eq!(done.replaced, 0);
+        assert_eq!(done.skipped, found);
+        assert!(!editing.modified(), "nothing was written");
+        assert_eq!(text_at(&view, 4, 3), "136.4");
+    }
+
+    #[test]
+    fn replace_one_takes_the_current_match_only() {
+        let (mut view, mut editing) = opened();
+        view.find("m6");
+        view.show_match(1);
+        view.replace("X", false, &mut editing);
+        assert_eq!(text_at(&view, 1, 0), "Bolt M6");
+        assert_eq!(text_at(&view, 2, 0), "Nut X");
+    }
+
+    #[test]
+    fn rows_inserted_above_the_selection_are_selected_and_undo_takes_them_back() {
+        let (mut view, mut editing) = opened();
+        view.pick((1, 0));
+        view.extend((2, 1));
+        view.change_sheet(SheetCommand::RowAbove, &mut editing);
+        assert_eq!(text_at(&view, 1, 0), "");
+        assert_eq!(
+            text_at(&view, 3, 0),
+            "Bolt M6",
+            "the rows moved down by the two inserted"
+        );
+        assert_eq!(
+            view.range(),
+            ((1, 0), (2, 1)),
+            "the new rows are what is selected"
+        );
+        let document = view.document.as_mut().expect("open");
+        let (previous, _) = editing
+            .undo(&document.document.content, None)
+            .expect("one step");
+        document.document.content = previous;
+        document.reindex();
+        assert_eq!(text_at(&view, 1, 0), "Bolt M6");
+        assert!(!editing.can_undo());
+    }
+
+    #[test]
+    fn what_is_in_the_way_is_said_and_nothing_changes() {
+        let (mut view, mut editing) = opened();
+        view.pick((0, 1));
+        view.change_sheet(SheetCommand::DeleteColumns, &mut editing);
+        let notice = view.notice.clone().expect("a notice");
+        assert!(
+            notice.contains("[.B2]") || notice.contains("[."),
+            "{notice}"
+        );
+        assert!(!editing.modified());
+        assert_eq!(text_at(&view, 1, 1), "12");
     }
 
     #[test]

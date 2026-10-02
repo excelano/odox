@@ -14,7 +14,8 @@ use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use odox_core::Document;
 
 use crate::edit::{Caret, Editing};
-use crate::find_bar::{FindBar, Step};
+use crate::find::Replaced;
+use crate::find_bar::{FindBar, Replace, Step};
 use crate::i18n::{fill, t};
 use crate::settings::Settings;
 
@@ -86,6 +87,11 @@ pub trait View {
     /// [`Self::reindex`].
     fn restore_caret(&mut self, _caret: Caret) {}
 
+    /// Draw the view's own menus, after Edit: each a `menu_button` of its
+    /// own. A command chosen is kept by the view and applied when it next
+    /// draws its page, where the document and the editing state are.
+    fn menus(&mut self, _ui: &mut Ui, _editing: &Editing) {}
+
     /// Whether the view is showing the document full screen and nothing else,
     /// as a slideshow does: the shell takes its menu, its panels and its keys
     /// away until it is not.
@@ -99,6 +105,18 @@ pub trait View {
     /// and the current match is kept if there are still that many.
     fn find(&mut self, _query: &str) -> usize {
         0
+    }
+
+    /// Whether the search bar offers to replace: where the document can be
+    /// changed now.
+    fn can_replace(&self, _editing: &Editing) -> bool {
+        false
+    }
+
+    /// Replace the current match, or every match, with a text, as one step to
+    /// undo, and answer how many were replaced and how many left alone.
+    fn replace(&mut self, _with: &str, _all: bool, _editing: &mut Editing) -> Replaced {
+        Replaced::default()
     }
 
     /// Make one of the matches the current one, and bring it into view.
@@ -597,6 +615,9 @@ impl<V: View> Shell<V> {
                 }
             });
             ui.menu_button(t("Edit"), |ui| self.edit_menu(ui));
+            if self.view.is_open() {
+                self.view.menus(ui, &self.editing);
+            }
             ui.menu_button(t("View"), |ui| {
                 if ui.button(t("Zoom in")).clicked() {
                     self.zoom = (self.zoom * ZOOM_STEP).min(ZOOM_MAX);
@@ -648,6 +669,16 @@ impl<V: View> Shell<V> {
             ui.close();
             self.find.open();
         }
+        if ui
+            .add_enabled(
+                self.view.is_open() && self.view.can_replace(&self.editing),
+                egui::Button::new(t("Replace…")),
+            )
+            .clicked()
+        {
+            ui.close();
+            self.find.open_replacing();
+        }
         ui.separator();
         ui.checkbox(&mut self.editing.on, t("Edit mode"));
         if ui
@@ -676,8 +707,9 @@ impl<V: View> Shell<V> {
             }
             return;
         }
-        let mut step = None;
-        egui::Panel::top("find").show(ui, |ui| step = self.find.ui(ui));
+        let can_replace = self.view.can_replace(&self.editing);
+        let mut pressed = crate::find_bar::Pressed::default();
+        egui::Panel::top("find").show(ui, |ui| pressed = self.find.ui(ui, can_replace));
         if !self.find.is_open() {
             return;
         }
@@ -693,9 +725,39 @@ impl<V: View> Shell<V> {
                 self.find.current = self.find.current.min(self.find.count.saturating_sub(1));
             }
         }
-        if let Some(step) = step {
+        if let Some(step) = pressed.step {
             self.step_match(step);
         }
+        if let Some(which) = pressed.replace {
+            self.replace(which);
+        }
+    }
+
+    fn replace(&mut self, which: Replace) {
+        let with = self.find.replacement().to_owned();
+        let done = self
+            .view
+            .replace(&with, which == Replace::All, &mut self.editing);
+        // A replacement that still matches the query is the match it replaced,
+        // so the next one is the one after.
+        if which == Replace::One
+            && done.replaced > 0
+            && !crate::find::ranges(&with, self.find.query()).is_empty()
+        {
+            self.find.current += 1;
+        }
+        let replaced = done.replaced.to_string();
+        self.find.say(if done.skipped == 0 {
+            fill(t("{replaced} replaced"), &[("replaced", &replaced)])
+        } else {
+            fill(
+                t("{replaced} replaced, {skipped} left"),
+                &[
+                    ("replaced", &replaced),
+                    ("skipped", &done.skipped.to_string()),
+                ],
+            )
+        });
     }
 
     fn step_match(&mut self, step: Step) {
@@ -738,6 +800,9 @@ impl<V: View> Shell<V> {
         };
         if pressed(Modifiers::COMMAND, Key::F) {
             self.find.open();
+        }
+        if pressed(Modifiers::COMMAND, Key::H) {
+            self.find.open_replacing();
         }
         if pressed(Modifiers::SHIFT, Key::F3) {
             self.step_match(Step::Previous);

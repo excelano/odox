@@ -9,8 +9,9 @@ use eframe::egui::{self, Ui};
 use egui_richedit::Selection;
 use odox_core::Document;
 use odox_core::doc::TextDocument;
-use odox_ui::find::in_paragraphs;
+use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
 };
@@ -29,6 +30,9 @@ pub struct TextView {
     page: PageEditor,
     /// What a search found.
     found: Found,
+    /// What the Format menu draws itself from, and what it last chose.
+    menu: MenuState,
+    command: Option<Command>,
 }
 
 impl Default for TextView {
@@ -40,6 +44,8 @@ impl Default for TextView {
             place: None,
             page: page_editor(),
             found: Found::default(),
+            menu: MenuState::offering_blocks(true),
+            command: None,
         }
     }
 }
@@ -116,6 +122,37 @@ impl View for TextView {
         self.found.show(index);
     }
 
+    fn menus(&mut self, ui: &mut Ui, _editing: &Editing) {
+        ui.menu_button(t("Format"), |ui| {
+            if let Some(command) = toolbar::menu(ui, &self.menu) {
+                self.command = Some(command);
+            }
+        });
+    }
+
+    fn can_replace(&self, editing: &Editing) -> bool {
+        editing.on && self.document.is_some()
+    }
+
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        let Some(root) = document.body_path() else {
+            return Replaced::default();
+        };
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, editing);
+        model.replace_matches(&matches.iter().collect::<Vec<_>>(), with, true)
+    }
+
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
@@ -145,14 +182,27 @@ impl View for TextView {
                 content, styles, ..
             } = &mut document.document;
             let mut model = FlowModel::new(content, styles, root, editing);
-            let pressed = odox_ui::toolbar::text(ui, &self.page, &model);
-            if let Some(mark) = pressed.mark {
+            let pressed = toolbar::text(ui, &self.page, &model);
+            let command = self.command.take();
+            let mark = pressed.mark.or(match command {
+                Some(Command::Mark(mark)) => Some(mark),
+                _ => None,
+            });
+            let block = pressed.block.or(match command {
+                Some(Command::Block(block)) => Some(block),
+                _ => None,
+            });
+            if let Some(mark) = mark {
                 self.page.toggle(&mut model, mark);
             }
-            if let Some(block) = pressed.block {
+            if let Some(block) = block {
                 model.apply_block(&mut self.page, block);
             }
+            self.menu = MenuState::of(&self.page, &model, true);
             ui.separator();
+        } else {
+            self.command = None;
+            self.menu = MenuState::offering_blocks(true);
         }
 
         egui::ScrollArea::both()

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-01 14:08-0500\n"
+"POT-Creation-Date: 2026-10-02 11:03-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: none\n"
@@ -17,204 +17,228 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: crates/odox-ui/src/find_bar.rs:83
+#: crates/odox-ui/src/find_bar.rs:136
 msgid "Find"
 msgstr "[Fíñd ··]"
 
-#: crates/odox-ui/src/find_bar.rs:107
+#: crates/odox-ui/src/find_bar.rs:160
 msgid "Previous"
 msgstr "[Prévíöüš ····]"
 
-#: crates/odox-ui/src/find_bar.rs:110
+#: crates/odox-ui/src/find_bar.rs:163
 msgid "Next"
 msgstr "[Néxt ··]"
 
-#: crates/odox-ui/src/find_bar.rs:115
+#: crates/odox-ui/src/find_bar.rs:168
 msgid "No matches"
 msgstr "[Nö mätchéš ·····]"
 
-#: crates/odox-ui/src/find_bar.rs:118
+#: crates/odox-ui/src/find_bar.rs:171
 msgid "{current} of {count}"
 msgstr "[{current} öf {count} ·········]"
 
-#: crates/odox-ui/src/find_bar.rs:126 crates/odox-ui/src/shell.rs:571
+#: crates/odox-ui/src/find_bar.rs:179 crates/odox-ui/src/shell.rs:589
 msgid "Close"
 msgstr "[Clöšé ···]"
 
+#: crates/odox-ui/src/find_bar.rs:194
+msgid "Replace with"
+msgstr "[Répläcé wíth ·····]"
+
+#: crates/odox-ui/src/find_bar.rs:210
+msgid "Replace"
+msgstr "[Répläcé ···]"
+
+#: crates/odox-ui/src/find_bar.rs:216
+msgid "Replace all"
+msgstr "[Répläcé äll ·····]"
+
 #: crates/odox-ui/src/i18n.rs:89 crates/odox-ui/src/i18n.rs:93
-#: crates/odox-ui/src/shell.rs:557 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/shell.rs:575 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr "[Fílé ··]"
 
 #: crates/odox-ui/src/i18n.rs:96 crates/odox-ui/src/i18n.rs:97
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:103
-#: crates/xods/src/view.rs:77 crates/xodt/src/view.rs:51
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:121
+#: crates/xods/src/view.rs:90 crates/xodt/src/view.rs:57
 msgid "{file} could not be opened: {reason}"
 msgstr "[{file} cöüld ñöt bé öpéñéd: {reason} ···············]"
 
-#: crates/odox-ui/src/shell.rs:213
+#: crates/odox-ui/src/shell.rs:231
 msgid "{file} could not be read: {reason}"
 msgstr "[{file} cöüld ñöt bé réäd: {reason} ··············]"
 
-#: crates/odox-ui/src/shell.rs:321
+#: crates/odox-ui/src/shell.rs:339
 msgid "{file} could not be saved: {reason}"
 msgstr "[{file} cöüld ñöt bé šävéd: {reason} ···············]"
 
-#: crates/odox-ui/src/shell.rs:382
+#: crates/odox-ui/src/shell.rs:400
 msgid "Save changes to {file}?"
 msgstr "[Sävé chäñgéš tö {file}? ··········]"
 
-#: crates/odox-ui/src/shell.rs:383
+#: crates/odox-ui/src/shell.rs:401
 msgid "The document has changes that are not saved."
 msgstr "[Thé döcüméñt häš chäñgéš thät äré ñöt šävéd. ··················]"
 
-#: crates/odox-ui/src/shell.rs:386 crates/odox-ui/src/shell.rs:580
+#: crates/odox-ui/src/shell.rs:404 crates/odox-ui/src/shell.rs:598
 msgid "Save"
 msgstr "[Sävé ··]"
 
-#: crates/odox-ui/src/shell.rs:389
+#: crates/odox-ui/src/shell.rs:407
 msgid "Discard"
 msgstr "[Díšcärd ···]"
 
-#: crates/odox-ui/src/shell.rs:392
+#: crates/odox-ui/src/shell.rs:410
 msgid "Cancel"
 msgstr "[Cäñcél ···]"
 
-#: crates/odox-ui/src/shell.rs:524
+#: crates/odox-ui/src/shell.rs:542
 msgid "Dismiss"
 msgstr "[Díšmíšš ···]"
 
-#: crates/odox-ui/src/shell.rs:558 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:576 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr "[Öpéñ… ···]"
 
-#: crates/odox-ui/src/shell.rs:564 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:582 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr "[Rélöäd ···]"
 
-#: crates/odox-ui/src/shell.rs:587
+#: crates/odox-ui/src/shell.rs:605
 msgid "Save as…"
 msgstr "[Sävé äš… ·····]"
 
-#: crates/odox-ui/src/shell.rs:594
+#: crates/odox-ui/src/shell.rs:612
 msgid "Quit"
 msgstr "[Qüít ··]"
 
-#: crates/odox-ui/src/shell.rs:599
+#: crates/odox-ui/src/shell.rs:617
 msgid "Edit"
 msgstr "[Édít ··]"
 
-#: crates/odox-ui/src/shell.rs:600
+#: crates/odox-ui/src/shell.rs:621
 msgid "View"
 msgstr "[Víéw ··]"
 
-#: crates/odox-ui/src/shell.rs:601
+#: crates/odox-ui/src/shell.rs:622
 msgid "Zoom in"
 msgstr "[Zööm íñ ···]"
 
-#: crates/odox-ui/src/shell.rs:604
+#: crates/odox-ui/src/shell.rs:625
 msgid "Zoom out"
 msgstr "[Zööm öüt ····]"
 
-#: crates/odox-ui/src/shell.rs:607
+#: crates/odox-ui/src/shell.rs:628
 msgid "Actual size"
 msgstr "[Åctüäl šízé ·····]"
 
-#: crates/odox-ui/src/shell.rs:611
+#: crates/odox-ui/src/shell.rs:632
 msgid "Show the side panel"
 msgstr "[Shöw thé šídé päñél ········]"
 
-#: crates/odox-ui/src/shell.rs:617
+#: crates/odox-ui/src/shell.rs:638
 msgid "{percent}%"
 msgstr "[{percent}% ·····]"
 
-#: crates/odox-ui/src/shell.rs:620
+#: crates/odox-ui/src/shell.rs:641
 msgid "Editing"
 msgstr "[Édítíñg ···]"
 
-#: crates/odox-ui/src/shell.rs:630
+#: crates/odox-ui/src/shell.rs:651
 msgid "Undo"
 msgstr "[Üñdö ··]"
 
-#: crates/odox-ui/src/shell.rs:637
+#: crates/odox-ui/src/shell.rs:658
 msgid "Redo"
 msgstr "[Rédö ··]"
 
-#: crates/odox-ui/src/shell.rs:645
+#: crates/odox-ui/src/shell.rs:666
 msgid "Find…"
 msgstr "[Fíñd… ···]"
 
-#: crates/odox-ui/src/shell.rs:652
+#: crates/odox-ui/src/shell.rs:675
+msgid "Replace…"
+msgstr "[Répläcé… ·····]"
+
+#: crates/odox-ui/src/shell.rs:683
 msgid "Edit mode"
 msgstr "[Édít mödé ····]"
 
-#: crates/odox-ui/src/shell.rs:656
+#: crates/odox-ui/src/shell.rs:687
 msgid "Open documents in edit mode"
 msgstr "[Öpéñ döcüméñtš íñ édít mödé ···········]"
 
-#: crates/odox-ui/src/shell.rs:662
+#: crates/odox-ui/src/shell.rs:693
 msgid "The setting could not be saved: {reason}"
 msgstr "[Thé šéttíñg cöüld ñöt bé šävéd: {reason} ·················]"
 
-#: crates/odox-ui/src/shell.rs:723
+#: crates/odox-ui/src/shell.rs:751
+msgid "{replaced} replaced"
+msgstr "[{replaced} répläcéd ········]"
+
+#: crates/odox-ui/src/shell.rs:754
+msgid "{replaced} replaced, {skipped} left"
+msgstr "[{replaced} répläcéd, {skipped} léft ···············]"
+
+#: crates/odox-ui/src/shell.rs:785
 msgid "Open a document…"
 msgstr "[Öpéñ ä döcüméñt… ········]"
 
-#: crates/odox-ui/src/toolbar.rs:47
+#: crates/odox-ui/src/toolbar.rs:47 crates/odox-ui/src/toolbar.rs:136
 msgid "Body text"
 msgstr "[Bödy téxt ····]"
 
-#: crates/odox-ui/src/toolbar.rs:48
+#: crates/odox-ui/src/toolbar.rs:48 crates/odox-ui/src/toolbar.rs:137
 msgid "Heading 1"
 msgstr "[Héädíñg 1 ····]"
 
-#: crates/odox-ui/src/toolbar.rs:49
+#: crates/odox-ui/src/toolbar.rs:49 crates/odox-ui/src/toolbar.rs:138
 msgid "Heading 2"
 msgstr "[Héädíñg 2 ····]"
 
-#: crates/odox-ui/src/toolbar.rs:50
+#: crates/odox-ui/src/toolbar.rs:50 crates/odox-ui/src/toolbar.rs:139
 msgid "Heading 3"
 msgstr "[Héädíñg 3 ····]"
 
-#: crates/odox-ui/src/toolbar.rs:51
+#: crates/odox-ui/src/toolbar.rs:51 crates/odox-ui/src/toolbar.rs:140
 msgid "Bulleted list"
 msgstr "[Büllétéd líšt ······]"
 
-#: crates/odox-ui/src/toolbar.rs:52
+#: crates/odox-ui/src/toolbar.rs:52 crates/odox-ui/src/toolbar.rs:141
 msgid "Numbered list"
 msgstr "[Nümbéréd líšt ······]"
 
-#: crates/odox-ui/src/toolbar.rs:79
-msgid "B"
-msgstr "[B ·]"
-
-#: crates/odox-ui/src/toolbar.rs:79
+#: crates/odox-ui/src/toolbar.rs:74
 msgid "Bold"
 msgstr "[Böld ··]"
 
-#: crates/odox-ui/src/toolbar.rs:80
-msgid "I"
-msgstr "[Î ·]"
-
-#: crates/odox-ui/src/toolbar.rs:80
+#: crates/odox-ui/src/toolbar.rs:75
 msgid "Italic"
 msgstr "[Îtälíc ···]"
 
-#: crates/odox-ui/src/toolbar.rs:82
-msgid "U"
-msgstr "[Ü ·]"
-
-#: crates/odox-ui/src/toolbar.rs:83
+#: crates/odox-ui/src/toolbar.rs:76
 msgid "Underline"
 msgstr "[Üñdérlíñé ····]"
 
-#: crates/odox-ui/src/toolbar.rs:87
-msgid "S"
-msgstr "[S ·]"
-
-#: crates/odox-ui/src/toolbar.rs:88
+#: crates/odox-ui/src/toolbar.rs:77
 msgid "Strikethrough"
 msgstr "[Stríkéthröügh ······]"
+
+#: crates/odox-ui/src/toolbar.rs:91
+msgid "B"
+msgstr "[B ·]"
+
+#: crates/odox-ui/src/toolbar.rs:92
+msgid "I"
+msgstr "[Î ·]"
+
+#: crates/odox-ui/src/toolbar.rs:93
+msgid "U"
+msgstr "[Ü ·]"
+
+#: crates/odox-ui/src/toolbar.rs:94
+msgid "S"
+msgstr "[S ·]"
 
 #: crates/odox-ui/tests/german.rs:28 crates/xods/src/main.rs:22
 msgid "OpenDocument Spreadsheet"
@@ -224,49 +248,161 @@ msgstr "[ÖpéñDöcüméñt Spréädšhéét ··········]"
 msgid "OpenDocument Presentation"
 msgstr "[ÖpéñDöcüméñt Préšéñtätíöñ ···········]"
 
-#: crates/xodp/src/view.rs:221
+#: crates/xodp/src/view.rs:224 crates/xodt/src/view.rs:126
+msgid "Format"
+msgstr "[Förmät ···]"
+
+#: crates/xodp/src/view.rs:234
+msgid "Slide"
+msgstr "[Slídé ···]"
+
+#: crates/xodp/src/view.rs:236
+msgid "Duplicate slide"
+msgstr "[Düplícäté šlídé ·······]"
+
+#: crates/xodp/src/view.rs:237
+msgid "Delete slide"
+msgstr "[Délété šlídé ·····]"
+
+#: crates/xodp/src/view.rs:239
+msgid "Move slide earlier"
+msgstr "[Mövé šlídé éärlíér ········]"
+
+#: crates/xodp/src/view.rs:244
+msgid "Move slide later"
+msgstr "[Mövé šlídé lätér ·······]"
+
+#: crates/xodp/src/view.rs:339
 msgid "This presentation has no slides."
 msgstr "[Thíš préšéñtätíöñ häš ñö šlídéš. ·············]"
 
-#: crates/xodp/src/view.rs:336
+#: crates/xodp/src/view.rs:465
 msgid "Slides"
 msgstr "[Slídéš ···]"
 
-#: crates/xodp/src/view.rs:360
+#: crates/xodp/src/view.rs:489
 msgid "Show the speaker's notes"
 msgstr "[Shöw thé špéäkér'š ñötéš ··········]"
 
-#: crates/xodp/src/view.rs:362
+#: crates/xodp/src/view.rs:491
 msgid "Start the slideshow"
 msgstr "[Stärt thé šlídéšhöw ········]"
 
-#: crates/xodp/src/view.rs:367
+#: crates/xodp/src/view.rs:496
 msgid "Start the slideshow from this slide"
 msgstr "[Stärt thé šlídéšhöw fröm thíš šlídé ···············]"
 
-#: crates/xodp/src/view.rs:737
+#: crates/xodp/src/view.rs:919
 msgid "Notes"
 msgstr "[Nötéš ···]"
 
-#: crates/xodp/src/view.rs:746
+#: crates/xodp/src/view.rs:928
 msgid "This slide has no notes."
 msgstr "[Thíš šlídé häš ñö ñötéš. ··········]"
 
-#: crates/xods/src/view.rs:187
+#: crates/xods/src/view.rs:177
+msgid "Sheet"
+msgstr "[Shéét ···]"
+
+#: crates/xods/src/view.rs:179
+msgid "Insert row above"
+msgstr "[Îñšért röw äbövé ·······]"
+
+#: crates/xods/src/view.rs:180
+msgid "Insert row below"
+msgstr "[Îñšért röw bélöw ·······]"
+
+#: crates/xods/src/view.rs:181
+msgid "Insert column left"
+msgstr "[Îñšért cölümñ léft ········]"
+
+#: crates/xods/src/view.rs:182
+msgid "Insert column right"
+msgstr "[Îñšért cölümñ ríght ········]"
+
+#: crates/xods/src/view.rs:183
+msgid "Delete row"
+msgstr "[Délété röw ·····]"
+
+#: crates/xods/src/view.rs:184
+msgid "Delete column"
+msgstr "[Délété cölümñ ······]"
+
+#: crates/xods/src/view.rs:280
 msgid "Copy the sheet as tab-separated text"
 msgstr "[Cöpy thé šhéét äš täb-šépärätéd téxt ···············]"
 
-#: crates/xods/src/view.rs:939
+#: crates/xods/src/view.rs:1098
+msgid "There is nothing there to change."
+msgstr "[Théré íš ñöthíñg théré tö chäñgé. ··············]"
+
+#: crates/xods/src/view.rs:1099
+msgid "A merged cell is in the way: this would cut through it."
+msgstr ""
+"[Å mérgéd céll íš íñ thé wäy: thíš wöüld cüt thröügh ít. "
+"·······················]"
+
+#: crates/xods/src/view.rs:1101
+msgid "A formula holds [{reference}], which this version cannot move."
+msgstr ""
+"[Å förmülä höldš [{reference}], whích thíš véršíöñ cäññöt mövé. "
+"·························]"
+
+#: crates/xods/src/view.rs:1105
+msgid "A formula points at [{reference}], which would be deleted."
+msgstr ""
+"[Å förmülä pöíñtš ät [{reference}], whích wöüld bé délétéd. "
+"························]"
+
+#: crates/xods/src/view.rs:1110
+msgid "conditional formats"
+msgstr "[cöñdítíöñäl förmätš ········]"
+
+#: crates/xods/src/view.rs:1111
+msgid "validations"
+msgstr "[välídätíöñš ·····]"
+
+#: crates/xods/src/view.rs:1112
+msgid "database ranges"
+msgstr "[dätäbäšé räñgéš ·······]"
+
+#: crates/xods/src/view.rs:1113
+msgid "pivot tables"
+msgstr "[pívöt täbléš ·····]"
+
+#: crates/xods/src/view.rs:1114
+msgid "consolidations"
+msgstr "[cöñšölídätíöñš ······]"
+
+#: crates/xods/src/view.rs:1115
+msgid "charts and objects"
+msgstr "[chärtš äñd öbjéctš ········]"
+
+#: crates/xods/src/view.rs:1116
+msgid "print ranges"
+msgstr "[príñt räñgéš ·····]"
+
+#: crates/xods/src/view.rs:1117
+msgid "shapes anchored to cells"
+msgstr "[šhäpéš äñchöréd tö céllš ··········]"
+
+#: crates/xods/src/view.rs:1120
+msgid "This document has {what}, which this version cannot move."
+msgstr ""
+"[Thíš döcüméñt häš {what}, whích thíš véršíöñ cäññöt mövé. "
+"·······················]"
+
+#: crates/xods/src/view.rs:1130
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 "[Thíš céll höldš ä förmülä, whích thíš véršíöñ döéš ñöt édít. "
 "·························]"
 
-#: crates/xods/src/view.rs:940
+#: crates/xods/src/view.rs:1131
 msgid "This cell is covered by the one that spans it."
 msgstr "[Thíš céll íš cövéréd by thé öñé thät špäñš ít. ···················]"
 
-#: crates/xods/src/view.rs:943
+#: crates/xods/src/view.rs:1135
 msgid "There is no cell there."
 msgstr "[Théré íš ñö céll théré. ··········]"
 
@@ -274,18 +410,18 @@ msgstr "[Théré íš ñö céll théré. ··········]"
 msgid "OpenDocument Text"
 msgstr "[ÖpéñDöcüméñt Téxt ·······]"
 
-#: crates/xodt/src/view.rs:131
+#: crates/xodt/src/view.rs:168
 msgid "This document has no text in it."
 msgstr "[Thíš döcüméñt häš ñö téxt íñ ít. ·············]"
 
-#: crates/xodt/src/view.rs:206
+#: crates/xodt/src/view.rs:256
 msgid "Outline"
 msgstr "[Öütlíñé ···]"
 
-#: crates/xodt/src/view.rs:215
+#: crates/xodt/src/view.rs:265
 msgid "(untitled)"
 msgstr "[(üñtítléd) ·····]"
 
-#: crates/xodt/src/view.rs:239
+#: crates/xodt/src/view.rs:289
 msgid "Copy the document as text"
 msgstr "[Cöpy thé döcüméñt äš téxt ···········]"

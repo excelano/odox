@@ -11,7 +11,9 @@
 use egui::output::OutputCommand;
 use egui::text::LayoutJob;
 use egui::{Context, Event, Id, Key, Modifiers, Pos2, RawInput, Rect, Sense, TextFormat, vec2};
-use egui_richedit::{Edit, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection};
+use egui_richedit::{
+    Edit, Fragment, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection,
+};
 
 /// Paragraphs of plain text, named by their index.
 struct Plain {
@@ -112,6 +114,35 @@ impl Model for Plain {
         chars.all(|b| b == first).then_some(first)
     }
 
+    fn fragment(&self, from: &Position<usize>, to: &Position<usize>) -> Option<Fragment> {
+        if from.paragraph != to.paragraph {
+            return None;
+        }
+        let text = self.paragraphs[from.paragraph]
+            .chars()
+            .skip(from.offset)
+            .take(to.offset - from.offset)
+            .collect::<String>();
+        let bold = self.bold[from.paragraph][from.offset..to.offset].to_vec();
+        Some(Fragment::new((text, bold)))
+    }
+
+    fn paste_fragment(
+        &mut self,
+        at: &Position<usize>,
+        fragment: &Fragment,
+        new_step: bool,
+    ) -> Option<Position<usize>> {
+        let (text, bold) = fragment.get::<(String, Vec<bool>)>()?;
+        if new_step {
+            self.steps += 1;
+        }
+        let paragraph = self.paragraphs.get_mut(at.paragraph)?;
+        paragraph.insert_str(byte(paragraph, at.offset), text);
+        self.bold[at.paragraph].splice(at.offset..at.offset, bold.iter().copied());
+        Some(Position::new(at.paragraph, at.offset + bold.len()))
+    }
+
     fn apply(&mut self, edit: Edit<'_, usize>, new_step: bool) -> Option<Position<usize>> {
         if new_step {
             self.steps += 1;
@@ -164,6 +195,8 @@ struct Harness {
     ctx: Context,
     editor: RichEdit<usize>,
     model: Plain,
+    /// The last tree handed to assistive technology, once it is switched on.
+    access: Option<egui::accesskit::TreeUpdate>,
 }
 
 impl Harness {
@@ -172,6 +205,7 @@ impl Harness {
             ctx: Context::default(),
             editor: RichEdit::new(Id::new("editor")),
             model: Plain::new(paragraphs),
+            access: None,
         };
         // One frame to lay the paragraphs out, which is what Up and Down move
         // through.
@@ -192,7 +226,12 @@ impl Harness {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
             ..RawInput::default()
         };
-        let Self { ctx, editor, model } = self;
+        let Self {
+            ctx,
+            editor,
+            model,
+            access,
+        } = self;
         let mut output = ctx.run_ui(input, |ui| {
             editor.input(ui, model);
             for (index, text) in model.paragraphs.iter().enumerate() {
@@ -216,6 +255,9 @@ impl Harness {
         // Nothing draws here, so the glyph atlas's updates go nowhere, and
         // egui asks that dropping them be said.
         output.textures_delta.clear();
+        if let Some(update) = output.platform_output.accesskit_update.take() {
+            *access = Some(update);
+        }
         output
             .platform_output
             .commands
@@ -497,6 +539,64 @@ fn a_click_whose_release_comes_a_frame_later_keeps_the_caret() {
 }
 
 #[test]
+fn a_screen_reader_reads_each_paragraph_and_where_the_caret_is() {
+    use egui::accesskit::Role;
+    let mut h = Harness::new(&["Hello", "world"]);
+    h.ctx.enable_accesskit();
+    h.caret(0, 2);
+    h.frame(Vec::new());
+    h.frame(Vec::new());
+    let update = h.access.take().expect("a tree update");
+    let paragraphs: Vec<_> = update
+        .nodes
+        .iter()
+        .filter(|(_, node)| node.role() == Role::Paragraph)
+        .collect();
+    assert_eq!(paragraphs.len(), 2, "one node a paragraph");
+    let reads = |text: &str| {
+        update
+            .nodes
+            .iter()
+            .any(|(_, node)| node.role() == Role::TextRun && node.value() == Some(text))
+    };
+    assert!(
+        reads("Hello") && reads("world"),
+        "the text is there to be read"
+    );
+    let selected: Vec<_> = paragraphs
+        .iter()
+        .filter_map(|(_, node)| node.text_selection())
+        .collect();
+    assert_eq!(
+        selected.len(),
+        1,
+        "only the paragraph holding the caret says where it is"
+    );
+    assert_eq!(selected[0].focus.character_index, 2);
+    assert_eq!(selected[0].anchor.character_index, 2);
+}
+
+#[test]
+fn a_drag_past_the_last_paragraph_takes_its_end_and_past_the_first_takes_its_start() {
+    let mut h = Harness::new(&["Hello", "world", "again"]);
+    let button = |at: Pos2, pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    let start = Pos2::new(20.0, 40.0);
+    h.frame(vec![Event::PointerMoved(start)]);
+    h.frame(vec![button(start, true)]);
+    h.frame(vec![Event::PointerMoved(Pos2::new(20.0, 390.0))]);
+    h.frame(Vec::new());
+    assert_eq!(h.focus(), Position::new(2, 5), "below everything");
+    h.frame(vec![Event::PointerMoved(Pos2::new(20.0, -30.0))]);
+    h.frame(Vec::new());
+    assert_eq!(h.focus(), Position::new(0, 0), "above everything");
+}
+
+#[test]
 fn a_drag_stays_in_the_paragraph_it_is_over_when_another_sits_beside_it() {
     // Two paragraphs side by side, as two cells of a table row are.
     let ctx = Context::default();
@@ -665,6 +765,54 @@ fn a_mark_on_a_selection_is_one_step_and_keeps_the_selection() {
     h.keys(&[command(Key::B)]);
     assert_eq!(h.model.bold_text(0), "");
     assert_eq!(h.model.steps, 2);
+}
+
+#[test]
+fn a_paste_of_what_was_copied_keeps_its_formatting_and_any_other_text_does_not() {
+    let mut h = Harness::new(&["Hello world"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 6),
+        focus: Position::new(0, 11),
+    });
+    h.keys(&[command(Key::B)]);
+    assert_eq!(h.model.bold_text(0), "world");
+    let copied = h
+        .frame(vec![Event::Copy])
+        .expect("it went on the clipboard");
+    assert_eq!(copied, "world");
+
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste(copied)]);
+    assert_eq!(h.model.paragraphs, ["worldHello world"]);
+    assert_eq!(
+        h.model.bold_text(0),
+        "worldworld",
+        "the pasted word is bold too"
+    );
+    assert_eq!(h.focus(), Position::new(0, 5), "the caret is after it");
+
+    // The clipboard held something else by then: a paste is plain, and typed
+    // text takes the character before it, which at the start is none.
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste("zz".to_owned())]);
+    assert_eq!(h.model.paragraphs, ["zzworldHello world"]);
+    assert_eq!(h.model.bold_text(0), "worldworld");
+}
+
+#[test]
+fn a_cut_can_be_pasted_back_with_its_formatting() {
+    let mut h = Harness::new(&["ab cd"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 3),
+        focus: Position::new(0, 5),
+    });
+    h.keys(&[command(Key::B)]);
+    let cut = h.frame(vec![Event::Cut]).expect("it went on the clipboard");
+    assert_eq!(h.model.paragraphs, ["ab "]);
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste(cut)]);
+    assert_eq!(h.model.paragraphs, ["cdab "]);
+    assert_eq!(h.model.bold_text(0), "cd");
 }
 
 #[test]

@@ -84,6 +84,35 @@ pub fn in_paragraphs(root: &Element, scope: usize, query: &str) -> Vec<Match> {
     found
 }
 
+/// What a replace did: how many matches were replaced, and how many were left
+/// as they were because what holds them cannot take text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Replaced {
+    /// Matches that now say something else.
+    pub replaced: usize,
+    /// Matches left alone: a formula, or a cell that holds a number, a date or
+    /// a boolean and not text.
+    pub skipped: usize,
+}
+
+/// A text with some ranges of it, counted in characters and not overlapping,
+/// replaced by another text.
+pub fn replace_ranges(text: &str, ranges: &[Range<usize>], with: &str) -> String {
+    let mut out = String::new();
+    let mut from = 0;
+    for range in ranges {
+        out.extend(
+            text.chars()
+                .skip(from)
+                .take(range.start.saturating_sub(from)),
+        );
+        out.push_str(with);
+        from = range.end;
+    }
+    out.extend(text.chars().skip(from));
+    out
+}
+
 /// What a view keeps of a search: the matches, which one is current, and
 /// whether the view still owes a scroll to it.
 #[derive(Default)]
@@ -118,6 +147,11 @@ impl Found {
     /// Whether there are none.
     pub fn is_empty(&self) -> bool {
         self.matches.is_empty()
+    }
+
+    /// Every match, in document order.
+    pub fn all(&self) -> &[Match] {
+        &self.matches
     }
 
     /// Which match is current, counted from zero.
@@ -210,6 +244,16 @@ mod tests {
             let matched: String = text[hit.range.clone()].iter().collect();
             assert_eq!(matched.to_lowercase(), "and");
         }
+    }
+
+    #[test]
+    fn ranges_are_replaced_in_place_and_counted_in_characters() {
+        assert_eq!(replace_ranges("ünï ünï x", &[0..3, 4..7], "a"), "a a x");
+        assert_eq!(
+            replace_ranges("abc", std::slice::from_ref(&(1..2)), ""),
+            "ac"
+        );
+        assert_eq!(replace_ranges("abc", &[], "z"), "abc");
     }
 
     #[test]

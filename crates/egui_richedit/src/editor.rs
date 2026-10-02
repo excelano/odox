@@ -7,8 +7,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use egui::accesskit::Role;
+use egui::emath::TSTransform;
 use egui::output::IMEOutput;
 use egui::text::{CCursor, CCursorRange, CharIndex};
+use egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use egui::text_selection::text_cursor_state::{
     ccursor_next_word, ccursor_previous_word, is_word_char,
 };
@@ -18,7 +21,7 @@ use egui::{
     Response, Sense, Ui, vec2,
 };
 
-use crate::{Edit, Mark, Model, OffsetMap, Position, Selection};
+use crate::{Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
 
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
@@ -81,6 +84,9 @@ pub struct RichEdit<P> {
     last_interaction: f64,
     /// Marks given or taken off at a caret, for the text typed there next.
     pending: Option<Pending<P>>,
+    /// The last copy, with the plain text it put on the clipboard: a paste of
+    /// that text is a paste of the copy, formatting and all.
+    clip: Option<(String, Fragment)>,
 }
 
 /// Marks given or taken off with a caret and nothing selected. The next text
@@ -142,6 +148,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             dragging: false,
             last_interaction: 0.0,
             pending: None,
+            clip: None,
         }
     }
 
@@ -167,6 +174,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.column = None;
         self.dragging = false;
         self.pending = None;
+        self.clip = None;
     }
 
     /// The document was changed or replaced by something other than this
@@ -256,6 +264,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         ui.memory_mut(|memory| memory.set_focus_lock_filter(self.id, FILTER));
         if self.dragging {
             scroll_toward_pointer(ui);
+            self.extend_past_the_ends(ui);
         }
         self.settle(model);
 
@@ -298,6 +307,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
         ui.painter()
             .galley(origin, galley.clone(), ui.visuals().text_color());
+        self.expose(ui, response, paragraph, &galley, &map, origin, focused);
 
         if focused
             && let Some(selection) = &self.selection
@@ -341,6 +351,73 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         );
     }
 
+    /// Tell assistive technology what the paragraph says and where the caret
+    /// or the selection is in it, as a screen reader reads a paragraph of text.
+    /// A selection that began in another paragraph is reported as a caret at
+    /// its end here, because one node cannot name a position in another.
+    #[allow(clippy::too_many_arguments)]
+    fn expose(
+        &self,
+        ui: &Ui,
+        response: &Response,
+        paragraph: &P,
+        galley: &Galley,
+        map: &OffsetMap,
+        origin: Pos2,
+        focused: bool,
+    ) {
+        let cursor_range = self
+            .selection
+            .as_ref()
+            .filter(|selection| focused && selection.focus.paragraph == *paragraph)
+            .map(|selection| {
+                let at = |position: &Position<P>| CCursor::new(map.to_galley(position.offset));
+                let anchor = if selection.anchor.paragraph == *paragraph {
+                    &selection.anchor
+                } else {
+                    &selection.focus
+                };
+                CCursorRange::two(at(anchor), at(&selection.focus))
+            });
+        let to_global = ui
+            .ctx()
+            .layer_transform_to_global(ui.layer_id())
+            .unwrap_or_default();
+        update_accesskit_for_text_widget(
+            ui.ctx(),
+            response.id,
+            cursor_range,
+            Role::Paragraph,
+            to_global * TSTransform::from_translation(origin.to_vec2()),
+            galley,
+        );
+    }
+
+    /// A drag whose pointer is below every paragraph takes the selection to
+    /// the end of the last, and above every paragraph to the start of the
+    /// first. Only a paragraph the pointer is over takes it otherwise, so
+    /// without this a drag stops one short of an end it has run past.
+    fn extend_past_the_ends(&mut self, ui: &Ui) {
+        let Some(pointer) = ui.input(|input| input.pointer.latest_pos()) else {
+            return;
+        };
+        let first = self.placed.iter().min_by_key(|(_, placed)| placed.index);
+        let last = self.placed.iter().max_by_key(|(_, placed)| placed.index);
+        let (Some((first, above)), Some((last, below))) = (first, last) else {
+            return;
+        };
+        let to = if pointer.y > below.origin.y + below.galley.rect.bottom() {
+            Position::new(last.clone(), below.map.model_len())
+        } else if pointer.y < above.origin.y + above.galley.rect.top() {
+            Position::new(first.clone(), 0)
+        } else {
+            return;
+        };
+        if let Some(selection) = &mut self.selection {
+            selection.focus = to;
+        }
+    }
+
     /// Drop a selection whose paragraph is gone, and pull one past the end of
     /// its paragraph back to it, as an undo can leave either.
     fn settle<M: Model<Paragraph = P>>(&mut self, model: &M) {
@@ -375,16 +452,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             }
             Event::Paste(text) => (false, self.paste(model, text)),
             Event::Copy => {
-                if let Some(text) = self.selected_text(model) {
-                    ui.ctx().copy_text(text);
-                }
+                self.copy(ui, model);
                 (false, false)
             }
             Event::Cut => {
-                let Some(text) = self.selected_text(model) else {
+                if !self.copy(ui, model) {
                     return (false, false);
-                };
-                ui.ctx().copy_text(text);
+                }
                 self.group = None;
                 let cut = self.delete_selection(model, Group::Other);
                 self.group = None;
@@ -553,9 +627,49 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     /// Paste text, each of its lines after the first a paragraph of its own,
     /// in one undo step. It stops at the first part the model refuses, so a
     /// selection that cannot be replaced is left as it was.
+    /// Paste the last copy where the caret is, in place of the selection,
+    /// when the clipboard still holds the text it put there. `None` when it
+    /// does not or the model will not, and the paste is plain.
+    fn paste_copy<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> Option<bool> {
+        let fragment = self
+            .clip
+            .as_ref()
+            .filter(|(plain, _)| plain == text)
+            .map(|(_, fragment)| fragment.clone())?;
+        self.selection.as_ref()?;
+        let deleted = self.delete_selection(model, Group::Other);
+        let at = self.selection.as_ref().map(|s| s.focus.clone())?;
+        let after = model.paste_fragment(&at, &fragment, !deleted)?;
+        self.selection = Some(Selection::caret(after));
+        self.owed = Owed::Reveal;
+        Some(true)
+    }
+
+    /// Put the selection on the clipboard as text, and keep a copy of it that
+    /// has its formatting for a paste of that text. Answers whether there was a
+    /// selection.
+    fn copy<M: Model<Paragraph = P>>(&mut self, ui: &Ui, model: &M) -> bool {
+        let Some(text) = self.selected_text(model) else {
+            return false;
+        };
+        ui.ctx().copy_text(text.clone());
+        self.clip = self
+            .selection
+            .as_ref()
+            .map(|selection| self.ordered(selection))
+            .and_then(|(from, to)| model.fragment(&from, &to))
+            .map(|fragment| (text, fragment));
+        true
+    }
+
+    /// Paste what the clipboard holds, as the copy it came from if it is that.
     fn paste<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let text = text.replace("\r\n", "\n").replace('\r', "\n");
         self.group = None;
+        if let Some(changed) = self.paste_copy(model, &text) {
+            self.group = None;
+            return changed;
+        }
         let mut changed = false;
         for (index, line) in text.split('\n').enumerate() {
             if index > 0 {

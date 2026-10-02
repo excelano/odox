@@ -28,8 +28,8 @@ Editing means changing what is there, not authoring. You can type and delete
 text, split a paragraph and join two, enter a value in a cell, move a shape on a
 slide and resize it, make text bold, italic, underlined or struck through, make
 a paragraph a heading or a list item, undo any of that, and save. You cannot
-apply other formatting, insert a table or a picture, edit a formula, or replace
-text. What you did
+apply other formatting, insert a table or a picture, or edit a formula. What you
+did
 not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
@@ -98,12 +98,13 @@ as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
 before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
-processor. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+processor. Text copied in a window and pasted back into it keeps its bold, italic, underline,
+strikethrough and paragraph kinds; pasted anywhere else it is plain text. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
-off. Undo puts the caret back where the edit
+off. The Format menu offers the same commands, and in `xodp` the marks. Undo puts the caret back where the edit
 was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
@@ -117,25 +118,28 @@ spreadsheet application recalculates it. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
 show it, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste or a delete that reaches a cell it
-cannot write, a formula or one under a merge, changes nothing.
+cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
-there to type into it as in `xodt`, within that shape. F5 starts the slideshow
+there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
 at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
 or a right click go back, and Escape ends it. The notes are not shown.
 
-In `xodt`, a click on a link opens a web or mail address in the desktop's own
-browser or mail program, or scrolls to a bookmark or heading in the document;
+A click on a link, in `xodt` and in the text of a slide in `xodp`, opens a web or
+mail address in the desktop's own browser or mail program, or in `xodt` scrolls
+to a bookmark or heading and in `xodp` goes to the slide the link names;
 while editing it takes Ctrl and a click, a plain click being the caret. No other
 kind of link is followed, whatever the document says.
 
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
 and Escape closes it. Every match is lit, `xodp` searches the notes as well as
-the slides, and `xods` searches every sheet.
+the slides, and `xods` searches every sheet. In edit mode, and always in `xods`, Ctrl+H adds a row to replace the
+current match or every match, as one step to undo; `xods` replaces in cells that
+hold text and says how many it left, formulas and numbers among them.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

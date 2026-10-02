@@ -15,8 +15,9 @@ use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, v
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns};
-use odox_ui::find::{Highlights, in_paragraphs};
+use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
 };
@@ -39,6 +40,11 @@ pub struct SlideView {
     found: Found,
     /// The slideshow is on: one slide, filling the screen, and nothing else.
     presenting: bool,
+    /// What the Format menu draws itself from, and what it last chose.
+    menu: MenuState,
+    command: Option<Command>,
+    /// What the Slide menu last chose.
+    slide_command: Option<SlideCommand>,
 }
 
 impl Default for SlideView {
@@ -53,8 +59,20 @@ impl Default for SlideView {
             page_editor: page_editor(),
             found: Found::default(),
             presenting: false,
+            menu: MenuState::offering_blocks(false),
+            command: None,
+            slide_command: None,
         }
     }
+}
+
+/// What the Slide menu asked for, applied when the page is next drawn.
+#[derive(Clone, Copy)]
+enum SlideCommand {
+    Duplicate,
+    Delete,
+    Earlier,
+    Later,
 }
 
 /// A shape's box on the page, in ODF points.
@@ -152,6 +170,12 @@ impl View for SlideView {
     fn reindex(&mut self) {
         self.drag = None;
         self.page_editor.document_replaced();
+        // An undo can take slides away from under the one in view.
+        let last = self
+            .document
+            .as_ref()
+            .map_or(0, |document| document.slides().len().saturating_sub(1));
+        self.slide = self.slide.min(last);
     }
 
     fn caret(&self) -> Option<Caret> {
@@ -196,6 +220,100 @@ impl View for SlideView {
         }
     }
 
+    fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
+        ui.menu_button(t("Format"), |ui| {
+            if let Some(command) = toolbar::menu(ui, &self.menu) {
+                self.command = Some(command);
+            }
+        });
+        let count = self
+            .document
+            .as_ref()
+            .map_or(0, |document| document.slides().len());
+        let can = editing.on && !editing.asking;
+        ui.menu_button(t("Slide"), |ui| {
+            let entries = [
+                (t("Duplicate slide"), SlideCommand::Duplicate, can),
+                (t("Delete slide"), SlideCommand::Delete, can && count > 1),
+                (
+                    t("Move slide earlier"),
+                    SlideCommand::Earlier,
+                    can && self.slide > 0,
+                ),
+                (
+                    t("Move slide later"),
+                    SlideCommand::Later,
+                    can && self.slide + 1 < count,
+                ),
+            ];
+            for (name, command, enabled) in entries {
+                if ui.add_enabled(enabled, egui::Button::new(name)).clicked() {
+                    self.slide_command = Some(command);
+                    ui.close();
+                }
+            }
+        });
+    }
+
+    fn can_replace(&self, editing: &Editing) -> bool {
+        editing.on && self.document.is_some()
+    }
+
+    fn replace(&mut self, with: &str, all: bool, editing: &mut Editing) -> Replaced {
+        let matches: Vec<Match> = if all {
+            self.found.all().to_vec()
+        } else {
+            self.found.current_match().cloned().into_iter().collect()
+        };
+        let Some(document) = &mut self.document else {
+            return Replaced::default();
+        };
+        // Where each scope's paragraphs are rooted, found before the document
+        // is changed: the slides borrow it.
+        let count = document.slides().len();
+        let mut roots: Vec<(usize, usize, Vec<usize>)> = Vec::new();
+        for found in &matches {
+            if roots.iter().any(|(scope, ..)| *scope == found.scope) {
+                continue;
+            }
+            let (slide, notes) = if found.scope >= count {
+                (found.scope - count, true)
+            } else {
+                (found.scope, false)
+            };
+            let slides = document.slides();
+            let Some(this) = slides.get(slide) else {
+                continue;
+            };
+            let Some(mut root) = document.page_path(this.position) else {
+                continue;
+            };
+            if notes {
+                let Some((at, _)) = this
+                    .element
+                    .elements_indexed()
+                    .find(|(_, e)| e.is(&Ns::Presentation, "notes"))
+                else {
+                    continue;
+                };
+                root.push(at);
+            }
+            roots.push((found.scope, slide, root));
+        }
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut total = Replaced::default();
+        for (scope, slide, root) in roots {
+            let group: Vec<&Match> = matches.iter().filter(|m| m.scope == scope).collect();
+            let mut model = FlowModel::new(content, styles, root, editing).tagged(vec![slide]);
+            let done = model.replace_matches(&group, with, total.replaced == 0);
+            total.replaced += done.replaced;
+            total.skipped += done.skipped;
+        }
+        total
+    }
+
     fn restore_caret(&mut self, caret: Caret) {
         let Some((&slide, within)) = caret.paragraph.split_first() else {
             return;
@@ -225,6 +343,9 @@ impl View for SlideView {
         if self.keys_before_drawing(ui, editing, count) {
             return;
         }
+        if let Some(command) = self.slide_command.take() {
+            self.change_slides(command, editing);
+        }
 
         // The document and the picture cache are taken as separate borrows of
         // separate fields, which is what lets the renderer hold one while filling
@@ -235,9 +356,13 @@ impl View for SlideView {
         let picked = self.picked;
         let dragging = self.drag.is_some();
         let mut action = None;
+        let mut followed = None;
 
         if edit_mode {
             self.edit(ui, editing);
+        } else {
+            self.command = None;
+            self.menu = MenuState::offering_blocks(false);
         }
 
         let Some(document) = &self.document else {
@@ -303,6 +428,7 @@ impl View for SlideView {
                 for (index, shape) in slide.shapes_indexed() {
                     canvas.slide_shape(ui, index, shape);
                 }
+                followed = canvas.followed.take();
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.
@@ -320,6 +446,9 @@ impl View for SlideView {
         });
 
         self.found.drawn();
+        if let Some(name) = followed {
+            self.go_to_slide_named(&name);
+        }
         if let Some(action) = action {
             self.act(action, fit, editing);
         }
@@ -400,9 +529,15 @@ impl SlideView {
         let mut model = FlowModel::new(content, styles, root, editing)
             .within(scope)
             .tagged(vec![self.slide]);
-        if let Some(mark) = odox_ui::toolbar::marks(ui, &self.page_editor, &model) {
+        let command = self.command.take();
+        let mark = toolbar::marks(ui, &self.page_editor, &model).or(match command {
+            Some(Command::Mark(mark)) => Some(mark),
+            _ => None,
+        });
+        if let Some(mark) = mark {
             self.page_editor.toggle(&mut model, mark);
         }
+        self.menu = MenuState::of(&self.page_editor, &model, false);
         ui.separator();
         self.page_editor.input(ui, &mut model);
     }
@@ -502,6 +637,39 @@ impl SlideView {
             self.page_editor.clear();
         }
         false
+    }
+
+    /// Duplicate, delete or move the slide in view, as one step to undo, and
+    /// follow it: the copy, the slide after a deleted one, the moved slide.
+    fn change_slides(&mut self, command: SlideCommand, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(position) = document
+            .slides()
+            .get(self.slide)
+            .map(|slide| slide.position)
+        else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let done = match command {
+            SlideCommand::Duplicate => document.duplicate_slide(position).map(|_| self.slide + 1),
+            SlideCommand::Delete => document
+                .delete_slide(position)
+                .map(|()| self.slide.min(document.slides().len().saturating_sub(1))),
+            SlideCommand::Earlier => document.move_slide(position, false).map(|_| self.slide - 1),
+            SlideCommand::Later => document.move_slide(position, true).map(|_| self.slide + 1),
+        };
+        let Ok(shown) = done else {
+            return;
+        };
+        editing.record_snapshot(before, None);
+        self.slide = shown;
+        self.picked = None;
+        self.drag = None;
+        self.page_editor.clear();
+        self.found.clear();
     }
 
     /// F5 starts the slideshow at the first slide and Shift+F5 at this one.
@@ -611,6 +779,20 @@ impl SlideView {
             }
         });
         self.show_slide(slide.min(count.saturating_sub(1)));
+    }
+
+    /// Go to the slide a link names, which is the `draw:name` the link
+    /// carries after its `#`. A name no slide has leaves the view as it is.
+    fn go_to_slide_named(&mut self, name: &str) {
+        let Some(index) = self.document.as_ref().and_then(|document| {
+            document
+                .slides()
+                .iter()
+                .position(|slide| slide.name == Some(name))
+        }) else {
+            return;
+        };
+        self.show_slide(index);
     }
 
     /// Look at another slide, with nothing picked and no caret. The slide

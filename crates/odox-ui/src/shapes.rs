@@ -48,6 +48,9 @@ pub struct Canvas<'a> {
     pub page_editor: Option<&'a mut PageEditor>,
     /// The matches of a search, drawn in the slide's own labels.
     pub find: Option<Highlights<'a>>,
+    /// A place in the document that a link in a label just followed, for the
+    /// view to go to.
+    pub followed: Option<String>,
     /// The index among the page's children of the shape being drawn, where it
     /// is one of the slide's own; a master page's decoration has none and
     /// nothing in it is edited.
@@ -125,6 +128,7 @@ impl<'a> Canvas<'a> {
             palette,
             page_editor: None,
             find: None,
+            followed: None,
             at: None,
         }
     }
@@ -543,6 +547,9 @@ impl Canvas<'_> {
                 flow.frame(ui, content, rect.width());
             } else {
                 flow.blocks(ui, content, rect.width());
+            }
+            if flow.followed.is_some() {
+                self.followed = flow.followed.take();
             }
         })
         .response

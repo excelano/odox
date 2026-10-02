@@ -14,11 +14,12 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Mark, Model, Position, RichEdit, Selection};
+use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
 use odox_core::edit::{self, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
+use crate::find::{Match, Replaced};
 use crate::flow::is_block_container;
 
 /// The editor over a flow's paragraphs.
@@ -227,6 +228,27 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Replace each match of a search with a text, last first so that the
+    /// offsets of the ones before hold. The first replacement begins an undo
+    /// step when `new_step` says so and the rest join it. Answers how many
+    /// were replaced.
+    pub fn replace_matches(&mut self, matches: &[&Match], with: &str, new_step: bool) -> Replaced {
+        let mut done = Replaced::default();
+        for found in matches.iter().rev() {
+            let edit = Edit::Replace {
+                from: Position::new(found.paragraph.clone(), found.range.start),
+                to: Position::new(found.paragraph.clone(), found.range.end),
+                text: with,
+            };
+            if self.apply(edit, new_step && done.replaced == 0).is_some() {
+                done.replaced += 1;
+            } else {
+                done.skipped += 1;
+            }
+        }
+        done
+    }
+
     /// Make the paragraphs a selection runs over a kind of paragraph, or take
     /// them out of it where they already are one, as one step to undo, and put
     /// the selection back over the same paragraphs. Answers whether the
@@ -322,6 +344,27 @@ impl<'a> FlowModel<'a> {
         {
             *first += 1;
         }
+    }
+
+    /// Split a paragraph in two. What follows a heading's last character is
+    /// body text and not another heading, as it is in every word processor.
+    fn split(&mut self, at: &Position<Vec<usize>>) -> Option<Vec<usize>> {
+        let at_end_of_heading = self
+            .root()
+            .and_then(|root| root.at(&at.paragraph))
+            .is_some_and(|paragraph| {
+                edit::heading_level(paragraph).is_some()
+                    && at.offset >= edit::text(paragraph).chars().count()
+            });
+        let root = self.content.at_mut(&self.root)?;
+        let second = edit::split_at(root, &at.paragraph, at.offset).ok()?;
+        if at_end_of_heading {
+            let path = [self.root.as_slice(), &second].concat();
+            // A document that cannot be given the paragraph style keeps the
+            // heading, which is a split all the same.
+            let _ = edit::set_heading(self.content, &path, None, self.styles);
+        }
+        Some(second)
     }
 
     /// Give the text from one position to another a mark, or take it off,
@@ -420,6 +463,36 @@ impl Model for FlowModel<'_> {
         answer
     }
 
+    fn fragment(&self, from: &Position<Vec<usize>>, to: &Position<Vec<usize>>) -> Option<Fragment> {
+        let root = self.root()?;
+        let items: Vec<Element> = self
+            .covered(from, to)?
+            .into_iter()
+            .filter_map(|(path, range)| Some(edit::slice(root.at(&path)?, range)))
+            .collect();
+        (!items.is_empty()).then(|| Fragment::new(items))
+    }
+
+    fn paste_fragment(
+        &mut self,
+        at: &Position<Vec<usize>>,
+        fragment: &Fragment,
+        new_step: bool,
+    ) -> Option<Position<Vec<usize>>> {
+        let items = fragment.get::<Vec<Element>>()?;
+        let new_step = new_step || !self.editing.modified();
+        let before = new_step.then(|| self.content.clone());
+        let root = self.content.at_mut(&self.root)?;
+        let (path, offset) = edit::paste_fragment(root, &at.paragraph, at.offset, items).ok()?;
+        self.editing.touch();
+        if let Some(before) = before {
+            let begins = Position::new([self.tag.as_slice(), &at.paragraph].concat(), at.offset);
+            self.editing.record_snapshot(before, Some(begins));
+        }
+        self.order = OnceCell::new();
+        Some(Position::new(path, offset))
+    }
+
     fn apply(
         &mut self,
         edit: Edit<'_, Vec<usize>>,
@@ -445,12 +518,7 @@ impl Model for FlowModel<'_> {
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
                 .map(|()| Position::new(from.paragraph, from.offset + text.chars().count())),
-            Edit::Split { at } => {
-                let root = self.content.at_mut(&self.root)?;
-                edit::split_at(root, &at.paragraph, at.offset)
-                    .ok()
-                    .map(|second| Position::new(second, 0))
-            }
+            Edit::Split { at } => self.split(&at).map(|second| Position::new(second, 0)),
             Edit::Format { from, to, mark, on } => {
                 self.format(&from, &to, core_mark(mark), on).map(|()| to)
             }
@@ -675,6 +743,110 @@ mod tests {
         let current = content.clone();
         let (_, caret) = editing.undo(&current, None).expect("a step to undo");
         assert_eq!(caret, Some(Position::new(vec![7, 0], 1)));
+    }
+
+    fn heading_document() -> Element {
+        odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:body><office:text><text:h text:outline-level="1" text:style-name="H">Title</text:h><text:p text:style-name="Body">a</text:p><text:p text:style-name="Body">b</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document")
+    }
+
+    #[test]
+    fn enter_at_the_end_of_a_heading_starts_body_text() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let at = model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 5),
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![1], 0)));
+        let second = content.at(&[0, 0, 1]).expect("the new paragraph");
+        assert!(second.is(&Ns::Text, "p"));
+        assert_eq!(second.attr(&Ns::Text, "style-name"), Some("Body"));
+        assert!(
+            content
+                .at(&[0, 0, 0])
+                .expect("the heading")
+                .is(&Ns::Text, "h")
+        );
+    }
+
+    #[test]
+    fn replacing_every_match_is_one_step_and_the_offsets_hold() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let matches = crate::find::in_paragraphs(content.at(&[0, 0]).expect("the body"), 0, "t");
+        assert_eq!(matches.len(), 2, "the two t of Title");
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let done = model.replace_matches(&matches.iter().collect::<Vec<_>>(), "TT", true);
+        assert_eq!(done.replaced, 2);
+        assert_eq!(model.text(&vec![0]).as_deref(), Some("TTiTTle"));
+        let mut undone = 0;
+        let mut current = content.clone();
+        while let Some((previous, _)) = editing.undo(&current, None) {
+            current = previous;
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
+    }
+
+    #[test]
+    fn a_copy_keeps_spans_and_a_paste_puts_them_back_in_one_step() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>one <text:span text:style-name="T1">two</text:span> three</text:p><text:p>x</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let fragment = model
+            .fragment(&Position::new(vec![0], 3), &Position::new(vec![0], 7))
+            .expect("a copy");
+        let after = model
+            .paste_fragment(&Position::new(vec![1], 1), &fragment, true)
+            .expect("it goes in");
+        assert_eq!(after, Position::new(vec![1], 5));
+        let written = String::from_utf8(odox_core::xml::serialize(&content)).expect("UTF-8");
+        assert!(
+            written.contains(
+                r#"<text:p>x<text:s/><text:span text:style-name="T1">two</text:span></text:p>"#
+            ),
+            "{written}"
+        );
+        assert_eq!(editing.undo(&content.clone(), None).map(|_| ()), Some(()));
+        assert!(!editing.can_undo(), "one step");
+    }
+
+    #[test]
+    fn enter_in_the_middle_of_a_heading_leaves_two_headings() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        model.apply(
+            Edit::Split {
+                at: Position::new(vec![0], 2),
+            },
+            true,
+        );
+        assert!(
+            content
+                .at(&[0, 0, 1])
+                .expect("the second half")
+                .is(&Ns::Text, "h")
+        );
     }
 
     #[test]
