@@ -256,6 +256,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         ui.memory_mut(|memory| memory.set_focus_lock_filter(self.id, FILTER));
         if self.dragging {
             scroll_toward_pointer(ui);
+            self.extend_past_the_ends(ui);
         }
         self.settle(model);
 
@@ -339,6 +340,31 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 index,
             },
         );
+    }
+
+    /// A drag whose pointer is below every paragraph takes the selection to
+    /// the end of the last, and above every paragraph to the start of the
+    /// first. Only a paragraph the pointer is over takes it otherwise, so
+    /// without this a drag stops one short of an end it has run past.
+    fn extend_past_the_ends(&mut self, ui: &Ui) {
+        let Some(pointer) = ui.input(|input| input.pointer.latest_pos()) else {
+            return;
+        };
+        let first = self.placed.iter().min_by_key(|(_, placed)| placed.index);
+        let last = self.placed.iter().max_by_key(|(_, placed)| placed.index);
+        let (Some((first, above)), Some((last, below))) = (first, last) else {
+            return;
+        };
+        let to = if pointer.y > below.origin.y + below.galley.rect.bottom() {
+            Position::new(last.clone(), below.map.model_len())
+        } else if pointer.y < above.origin.y + above.galley.rect.top() {
+            Position::new(first.clone(), 0)
+        } else {
+            return;
+        };
+        if let Some(selection) = &mut self.selection {
+            selection.focus = to;
+        }
     }
 
     /// Drop a selection whose paragraph is gone, and pull one past the end of

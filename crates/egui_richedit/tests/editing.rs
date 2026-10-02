@@ -497,6 +497,26 @@ fn a_click_whose_release_comes_a_frame_later_keeps_the_caret() {
 }
 
 #[test]
+fn a_drag_past_the_last_paragraph_takes_its_end_and_past_the_first_takes_its_start() {
+    let mut h = Harness::new(&["Hello", "world", "again"]);
+    let button = |at: Pos2, pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    let start = Pos2::new(20.0, 40.0);
+    h.frame(vec![Event::PointerMoved(start)]);
+    h.frame(vec![button(start, true)]);
+    h.frame(vec![Event::PointerMoved(Pos2::new(20.0, 390.0))]);
+    h.frame(Vec::new());
+    assert_eq!(h.focus(), Position::new(2, 5), "below everything");
+    h.frame(vec![Event::PointerMoved(Pos2::new(20.0, -30.0))]);
+    h.frame(Vec::new());
+    assert_eq!(h.focus(), Position::new(0, 0), "above everything");
+}
+
+#[test]
 fn a_drag_stays_in_the_paragraph_it_is_over_when_another_sits_beside_it() {
     // Two paragraphs side by side, as two cells of a table row are.
     let ctx = Context::default();
