@@ -107,14 +107,6 @@ third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, and in `xodp` the marks. Undo puts the caret back where the edit
 was.
 
-File > Export as PDF/UA… in `xodt` writes the document as a PDF that conforms
-to PDF/UA-1, the standard for accessible PDF: headings, lists, tables, links and
-pictures are tagged for a screen reader, and the fonts travel inside the file.
-The window has no pages and the PDF does, laid out on the paper and margins the
-document's page style gives. A picture that has neither alternative text nor a
-mark that it is decoration is asked about first, and what you answer is saved
-into the document, so the next export does not ask again.
-
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, one tab per sheet, and shows the formula behind whichever cell you pick.
 Typing on the picked cell replaces it, Enter or F2 opens it with what it holds,
@@ -141,6 +133,18 @@ mail address in the desktop's own browser or mail program, or in `xodt` scrolls
 to a bookmark or heading and in `xodp` goes to the slide the link names;
 while editing it takes Ctrl and a click, a plain click being the caret. No other
 kind of link is followed, whatever the document says.
+
+File > Export as PDF/UA…, in any of the three, writes the document as a PDF
+that conforms to PDF/UA-1, the standard for accessible PDF: headings, lists,
+tables, links and pictures are tagged for a screen reader, and the fonts travel
+inside the file. The windows have no pages and the PDF does. A text document is
+laid out on the paper and margins its page style gives; a spreadsheet prints
+each sheet that is shown, its print range or the cells in use, across as many
+pages as it takes or fitted as its page style asks, with its header rows at the
+top of each; a presentation is a page per slide, without the slides the show
+skips or the speaker's notes. A picture that has neither alternative text nor a
+mark that it is decoration is asked about first, and what you answer is saved
+into the document, so the next export does not ask again.
 
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
