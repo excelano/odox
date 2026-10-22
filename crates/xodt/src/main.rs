@@ -15,7 +15,6 @@
 // in a debug build, which is where a panic message still has somewhere to go.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod export;
 mod view;
 
 use odox_ui::{Product, mark, run};

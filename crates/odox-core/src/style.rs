@@ -466,6 +466,8 @@ pub struct Properties {
     pub background_visible: Option<bool>,
     /// Whether the master page's decorations are drawn.
     pub background_objects_visible: Option<bool>,
+    /// Whether a slide is left out of a show, from `presentation:visibility`.
+    pub hidden: Option<bool>,
     /// A column's width, from a `table-column` style.
     pub column_width: Option<Length>,
     /// A row's height, from a `table-row` style.
@@ -960,6 +962,9 @@ impl Properties {
                     .and_then(crate::value::boolean)
                 {
                     self.background_objects_visible = Some(visible);
+                }
+                if let Some(visibility) = properties.attr(&Ns::Presentation, "visibility") {
+                    self.hidden = Some(visibility == "hidden");
                 }
             } else if properties.is(&Ns::Style, "table-column-properties") {
                 if let Some(width) = properties

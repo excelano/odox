@@ -63,9 +63,10 @@ fn collect(parent: &Element, path: &mut Vec<usize>, into: &mut Vec<Vec<usize>>) 
 /// Decoration wins over a title, because a person who marked a picture
 /// decorative has said it is to be skipped whatever text it still carries.
 pub fn description(frame: &Element, styles: &Styles) -> Description {
+    let kind = StyleKind::of(frame);
     let decorative = frame
-        .attr(&Ns::Draw, "style-name")
-        .map(|name| styles.resolve(&Family::Graphic, name))
+        .attr(&kind.ns, "style-name")
+        .map(|name| styles.resolve(&kind.family, name))
         .and_then(|properties| properties.graphic.decorative)
         .unwrap_or(false);
     if decorative {
@@ -130,13 +131,47 @@ pub fn set_alternative_text(
     Ok(())
 }
 
+/// Which style a frame takes its graphic properties from: a `graphic` style
+/// as `draw:style-name`, or, for one of a slide's own placeholders, a
+/// `presentation` style as `presentation:style-name`. A frame names one or
+/// the other.
+struct StyleKind {
+    ns: Ns,
+    family: Family,
+    family_name: &'static str,
+    prefix: &'static str,
+}
+
+impl StyleKind {
+    fn of(frame: &Element) -> Self {
+        if frame.attr(&Ns::Draw, "style-name").is_none()
+            && frame.attr(&Ns::Presentation, "style-name").is_some()
+        {
+            Self {
+                ns: Ns::Presentation,
+                family: Family::Presentation,
+                family_name: "presentation",
+                prefix: "pr",
+            }
+        } else {
+            Self {
+                ns: Ns::Draw,
+                family: Family::Graphic,
+                family_name: "graphic",
+                prefix: "gr",
+            }
+        }
+    }
+}
+
 /// Mark the figure at a path under the content root as decoration.
 ///
 /// `LibreOffice`'s namespace is declared on the content root where it is not,
 /// since a document another application wrote has no other way to say it.
-/// The frame is given an automatic graphic style that says so: a copy of the
-/// one it has where that one is automatic, so that nothing else it says is
-/// lost, and otherwise a style that inherits from the one it names. A document
+/// The frame is given an automatic style that says so, of the family it
+/// names: a copy of the one it has where that one is automatic, so that
+/// nothing else it says is lost, and otherwise a style that inherits from the
+/// one it names. A document
 /// with no `office:automatic-styles` is given one before its body, which moves
 /// the body one place along: a path held from before the edit is to be taken
 /// again.
@@ -158,7 +193,8 @@ pub fn set_decorative(
     if description(frame, styles) == Description::Decorative {
         return Ok(());
     }
-    let current = frame.attr(&Ns::Draw, "style-name").map(ToOwned::to_owned);
+    let kind = StyleKind::of(frame);
+    let current = frame.attr(&kind.ns, "style-name").map(ToOwned::to_owned);
     declares(content, &[Ns::Draw, Ns::Style])?;
     if !content.declare(&Ns::Loext) {
         return Err(Refused::Namespace);
@@ -170,7 +206,7 @@ pub fn set_decorative(
             .elements()
             .find(|s| {
                 s.is(&Ns::Style, "style")
-                    && s.attr(&Ns::Style, "family") == Some("graphic")
+                    && s.attr(&Ns::Style, "family") == Some(kind.family_name)
                     && s.attr(&Ns::Style, "name") == Some(name)
             })
             .cloned()
@@ -180,7 +216,7 @@ pub fn set_decorative(
         copy
     } else {
         let mut style = element(content.name_for(&Ns::Style, "style"));
-        style.set_attr(content.name_for(&Ns::Style, "family"), "graphic");
+        style.set_attr(content.name_for(&Ns::Style, "family"), kind.family_name);
         if let Some(parent) = &current {
             style.set_attr(content.name_for(&Ns::Style, "parent-style-name"), parent);
         }
@@ -203,8 +239,8 @@ pub fn set_decorative(
         properties.set_attr(content.name_for(&Ns::Loext, "decorative"), "true");
     }
 
-    let (name, fresh) = name_for(content, styles, style, &Family::Graphic, "gr");
-    let name_attr = content.name_for(&Ns::Draw, "style-name");
+    let (name, fresh) = name_for(content, styles, style, &kind.family, kind.prefix);
+    let name_attr = content.name_for(&kind.ns, "style-name");
     content
         .at_mut(path)
         .ok_or(Refused::NotFound)?

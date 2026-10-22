@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::num::{NonZeroU16, NonZeroU32};
 use std::rc::Rc;
 
+use krilla::paint::Paint;
 use krilla::tagging::{TableHeaderScope, Tag, TagKind};
 use krilla::text::KrillaGlyph;
 use odox_core::edit::Description;
@@ -91,6 +92,26 @@ pub(crate) enum Item {
     /// Nothing drawn, standing for content that is empty: a table cell with
     /// no text in it, which is still a cell to a reader.
     Empty { x: f32, y: f32, leaf: LeafId },
+    /// An outline, filled and stroked: a shape on a slide. It is decoration
+    /// where it has no leaf, and a figure's content where it has one.
+    Shape {
+        outline: Vec<Segment>,
+        /// The top and bottom of the outline.
+        span: (f32, f32),
+        ground: Option<Ground>,
+        stroke: Option<(Color, f32)>,
+        leaf: Option<LeafId>,
+    },
+    /// A picture stretched over a box that may be turned or leaned: where the
+    /// box's top left corner is, and the vectors along its top and left
+    /// edges.
+    Placed {
+        origin: (f32, f32),
+        across: (f32, f32),
+        down: (f32, f32),
+        image: krilla::image::Image,
+        leaf: Option<LeafId>,
+    },
     /// The area of a link that a click follows.
     Link {
         x: f32,
@@ -102,8 +123,40 @@ pub(crate) enum Item {
     },
 }
 
+/// One step of an outline.
+#[derive(Clone, Copy)]
+pub(crate) enum Segment {
+    Move(f32, f32),
+    Line(f32, f32),
+    Cubic(f32, f32, f32, f32, f32, f32),
+    Close,
+}
+
+impl Segment {
+    fn shifted(self, dx: f32, dy: f32) -> Self {
+        match self {
+            Self::Move(x, y) => Self::Move(x + dx, y + dy),
+            Self::Line(x, y) => Self::Line(x + dx, y + dy),
+            Self::Cubic(a, b, c, d, e, f) => {
+                Self::Cubic(a + dx, b + dy, c + dx, d + dy, e + dx, f + dy)
+            }
+            Self::Close => Self::Close,
+        }
+    }
+}
+
+/// What fills a shape's outline.
+#[derive(Clone)]
+pub(crate) enum Ground {
+    /// A colour or a gradient, with how opaque it is.
+    Paint(Paint, f32),
+    /// A picture stretched over the rectangle `(x, y, width, height)` and
+    /// cut to the outline, with how opaque it is.
+    Image(krilla::image::Image, (f32, f32, f32, f32), f32),
+}
+
 impl Item {
-    fn shifted(mut self, dx: f32, dy: f32) -> Self {
+    pub(crate) fn shifted(mut self, dx: f32, dy: f32) -> Self {
         match &mut self {
             Self::Text { x, baseline, .. } => {
                 *x += dx;
@@ -122,15 +175,38 @@ impl Item {
                 to.0 += dx;
                 to.1 += dy;
             }
+            Self::Shape {
+                outline,
+                span,
+                ground,
+                ..
+            } => {
+                for segment in outline.iter_mut() {
+                    *segment = segment.shifted(dx, dy);
+                }
+                span.0 += dy;
+                span.1 += dy;
+                if let Some(Ground::Image(_, (x, y, _, _), _)) = ground {
+                    *x += dx;
+                    *y += dy;
+                }
+            }
+            Self::Placed { origin, .. } => {
+                origin.0 += dx;
+                origin.1 += dy;
+            }
         }
         self
     }
 
     /// The same, drawn as decoration: a repeated table header is the header
     /// a reader has already been read, drawn again.
-    fn decoration(mut self) -> Self {
+    pub(crate) fn decoration(mut self) -> Self {
         match &mut self {
-            Self::Text { leaf, .. } | Self::Image { leaf, .. } => *leaf = None,
+            Self::Text { leaf, .. }
+            | Self::Image { leaf, .. }
+            | Self::Shape { leaf, .. }
+            | Self::Placed { leaf, .. } => *leaf = None,
             _ => {}
         }
         self
@@ -145,6 +221,24 @@ impl Item {
             | Self::Link { y, height, .. } => (*y, y + height),
             Self::Rule { from, to, .. } => (from.1.min(to.1), from.1.max(to.1)),
             Self::Empty { y, .. } => (*y, *y),
+            Self::Shape { span, .. } => *span,
+            Self::Placed {
+                origin,
+                across,
+                down,
+                ..
+            } => {
+                let ys = [
+                    origin.1,
+                    origin.1 + across.1,
+                    origin.1 + down.1,
+                    origin.1 + across.1 + down.1,
+                ];
+                (
+                    ys.iter().copied().fold(f32::MAX, f32::min),
+                    ys.iter().copied().fold(f32::MIN, f32::max),
+                )
+            }
         }
     }
 }

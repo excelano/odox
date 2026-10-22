@@ -19,7 +19,8 @@ use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
-    Canvas, Caret, Editing, Flow, FlowModel, Found, PageEditor, Pictures, View, fonts, page_editor,
+    Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
+    fonts, page_editor,
 };
 
 /// A presentation, open or not.
@@ -45,6 +46,7 @@ pub struct SlideView {
     command: Option<Command>,
     /// What the Slide menu last chose.
     slide_command: Option<SlideCommand>,
+    export: Export,
 }
 
 impl Default for SlideView {
@@ -62,6 +64,7 @@ impl Default for SlideView {
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
+            export: Export::default(),
         }
     }
 }
@@ -142,6 +145,7 @@ impl View for SlideView {
         self.page_editor.clear();
         self.found.clear();
         self.presenting = false;
+        self.export = Export::default();
         Ok(())
     }
 
@@ -153,6 +157,7 @@ impl View for SlideView {
         self.page_editor.clear();
         self.found.clear();
         self.presenting = false;
+        self.export = Export::default();
     }
 
     fn is_open(&self) -> bool {
@@ -340,7 +345,8 @@ impl View for SlideView {
             });
             return;
         }
-        if self.keys_before_drawing(ui, editing, count) {
+        let asking = self.carry_export(ui.ctx(), editing);
+        if !asking && self.keys_before_drawing(ui, editing, count) {
             return;
         }
         if let Some(command) = self.slide_command.take() {
@@ -352,7 +358,7 @@ impl View for SlideView {
         // the other.
         let slide_index = self.slide;
         let show_notes = self.show_notes;
-        let edit_mode = editing.on && !editing.asking;
+        let edit_mode = editing.on && !editing.asking && !asking;
         let picked = self.picked;
         let dragging = self.drag.is_some();
         let mut action = None;
@@ -482,6 +488,15 @@ impl View for SlideView {
             self.show_slide(index);
         }
         true
+    }
+
+    fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {
+        ui.separator();
+        self.export.menu(ui, path);
+    }
+
+    fn take_notice(&mut self) -> Option<Notice> {
+        self.export.take_notice()
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {
@@ -637,6 +652,15 @@ impl SlideView {
             self.page_editor.clear();
         }
         false
+    }
+
+    /// Carry an export on. Answers whether its question is up, which the
+    /// slide waits on: it is drawn as it is and takes no keys.
+    fn carry_export(&mut self, ctx: &egui::Context, editing: &mut Editing) -> bool {
+        if let Some(document) = &mut self.document {
+            self.export.show(ctx, document, editing);
+        }
+        self.export.asking()
     }
 
     /// Duplicate, delete or move the slide in view, as one step to undo, and

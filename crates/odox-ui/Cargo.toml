@@ -16,6 +16,7 @@ egui_richedit.workspace = true
 eframe.workspace = true
 rfd.workspace = true
 odox-fonts.workspace = true
+odox-pdf.workspace = true
 image.workspace = true
 potext.workspace = true
 

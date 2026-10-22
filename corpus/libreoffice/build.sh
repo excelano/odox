@@ -108,3 +108,10 @@ done
 # ODF by hand, because no text format LibreOffice imports carries alternative
 # text and the decorative flag; LibreOffice still writes the package.
 convert odt:writer8 export.odt "OpenDocument Text Flat XML" export.fodt
+
+# A presentation for the PDF export: a title written after the shape read
+# after it, a list, pictures described, decorative, turned and undescribed, a
+# shape that is a figure, a group, an untitled slide, a hidden slide, and
+# master-page decoration. Flat ODF by hand, for the same reason as the text
+# document above.
+convert odp:impress8 export.odp "OpenDocument Presentation Flat XML" export.fodp
