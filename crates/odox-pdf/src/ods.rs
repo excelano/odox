@@ -1,8 +1,9 @@
 //! A spreadsheet laid out onto pages: each sheet that is shown cut into
 //! pages of cells.
 //!
-//! A sheet prints its print range, or every cell up to the last that holds
-//! anything, leaving out the rows and columns it hides. Columns that do not
+//! A sheet prints its print range as far as the cells in use, or every cell
+//! up to the last that holds anything, leaving out the rows and columns it
+//! hides. Columns that do not
 //! fit across a page go on pages of their own, down the sheet and then across
 //! it unless its page style says across first, and the page style's scale or
 //! its number of pages to fit decides how large the cells are drawn. A cell
@@ -165,9 +166,17 @@ impl Sheets<'_, '_, '_> {
     #[allow(clippy::too_many_lines)]
     fn sheet(&mut self) -> Result<Option<SheetPages>, Refusal> {
         let (document, sheet) = (self.document, self.sheet);
-        let (row_range, column_range) = document
-            .print_range(sheet)
-            .unwrap_or((0..sheet.used_rows, 0..sheet.used_columns));
+        // A print range goes no further than the cells in use: one written as
+        // whole columns, which is how Excel writes a print area, reaches the
+        // last row a sheet can have.
+        let used = (0..sheet.used_rows, 0..sheet.used_columns);
+        let (row_range, column_range) = match document.print_range(sheet) {
+            Some((rows, columns)) => (
+                rows.start..rows.end.min(used.0.end),
+                columns.start..columns.end.min(used.1.end),
+            ),
+            None => used,
+        };
         let rows: Vec<usize> = row_range.filter(|&row| sheet.row_shown(row)).collect();
         let columns: Vec<usize> = column_range
             .filter(|&column| sheet.column_shown(column))
