@@ -144,12 +144,8 @@ fn offsets(bands: &[Range<usize>], sizes: &[f32]) -> Vec<f32> {
 /// The largest share, no larger than one, at which a sheet's bands fit a
 /// rule, trying in steps of a hundredth down to the smallest.
 fn largest(fits: impl Fn(f32) -> bool) -> f32 {
-    (0..=90)
-        .map(|step| {
-            #[allow(clippy::cast_precision_loss)]
-            let share = 1.0 - step as f32 / 100.0;
-            share
-        })
+    (0u8..=90)
+        .map(|step| 1.0 - f32::from(step) / 100.0)
         .find(|&share| fits(share))
         .unwrap_or(SMALLEST)
 }
@@ -332,19 +328,26 @@ impl Sheets<'_, '_, '_> {
         // The marked header rows again at the top of every page below the
         // first, as decoration: a reader has read them once. They are laid out
         // under a group nothing drawn is read under, which the tree drops.
-        let again = Read::Again(self.layout.tree.group(None, Tag::Div));
-        for band in 1..row_bands.len() {
-            let mut y = 0.0;
-            for &at in &repeated {
-                for column_index in 0..columns.len() {
-                    let x = left + column_at[column_index] * share;
-                    let items =
-                        self.cell(&grid, (at, column_index), (x, y), clip(column_index), again)?;
-                    pages[page_of(band, column_band[column_index])]
-                        .items
-                        .extend(items.into_iter().map(|item| (top, item.decoration())));
+        if !repeated.is_empty() {
+            let again = Read::Again(self.layout.tree.group(None, Tag::Div));
+            for band in 1..row_bands.len() {
+                let mut y = 0.0;
+                for &at in &repeated {
+                    for column_index in 0..columns.len() {
+                        let x = left + column_at[column_index] * share;
+                        let items = self.cell(
+                            &grid,
+                            (at, column_index),
+                            (x, y),
+                            clip(column_index),
+                            again,
+                        )?;
+                        pages[page_of(band, column_band[column_index])]
+                            .items
+                            .extend(items.into_iter().map(|item| (top, item.decoration())));
+                    }
+                    y += heights[at] * share;
                 }
-                y += heights[at] * share;
             }
         }
 
