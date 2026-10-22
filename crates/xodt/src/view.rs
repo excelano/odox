@@ -324,6 +324,6 @@ impl TextView {
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);
         }
-        ctx.set_fonts(fonts::for_document(&parts));
+        fonts::install(ctx, &parts);
     }
 }

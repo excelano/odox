@@ -102,7 +102,7 @@ impl View for SheetView {
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);
         }
-        ctx.set_fonts(fonts::for_document(&parts));
+        fonts::install(ctx, &parts);
 
         // The first sheet a person can see, which is not always the first sheet:
         // a workbook may open on a hidden one.
