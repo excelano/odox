@@ -252,12 +252,21 @@ fn ask(
                             .href
                             .as_deref()
                             .and_then(|href| pictures.get(ctx, document, href));
-                        if let Some(texture) = texture {
-                            ui.add(
-                                egui::Image::new(texture)
-                                    .max_size(egui::vec2(96.0, 72.0))
-                                    .maintain_aspect_ratio(true),
-                            );
+                        // A slot of one size whatever the picture's shape, so
+                        // that the fields beside the pictures line up.
+                        let slot = egui::vec2(96.0, 72.0);
+                        match texture {
+                            Some(texture) => {
+                                ui.add_sized(
+                                    slot,
+                                    egui::Image::new(texture)
+                                        .max_size(slot)
+                                        .maintain_aspect_ratio(true),
+                                );
+                            }
+                            None => {
+                                ui.allocate_space(slot);
+                            }
                         }
                         ui.vertical(|ui| {
                             ui.add_enabled(

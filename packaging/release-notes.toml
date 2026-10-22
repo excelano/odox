@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.7.0"
+version = "0.8.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Export as PDF/UA: File > Export as PDF/UA… writes the document as a PDF that conforms to PDF/UA-1, the standard for accessible PDF, with its headings, lists, tables, links and pictures tagged in reading order and its fonts embedded. The window keeps its one continuous page; the PDF is laid out on the paper and margins of the document's own page style. A picture with no description is asked about first, and the answer is saved into the document."
+whats-new = "A character typed or pasted that none of the document's fonts has, such as the first Chinese or Japanese character in a document that held none, is drawn from a font on your computer that has it rather than as a box. When an export asks about pictures without a description, the fields beside them now line up whatever each picture's shape."
 
 [products.xodt.locales.de-de]
-whats-new = "Export als PDF/UA: Datei > Als PDF/UA exportieren… schreibt das Dokument als PDF nach PDF/UA-1, der Norm für barrierefreies PDF, mit Überschriften, Listen, Tabellen, Links und Bildern in Lesereihenfolge ausgezeichnet und eingebetteten Schriften. Das Fenster behält seine eine durchgehende Seite; das PDF wird auf Papier und Ränder der eigenen Seitenvorlage gesetzt. Nach einem Bild ohne Beschreibung wird zuerst gefragt, und die Antwort wird im Dokument gespeichert."
+whats-new = "Ein getipptes oder eingefügtes Zeichen, das keine Schrift des Dokuments hat, etwa das erste chinesische oder japanische Zeichen in einem Dokument ohne solche, wird mit einer Schrift Ihres Computers gezeichnet, die es hat, statt als Kästchen. Fragt ein Export nach Bildern ohne Beschreibung, stehen die Felder daneben jetzt bündig, gleich welche Form jedes Bild hat."
 
 [products.xods.locales.en-us]
-whats-new = "Built with this release's shared library. Nothing in Odox Grid changes."
+whats-new = "Export as PDF/UA: File > Export as PDF/UA… writes the workbook as a PDF that conforms to PDF/UA-1, the standard for accessible PDF. Each sheet that is shown becomes a table a screen reader reads cell by cell, under the sheet's name and with its header row marked, printed as its page style asks: its print range or the cells in use, across as many pages as it takes or fitted to the pages it names, with its header rows at the top of each. A sheet the document hides is no longer shown as a tab, and a character typed that none of the document's fonts has is drawn rather than shown as a box."
 
 [products.xods.locales.de-de]
-whats-new = "Mit der gemeinsamen Bibliothek dieser Version gebaut. An Odox Grid ändert sich nichts."
+whats-new = "Export als PDF/UA: Datei > Als PDF/UA exportieren… schreibt das Tabellendokument als PDF nach PDF/UA-1, der Norm für barrierefreies PDF. Jedes sichtbare Blatt wird zu einer Tabelle, die ein Bildschirmleser Zelle für Zelle vorliest, unter dem Namen des Blatts und mit ausgezeichneter Kopfzeile, gedruckt nach seiner Seitenvorlage: sein Druckbereich oder die belegten Zellen, über so viele Seiten wie nötig oder auf die genannte Seitenzahl eingepasst, mit den Kopfzeilen oben auf jeder Seite. Ein Blatt, das das Dokument ausblendet, erscheint nicht mehr als Reiter, und ein getipptes Zeichen, das keine Schrift des Dokuments hat, wird gezeichnet statt als Kästchen gezeigt."
 
 [products.xodp.locales.en-us]
-whats-new = "Built with this release's shared library. Nothing in Odox Deck changes."
+whats-new = "Export as PDF/UA: File > Export as PDF/UA… writes the deck as a PDF that conforms to PDF/UA-1, the standard for accessible PDF: a page per slide as it is drawn, with each slide's title, text, lists and pictures tagged so that a screen reader reads them in order, title first, and the fonts inside the file. Slides the show skips are left out, and so are the speaker's notes. A picture with no description is asked about first, and the answer is saved into the deck. A character typed that none of the deck's fonts has is drawn rather than shown as a box."
 
 [products.xodp.locales.de-de]
-whats-new = "Mit der gemeinsamen Bibliothek dieser Version gebaut. An Odox Deck ändert sich nichts."
+whats-new = "Export als PDF/UA: Datei > Als PDF/UA exportieren… schreibt den Foliensatz als PDF nach PDF/UA-1, der Norm für barrierefreies PDF: eine Seite je Folie, wie sie gezeichnet wird, mit Titel, Text, Listen und Bildern so ausgezeichnet, dass ein Bildschirmleser sie in Lesereihenfolge vorliest, den Titel zuerst, und mit eingebetteten Schriften. Ausgeblendete Folien bleiben weg, ebenso die Notizen. Nach einem Bild ohne Beschreibung wird zuerst gefragt, und die Antwort wird im Foliensatz gespeichert. Ein getipptes Zeichen, das keine Schrift des Foliensatzes hat, wird gezeichnet statt als Kästchen gezeigt."

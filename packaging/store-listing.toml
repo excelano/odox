@@ -13,7 +13,7 @@
 # apple.keywords 100 including the commas, description 4,000 - the Microsoft
 # Store allows 10,000 and this is written to Apple's - microsoft.short-description
 # 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30, apple-review-notes
-# and microsoft-review-notes 4,000 each.
+# 4,000 and microsoft-review-notes 2,000.
 #
 # What is *not* here is what changed in this release. That is
 # release-notes.toml, which is rewritten every time; this changes when a
@@ -195,7 +195,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well.
 
-Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited; once anything in the sheet has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere; nothing else is written, except one preference, in a settings file, when it is changed in the menu. CFBundleTypeRole is Editor.
+Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited; once anything in the sheet has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel; nothing else is written, except one preference, in a settings file, when it is changed in the menu. CFBundleTypeRole is Editor.
 
 Odox Grid declares its one OpenDocument type at rank Alternate rather than Default or Owner. OpenDocument is an OASIS standard this project reads and does not own, on a machine that may well have a full office suite already claiming it, so the application adds itself to the list a person can choose from and does not ask to be preferred.
 
@@ -213,7 +213,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Grid under Open With, or launch the application and use Open.
 
-Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited; once anything in the sheet has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere.
+Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A cell that holds a formula is kept as it is and not edited; once anything in the sheet has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .ods association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -224,9 +224,11 @@ Odox Grid opens an OpenDocument spreadsheet, lets you change the cells that need
 
 It is a lightweight editor and not a spreadsheet application. Typing on the cell you picked replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts and deletes rows and columns, and the formulas that name the cells it moves follow them. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited, and once anything in the sheet has changed every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. There is no recent-documents list and no cache.
 
-It draws the sheet at the document's own column widths and row heights, with the cell styles the document carries, and shows numbers, dates and booleans the way the document says to show them. There is one tab per sheet, and picking a cell shows the formula behind it above the grid. Take the whole sheet as tab-separated text in one command and paste it wherever you need it.
+It draws the sheet at the document's own column widths and row heights, with the cell styles the document carries, and shows numbers, dates and booleans the way the document says to show them. There is one tab per sheet, and picking a cell shows the formula behind it above the grid.
 
 A spreadsheet often has a gap in it, a run of ten thousand empty rows between one block of figures and the next, and a reader that turns that gap into ten thousand rows in memory is slow to open and slow to scroll. Odox Grid keeps the gap as the document writes it, which is why a sparse sheet opens as fast as a dense one.
+
+File > Export as PDF/UA… writes the workbook as an accessible PDF that conforms to PDF/UA-1: each sheet that is shown a tagged table with its header row, printed as its page style asks.
 
 It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
 
@@ -266,6 +268,7 @@ features = [
     "Insert and delete rows and columns from the Sheet menu; formulas that name the cells follow them, and a change that would break one is refused",
     "Formulas are kept and not edited; once anything has changed their results are drawn faint until a spreadsheet application recalculates them",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
+    "Export as PDF/UA-1, the standard for accessible PDF: each sheet a tagged table with its header row, printed as its page style asks, fonts embedded, checked as it is written",
     "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
     "No network connection of any kind, no account, and no telemetry",
     "Follows your desktop's light or dark setting",
@@ -280,9 +283,11 @@ Odox Grid öffnet ein OpenDocument-Tabellendokument, lässt Sie die Zellen ände
 
 Es ist ein leichter Editor und keine Tabellenkalkulation. Tippen auf der gewählten Zelle ersetzt sie, Enter oder F2 öffnet sie mit ihrem Inhalt, Entf leert sie, und Rückgängig nimmt alles zurück. Ziehen, oder Umschalt mit den Pfeiltasten, wählt einen Bereich, den Strg+C und Strg+X als tabulatorgetrennten Text übernehmen und Strg+V ab der gewählten Zelle einfügt; Entf leert den Bereich. Strg+F sucht Text in jedem Blatt und Strg+H ersetzt ihn in den Zellen mit Text. Das Menü Blatt fügt Zeilen und Spalten ein und löscht sie, und die Formeln, die auf verschobene Zellen verweisen, folgen ihnen. Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text. Eine Zelle mit einer Formel bleibt, wie sie ist, und wird nicht bearbeitet; sobald sich im Blatt etwas geändert hat, wird das Ergebnis jeder Formel blass gezeichnet, bis eine Tabellenkalkulation es neu berechnet, was LibreOffice beim Öffnen der Datei tut. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Es gibt keine Liste zuletzt geöffneter Dokumente und keinen Zwischenspeicher.
 
-Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt. Es gibt einen Reiter je Tabellenblatt, und wer eine Zelle wählt, sieht die Formel dahinter über dem Gitter. Mit einem Befehl übernehmen Sie das ganze Blatt als tabulatorgetrennten Text und fügen es ein, wo Sie es brauchen.
+Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt. Es gibt einen Reiter je Tabellenblatt, und wer eine Zelle wählt, sieht die Formel dahinter über dem Gitter.
 
 Ein Tabellendokument hat oft eine Lücke: einen Lauf von zehntausend leeren Zeilen zwischen zwei Zahlenblöcken. Ein Programm, das daraus zehntausend Zeilen im Speicher macht, öffnet langsam und rollt langsam. Odox Grid behält die Lücke so, wie das Dokument sie schreibt, und deshalb öffnet ein dünn besetztes Blatt so schnell wie ein dichtes.
+
+Datei > Als PDF/UA exportieren… schreibt das Tabellendokument als barrierefreies PDF nach PDF/UA-1: jedes sichtbare Blatt eine ausgezeichnete Tabelle mit Kopfzeile, gedruckt nach seiner Seitenvorlage.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
@@ -322,6 +327,7 @@ features = [
     "Zeilen und Spalten im Menü Blatt einfügen und löschen; Formeln, die auf die Zellen verweisen, folgen ihnen, und eine Änderung, die eine zerstören würde, wird abgelehnt",
     "Formeln bleiben erhalten und werden nicht bearbeitet; sobald sich etwas geändert hat, werden ihre Ergebnisse blass gezeichnet, bis eine Tabellenkalkulation sie neu berechnet",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
+    "Export als PDF/UA-1, der Norm für barrierefreies PDF: jedes Blatt eine ausgezeichnete Tabelle mit Kopfzeile, gedruckt nach seiner Seitenvorlage, Schriften eingebettet, beim Schreiben geprüft",
     "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
     "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
@@ -341,7 +347,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere; nothing else is written, except one preference, in a settings file, when it is changed in the menu. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build. CFBundleTypeRole is Editor.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel, asking first about the two pictures in this deck that have no description; nothing else is written, except one preference, in a settings file, when it is changed in the menu. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build. CFBundleTypeRole is Editor.
 
 Odox Deck declares its one OpenDocument type at rank Alternate rather than Default or Owner. OpenDocument is an OASIS standard this project reads and does not own, on a machine that may well have a full office suite already claiming it, so the application adds itself to the list a person can choose from and does not ask to be preferred.
 
@@ -359,7 +365,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Deck under Open With, or launch the application and use Open.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA asks about the deck's two undescribed pictures, then writes a PDF. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .odp association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -373,6 +379,8 @@ It is a lightweight editor and not a presentation application. A deck opens read
 It draws each slide at the size the document sets. Behind the slide's own text and pictures is the master page: the ground it fills and the decorations a template puts on every slide, which is most of what makes a deck look like the template it was built from. The shapes are drawn from the geometry the document states rather than approximated into rectangles, which covers paths, custom shapes with their own formulas, connectors routed between the shapes they join, and the labels a shape carries. The speaker's notes sit underneath the slide and a list of slides beside it.
 
 How well it draws is measured rather than asserted. Every slide of the templates in its corpus is rendered by Odox Deck and by LibreOffice from the same file, and the two are compared colour by colour, because a renderer is the kind of thing that passes every test and still looks wrong.
+
+File > Export as PDF/UA… writes the deck as an accessible PDF that conforms to PDF/UA-1: a page per slide, titles, text and pictures tagged in reading order; a picture with no description is asked about first.
 
 It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
 
@@ -413,6 +421,7 @@ features = [
     "A Slide menu to duplicate, move and delete slides, each one step to undo; a slide's links to other slides go where they say",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
     "What you did not touch is written back as it was read, element for element, the master page and the template's decorations included",
+    "Export as PDF/UA-1, the standard for accessible PDF: a page per slide, titles, text and pictures tagged in reading order, fonts embedded, checked as it is written",
     "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference in a settings file, only when you change it",
     "No network connection of any kind, no account, and no telemetry",
     "Follows your desktop's light or dark setting",
@@ -430,6 +439,8 @@ Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffn
 Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt. Hinter dem Text und den Bildern der Folie liegt die Masterfolie: der Grund, den sie füllt, und die Verzierungen, die eine Vorlage auf jede Folie legt, und das ist das meiste von dem, was einen Foliensatz nach seiner Vorlage aussehen lässt. Die Formen werden aus der Geometrie gezeichnet, die das Dokument angibt, statt zu Rechtecken angenähert zu werden: Pfade, benutzerdefinierte Formen mit ihren eigenen Formeln, Verbinder zwischen den Formen, die sie verknüpfen, und die Beschriftung, die eine Form trägt. Die Notizen stehen unter der Folie, eine Liste der Folien daneben.
 
 Wie gut gezeichnet wird, ist gemessen und nicht behauptet. Jede Folie der Vorlagen im Prüfbestand wird von Odox Deck und von LibreOffice aus derselben Datei gezeichnet, und beide werden Farbe für Farbe verglichen, denn ein Zeichner ist genau die Art von Sache, die jeden Test besteht und trotzdem falsch aussieht.
+
+Der Export als PDF/UA schreibt den Foliensatz als barrierefreies PDF (PDF/UA-1): eine Seite je Folie, Titel, Text und Bilder in Lesereihenfolge ausgezeichnet; ein Bild ohne Beschreibung wird vorher erfragt.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
@@ -470,6 +481,7 @@ features = [
     "Ein Menü Folie zum Duplizieren, Verschieben und Löschen von Folien, jedes in einem Schritt rückgängig zu machen; Verweise einer Folie auf andere Folien führen dorthin",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
     "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, Masterfolie und Verzierungen der Vorlage eingeschlossen",
+    "Export als PDF/UA-1, der Norm für barrierefreies PDF: eine Seite je Folie, Titel, Text und Bilder in Lesereihenfolge ausgezeichnet, Schriften eingebettet, beim Schreiben geprüft",
     "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung in einer Einstellungsdatei, nur wenn Sie sie ändern",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
     "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
