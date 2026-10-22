@@ -115,3 +115,10 @@ convert odt:writer8 export.odt "OpenDocument Text Flat XML" export.fodt
 # master-page decoration. Flat ODF by hand, for the same reason as the text
 # document above.
 convert odp:impress8 export.odp "OpenDocument Presentation Flat XML" export.fodp
+
+# A spreadsheet for the PDF export: a sheet wider and longer than a page with
+# a marked header row, a hidden row and column and a merged cell; a sheet with
+# a print range fitted to one page; a hidden sheet and an empty one. Flat ODF
+# by hand, because no text format Calc imports carries header rows, print
+# ranges or page styles.
+convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods

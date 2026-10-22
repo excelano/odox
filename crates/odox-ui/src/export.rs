@@ -219,7 +219,9 @@ fn refused(refusal: &Refusal) -> String {
             t("No font on this computer has the character {character}."),
             &[("character", &character.to_string())],
         ),
-        Refusal::Empty => t("There is nothing to export: every slide is hidden.").to_owned(),
+        Refusal::Empty => {
+            t("There is nothing to export: nothing in the document is shown.").to_owned()
+        }
         Refusal::Writer(reason) => fill(
             t("The PDF could not be written: {reason}"),
             &[("reason", reason)],

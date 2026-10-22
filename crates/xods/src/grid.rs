@@ -10,16 +10,9 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use odox_core::doc::{Sheet, SheetDocument};
-
-/// A row's height when neither the row nor its style gives one, in ODF points.
-///
-/// The height a spreadsheet gives a row of text at its default size, which is
-/// what an application shows for a sheet nobody has resized.
-const DEFAULT_ROW: f32 = 13.0;
-
-/// A column's width when nothing gives one, in ODF points.
-const DEFAULT_COLUMN: f32 = 64.0;
+use odox_core::doc::{
+    DEFAULT_COLUMN_WIDTH as DEFAULT_COLUMN, DEFAULT_ROW_HEIGHT as DEFAULT_ROW, Sheet, SheetDocument,
+};
 
 /// The smallest a row or column may be drawn and still be found by a pointer.
 const MINIMUM: f32 = 4.0;

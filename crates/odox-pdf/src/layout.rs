@@ -112,6 +112,12 @@ pub(crate) enum Item {
         image: krilla::image::Image,
         leaf: Option<LeafId>,
     },
+    /// Something drawn only inside the rectangle `(x, y, width, height)`: a
+    /// spreadsheet cell's text, cut at the cell's edge as the window cuts it.
+    Clipped {
+        rect: (f32, f32, f32, f32),
+        item: Box<Item>,
+    },
     /// The area of a link that a click follows.
     Link {
         x: f32,
@@ -195,6 +201,11 @@ impl Item {
                 origin.0 += dx;
                 origin.1 += dy;
             }
+            Self::Clipped { rect, item } => {
+                rect.0 += dx;
+                rect.1 += dy;
+                **item = (**item).clone().shifted(dx, dy);
+            }
         }
         self
     }
@@ -207,6 +218,7 @@ impl Item {
             | Self::Image { leaf, .. }
             | Self::Shape { leaf, .. }
             | Self::Placed { leaf, .. } => *leaf = None,
+            Self::Clipped { item, .. } => **item = (**item).clone().decoration(),
             _ => {}
         }
         self
@@ -222,6 +234,7 @@ impl Item {
             Self::Rule { from, to, .. } => (from.1.min(to.1), from.1.max(to.1)),
             Self::Empty { y, .. } => (*y, *y),
             Self::Shape { span, .. } => *span,
+            Self::Clipped { item, .. } => item.extent(),
             Self::Placed {
                 origin,
                 across,

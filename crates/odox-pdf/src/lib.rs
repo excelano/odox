@@ -17,6 +17,7 @@ mod fonts;
 mod layout;
 mod model;
 mod odp;
+mod ods;
 mod odt;
 mod tags;
 mod text;
@@ -38,7 +39,7 @@ use krilla::paint::{Fill, FillRule, Stroke};
 use krilla::surface::Surface;
 use krilla::tagging::{Artifact, ArtifactType, ContentTag, Identifier, SpanTag};
 use krilla::{Document as Pdf, SerializeSettings};
-use odox_core::doc::{Presentation, TextDocument};
+use odox_core::doc::{Presentation, SheetDocument, TextDocument};
 use odox_core::{Color, Document, Element, Ns};
 
 use fonts::Faces;
@@ -77,7 +78,8 @@ pub enum Refusal {
     Font(String),
     /// A character no face on the machine has.
     Glyph(char),
-    /// Nothing would be drawn: every slide is left out of the show.
+    /// Nothing would be drawn: every slide is left out of the show, or no
+    /// sheet that is shown holds anything.
     Empty,
     /// The writer could not produce a conforming file, with its reason.
     Writer(String),
@@ -140,6 +142,24 @@ impl Exportable for TextDocument {
 
     fn export(&self, options: &Options) -> Result<Exported, Refusal> {
         odt::export(self, options)
+    }
+}
+
+impl Exportable for SheetDocument {
+    fn document(&self) -> &Document {
+        &self.document
+    }
+
+    fn document_mut(&mut self) -> &mut Document {
+        &mut self.document
+    }
+
+    fn undescribed(&self) -> Vec<Vec<usize>> {
+        ods::undescribed(self)
+    }
+
+    fn export(&self, options: &Options) -> Result<Exported, Refusal> {
+        ods::export(self, options)
     }
 }
 
@@ -459,6 +479,22 @@ fn draw(
             if let Some(leaf) = leaf {
                 drawn.insert(*leaf, id);
             }
+        }
+        Item::Clipped {
+            rect: (x, y, width, height),
+            item,
+        } => {
+            let Some(rect) = Rect::from_xywh(*x, top + y, *width, *height) else {
+                return;
+            };
+            let mut path = PathBuilder::new();
+            path.push_rect(rect);
+            let Some(path) = path.finish() else {
+                return;
+            };
+            surface.push_clip_path(&path, &FillRule::NonZero);
+            draw(surface, item, top, faces, drawn, links);
+            surface.pop();
         }
         Item::Empty { leaf, .. } => {
             let id = surface.start_tagged(ContentTag::Other);

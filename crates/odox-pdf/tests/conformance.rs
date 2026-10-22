@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use odox_core::doc::{Presentation, TextDocument};
+use odox_core::doc::{Presentation, SheetDocument, TextDocument};
 use odox_core::edit;
 use odox_pdf::{Exportable, Options, Refusal};
 
@@ -100,6 +100,11 @@ fn conforms<D: Exportable>(extension: &str, read: fn(&[u8]) -> Result<D, odox_co
 #[test]
 fn every_text_document_in_the_corpus_exports_as_pdf_ua() {
     conforms("odt", TextDocument::read);
+}
+
+#[test]
+fn every_spreadsheet_in_the_corpus_exports_as_pdf_ua() {
+    conforms("ods", SheetDocument::read);
 }
 
 #[test]

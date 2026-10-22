@@ -210,6 +210,25 @@ fn read_end(text: &str) -> Option<End> {
     })
 }
 
+/// A range of cells as `table:print-ranges` writes one, `Sheet1.A1:Sheet1.D9`
+/// or one cell alone, as its first and last cell, each `(row, column)`
+/// counting from zero.
+pub(super) fn read_area(text: &str) -> Option<((usize, usize), (usize, usize))> {
+    let ends: Vec<End> = split_range(text)
+        .into_iter()
+        .map(read_end)
+        .collect::<Option<_>>()?;
+    let cell = |end: &End| Some((end.row?.index, end.column?.index));
+    match ends.as_slice() {
+        [only] => cell(only).map(|at| (at, at)),
+        [from, to] => {
+            let (a, b) = (cell(from)?, cell(to)?);
+            Some(((a.0.min(b.0), a.1.min(b.1)), (a.0.max(b.0), a.1.max(b.1))))
+        }
+        _ => None,
+    }
+}
+
 fn write_end(end: &End) -> String {
     let mut out = end.sheet_text.clone();
     if let Some(column) = end.column {

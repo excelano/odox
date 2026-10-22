@@ -20,7 +20,7 @@ use odox_core::{
 use odox_fonts::Variant;
 
 /// The size text is drawn at where a document names none, as in the window.
-const DEFAULT_SIZE: f32 = 12.0;
+pub(crate) const DEFAULT_SIZE: f32 = 12.0;
 /// How large a superscript or subscript is, as a proportion of its run.
 pub(crate) const SCRIPT_SCALE: f32 = 0.58;
 /// How large a footnote's citation is, as a proportion of its run.
@@ -639,13 +639,13 @@ fn is_invisible(c: char) -> bool {
     matches!(c, '\u{200B}'..='\u{200F}' | '\u{2060}'..='\u{2064}' | '\u{FEFF}')
 }
 
-fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
+pub(crate) fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
     properties
         .size
         .map_or(inherited, |measure| measure.resolve(inherited))
 }
 
-fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
+pub(crate) fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
     let (scale, rise) = match properties.position {
         Some(Position::Super) => (SCRIPT_SCALE, size * 0.33),
         Some(Position::Sub) => (SCRIPT_SCALE, -size * 0.08),

@@ -258,6 +258,6 @@ fn presentation_default() -> PageLayout {
     PageLayout {
         width: portrait.height,
         height: portrait.width,
-        margin: portrait.margin,
+        ..portrait
     }
 }

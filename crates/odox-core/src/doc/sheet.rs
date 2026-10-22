@@ -13,12 +13,22 @@
 mod restructure;
 pub use restructure::{Blocked, Restructure};
 
+use std::ops::Range;
+
 use super::Document;
 use crate::edit::Refused;
 use crate::media_type;
 use crate::value::Length;
 use crate::xml::{Element, Name, Node, Ns};
-use crate::{Error, Family, Properties};
+use crate::{Error, Family, PageLayout, Properties};
+
+/// A row's height when neither the row nor its style gives one, in points:
+/// the height a spreadsheet gives a row of text at its default size, which
+/// is what an application shows for a sheet nobody has resized.
+pub const DEFAULT_ROW_HEIGHT: f32 = 13.0;
+
+/// A column's width when nothing gives one, in points.
+pub const DEFAULT_COLUMN_WIDTH: f32 = 64.0;
 
 /// An `OpenDocument` spreadsheet.
 pub struct SheetDocument {
@@ -66,6 +76,12 @@ struct RowRange {
     count: usize,
     /// Where the `table:table-row` element is, relative to the `table:table`.
     path: RowPath,
+    /// Whether the rows are shown, from `table:visibility`: a row collapsed
+    /// in an outline or hidden by a filter is not.
+    visible: bool,
+    /// Whether the rows are the sheet's header, `table:table-header-rows`,
+    /// which a printed sheet repeats at the top of every page.
+    header: bool,
 }
 
 /// Where a row element sits under its table.
@@ -441,6 +457,45 @@ impl SheetDocument {
             .row_height
     }
 
+    /// The page a sheet is printed on: the page layout of the master page
+    /// its table style names, or of the document's first master page.
+    pub fn page_layout(&self, sheet: &Sheet) -> PageLayout {
+        let styles = &self.document.styles;
+        let named = self
+            .table(sheet)
+            .and_then(|table| table.attr(&Ns::Table, "style-name"))
+            .and_then(|name| styles.style(&Family::Table, name))
+            .and_then(|style| style.element.attr(&Ns::Style, "master-page-name"));
+        let first = self
+            .document
+            .styles_part
+            .as_ref()
+            .and_then(|part| part.child(&Ns::Office, "master-styles"))
+            .and_then(|masters| masters.child(&Ns::Style, "master-page"))
+            .and_then(|master| master.attr(&Ns::Style, "name"));
+        named
+            .or(first)
+            .and_then(|name| styles.page_layout_of(name))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The part of a sheet it prints, from `table:print-ranges`, as rows and
+    /// columns counting from zero: the smallest rectangle holding every
+    /// range it names. `None` where it names none, or none that can be read.
+    pub fn print_range(&self, sheet: &Sheet) -> Option<(Range<usize>, Range<usize>)> {
+        let ranges = self.table(sheet)?.attr(&Ns::Table, "print-ranges")?;
+        let read: Vec<((usize, usize), (usize, usize))> = ranges
+            .split_whitespace()
+            .filter_map(super::refs::read_area)
+            .collect();
+        let top = read.iter().map(|(from, _)| from.0).min()?;
+        let left = read.iter().map(|(from, _)| from.1).min()?;
+        let bottom = read.iter().map(|(_, to)| to.0).max()?;
+        let right = read.iter().map(|(_, to)| to.1).max()?;
+        Some((top..bottom + 1, left..right + 1))
+    }
+
     /// The resolved style of a cell: the style it names, or the one its column
     /// gives every cell that names none.
     pub fn cell_style(
@@ -475,6 +530,23 @@ impl Sheet {
             })
             .ok()?;
         self.rows.get(found)
+    }
+
+    /// Whether a row is shown: not collapsed in an outline or hidden by a
+    /// filter.
+    pub fn row_shown(&self, row: usize) -> bool {
+        self.row_range(row).is_none_or(|range| range.visible)
+    }
+
+    /// Whether a row is one of the sheet's header rows, which a printed
+    /// sheet repeats at the top of every page.
+    pub fn is_header_row(&self, row: usize) -> bool {
+        self.row_range(row).is_some_and(|range| range.header)
+    }
+
+    /// Whether a column is shown.
+    pub fn column_shown(&self, column: usize) -> bool {
+        self.columns.get(column).is_none_or(|c| c.visible)
     }
 
     /// The width of a column, where its column style gives one.
@@ -776,7 +848,7 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         used_rows: 0,
         used_columns: 0,
     };
-    index.walk(table, &mut Vec::new());
+    index.walk(table, &mut Vec::new(), false);
 
     Sheet {
         name: table
@@ -786,10 +858,25 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         columns: index.columns,
         used_rows: index.used_rows,
         used_columns: index.used_columns,
-        visible: table.attr(&Ns::Table, "display").unwrap_or("true") != "false",
+        visible: shown(document, table),
         rows: index.rows,
         table: position,
     }
+}
+
+/// Whether a sheet is shown: `table:display` in its table style's
+/// properties, which is where ODF puts it, or on the table itself, where an
+/// older producer wrote it.
+fn shown(document: &Document, table: &Element) -> bool {
+    let from_style = table
+        .attr(&Ns::Table, "style-name")
+        .and_then(|name| document.styles.style(&Family::Table, name))
+        .and_then(|style| style.element.child(&Ns::Style, "table-properties"))
+        .and_then(|properties| properties.attr(&Ns::Table, "display"));
+    from_style
+        .or_else(|| table.attr(&Ns::Table, "display"))
+        .unwrap_or("true")
+        != "false"
 }
 
 /// The state of one sheet's indexing pass.
@@ -808,7 +895,7 @@ impl Index<'_> {
     ///
     /// `path` is the route from the table to whatever is being walked, and is the
     /// route a lookup will take back.
-    fn walk(&mut self, parent: &Element, path: &mut Vec<usize>) {
+    fn walk(&mut self, parent: &Element, path: &mut Vec<usize>, header: bool) {
         for (child_index, child) in parent.children.iter().enumerate() {
             let crate::xml::Node::Element(element) = child else {
                 continue;
@@ -818,7 +905,7 @@ impl Index<'_> {
                 self.column(element);
             } else if element.is(&Ns::Table, "table-row") {
                 path.push(child_index);
-                self.row(element, path);
+                self.row(element, path, header);
                 path.pop();
             } else if is_row_container(element) || is_column_container(element) {
                 // A header band or an outline group holds rows and columns that
@@ -826,7 +913,11 @@ impl Index<'_> {
                 // grouping itself is what a view would draw a collapse handle
                 // for, and the tree still carries it.
                 path.push(child_index);
-                self.walk(element, path);
+                self.walk(
+                    element,
+                    path,
+                    header || element.is(&Ns::Table, "table-header-rows"),
+                );
                 path.pop();
             }
         }
@@ -859,7 +950,7 @@ impl Index<'_> {
         }
     }
 
-    fn row(&mut self, element: &Element, path: &[usize]) {
+    fn row(&mut self, element: &Element, path: &[usize], header: bool) {
         let repeat = element
             .attr_usize(&Ns::Table, "number-rows-repeated")
             .unwrap_or(1)
@@ -872,6 +963,8 @@ impl Index<'_> {
             first: self.at_row,
             count: repeat,
             path: RowPath::of(path),
+            visible: element.attr(&Ns::Table, "visibility").unwrap_or("visible") == "visible",
+            header,
         });
         self.at_row += repeat;
     }

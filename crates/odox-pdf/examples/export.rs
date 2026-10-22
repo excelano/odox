@@ -1,25 +1,26 @@
 //! Export one document to PDF/UA from the command line, marking every figure
 //! with nothing to say as decorative:
-//! `cargo run -p odox-pdf --example export -- in.odp out.pdf`.
+//! `cargo run -p odox-pdf --example export -- in.ods out.pdf`.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
 use std::path::Path;
 
-use odox_core::doc::{Presentation, TextDocument};
+use odox_core::doc::{Presentation, SheetDocument, TextDocument};
 use odox_core::edit;
 use odox_pdf::Exportable;
 
 fn main() {
     let mut arguments = std::env::args().skip(1);
     let (Some(input), Some(output)) = (arguments.next(), arguments.next()) else {
-        eprintln!("usage: export <in.odt|in.odp> <out.pdf>");
+        eprintln!("usage: export <in.odt|in.ods|in.odp> <out.pdf>");
         std::process::exit(2);
     };
     let bytes = std::fs::read(&input).expect("the document reads");
     let result = match Path::new(&input).extension().and_then(|e| e.to_str()) {
         Some("odp") => run(Presentation::read(&bytes).expect("a presentation"), &input),
+        Some("ods") => run(SheetDocument::read(&bytes).expect("a spreadsheet"), &input),
         _ => run(TextDocument::read(&bytes).expect("a text document"), &input),
     };
     match result {
