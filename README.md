@@ -131,7 +131,8 @@ View > Freeze rows and columns keeps the rows above and the columns left of the 
 the arrows go to the edge of the data, Page Up and Page Down move a screen,
 Ctrl+Home and Ctrl+End go to the first and last used cells and Ctrl+A selects
 them, Shift with any of them stretching the selection; a selection's sum,
-average and count are shown above the grid.
+average and count are shown above the grid. A screen reader can walk the cells
+in view as a grid, and says the picked cell as it moves.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,

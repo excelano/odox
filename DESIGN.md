@@ -606,8 +606,21 @@ paragraph otherwise; the page editor adds where the caret or the selection is in
 the paragraph that holds it, counted in the galley's characters through the same
 offset map the caret uses. A selection that began in another paragraph is
 reported as a caret at its end here, because one node cannot name a position in
-another. Slide labels go through the same flow and so are told the same way. A
-sheet's grid is painted cell by cell and is not yet.
+another. Slide labels go through the same flow and so are told the same way.
+
+**A sheet's grid is told as a grid of the cells in view.** The grid is painted
+and has no widgets, so beside the painting each row in view and shown is a row
+node and each cell in it a cell node, carrying its text, its row and column with
+the names the headers give them, its bounds and whether it is selected, under a
+grid node named for the sheet with the grid's size and the picked cell as its
+active descendant; a cell under a merge is left out and the merge's own covers
+it. A node is made under another by being a `Ui` inside the other's, with its
+role set on the node egui gives every `Ui`. The grid does not take the
+keyboard's focus, which would take the keys from it, so the picked cell is also
+a polite live node saying its address and its text, which a screen reader reads
+out as the pick moves. None of it is built unless a screen reader is
+listening, which is when egui makes nodes at all. The cell editor is egui's
+text box, named for its cell.
 
 **A copy keeps its formatting, in the window and out of it.** The editor puts
 the selection on the clipboard as text and as HTML, and keeps beside them a

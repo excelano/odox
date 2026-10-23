@@ -16,6 +16,7 @@ use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Export, Found, Notice, View, fonts};
 
+use crate::access;
 use crate::grid::{Metrics, address, column_name};
 
 /// A spreadsheet, open or not.
@@ -1344,6 +1345,35 @@ impl SheetView {
                         StrokeKind::Inside,
                     );
 
+                let shown = |range: std::ops::Range<usize>, size: &dyn Fn(usize) -> f32| {
+                    range.filter(|&n| size(n) > 0.0).collect::<Vec<_>>()
+                };
+                let told = access::Told {
+                    document,
+                    sheet,
+                    rows: shown(0..frozen.0, &|r| metrics.row(r).1)
+                        .into_iter()
+                        .chain(shown(rows.clone(), &|r| metrics.row(r).1))
+                        .collect(),
+                    columns: shown(0..frozen.1, &|c| metrics.column(c).1)
+                        .into_iter()
+                        .chain(shown(columns.clone(), &|c| metrics.column(c).1))
+                        .collect(),
+                    extent: (metrics.rows.len() - 1, metrics.columns.len() - 1),
+                    picked: selected,
+                    range: (range_start, range_end),
+                };
+                access::tell(ui, &told, |row, column| {
+                    let (down, across) = metrics.extent(row, column);
+                    Rect::from_min_size(
+                        place.at(metrics, row, column),
+                        vec2(
+                            across.map(|c| metrics.column(c).1).sum(),
+                            down.map(|r| metrics.row(r).1).sum(),
+                        ),
+                    )
+                });
+
                 // The cell being typed into, as a text box where the cell is.
                 if let Some(editor) = editor.as_mut() {
                     let in_view = (editor.row < frozen.0 || rows.contains(&editor.row))
@@ -1371,6 +1401,10 @@ impl SheetView {
                                 .margin(vec2(3.0 * zoom, 0.0))
                                 .vertical_align(Align::Center),
                         );
+                        // What a screen reader calls the box: the cell.
+                        ui.ctx().accesskit_node_builder(response.id, |node| {
+                            node.set_label(address(editor.row, editor.column));
+                        });
                         if editor.opened {
                             editor.opened = false;
                             response.request_focus();
@@ -2538,6 +2572,64 @@ mod tests {
             .expect("one step");
         document.reindex();
         assert!(merged(&view, 20, 0).is_some(), "the unmerge undone");
+    }
+
+    #[test]
+    fn a_screen_reader_is_told_the_cells_in_view_and_the_picked_one() {
+        use egui::accesskit::Role;
+        let (mut view, mut editing) = opened();
+        view.pick((1, 1));
+        view.extend((2, 1));
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let document = &view.document.as_ref().expect("open").document;
+        let mut parts = vec![&document.content];
+        parts.extend(document.styles_part.as_ref());
+        ctx.set_fonts(odox_ui::fonts::for_document(&parts));
+        let input = || egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0))),
+            ..egui::RawInput::default()
+        };
+        let mut update = None;
+        for _ in 0..2 {
+            let mut output = ctx.run_ui(input(), |ui| view.grid(ui, 1.0, &mut editing));
+            output.textures_delta.clear();
+            update = output.platform_output.accesskit_update.take().or(update);
+        }
+        let update = update.expect("a tree update");
+        let node = |id: &egui::accesskit::NodeId| {
+            update
+                .nodes
+                .iter()
+                .find(|(n, _)| n == id)
+                .map(|(_, node)| node)
+                .expect("a node it names")
+        };
+        let (_, grid) = update
+            .nodes
+            .iter()
+            .find(|(_, node)| node.role() == Role::Grid)
+            .expect("a grid");
+        let rows: Vec<_> = grid.children().iter().map(node).collect();
+        assert!(rows.iter().filter(|row| row.role() == Role::Row).count() > 5);
+        let first: Vec<_> = rows[0].children().iter().map(node).collect();
+        assert_eq!(first[0].role(), Role::Cell);
+        assert_eq!(first[0].label(), Some("Item"));
+        assert_eq!(first[1].column_index_text(), Some("B"));
+
+        let picked = node(&grid.active_descendant().expect("the picked cell"));
+        assert_eq!(
+            (picked.row_index(), picked.column_index()),
+            (Some(2), Some(1))
+        );
+        assert_eq!(picked.is_selected(), Some(true));
+        assert!(
+            update.nodes.iter().any(|(_, node)| {
+                node.live() == Some(egui::accesskit::Live::Polite)
+                    && node.value() == Some("B3, 300")
+            }),
+            "the picked cell said aloud"
+        );
     }
 
     #[test]
