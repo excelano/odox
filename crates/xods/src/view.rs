@@ -9,12 +9,14 @@ use eframe::egui::{
     self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
 use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
+use odox_core::edit::html;
 use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Export, Found, Notice, View, fonts};
 
+use crate::access;
 use crate::grid::{Metrics, address, column_name};
 
 /// A spreadsheet, open or not.
@@ -356,6 +358,8 @@ enum SheetCommand {
     ShowRows,
     HideColumns,
     ShowColumns,
+    Merge,
+    Unmerge,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -517,7 +521,11 @@ impl View for SheetView {
                 (t("Hide columns"), SheetCommand::HideColumns),
                 (t("Show hidden columns"), SheetCommand::ShowColumns),
             ];
-            for group in [&entries[..], &shown[..]] {
+            let merged = [
+                (t("Merge cells"), SheetCommand::Merge),
+                (t("Unmerge cells"), SheetCommand::Unmerge),
+            ];
+            for group in [&entries[..], &shown[..], &merged[..]] {
                 for &(name, command) in group {
                     if ui.add_enabled(can, egui::Button::new(name)).clicked() {
                         self.sheet_command = Some(command);
@@ -692,6 +700,10 @@ impl SheetView {
                 self.change_shown(command, editing);
                 return;
             }
+            SheetCommand::Merge | SheetCommand::Unmerge => {
+                self.change_merged(command, editing);
+                return;
+            }
         };
         let Some(document) = &mut self.document else {
             return;
@@ -792,6 +804,49 @@ impl SheetView {
         );
         if picked != self.selected {
             self.pick(picked);
+        }
+    }
+
+    /// Merge the selection into its top left cell, or take apart the merge
+    /// the picked cell is in, as one step to undo.
+    fn change_merged(&mut self, command: SheetCommand, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let (row, column) = self.selected;
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let merge = matches!(command, SheetCommand::Merge);
+        if merge && (top, left) == (bottom, right) {
+            return;
+        }
+        if !merge && document.merge_at(sheet, row, column).is_none() {
+            return;
+        }
+        let before = document.document.content.clone();
+        let done = if merge {
+            document.merge(self.sheet, top..=bottom, left..=right)
+        } else {
+            document.unmerge(self.sheet, row, column)
+        };
+        match done {
+            Ok(()) => editing.record_snapshot(before, None),
+            Err(Refused::Structure) => {
+                self.notice =
+                    Some(t("A merged cell crosses the edge of the selection.").to_owned());
+                return;
+            }
+            Err(refused) => {
+                self.notice = Some(notice(&refused));
+                return;
+            }
+        }
+        self.metrics = None;
+        self.editor = None;
+        if merge {
+            self.pick((top, left));
         }
     }
 
@@ -1256,7 +1311,11 @@ impl SheetView {
                 // The picked cell, over everything in it.
                 let (row, column) = selected;
                 let at = place.at(metrics, row, column);
-                let size = vec2(metrics.column(column).1, metrics.row(row).1);
+                let (down, across) = metrics.extent(row, column);
+                let size = vec2(
+                    across.map(|c| metrics.column(c).1).sum(),
+                    down.map(|r| metrics.row(r).1).sum(),
+                );
                 if scroll == Scroll::Start {
                     ui.scroll_to_rect(Rect::from_min_size(area.min, vec2(1.0, 1.0)), None);
                 } else if scroll == Scroll::Picked {
@@ -1286,6 +1345,35 @@ impl SheetView {
                         StrokeKind::Inside,
                     );
 
+                let shown = |range: std::ops::Range<usize>, size: &dyn Fn(usize) -> f32| {
+                    range.filter(|&n| size(n) > 0.0).collect::<Vec<_>>()
+                };
+                let told = access::Told {
+                    document,
+                    sheet,
+                    rows: shown(0..frozen.0, &|r| metrics.row(r).1)
+                        .into_iter()
+                        .chain(shown(rows.clone(), &|r| metrics.row(r).1))
+                        .collect(),
+                    columns: shown(0..frozen.1, &|c| metrics.column(c).1)
+                        .into_iter()
+                        .chain(shown(columns.clone(), &|c| metrics.column(c).1))
+                        .collect(),
+                    extent: (metrics.rows.len() - 1, metrics.columns.len() - 1),
+                    picked: selected,
+                    range: (range_start, range_end),
+                };
+                access::tell(ui, &told, |row, column| {
+                    let (down, across) = metrics.extent(row, column);
+                    Rect::from_min_size(
+                        place.at(metrics, row, column),
+                        vec2(
+                            across.map(|c| metrics.column(c).1).sum(),
+                            down.map(|r| metrics.row(r).1).sum(),
+                        ),
+                    )
+                });
+
                 // The cell being typed into, as a text box where the cell is.
                 if let Some(editor) = editor.as_mut() {
                     let in_view = (editor.row < frozen.0 || rows.contains(&editor.row))
@@ -1313,6 +1401,10 @@ impl SheetView {
                                 .margin(vec2(3.0 * zoom, 0.0))
                                 .vertical_align(Align::Center),
                         );
+                        // What a screen reader calls the box: the cell.
+                        ui.ctx().accesskit_node_builder(response.id, |node| {
+                            node.set_label(address(editor.row, editor.column));
+                        });
                         if editor.opened {
                             editor.opened = false;
                             response.request_focus();
@@ -1545,6 +1637,14 @@ impl SheetView {
         if let Some(outcome) = outcome {
             self.finish_editing(outcome, editing);
         }
+        // A press anywhere on a merged cell picks it, at its corner.
+        let pointed = pointed.map(|(cell, extend)| match (&self.metrics, extend) {
+            (Some(metrics), false) => {
+                let (rows, columns) = metrics.extent(cell.0, cell.1);
+                ((*rows.start(), *columns.start()), false)
+            }
+            _ => (cell, extend),
+        });
         match pointed {
             Some((cell, true)) if cell != self.selected => self.extend(cell),
             Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
@@ -1692,12 +1792,13 @@ impl SheetView {
             return;
         };
         let ((top, left), (bottom, right)) = self.range();
-        ui.ctx()
-            .copy_text(text_of(document, sheet, top..bottom + 1, left..right + 1));
+        let cells = cells_of_range(document, sheet, top..bottom + 1, left..right + 1);
+        odox_ui::clipboard::put(ui.ctx(), &tab_separated(&cells), Some(&html::table(&cells)));
     }
 
-    /// Empty the selected cells. A cell under a merged neighbour holds nothing
-    /// to empty and is left; a formula refuses the whole of it.
+    /// Empty the selected cells that are shown. A cell under a merged
+    /// neighbour holds nothing to empty and is left, as is one in a hidden row
+    /// or column; a formula refuses the whole of it.
     fn clear_range(&mut self, editing: &mut Editing) {
         let ((top, left), (bottom, right)) = self.range();
         let block: Vec<Vec<Value>> = (top..=bottom)
@@ -1721,13 +1822,13 @@ impl SheetView {
     /// Write a block of values with its top left corner at a cell, as one
     /// step to undo. Nothing is written unless every cell can be: the first
     /// one that cannot is what the notice says. A block of empty values leaves
-    /// alone a cell that is not there, and with `leave_covered` one that is
-    /// under a merge. Answers whether anything was written.
+    /// alone a cell that is not there, and with `leave_unseen` one that is
+    /// under a merge or hidden. Answers whether anything was written.
     fn write_block(
         &mut self,
         (top, left): (usize, usize),
         block: &[Vec<Value>],
-        leave_covered: bool,
+        leave_unseen: bool,
         editing: &mut Editing,
     ) -> bool {
         let Some(document) = &mut self.document else {
@@ -1738,14 +1839,14 @@ impl SheetView {
         for (down, row) in block.iter().enumerate() {
             for (across, value) in row.iter().enumerate() {
                 let (r, c) = (top + down, left + across);
-                let existing = document
-                    .sheets()
-                    .get(sheet)
-                    .and_then(|sheet| document.cell(sheet, r, c));
+                let current = document.sheets().get(sheet);
+                let existing = current.and_then(|sheet| document.cell(sheet, r, c));
+                let hidden =
+                    current.is_some_and(|sheet| !sheet.row_shown(r) || !sheet.column_shown(c));
                 if matches!(value, Value::Empty)
                     && existing
                         .as_ref()
-                        .is_none_or(|cell| leave_covered && cell.covered)
+                        .is_none_or(|cell| leave_unseen && (cell.covered || hidden))
                 {
                     continue;
                 }
@@ -1839,11 +1940,16 @@ impl SheetView {
             })
         };
         let (row, column) = self.selected;
+        // A merged cell is stepped off from its far side.
+        let (rows, columns) = self
+            .metrics
+            .as_ref()
+            .map_or((row..=row, column..=column), |m| m.extent(row, column));
         let cell = match (key, jump) {
-            (Key::ArrowDown, false) => (row + 1, column),
-            (Key::ArrowUp, false) => (row.saturating_sub(1), column),
-            (Key::ArrowRight, false) => (row, column + 1),
-            (Key::ArrowLeft, false) => (row, column.saturating_sub(1)),
+            (Key::ArrowDown, false) => (rows.end() + 1, column),
+            (Key::ArrowUp, false) => (rows.start().saturating_sub(1), column),
+            (Key::ArrowRight, false) => (row, columns.end() + 1),
+            (Key::ArrowLeft, false) => (row, columns.start().saturating_sub(1)),
             (Key::ArrowDown, true) => (edge(row, last_row, true, |r| filled(r, column)), column),
             (Key::ArrowUp, true) => (edge(row, last_row, false, |r| filled(r, column)), column),
             (Key::ArrowRight, true) => (row, edge(column, last_column, true, |c| filled(row, c))),
@@ -1865,6 +1971,14 @@ impl SheetView {
             })
             .unwrap_or(column),
         );
+        // Onto a merged cell at its corner, unless the selection is stretching.
+        let cell = match &self.metrics {
+            Some(metrics) if !extend => {
+                let (rows, columns) = metrics.extent(cell.0, cell.1);
+                (*rows.start(), *columns.start())
+            }
+            _ => cell,
+        };
         if cell != self.selected {
             if extend {
                 self.extend(cell);
@@ -2069,16 +2183,21 @@ fn notice(refused: &Refused) -> String {
     .to_owned()
 }
 
-/// Count what a range holds, as far as the sheet has cells: a selection
-/// stretched into the empty grid past them holds nothing more.
+/// Count what a range shows, as far as the sheet has cells: a selection
+/// stretched into the empty grid past them holds nothing more, and a hidden
+/// row or column holds nothing counted.
 fn summarize(
     document: &SheetDocument,
     sheet: &Sheet,
     ((top, left), (bottom, right)): Range,
 ) -> Summary {
     let mut summary = Summary::default();
-    for row in top..=bottom.min(sheet.used_rows.saturating_sub(1)) {
-        for column in left..=right.min(sheet.used_columns.saturating_sub(1)) {
+    let rows =
+        (top..=bottom.min(sheet.used_rows.saturating_sub(1))).filter(|&r| sheet.row_shown(r));
+    for row in rows {
+        let columns = (left..=right.min(sheet.used_columns.saturating_sub(1)))
+            .filter(|&c| sheet.column_shown(c));
+        for column in columns {
             let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) else {
                 continue;
             };
@@ -2113,31 +2232,51 @@ fn shown(number: f64) -> String {
 
 /// A sheet as text, for handing to something else.
 fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
-    text_of(document, sheet, 0..sheet.used_rows, 0..sheet.used_columns)
+    tab_separated(&cells_of_range(
+        document,
+        sheet,
+        0..sheet.used_rows,
+        0..sheet.used_columns,
+    ))
 }
 
-/// Some rows and columns of a sheet as text.
-///
-/// Tab separated and taking each cell as the document displays it, because that
-/// is the string the producing application formatted and the one a person sees.
-fn text_of(
+/// The cells of the rows and columns of a sheet that are shown, each as the
+/// document displays it, because that is the string the producing application
+/// formatted and the one a person sees.
+fn cells_of_range(
     document: &SheetDocument,
     sheet: &Sheet,
     rows: std::ops::Range<usize>,
     columns: std::ops::Range<usize>,
-) -> String {
+) -> Vec<Vec<String>> {
+    rows.filter(|&r| sheet.row_shown(r))
+        .map(|row| {
+            columns
+                .clone()
+                .filter(|&c| sheet.column_shown(c))
+                .map(|column| {
+                    // A cell under a merge keeps what it held, which is not shown.
+                    document
+                        .cell(sheet, row, column)
+                        .filter(|c| !c.covered)
+                        .map(|cell| cell.text())
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Rows of cells as tab separated text. A tab or a newline inside a cell would
+/// make the row unreadable as a row, so each becomes a space.
+fn tab_separated(cells: &[Vec<String>]) -> String {
     let mut out = String::new();
-    for row in rows {
-        for (at, column) in columns.clone().enumerate() {
-            if at > 0 {
-                out.push('\t');
-            }
-            if let Some(cell) = document.cell(sheet, row, column) {
-                // A tab or a newline inside a cell would make the row unreadable
-                // as a row, so each becomes a space.
-                out.push_str(&cell.text().replace(['\t', '\n'], " "));
-            }
-        }
+    for row in cells {
+        let row: Vec<String> = row
+            .iter()
+            .map(|cell| cell.replace(['\t', '\n'], " "))
+            .collect();
+        out.push_str(&row.join("\t"));
         out.push('\n');
     }
     out
@@ -2379,6 +2518,118 @@ mod tests {
         assert_eq!(summary.numbers, 4, "12, 300, 88 and 400");
         assert_eq!(summary.filled, 5, "and the heading");
         assert!((summary.sum - 800.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn hidden_cells_are_not_copied_counted_or_cleared() {
+        let (mut view, mut editing) = opened();
+        let numbers = |view: &SheetView| {
+            let document = view.document.as_ref().expect("open");
+            (0..=40)
+                .filter(|&row| {
+                    document
+                        .cell(&document.sheets()[0], row, 1)
+                        .is_some_and(|cell| matches!(cell.value(), Value::Number(_)))
+                })
+                .collect::<Vec<_>>()
+        };
+        let row = numbers(&view)[0];
+        let kept = text_at(&view, row, 1);
+        view.pick((row, 0));
+        view.change_sheet(SheetCommand::HideRows, &mut editing);
+        let document = view.document.as_ref().expect("open");
+        let sheet = &document.sheets()[0];
+        assert_eq!(summarize(document, sheet, ((0, 1), (40, 1))).numbers, 3);
+        let text = tab_separated(&cells_of_range(document, sheet, row - 1..row + 2, 1..2));
+        assert_eq!(text.lines().count(), 2, "the hidden row left out");
+        assert!(!text.contains(&kept));
+        let after = numbers(&view)[1];
+        view.pick((row - 1, 1));
+        view.extend((after, 1));
+        view.clear_range(&mut editing);
+        assert_eq!(text_at(&view, row, 1), kept, "a hidden cell is left");
+        assert_eq!(text_at(&view, after, 1), "", "a shown one is emptied");
+    }
+
+    #[test]
+    fn a_merge_is_one_step_and_unmerges_from_any_cell_in_it() {
+        let (mut view, mut editing) = opened();
+        let merged = |view: &SheetView, row, column| {
+            let document = view.document.as_ref().expect("open");
+            document.merge_at(&document.sheets()[0], row, column)
+        };
+        view.pick((20, 0));
+        view.extend((21, 2));
+        view.change_sheet(SheetCommand::Merge, &mut editing);
+        assert_eq!(merged(&view, 21, 2), Some((20..=21, 0..=2)));
+        assert_eq!(view.range(), ((20, 0), (20, 0)), "the corner picked");
+        view.pick((21, 1));
+        view.change_sheet(SheetCommand::Unmerge, &mut editing);
+        assert!(merged(&view, 20, 0).is_none());
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&mut document.document, None)
+            .expect("one step");
+        document.reindex();
+        assert!(merged(&view, 20, 0).is_some(), "the unmerge undone");
+    }
+
+    #[test]
+    fn a_screen_reader_is_told_the_cells_in_view_and_the_picked_one() {
+        use egui::accesskit::Role;
+        let (mut view, mut editing) = opened();
+        view.pick((1, 1));
+        view.extend((2, 1));
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let document = &view.document.as_ref().expect("open").document;
+        let mut parts = vec![&document.content];
+        parts.extend(document.styles_part.as_ref());
+        ctx.set_fonts(odox_ui::fonts::for_document(&parts));
+        let input = || egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0))),
+            ..egui::RawInput::default()
+        };
+        let mut update = None;
+        for _ in 0..2 {
+            let mut output = ctx.run_ui(input(), |ui| view.grid(ui, 1.0, &mut editing));
+            output.textures_delta.clear();
+            update = output.platform_output.accesskit_update.take().or(update);
+        }
+        let update = update.expect("a tree update");
+        let node = |id: &egui::accesskit::NodeId| {
+            update
+                .nodes
+                .iter()
+                .find(|(n, _)| n == id)
+                .map(|(_, node)| node)
+                .expect("a node it names")
+        };
+        let (_, grid) = update
+            .nodes
+            .iter()
+            .find(|(_, node)| node.role() == Role::Grid)
+            .expect("a grid");
+        let rows: Vec<_> = grid.children().iter().map(node).collect();
+        assert!(rows.iter().filter(|row| row.role() == Role::Row).count() > 5);
+        let first: Vec<_> = rows[0].children().iter().map(node).collect();
+        assert_eq!(first[0].role(), Role::Cell);
+        assert_eq!(first[0].label(), Some("Item"));
+        assert_eq!(first[1].column_index_text(), Some("B"));
+
+        let picked = node(&grid.active_descendant().expect("the picked cell"));
+        assert_eq!(
+            (picked.row_index(), picked.column_index()),
+            (Some(2), Some(1))
+        );
+        assert_eq!(picked.is_selected(), Some(true));
+        assert!(
+            update.nodes.iter().any(|(_, node)| {
+                node.live() == Some(egui::accesskit::Live::Polite)
+                    && node.value() == Some("B3, 300")
+            }),
+            "the picked cell said aloud"
+        );
     }
 
     #[test]

@@ -44,6 +44,14 @@ paragraphs scrolled off screen are reported too.
 
     cargo run -p egui_richedit --example notes
 
+## The clipboard
+
+egui's clipboard carries text. To copy formatting into other programs, give the
+editor a `Clipboard` with `RichEdit::with_clipboard`, have your model write HTML
+of the fragments it makes (`Model::html`), and read HTML another program put
+there into a fragment (`Model::fragment_from_html`). Without one, a copy is
+text, and formatting survives a paste only into the editor that copied it.
+
 ## Positions
 
 A `Position` is a paragraph, named however your model likes, and a character

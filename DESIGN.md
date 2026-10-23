@@ -117,7 +117,12 @@ each shape is put where the document says. A slide is drawn back to front: the
 ground, the master page's contribution, the slide's own shapes. A child of a
 master page carrying a `presentation:class` is a slot and not a decoration: the
 slide's own frame of that class takes its place. The class is the test;
-`presentation:placeholder` is not written reliably and is not consulted.
+`presentation:placeholder` is not written reliably and is not consulted. A
+shape's text is laid over the shape's own style: where a paragraph's style and
+its spans do not say, its face, size, weight and alignment are its frame's, the
+presentation style of a placeholder or the graphic style of a drawing, which is
+where `LibreOffice` keeps a typed title's size. The window and the PDF lay it
+the same way.
 
 ## §6 Drawing
 
@@ -226,12 +231,14 @@ one in a window of its own: a window holds one document, as it does for Open.
 `odox_core::blank` writes each kind as a whole package that is then read like
 any other: a text document with one empty paragraph, a spreadsheet with one
 sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
-an empty title. The default text style is in the reader's language, and the page
+an empty title, on a master that places a title and a text frame in the common
+paragraph styles "Title" and "Text". The default text style is in the reader's language, and the page
 is Letter where the reader's country prints on it (the United States and
 Canada) and A4 elsewhere. A blank document opens in edit mode, untitled, with
 the caret in the first paragraph where the view has one; Save asks where to
 write it, offering "Untitled". On a slide being edited, an empty title or text
-placeholder says faintly what it is for.
+placeholder says faintly what it is for, and a click anywhere on it puts the
+caret in it.
 
 ## §8 Language
 
@@ -314,11 +321,12 @@ evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
 does not retype it as a number.
 
-**A selection is a range, and the clipboard carries it as text.** A press picks
-the cell under it, Shift or a drag stretches the selection to another, and the
-range is the rectangle between the two corners. Copy and cut hand over the cells
-as tab separated rows, each as it is displayed, which is what every other
-program can read; paste reads the same shape back, each cell as a typed value
+**A selection is a range, and the clipboard carries it as text and as a
+table.** A press picks the cell under it, Shift or a drag stretches the
+selection to another, and the range is the rectangle between the two corners.
+Copy and cut hand over the cells as tab separated rows, each as it is
+displayed, which is what every other program can read, and as an HTML table of
+the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a typed value
 would be read, from the top left of the selection. A paste, a cut or a delete is
 one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
@@ -330,6 +338,17 @@ inside the cell's width with each line aligned as the cell is. Either way what
 does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one
 cell, and the grid's lines stop at its edge.
+
+**A merged cell is picked, outlined and stepped over as one.** A press anywhere
+on it picks its top left corner, the outline goes round all of it, and an arrow
+leaves it from its far side. The Sheet menu merges the selection into its top
+left cell, which takes `table:number-columns-spanned` and
+`table:number-rows-spanned`, and writes each other cell as
+`table:covered-table-cell` with what it held kept, as ODF allows and
+`LibreOffice` does, so that unmerging gives each back. A merge wholly inside the
+selection becomes part of the new one; one across its edge refuses the merge.
+Unmerging takes apart the merge the picked cell is in. A copy leaves out what a
+covered cell holds, since it is not shown. Each is one step to undo.
 
 **A workbook's sheets are added, renamed, deleted and moved from the Sheet menu
 and from a tab's own menu**, and a double-click on a tab renames it; each is one
@@ -366,7 +385,9 @@ menu hides the selected rows or columns, writing "collapse" on their elements
 once the ends are split out of their runs, and shows hidden ones by removing
 the attribute: those in the selection and those next to it, so that a person
 picks a cell beside what is hidden, since it cannot be picked itself. Each is
-one step to undo.
+one step to undo. A selection is what it shows: a copy, the summary in the cell
+bar and emptying the range all leave hidden cells out, and only a paste writes
+through them, the way a block put down covers whatever is under it.
 
 **Frozen rows and columns stay in view.** A freeze is a view setting, which ODF
 has no element for and every producer writes as `LibreOffice` does, into
@@ -585,24 +606,50 @@ paragraph otherwise; the page editor adds where the caret or the selection is in
 the paragraph that holds it, counted in the galley's characters through the same
 offset map the caret uses. A selection that began in another paragraph is
 reported as a caret at its end here, because one node cannot name a position in
-another. Slide labels go through the same flow and so are told the same way. A
-sheet's grid is painted cell by cell and is not yet.
+another. Slide labels go through the same flow and so are told the same way.
 
-**A copy keeps its formatting inside the window it was made in.** The system
-clipboard carries plain text, so the editor puts the selection there as text and
-keeps beside it a `Fragment` its model made: the covered paragraphs cut to the
-range, each with its own style and kind, and the spans and links in it, without
-the ids, bookmarks, frames and notes that name one place in a document and would
-then be there twice. A paste of exactly the text it put on the clipboard is a
-paste of the fragment; any other text, a copy from another program or from
-another window, is plain. The first pasted paragraph merges into the paragraph at
+**A sheet's grid is told as a grid of the cells in view.** The grid is painted
+and has no widgets, so beside the painting each row in view and shown is a row
+node and each cell in it a cell node, carrying its text, its row and column with
+the names the headers give them, its bounds and whether it is selected, under a
+grid node named for the sheet with the grid's size and the picked cell as its
+active descendant; a cell under a merge is left out and the merge's own covers
+it. A node is made under another by being a `Ui` inside the other's, with its
+role set on the node egui gives every `Ui`. The grid does not take the
+keyboard's focus, which would take the keys from it, so the picked cell is also
+a polite live node saying its address and its text, which a screen reader reads
+out as the pick moves. None of it is built unless a screen reader is
+listening, which is when egui makes nodes at all. The cell editor is egui's
+text box, named for its cell.
+
+**A copy keeps its formatting, in the window and out of it.** The editor puts
+the selection on the clipboard as text and as HTML, and keeps beside them a
+`Fragment` its model made: the covered paragraphs cut to the range, each with its
+own style and kind, and the spans and links in it, without the ids, bookmarks,
+frames and notes that name one place in a document and would then be there
+twice. A paste of exactly the text it put on the clipboard is a paste of the
+fragment. Any other paste, from another window or another program, looks for
+HTML beside the text and reads the part of it that every program writes
+(`odox_core::edit::html`): paragraphs, headings of six levels, the items of
+bulleted and numbered lists, line breaks, and bold, italic, underline and
+strikethrough, by their tags or by a `style` attribute that says them, as a
+browser writes them; a table gives its rows as paragraphs with a tab between
+cells, and anything else gives its text. What is written is the same part, with
+links. A read paragraph's marks become the automatic styles a mark put on by
+hand would have, and its kind is made as the Format menu makes it, all in the
+paste's one undo step. The first pasted paragraph merges into the paragraph at
 the caret and takes its style, as typed text would; the ones between keep their
 own; the last merges with what followed the caret and keeps the paragraph's
-style; in a list each is an item. A model that keeps no formatting leaves the two
-`Model` methods as they are and every paste is plain. Across windows needs HTML
-on the system clipboard and is not done.
+style; in a list each is an item. Outside a list, a paragraph pasted where the
+caret has no text before it, or the last where it has none after, keeps its own
+kind, so that a heading pasted on an empty line is a heading. The clipboard is
+the system's through `arboard`, one kept for as long as the application runs;
+on Linux that is X11's, which under Wayland is Xwayland's and the desktop hands
+on, and where none can be had a copy is egui's text alone. A model that keeps
+no formatting leaves the four `Model` methods as they are and every paste is
+plain.
 
-**A deck's slides can be duplicated, deleted and moved, and not added.** A slide
+**A deck's slides can be added, duplicated, deleted and moved.** A slide
 is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and
 that name is what links, custom shows and the start page refer to it by. Moving
 swaps it with the neighbouring page and so changes nothing that refers to it.
@@ -614,10 +661,15 @@ the notes included, with the references that name those ids inside the copy
 (`draw:start-shape`, `draw:end-shape`, `smil:targetElement`) pointing at the
 copy's own. Styles are shared with the original, which is safe because a
 format edit picks or writes a style and never changes one that another span
-uses. A blank slide is not offered: it would hold only the master page's
-decorations, and nothing here adds a shape to fill it, so a duplicate is how a
-new slide is made. The Slide menu offers the four in edit mode, and each is one
-undo step with the view following the slide.
+uses. A new slide goes after the one in view, on its master, named `page` and
+the first free number from the count of slides on, with an empty title frame
+and an empty text frame where that master puts its title and outline
+placeholders, or across the page where it has none. A placeholder's own layer
+and any style only `styles.xml` can see are left behind; its paragraph style
+is kept where it is a common one. Where the slide it follows has a frame of the
+class, the new frame takes that frame's style and its first paragraph's, so a
+new title looks like the one before it. The Slide menu offers the five in edit
+mode, and each is one undo step with the view following the slide.
 
 **Rows and columns can be inserted and deleted, with the formulas that name
 them following.** A row or a column is not always one element, since

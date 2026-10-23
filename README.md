@@ -98,8 +98,9 @@ as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
 before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
-processor. Text copied in a window and pasted back into it keeps its bold, italic, underline,
-strikethrough and paragraph kinds; pasted anywhere else it is plain text. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+processor. Copied text keeps its bold, italic, underline, strikethrough, headings and lists
+pasted back into the window, into another window, or into another program that reads HTML,
+and text copied from a browser or a word processor keeps the same pasted in. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
@@ -117,24 +118,26 @@ anything else is text. A cell that holds a formula is not edited, and once
 a value has changed every formula's result is drawn faint until a
 spreadsheet application recalculates it. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
-show it, Ctrl+V puts such text down from the picked cell, as the values typing
+show it, and as a table for a word processor, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste or a delete that reaches a cell it
 cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
 The same menu, and a right click on a tab, add, rename, delete and move sheets;
 a double click on a tab renames it, and formulas that name a renamed sheet
 follow it. Dragging the edge of a column's or a row's header resizes it, and a
 double click on a column's fits it to its text. The Sheet menu hides the
-selected rows or columns and shows the hidden ones in or beside the selection.
+selected rows or columns and shows the hidden ones in or beside the selection,
+and merges the selection into one cell or unmerges the picked one.
 View > Freeze rows and columns keeps the rows above and the columns left of the picked cell in view. Ctrl and
 the arrows go to the edge of the data, Page Up and Page Down move a screen,
 Ctrl+Home and Ctrl+End go to the first and last used cells and Ctrl+A selects
 them, Shift with any of them stretching the selection; a selection's sum,
-average and count are shown above the grid.
+average and count are shown above the grid. A screen reader can walk the cells
+in view as a grid, and says the picked cell as it moves.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
-there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
+there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, adds a slide after the one in view, with a title and a text frame where its master places them, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
 at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
 or a right click go back, and Escape ends it. The notes are not shown.

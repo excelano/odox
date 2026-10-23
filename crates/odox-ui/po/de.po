@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-23 08:20-0500\n"
+"POT-Creation-Date: 2026-10-23 14:31-0500\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -106,7 +106,7 @@ msgid "Mark the rest as decoration"
 msgstr "Übrige als Schmuck markieren"
 
 #: crates/odox-ui/src/export.rs:301 crates/odox-ui/src/shell.rs:478
-#: crates/xods/src/view.rs:924
+#: crates/xods/src/view.rs:986
 msgid "Cancel"
 msgstr "Abbrechen"
 
@@ -152,16 +152,16 @@ msgid "File"
 msgstr "Datei"
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:124
-#: crates/xods/src/view.rs:398 crates/xodt/src/view.rs:64
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:125
+#: crates/xods/src/view.rs:402 crates/xodt/src/view.rs:64
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
-#: crates/odox-ui/src/shapes.rs:489
+#: crates/odox-ui/src/shapes.rs:508
 msgid "Click to add a title"
 msgstr "Klicken, um einen Titel hinzuzufügen"
 
-#: crates/odox-ui/src/shapes.rs:490
+#: crates/odox-ui/src/shapes.rs:509
 msgid "Click to add text"
 msgstr "Klicken, um Text hinzuzufügen"
 
@@ -345,7 +345,7 @@ msgstr "U"
 msgid "S"
 msgstr "D"
 
-#: crates/odox-ui/tests/german.rs:28 crates/xods/src/main.rs:22
+#: crates/odox-ui/tests/german.rs:28 crates/xods/src/main.rs:23
 msgid "OpenDocument Spreadsheet"
 msgstr "OpenDocument-Tabellendokument"
 
@@ -353,241 +353,265 @@ msgstr "OpenDocument-Tabellendokument"
 msgid "OpenDocument Presentation"
 msgstr "OpenDocument-Präsentation"
 
-#: crates/xodp/src/view.rs:233 crates/xodt/src/view.rs:142
+#: crates/xodp/src/view.rs:234 crates/xodt/src/view.rs:142
 msgid "Format"
 msgstr "Format"
 
-#: crates/xodp/src/view.rs:243
+#: crates/xodp/src/view.rs:244
 msgid "Slide"
 msgstr "Folie"
 
-#: crates/xodp/src/view.rs:245
+#: crates/xodp/src/view.rs:246
+msgid "New slide"
+msgstr "Neue Folie"
+
+#: crates/xodp/src/view.rs:247
 msgid "Duplicate slide"
 msgstr "Folie duplizieren"
 
-#: crates/xodp/src/view.rs:246
+#: crates/xodp/src/view.rs:248
 msgid "Delete slide"
 msgstr "Folie löschen"
 
-#: crates/xodp/src/view.rs:248
+#: crates/xodp/src/view.rs:250
 msgid "Move slide earlier"
 msgstr "Folie nach vorn"
 
-#: crates/xodp/src/view.rs:253
+#: crates/xodp/src/view.rs:255
 msgid "Move slide later"
 msgstr "Folie nach hinten"
 
-#: crates/xodp/src/view.rs:348
+#: crates/xodp/src/view.rs:350
 msgid "This presentation has no slides."
 msgstr "Diese Präsentation hat keine Folien."
 
-#: crates/xodp/src/view.rs:475
+#: crates/xodp/src/view.rs:477
 msgid "Slides"
 msgstr "Folien"
 
-#: crates/xodp/src/view.rs:508
+#: crates/xodp/src/view.rs:510
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
 
-#: crates/xodp/src/view.rs:510
+#: crates/xodp/src/view.rs:512
 msgid "Start the slideshow"
 msgstr "Bildschirmpräsentation starten"
 
-#: crates/xodp/src/view.rs:515
+#: crates/xodp/src/view.rs:517
 msgid "Start the slideshow from this slide"
 msgstr "Bildschirmpräsentation ab dieser Folie starten"
 
-#: crates/xodp/src/view.rs:947
+#: crates/xodp/src/view.rs:979
 msgid "Notes"
 msgstr "Notizen"
 
-#: crates/xodp/src/view.rs:956
+#: crates/xodp/src/view.rs:988
 msgid "This slide has no notes."
 msgstr "Diese Folie hat keine Notizen."
 
-#: crates/xods/src/view.rs:433 crates/xods/src/view.rs:2003
+#: crates/xods/src/access.rs:106
+msgid "{cell}, empty"
+msgstr "{cell}, leer"
+
+#: crates/xods/src/access.rs:109
+msgid "{cell}, {text}"
+msgstr "{cell}, {text}"
+
+#: crates/xods/src/view.rs:437 crates/xods/src/view.rs:2129
 msgid "Sheet{number}"
 msgstr "Tabelle{number}"
 
-#: crates/xods/src/view.rs:505
+#: crates/xods/src/view.rs:509
 msgid "Sheet"
 msgstr "Blatt"
 
-#: crates/xods/src/view.rs:507
+#: crates/xods/src/view.rs:511
 msgid "Insert row above"
 msgstr "Zeile oberhalb einfügen"
 
-#: crates/xods/src/view.rs:508
+#: crates/xods/src/view.rs:512
 msgid "Insert row below"
 msgstr "Zeile unterhalb einfügen"
 
-#: crates/xods/src/view.rs:509
+#: crates/xods/src/view.rs:513
 msgid "Insert column left"
 msgstr "Spalte links einfügen"
 
-#: crates/xods/src/view.rs:510
+#: crates/xods/src/view.rs:514
 msgid "Insert column right"
 msgstr "Spalte rechts einfügen"
 
-#: crates/xods/src/view.rs:511
+#: crates/xods/src/view.rs:515
 msgid "Delete row"
 msgstr "Zeile löschen"
 
-#: crates/xods/src/view.rs:512
+#: crates/xods/src/view.rs:516
 msgid "Delete column"
 msgstr "Spalte löschen"
 
-#: crates/xods/src/view.rs:515
+#: crates/xods/src/view.rs:519
 msgid "Hide rows"
 msgstr "Zeilen ausblenden"
 
-#: crates/xods/src/view.rs:516
+#: crates/xods/src/view.rs:520
 msgid "Show hidden rows"
 msgstr "Ausgeblendete Zeilen einblenden"
 
-#: crates/xods/src/view.rs:517
+#: crates/xods/src/view.rs:521
 msgid "Hide columns"
 msgstr "Spalten ausblenden"
 
-#: crates/xods/src/view.rs:518
+#: crates/xods/src/view.rs:522
 msgid "Show hidden columns"
 msgstr "Ausgeblendete Spalten einblenden"
 
-#: crates/xods/src/view.rs:639
+#: crates/xods/src/view.rs:525
+msgid "Merge cells"
+msgstr "Zellen verbinden"
+
+#: crates/xods/src/view.rs:526
+msgid "Unmerge cells"
+msgstr "Zellverbund aufheben"
+
+#: crates/xods/src/view.rs:647
 msgid "Freeze rows and columns"
 msgstr "Zeilen und Spalten fixieren"
 
-#: crates/xods/src/view.rs:641
+#: crates/xods/src/view.rs:649
 msgid "Unfreeze rows and columns"
 msgstr "Fixierung aufheben"
 
-#: crates/xods/src/view.rs:648
+#: crates/xods/src/view.rs:656
 msgid "Copy the sheet as tab-separated text"
 msgstr "Tabellenblatt als tabulatorgetrennten Text kopieren"
 
-#: crates/xods/src/view.rs:814
+#: crates/xods/src/view.rs:838
+msgid "A merged cell crosses the edge of the selection."
+msgstr "Eine verbundene Zelle reicht über den Rand der Auswahl hinaus."
+
+#: crates/xods/src/view.rs:876
 msgid "Add a sheet"
 msgstr "Blatt hinzufügen"
 
-#: crates/xods/src/view.rs:815
+#: crates/xods/src/view.rs:877
 msgid "Rename the sheet…"
 msgstr "Blatt umbenennen …"
 
-#: crates/xods/src/view.rs:816
+#: crates/xods/src/view.rs:878
 msgid "Delete the sheet"
 msgstr "Blatt löschen"
 
-#: crates/xods/src/view.rs:818
+#: crates/xods/src/view.rs:880
 msgid "Move the sheet left"
 msgstr "Blatt nach links verschieben"
 
-#: crates/xods/src/view.rs:823
+#: crates/xods/src/view.rs:885
 msgid "Move the sheet right"
 msgstr "Blatt nach rechts verschieben"
 
-#: crates/xods/src/view.rs:905
+#: crates/xods/src/view.rs:967
 msgid "Rename the sheet"
 msgstr "Blatt umbenennen"
 
-#: crates/xods/src/view.rs:921
+#: crates/xods/src/view.rs:983
 msgid "Rename"
 msgstr "Umbenennen"
 
-#: crates/xods/src/view.rs:1049
+#: crates/xods/src/view.rs:1111
 msgid "Sum: {sum}"
 msgstr "Summe: {sum}"
 
-#: crates/xods/src/view.rs:1051
+#: crates/xods/src/view.rs:1113
 msgid "Average: {average}"
 msgstr "Mittelwert: {average}"
 
-#: crates/xods/src/view.rs:1056
+#: crates/xods/src/view.rs:1118
 msgid "Count: {count}"
 msgstr "Anzahl: {count}"
 
-#: crates/xods/src/view.rs:2012
+#: crates/xods/src/view.rs:2138
 msgid "There is nothing there to change."
 msgstr "Dort gibt es nichts zu ändern."
 
-#: crates/xods/src/view.rs:2013
+#: crates/xods/src/view.rs:2139
 msgid "A merged cell is in the way: this would cut through it."
 msgstr "Eine verbundene Zelle steht im Weg: Das würde sie zerschneiden."
 
-#: crates/xods/src/view.rs:2015
+#: crates/xods/src/view.rs:2141
 msgid "A formula holds [{reference}], which this version cannot read."
 msgstr ""
 "Eine Formel enthält [{reference}], und diese Version kann das nicht lesen."
 
-#: crates/xods/src/view.rs:2019
+#: crates/xods/src/view.rs:2145
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr "Eine Formel verweist auf [{reference}], das gelöscht würde."
 
-#: crates/xods/src/view.rs:2022
+#: crates/xods/src/view.rs:2148
 msgid "Another sheet already has that name."
 msgstr "Ein anderes Blatt hat bereits diesen Namen."
 
-#: crates/xods/src/view.rs:2024
+#: crates/xods/src/view.rs:2150
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
 msgstr ""
 "Der Name eines Blatts darf nicht leer sein und keines der Zeichen [ ] "
 "* ? : / oder \\ enthalten."
 
-#: crates/xods/src/view.rs:2026
+#: crates/xods/src/view.rs:2152
 msgid "A workbook keeps at least one sheet to show."
 msgstr "Ein Tabellendokument behält mindestens ein sichtbares Blatt."
 
-#: crates/xods/src/view.rs:2029
+#: crates/xods/src/view.rs:2155
 msgid "conditional formats"
 msgstr "bedingte Formatierungen"
 
-#: crates/xods/src/view.rs:2030
+#: crates/xods/src/view.rs:2156
 msgid "validations"
 msgstr "Gültigkeitsprüfungen"
 
-#: crates/xods/src/view.rs:2031
+#: crates/xods/src/view.rs:2157
 msgid "database ranges"
 msgstr "Datenbankbereiche"
 
-#: crates/xods/src/view.rs:2032
+#: crates/xods/src/view.rs:2158
 msgid "pivot tables"
 msgstr "Pivot-Tabellen"
 
-#: crates/xods/src/view.rs:2033
+#: crates/xods/src/view.rs:2159
 msgid "consolidations"
 msgstr "Konsolidierungen"
 
-#: crates/xods/src/view.rs:2034
+#: crates/xods/src/view.rs:2160
 msgid "charts and objects"
 msgstr "Diagramme und Objekte"
 
-#: crates/xods/src/view.rs:2035
+#: crates/xods/src/view.rs:2161
 msgid "print ranges"
 msgstr "Druckbereiche"
 
-#: crates/xods/src/view.rs:2036
+#: crates/xods/src/view.rs:2162
 msgid "shapes anchored to cells"
 msgstr "an Zellen verankerte Formen"
 
-#: crates/xods/src/view.rs:2039
+#: crates/xods/src/view.rs:2165
 msgid "This document has {what}, which this version cannot update to match."
 msgstr ""
 "Dieses Dokument enthält {what}, und diese Version kann das nicht "
 "entsprechend anpassen."
 
-#: crates/xods/src/view.rs:2049
+#: crates/xods/src/view.rs:2175
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 "Diese Zelle enthält eine Formel; diese Version bearbeitet keine Formeln."
 
-#: crates/xods/src/view.rs:2050
+#: crates/xods/src/view.rs:2176
 msgid "This cell is covered by the one that spans it."
 msgstr "Diese Zelle wird von der Zelle verdeckt, die sich über sie erstreckt."
 
-#: crates/xods/src/view.rs:2054
+#: crates/xods/src/view.rs:2180
 msgid "There is no cell there."
 msgstr "Dort ist keine Zelle."
 
-#: crates/xods/src/view.rs:2095
+#: crates/xods/src/view.rs:2226
 msgid "{whole}.{fraction}"
 msgstr "{whole},{fraction}"
 
@@ -599,15 +623,15 @@ msgstr "OpenDocument-Textdokument"
 msgid "This document has no text in it."
 msgstr "Dieses Dokument enthält keinen Text."
 
-#: crates/xodt/src/view.rs:281
+#: crates/xodt/src/view.rs:286
 msgid "Outline"
 msgstr "Gliederung"
 
-#: crates/xodt/src/view.rs:290
+#: crates/xodt/src/view.rs:295
 msgid "(untitled)"
 msgstr "(ohne Titel)"
 
-#: crates/xodt/src/view.rs:323
+#: crates/xodt/src/view.rs:328
 msgid "Copy the document as text"
 msgstr "Dokument als Text kopieren"
 

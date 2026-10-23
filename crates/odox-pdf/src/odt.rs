@@ -28,7 +28,7 @@ pub fn undescribed(document: &TextDocument) -> Vec<Vec<usize>> {
 
 fn blocks(document: &TextDocument) -> Vec<Block> {
     match (document.body(), document.body_path()) {
-        (Some(body), Some(path)) => model::read(&document.document, body, path),
+        (Some(body), Some(path)) => model::read(&document.document, body, path, None),
         _ => Vec::new(),
     }
 }

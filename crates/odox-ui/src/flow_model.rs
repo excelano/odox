@@ -15,7 +15,7 @@ use std::ops::Range;
 
 use eframe::egui::Id;
 use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
-use odox_core::edit::{self, is_paragraph};
+use odox_core::edit::{self, html, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
@@ -33,7 +33,7 @@ pub(crate) fn page_editor_id() -> Id {
 
 /// A page editor with nothing selected.
 pub fn page_editor() -> PageEditor {
-    RichEdit::new(page_editor_id())
+    RichEdit::new(page_editor_id()).with_clipboard(&crate::clipboard::SYSTEM)
 }
 
 /// What a button for a kind of paragraph asks for.
@@ -49,6 +49,16 @@ pub enum Block {
     /// A numbered list, or no list where the paragraphs already are one.
     Numbers,
 }
+
+/// A copy made here: its paragraphs as [`edit::slice`] carries them, and the
+/// HTML written of them for another program.
+struct Copied {
+    items: Vec<Element>,
+    html: String,
+}
+
+/// Paragraphs another program put on the clipboard as HTML.
+struct Read(Vec<html::Paragraph>);
 
 /// The paragraphs under a root in a content tree, for one frame's editing.
 pub struct FlowModel<'a> {
@@ -306,6 +316,116 @@ impl<'a> FlowModel<'a> {
         true
     }
 
+    /// What a paragraph is, as HTML says it.
+    fn kind_of(&self, paragraph: &[usize]) -> html::Kind {
+        let path = [self.root.as_slice(), paragraph].concat();
+        match edit::block_state(self.content, &path, self.styles) {
+            (Some(level), _) => html::Kind::Heading(level),
+            (None, Some(list)) => html::Kind::List(list),
+            (None, None) => html::Kind::Body,
+        }
+    }
+
+    /// Put paragraphs read from HTML in at a position, as one edit, and answer
+    /// where the caret goes. They go in as a copy made here does, the ones
+    /// between the first and the last in the style of the paragraph pasted
+    /// into, and each that stands as a paragraph of its own, as
+    /// [`edit::paste_fragment`] says which do, is then made the heading or the
+    /// list item the HTML said it was.
+    fn paste_read(
+        &mut self,
+        at: &Position<Vec<usize>>,
+        read: &[html::Paragraph],
+        new_step: bool,
+    ) -> Option<Position<Vec<usize>>> {
+        let new_step = new_step || !self.editing.modified();
+        let (original, root) = (self.content.clone(), self.root.clone());
+        let style = self
+            .root()?
+            .at(&at.paragraph)
+            .filter(|paragraph| paragraph.is(&Ns::Text, "p"))
+            .and_then(|paragraph| paragraph.attr(&Ns::Text, "style-name"))
+            .map(ToOwned::to_owned);
+        // Which of them stand alone rather than merging into the paragraph
+        // pasted into.
+        let length = self.text(&at.paragraph).map_or(0, |t| t.chars().count());
+        let in_list = matches!(self.kind_of(&at.paragraph), html::Kind::List(_));
+        let start = usize::from(in_list || at.offset > 0);
+        let end = if !in_list && at.offset >= length {
+            read.len()
+        } else {
+            read.len().saturating_sub(1)
+        };
+        let alone = start..end.max(start);
+        let pasted = self.put_read(at, read, style);
+        let Some((path, offset)) = pasted else {
+            *self.content = original;
+            self.root = root;
+            self.order = OnceCell::new();
+            return None;
+        };
+        self.order = OnceCell::new();
+        let first = self.order().iter().position(|p| *p == at.paragraph)?;
+        for index in alone.clone() {
+            if let html::Kind::Heading(level) = read[index].kind {
+                let paragraph = self.order().get(first + index)?.clone();
+                self.set_headings(&[paragraph], Some(level));
+            }
+        }
+        // A run of items of one kind is one list. Wrapping paragraphs in a
+        // list moves them in the tree and leaves their order, so each run is
+        // found again by its place in that order.
+        let mut index = alone.start;
+        while index < alone.end {
+            let html::Kind::List(kind) = read[index].kind else {
+                index += 1;
+                continue;
+            };
+            let end = (index..alone.end)
+                .take_while(|&i| read[i].kind == html::Kind::List(kind))
+                .last()
+                .unwrap_or(index);
+            self.order = OnceCell::new();
+            let run = self.order().get(first + index..=first + end)?.to_vec();
+            self.set_lists(&run, Some(kind));
+            index = end + 1;
+        }
+        self.order = OnceCell::new();
+        let path = if read.len() > 1 {
+            self.order().get(first + read.len() - 1)?.clone()
+        } else {
+            path
+        };
+        self.editing.touch();
+        if new_step {
+            let begins = Position::new([self.tag.as_slice(), &at.paragraph].concat(), at.offset);
+            self.editing.record_snapshot(original, Some(begins));
+        }
+        Some(Position::new(path, offset))
+    }
+
+    fn put_read(
+        &mut self,
+        at: &Position<Vec<usize>>,
+        read: &[html::Paragraph],
+        style: Option<String>,
+    ) -> Option<(Vec<usize>, usize)> {
+        let had = self
+            .content
+            .child(&Ns::Office, "automatic-styles")
+            .is_some();
+        let mut items = html::paragraphs(self.content, read, self.styles).ok()?;
+        self.follow_styles(had);
+        if let Some(style) = style {
+            let name = self.content.name_for(&Ns::Text, "style-name");
+            for item in &mut items {
+                item.set_attr(name.clone(), style.clone());
+            }
+        }
+        let root = self.content.at_mut(&self.root)?;
+        edit::paste_fragment(root, &at.paragraph, at.offset, &items).ok()
+    }
+
     fn set_headings(&mut self, paragraphs: &[Vec<usize>], level: Option<u8>) -> Option<()> {
         let automatic =
             |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
@@ -465,12 +585,30 @@ impl Model for FlowModel<'_> {
 
     fn fragment(&self, from: &Position<Vec<usize>>, to: &Position<Vec<usize>>) -> Option<Fragment> {
         let root = self.root()?;
-        let items: Vec<Element> = self
-            .covered(from, to)?
-            .into_iter()
-            .filter_map(|(path, range)| Some(edit::slice(root.at(&path)?, range)))
-            .collect();
-        (!items.is_empty()).then(|| Fragment::new(items))
+        let mut items = Vec::new();
+        let mut kinds = Vec::new();
+        for (path, range) in self.covered(from, to)? {
+            let Some(paragraph) = root.at(&path) else {
+                continue;
+            };
+            items.push(edit::slice(paragraph, range));
+            kinds.push(self.kind_of(&path));
+        }
+        if items.is_empty() {
+            return None;
+        }
+        let paired: Vec<(&Element, html::Kind)> = items.iter().zip(kinds).collect();
+        let html = html::write(&paired, self.styles);
+        Some(Fragment::new(Copied { items, html }))
+    }
+
+    fn html(&self, fragment: &Fragment) -> Option<String> {
+        fragment.get::<Copied>().map(|copied| copied.html.clone())
+    }
+
+    fn fragment_from_html(&self, text: &str) -> Option<Fragment> {
+        let read = html::read(text);
+        (!read.is_empty()).then(|| Fragment::new(Read(read)))
     }
 
     fn paste_fragment(
@@ -479,7 +617,10 @@ impl Model for FlowModel<'_> {
         fragment: &Fragment,
         new_step: bool,
     ) -> Option<Position<Vec<usize>>> {
-        let items = fragment.get::<Vec<Element>>()?;
+        let Some(Copied { items, .. }) = fragment.get::<Copied>() else {
+            let Read(read) = fragment.get::<Read>()?;
+            return self.paste_read(at, read, new_step);
+        };
         let new_step = new_step || !self.editing.modified();
         let before = new_step.then(|| self.content.clone());
         let root = self.content.at_mut(&self.root)?;
@@ -597,7 +738,7 @@ fn block(element: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
 
 #[cfg(test)]
 mod tests {
-    use super::FlowModel;
+    use super::{FlowModel, html};
     use crate::Editing;
     use egui_richedit::{Edit, Model, Position};
     use odox_core::{Document, Element, Node, Ns, Styles};
@@ -918,5 +1059,101 @@ mod tests {
             undone += 1;
         }
         assert_eq!(undone, 1);
+    }
+
+    fn blank_text() -> odox_core::doc::TextDocument {
+        odox_core::doc::TextDocument::read(&odox_core::blank::text("en")).expect("a blank document")
+    }
+
+    #[test]
+    fn html_from_elsewhere_pastes_its_kinds_and_marks_as_one_step() {
+        let mut document = blank_text();
+        let root = document.body_path().expect("a body");
+        let mut editing = Editing::default();
+        editing.reset();
+        let odox_core::Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, &mut editing);
+        let first = model.first().expect("a paragraph");
+        model.apply(
+            Edit::Replace {
+                from: Position::new(first.clone(), 0),
+                to: Position::new(first.clone(), 0),
+                text: "ab",
+            },
+            true,
+        );
+        let fragment = model
+            .fragment_from_html(
+                "<p>x<b>bold</b></p><h1>Head</h1><ul><li>one</li><li>two</li></ul><p>tail</p>",
+            )
+            .expect("read");
+        let at = model
+            .paste_fragment(&Position::new(first.clone(), 1), &fragment, true)
+            .expect("pasted");
+        let mut texts = Vec::new();
+        let mut paragraph = model.first();
+        while let Some(path) = paragraph {
+            texts.push(model.text(&path).unwrap_or_default());
+            paragraph = model.next(&path);
+        }
+        assert_eq!(texts, ["axbold", "Head", "one", "two", "tailb"]);
+        assert_eq!(at.offset, 4, "after \"tail\"");
+        assert_eq!(
+            model.marked(
+                &Position::new(first.clone(), 2),
+                &Position::new(first.clone(), 6),
+                egui_richedit::Mark::Bold
+            ),
+            Some(true)
+        );
+        let kind = |model: &FlowModel<'_>, n: usize| {
+            let mut path = model.first().expect("first");
+            for _ in 0..n {
+                path = model.next(&path).expect("next");
+            }
+            model.kind_of(&path)
+        };
+        assert_eq!(kind(&model, 1), html::Kind::Heading(1));
+        assert_eq!(
+            kind(&model, 2),
+            html::Kind::List(odox_core::ListKind::Bullet)
+        );
+        assert_eq!(
+            kind(&model, 3),
+            html::Kind::List(odox_core::ListKind::Bullet)
+        );
+        assert_eq!(kind(&model, 4), html::Kind::Body);
+
+        let last = {
+            let mut path = model.first().expect("first");
+            while let Some(next) = model.next(&path) {
+                path = next;
+            }
+            path
+        };
+        let copied = model
+            .fragment(
+                &Position::new(model.first().expect("first"), 0),
+                &Position::new(last, 5),
+            )
+            .expect("a copy");
+        let written = model.html(&copied).expect("html");
+        assert!(
+            written.contains("<p>ax<b>bold</b></p><h1>Head</h1>"),
+            "{written}"
+        );
+        assert!(
+            written.contains("<ul><li>one</li><li>two</li></ul><p>tailb</p>"),
+            "{written}"
+        );
+
+        let mut steps = 0;
+        let mut current = holding(&document.document.content);
+        while editing.undo(&mut current, None).is_some() {
+            steps += 1;
+        }
+        assert_eq!(steps, 2, "the typing and the paste");
     }
 }

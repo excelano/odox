@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.9.0"
+version = "0.10.0"
 
 [products.xodt.locales.en-us]
-whats-new = "File > New starts a blank document, on Letter or A4 paper as your country prints, with the caret ready to type. In dark mode, text on a paragraph or table cell with a light fill is now readable, and black text a document sets on purpose follows the light or dark setting as text with no colour does."
+whats-new = "Copying keeps its formatting outside the window: bold, italic, underline, strikethrough, headings and lists paste into another window and into word processors and browsers, and text copied from them keeps the same when it is pasted in."
 
 [products.xodt.locales.de-de]
-whats-new = "Datei > Neu beginnt ein leeres Dokument auf Letter- oder A4-Papier, wie Ihr Land druckt, mit der Einfügemarke bereit zum Tippen. Im dunklen Modus ist Text auf einem Absatz oder einer Tabellenzelle mit heller Füllung jetzt lesbar, und schwarzer Text, den ein Dokument ausdrücklich setzt, folgt der hellen oder dunklen Einstellung wie Text ohne Farbe."
+whats-new = "Kopieren behält die Formatierung auch außerhalb des Fensters: Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften und Listen lassen sich in ein anderes Fenster und in Textverarbeitungen und Browser einfügen, und aus ihnen kopierter Text behält beim Einfügen dasselbe."
 
 [products.xods.locales.en-us]
-whats-new = "The basics a spreadsheet needs: add, rename, delete and move sheets, with formulas following a renamed sheet; freeze the top rows and the left columns from the View menu; hide and show rows and columns from the Sheet menu; drag a header's edge to resize a column or row, or double-click a column's to fit it; Ctrl and the arrows, Page Up and Page Down, Ctrl+Home, Ctrl+End and Ctrl+A move as in other spreadsheets; and the bar above the grid gives the sum, average and count of a selection. A cell set to wrap its text now wraps it, on screen and in the PDF. File > New starts a blank workbook. In dark mode, text on a filled cell, and the black text spreadsheets write into every cell, are now readable."
+whats-new = "Merge a selection into one cell, and unmerge it, from the Sheet menu; a merged cell is picked, outlined and stepped over as one. A copied range reaches a word processor as a table. Copy, the selection's sum, average and count, Cut and Delete now leave hidden rows and columns alone. A screen reader can walk the cells in view as a grid, and says the picked cell as it moves."
 
 [products.xods.locales.de-de]
-whats-new = "Das Nötigste für Tabellen: Blätter hinzufügen, umbenennen, löschen und verschieben, wobei Formeln einem umbenannten Blatt folgen; oberste Zeilen und linke Spalten im Menü Ansicht fixieren; Zeilen und Spalten im Menü Blatt aus- und einblenden; Spalten und Zeilen am Rand ihres Kopfs in der Größe ändern oder eine Spalte per Doppelklick einpassen; Strg mit den Pfeiltasten, Bild auf und Bild ab, Strg+Pos1, Strg+Ende und Strg+A bewegen sich wie in anderen Tabellenkalkulationen; und die Leiste über dem Gitter nennt Summe, Mittelwert und Anzahl einer Auswahl. Eine Zelle mit Zeilenumbruch bricht ihren Text jetzt um, am Bildschirm und im PDF. Datei > Neu beginnt ein leeres Tabellendokument. Im dunklen Modus sind Text auf gefüllten Zellen und der schwarze Text, den Tabellenkalkulationen in jede Zelle schreiben, jetzt lesbar."
+whats-new = "Eine Auswahl im Menü Blatt zu einer Zelle verbinden und den Verbund wieder aufheben; eine verbundene Zelle wird als eine gewählt, umrandet und übersprungen. Ein kopierter Bereich kommt in einer Textverarbeitung als Tabelle an. Kopieren, Summe, Mittelwert und Anzahl einer Auswahl, Ausschneiden und Löschen lassen ausgeblendete Zeilen und Spalten jetzt unberührt. Ein Bildschirmleser kann die sichtbaren Zellen als Gitter durchgehen und nennt die gewählte Zelle, wenn sie wechselt."
 
 [products.xodp.locales.en-us]
-whats-new = "File > New starts a blank deck: one wide slide whose empty title says where to type, as any empty title or text placeholder now does while you edit. In dark mode, text on a light slide background or a filled shape is now readable."
+whats-new = "Slide > New slide adds a slide after the one in view, with a title and a text frame where its master puts them, the title looking like the one before it, and a click anywhere on an empty placeholder puts the caret in it. Titles and text typed in LibreOffice now take the size their slide's styles give them, on screen and in the PDF. Copying keeps its formatting in other windows and programs, and text copied from them keeps it when it is pasted in."
 
 [products.xodp.locales.de-de]
-whats-new = "Datei > Neu beginnt einen leeren Foliensatz: eine breite Folie, deren leerer Titel zeigt, wo getippt wird, wie es jetzt jeder leere Titel- oder Textplatzhalter beim Bearbeiten tut. Im dunklen Modus ist Text auf einem hellen Folienhintergrund oder einer gefüllten Form jetzt lesbar."
+whats-new = "Folie > Neue Folie fügt nach der angezeigten Folie eine Folie ein, mit Titel und Textrahmen dort, wo ihr Master sie vorsieht, der Titel wie der davor, und ein Klick irgendwo auf einen leeren Platzhalter setzt die Einfügemarke hinein. In LibreOffice getippte Titel und Texte erhalten jetzt die Größe, die die Formate ihrer Folie vorgeben, am Bildschirm und im PDF. Kopieren behält die Formatierung in anderen Fenstern und Programmen, und aus ihnen kopierter Text behält sie beim Einfügen."

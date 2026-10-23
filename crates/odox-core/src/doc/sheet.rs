@@ -12,10 +12,12 @@
 
 mod freeze;
 mod hide;
+mod merge;
 mod restructure;
 mod sheets;
 mod size;
 pub use freeze::Frozen;
+pub use merge::Merged;
 pub use restructure::{Blocked, Restructure};
 
 use std::ops::Range;
@@ -567,6 +569,9 @@ struct CellNames {
     row: Name,
     column: Name,
     cell: Name,
+    covered: Name,
+    columns_spanned: Name,
+    rows_spanned: Name,
     rows_repeated: Name,
     columns_repeated: Name,
     value_type: Name,
@@ -585,6 +590,9 @@ impl CellNames {
             row: document.name(&Ns::Table, "table-row"),
             column: document.name(&Ns::Table, "table-column"),
             cell: document.name(&Ns::Table, "table-cell"),
+            covered: document.name(&Ns::Table, "covered-table-cell"),
+            columns_spanned: document.name(&Ns::Table, "number-columns-spanned"),
+            rows_spanned: document.name(&Ns::Table, "number-rows-spanned"),
             rows_repeated: document.name(&Ns::Table, "number-rows-repeated"),
             columns_repeated: document.name(&Ns::Table, "number-columns-repeated"),
             value_type: document.name(&Ns::Office, "value-type"),

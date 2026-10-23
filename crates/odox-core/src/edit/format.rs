@@ -40,7 +40,8 @@ pub enum Mark {
 }
 
 impl Mark {
-    fn of(self, properties: &TextProperties) -> Option<bool> {
+    /// What properties say of the mark.
+    pub(super) fn of(self, properties: &TextProperties) -> Option<bool> {
         match self {
             Self::Bold => properties.bold,
             Self::Italic => properties.italic,

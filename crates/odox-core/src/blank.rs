@@ -107,16 +107,17 @@ pub fn spreadsheet(language: &str, sheet: &str) -> Vec<u8> {
     assemble(media_type::SPREADSHEET, &content, &styles)
 }
 
-/// A blank presentation: one wide slide with an empty title.
+/// A blank presentation: one wide slide with an empty title, on a master that
+/// places a title and a text frame for the slides added after it.
 pub fn presentation(language: &str) -> Vec<u8> {
     let lang = language_attributes(language);
     let styles = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-styles {NS}><office:font-face-decls><style:font-face style:name="Liberation Sans" svg:font-family="'Liberation Sans'"/></office:font-face-decls><office:styles><style:default-style style:family="graphic"><style:graphic-properties draw:fill="none" draw:stroke="none"/><style:text-properties style:font-name="Liberation Sans" fo:font-size="18pt" {lang}/></style:default-style></office:styles><office:automatic-styles><style:page-layout style:name="PM1"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm" style:print-orientation="landscape"/></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Default" style:page-layout-name="PM1"/></office:master-styles></office:document-styles>"#
+<office:document-styles {NS}><office:font-face-decls><style:font-face style:name="Liberation Sans" svg:font-family="'Liberation Sans'"/></office:font-face-decls><office:styles><style:default-style style:family="graphic"><style:graphic-properties draw:fill="none" draw:stroke="none"/><style:text-properties style:font-name="Liberation Sans" fo:font-size="18pt" {lang}/></style:default-style><style:style style:name="Title" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-size="40pt"/></style:style><style:style style:name="Text" style:family="paragraph"><style:text-properties fo:font-size="24pt"/></style:style></office:styles><office:automatic-styles><style:page-layout style:name="PM1"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm" style:print-orientation="landscape"/></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Default" style:page-layout-name="PM1"><draw:frame draw:layer="backgroundobjects" presentation:class="title" presentation:placeholder="true" svg:x="1.4cm" svg:y="0.6cm" svg:width="25.2cm" svg:height="2.6cm"><draw:text-box><text:p text:style-name="Title"/></draw:text-box></draw:frame><draw:frame draw:layer="backgroundobjects" presentation:class="outline" presentation:placeholder="true" svg:x="1.4cm" svg:y="3.7cm" svg:width="25.2cm" svg:height="10.8cm"><draw:text-box><text:p text:style-name="Text"/></draw:text-box></draw:frame></style:master-page></office:master-styles></office:document-styles>"#
     );
     let content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content {NS}><office:automatic-styles><style:style style:name="title" style:family="presentation"><style:graphic-properties draw:textarea-vertical-align="middle"/></style:style><style:style style:name="P1" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-size="40pt"/></style:style></office:automatic-styles><office:body><office:presentation><draw:page draw:name="page1" draw:master-page-name="Default"><draw:frame presentation:style-name="title" presentation:class="title" svg:x="1.4cm" svg:y="0.6cm" svg:width="25.2cm" svg:height="2.6cm"><draw:text-box><text:p text:style-name="P1"/></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
+<office:document-content {NS}><office:automatic-styles><style:style style:name="title" style:family="presentation"><style:graphic-properties draw:textarea-vertical-align="middle"/></style:style></office:automatic-styles><office:body><office:presentation><draw:page draw:name="page1" draw:master-page-name="Default"><draw:frame presentation:style-name="title" presentation:class="title" svg:x="1.4cm" svg:y="0.6cm" svg:width="25.2cm" svg:height="2.6cm"><draw:text-box><text:p text:style-name="Title"/></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
     );
     assemble(media_type::PRESENTATION, &content, &styles)
 }
@@ -152,6 +153,7 @@ fn assemble(media_type: &str, content: &str, styles: &str) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::doc::{Presentation, SheetDocument, TextDocument};
+    use crate::xml::Ns;
 
     #[test]
     fn paper_follows_the_country() {
@@ -171,6 +173,29 @@ mod tests {
         assert!(sheet.document.write_verified().is_ok());
         let mut deck = Presentation::read(&presentation("en")).expect("a presentation");
         assert_eq!(deck.slides().len(), 1);
+        assert!(deck.document.write_verified().is_ok());
+    }
+
+    #[test]
+    fn a_slide_added_to_a_blank_deck_has_a_title_like_the_first_and_a_text_frame() {
+        let mut deck = Presentation::read(&presentation("en")).expect("a presentation");
+        let at = deck.add_slide(deck.slides()[0].position).expect("added");
+        let slides = deck.slides();
+        let added = slides.iter().find(|s| s.position == at).expect("added");
+        let classes: Vec<_> = added
+            .shapes()
+            .filter_map(|shape| shape.attr(&Ns::Presentation, "class"))
+            .collect();
+        assert_eq!(classes, ["title", "outline"]);
+        let title = added.shapes().next().expect("the title");
+        assert_eq!(title.attr(&Ns::Svg, "y"), Some("0.6cm"));
+        assert_eq!(
+            title
+                .descendant(&Ns::Text, "p")
+                .and_then(|p| p.attr(&Ns::Text, "style-name")),
+            Some("Title")
+        );
+        drop(slides);
         assert!(deck.document.write_verified().is_ok());
     }
 }
