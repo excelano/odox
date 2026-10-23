@@ -26,11 +26,13 @@ use std::ops::Range;
 
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
+pub(crate) use block::name_for;
 pub use block::{block_state, heading_level, set_heading, set_list};
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };
 pub use format::{Mark, format, marked};
+pub(crate) use format::{automatic_styles, element};
 
 /// Why an edit was not made. Each is a state of the document rather than a
 /// failure, and the window says which.

@@ -295,7 +295,7 @@ moves right, Escape puts it back, and Delete clears it; the text box sits in
 the cell in the cell's own font. What is typed is read the way a spreadsheet
 reads it: a number is a number, `true` and `false` are booleans, anything else
 is text, and a formula is not recognised. A cell that holds a formula is not
-opened, and once anything in the document has changed every formula's cached
+opened, and once a value in the document has changed every formula's cached
 result is drawn faint, because which of them went stale cannot be told without
 evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
@@ -317,6 +317,15 @@ inside the cell's width with each line aligned as the cell is. Either way what
 does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one
 cell, and the grid's lines stop at its edge.
+
+**A column's width and a row's height are dragged at the header's edge.** A
+double-click on a column's edge fits it to the widest text in it. The size is
+written into a style of the column's or the row's own, the style it had with
+the size changed and named as an automatic style the document already holds
+wherever one says the same, after the column or row is split out of a repeated
+run; a row given a height is marked as no longer fitted to its text. Each
+resize is one step to undo, and changes no value, so no formula is drawn faint
+for it.
 
 **The keyboard walks a sheet.** The arrows move one cell, into the empty grid
 past the data too; Ctrl and an arrow go to the end of the block of filled cells

@@ -46,7 +46,30 @@ pub struct SheetView {
     /// What the selection holds, kept for the sheet and range it was counted
     /// over until the document changes.
     summary: Option<(usize, Range, Summary)>,
+    /// A column or row whose edge is being dragged, with the size it has so
+    /// far, in points.
+    resizing: Option<Resize>,
+    /// Whether a value in the document has been changed since it was opened,
+    /// which may have left a formula's result out of date. A width or a
+    /// height leaves every result as it was.
+    values_changed: bool,
     export: Export,
+}
+
+/// A column's width or a row's height, being changed.
+#[derive(Clone, Copy, PartialEq)]
+struct Resize {
+    column: bool,
+    index: usize,
+    size: f32,
+}
+
+/// What a header's edge was asked for in a frame.
+enum Edge {
+    /// Dragged to this size, or still being dragged.
+    Dragging(Resize),
+    /// Let go at this size.
+    Released(Resize),
 }
 
 /// The first and last row and the first and last column, each counted in.
@@ -130,6 +153,7 @@ impl View for SheetView {
             .position(|s| s.visible)
             .unwrap_or(0);
         self.document = Some(document);
+        self.values_changed = false;
         self.pick((0, 0));
         self.metrics = None;
         self.editor = None;
@@ -262,6 +286,7 @@ impl View for SheetView {
         }
         if !writes.is_empty() {
             editing.record(&document.document.content);
+            self.values_changed = true;
             for (sheet, row, column, value) in &writes {
                 let _ = document.set_cell(*sheet, *row, *column, value);
             }
@@ -360,6 +385,7 @@ impl SheetView {
             return;
         }
         editing.record_snapshot(before, None);
+        self.values_changed = true;
         self.metrics = None;
         self.editor = None;
         let new = match command {
@@ -511,7 +537,7 @@ impl SheetView {
     #[allow(clippy::too_many_lines)]
     fn grid(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         let was_editing = self.editor.is_some();
-        let anything_changed = editing.modified();
+        let values_changed = self.values_changed;
         let Some(document) = &self.document else {
             return;
         };
@@ -540,6 +566,8 @@ impl SheetView {
         let editor = &mut self.editor;
         let mut outcome = None;
         let mut page_rows = self.page_rows;
+        let resizing = self.resizing;
+        let mut edge = None;
 
         egui::ScrollArea::both()
             .auto_shrink([false, false])
@@ -669,11 +697,11 @@ impl SheetView {
                             }
                         }
                         // A formula's cached result may be out of date once
-                        // anything has changed, and which ones are cannot be
+                        // a value has changed, and which ones are cannot be
                         // told without evaluating them; every one is drawn
                         // faint until the file is opened by something that
                         // recalculates. DESIGN.md §11.
-                        if anything_changed && cell.formula().is_some() {
+                        if values_changed && cell.formula().is_some() {
                             format.color = format.color.gamma_multiply(0.45);
                         }
                         // Text against the left edge and numbers against the right,
@@ -867,6 +895,52 @@ impl SheetView {
                     header_fill,
                 );
 
+                // The edge of a column's or a row's header is dragged to
+                // resize it, and a column's is double-clicked to fit its text.
+                for column in columns.clone() {
+                    let (x, width) = metrics.column(column);
+                    let rect = Rect::from_min_size(
+                        pos2(origin.x + x + width - 3.0, top),
+                        vec2(6.0, header_height),
+                    );
+                    let response = ui
+                        .interact(
+                            rect,
+                            ui.id().with(("column-edge", column)),
+                            Sense::click_and_drag(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::ResizeColumn);
+                    let fit = response
+                        .double_clicked()
+                        .then(|| widest(ui, document, sheet, column, zoom, palette));
+                    if let Some(Some(size)) = fit {
+                        edge = Some(Edge::Released(Resize {
+                            column: true,
+                            index: column,
+                            size,
+                        }));
+                    } else if let Some(change) =
+                        dragged(&response, resizing, true, column, width / zoom, zoom)
+                    {
+                        edge = Some(change);
+                    }
+                }
+                for row in rows.clone() {
+                    let (y, height) = metrics.row(row);
+                    let rect = Rect::from_min_size(
+                        pos2(left, origin.y + y + height - 3.0),
+                        vec2(header_width, 6.0),
+                    );
+                    let response = ui
+                        .interact(rect, ui.id().with(("row-edge", row)), Sense::drag())
+                        .on_hover_cursor(egui::CursorIcon::ResizeRow);
+                    if let Some(change) =
+                        dragged(&response, resizing, false, row, height / zoom, zoom)
+                    {
+                        edge = Some(change);
+                    }
+                }
+
                 // A press picks the cell under it, or with Shift stretches the
                 // selection to it, and a drag goes on stretching it. The cell
                 // is the one under where the button went down: a frame can
@@ -904,6 +978,29 @@ impl SheetView {
             });
 
         self.page_rows = page_rows;
+        match edge {
+            Some(Edge::Dragging(resize)) => {
+                if let Some(metrics) = &mut self.metrics {
+                    if resize.column {
+                        metrics.set_column(resize.index, resize.size * zoom);
+                    } else {
+                        metrics.set_row(resize.index, resize.size * zoom);
+                    }
+                }
+                self.resizing = Some(resize);
+            }
+            Some(Edge::Released(resize)) => {
+                self.resizing = None;
+                self.resize(resize, editing);
+            }
+            None => {}
+        }
+        let Some(document) = &self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
         let used = (sheet.used_rows, sheet.used_columns);
         let grid = self
             .metrics
@@ -927,6 +1024,26 @@ impl SheetView {
         if self.editor.is_none() {
             self.arrow_keys(ui, grid, used);
         }
+    }
+
+    /// Write a column's width or a row's height into the document, as one
+    /// step to undo.
+    fn resize(&mut self, resize: Resize, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let size = odox_core::Length(resize.size.max(1.0));
+        let done = if resize.column {
+            document.set_column_width(self.sheet, resize.index, size)
+        } else {
+            document.set_row_height(self.sheet, resize.index, size)
+        };
+        match done {
+            Ok(()) => editing.record_snapshot(before, None),
+            Err(refused) => self.notice = Some(notice(&refused)),
+        }
+        self.metrics = None;
     }
 
     /// Open the editor on the picked cell when the keys ask for it: Enter or
@@ -1107,6 +1224,7 @@ impl SheetView {
             return false;
         }
         editing.record(&document.document.content);
+        self.values_changed = true;
         for (r, c, value) in writes {
             if let Err(refused) = document.set_cell(sheet, r, c, value) {
                 self.notice = Some(notice(&refused));
@@ -1129,6 +1247,7 @@ impl SheetView {
             return;
         }
         editing.record(&document.document.content);
+        self.values_changed = true;
         match document.set_cell(self.sheet, row, column, value) {
             Ok(()) => self.metrics = None,
             Err(refused) => self.notice = Some(notice(&refused)),
@@ -1223,6 +1342,73 @@ const MOVES: [Key; 9] = [
     Key::End,
     Key::A,
 ];
+
+/// What a drag on a header's edge did this frame: a size, from the one the
+/// column or row had when the drag began and the pointer's travel since.
+fn dragged(
+    response: &egui::Response,
+    resizing: Option<Resize>,
+    column: bool,
+    index: usize,
+    size: f32,
+    zoom: f32,
+) -> Option<Edge> {
+    let ours = resizing.filter(|r| r.column == column && r.index == index);
+    let travel = if column {
+        response.drag_delta().x
+    } else {
+        response.drag_delta().y
+    };
+    let resize = Resize {
+        column,
+        index,
+        size: (ours.map_or(size, |r| r.size) + travel / zoom).max(2.0),
+    };
+    if response.drag_stopped() {
+        Some(Edge::Released(resize))
+    } else if response.dragged() {
+        Some(Edge::Dragging(resize))
+    } else {
+        None
+    }
+}
+
+/// The width a column needs for the widest text in it, in points, padding
+/// included: `None` for a column with no text.
+fn widest(
+    ui: &Ui,
+    document: &SheetDocument,
+    sheet: &Sheet,
+    column: usize,
+    zoom: f32,
+    palette: format::Palette,
+) -> Option<f32> {
+    (0..sheet.used_rows)
+        .filter_map(|row| {
+            let cell = document.cell(sheet, row, column)?;
+            if cell.covered || cell.columns_spanned() > 1 {
+                return None;
+            }
+            let text = cell.text();
+            if text.is_empty() {
+                return None;
+            }
+            let style = document.cell_style(sheet, Some(&cell), column);
+            let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+            let width = ui.fonts_mut(|fonts| {
+                text.lines()
+                    .map(|line| {
+                        fonts
+                            .layout_no_wrap(line.to_owned(), format.font_id.clone(), format.color)
+                            .size()
+                            .x
+                    })
+                    .fold(0.0_f32, f32::max)
+            });
+            Some(width / zoom + 6.0 + 2.0)
+        })
+        .reduce(f32::max)
+}
 
 /// Where Ctrl and an arrow go along one row or column, from `from` towards 0
 /// or towards `last`: to the end of the block of filled cells it is in, or,

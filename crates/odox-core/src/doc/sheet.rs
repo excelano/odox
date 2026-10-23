@@ -11,6 +11,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod restructure;
+mod size;
 pub use restructure::{Blocked, Restructure};
 
 use std::ops::Range;

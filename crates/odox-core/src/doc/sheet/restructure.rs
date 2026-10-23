@@ -243,7 +243,7 @@ fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
 }
 
 /// The same for the column definitions.
-fn columns_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
+pub(super) fn columns_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
     fn walk(
         parent: &Element,
         path: &mut Vec<usize>,

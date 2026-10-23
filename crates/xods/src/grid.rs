@@ -91,6 +91,16 @@ impl Metrics {
         at(&self.columns, index)
     }
 
+    /// Draw a column at another width, moving every column after it.
+    pub fn set_column(&mut self, index: usize, width: f32) {
+        set_size(&mut self.columns, index, width);
+    }
+
+    /// Draw a row at another height, moving every row below it.
+    pub fn set_row(&mut self, index: usize, height: f32) {
+        set_size(&mut self.rows, index, height);
+    }
+
     /// The row an offset falls in, for a pointer.
     pub fn row_at(&self, offset: f32) -> usize {
         index_at(&self.rows, offset)
@@ -99,6 +109,16 @@ impl Metrics {
     /// The column an offset falls in.
     pub fn column_at(&self, offset: f32) -> usize {
         index_at(&self.columns, offset)
+    }
+}
+
+fn set_size(offsets: &mut [f32], index: usize, size: f32) {
+    if index + 1 >= offsets.len() {
+        return;
+    }
+    let change = size.max(MINIMUM) - (offsets[index + 1] - offsets[index]);
+    for offset in &mut offsets[index + 1..] {
+        *offset += change;
     }
 }
 
@@ -156,6 +176,17 @@ mod tests {
             rows: vec![0.0, 10.0, 25.0, 45.0],
             columns: vec![0.0, 20.0, 40.0],
         }
+    }
+
+    #[test]
+    fn resizing_one_column_moves_the_ones_after_it() {
+        let mut metrics = metrics();
+        let (left, _) = metrics.column(1);
+        let total = metrics.size().0;
+        let (_, width) = metrics.column(0);
+        metrics.set_column(0, width + 10.0);
+        assert_eq!(metrics.column(1).0, left + 10.0);
+        assert_eq!(metrics.size().0, total + 10.0);
     }
 
     #[test]
