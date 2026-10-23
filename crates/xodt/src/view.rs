@@ -194,6 +194,7 @@ impl View for TextView {
         // width the document asked for; wider, the page shrinks to fit rather
         // than being cut off.
         let page = document.text_width() * zoom;
+        let page_height = document.text_height() * zoom;
         let margin = 24.0 * zoom;
 
         if edit_mode && let Some(root) = document.body_path() {
@@ -253,6 +254,10 @@ impl View for TextView {
                         .inner_margin(margin)
                         .show(ui, |ui| {
                             ui.set_width(width);
+                            // At least one page tall, however little is on
+                            // it, shrunk with the page when the window is
+                            // narrower.
+                            ui.set_min_height(page_height * width / page);
                             let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
                             flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();

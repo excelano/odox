@@ -86,6 +86,21 @@ impl TextDocument {
         (layout.width.points() - left - right).max(1.0)
     }
 
+    /// The height of a page's body text: the page less its top and bottom
+    /// margins.
+    pub fn text_height(&self) -> f32 {
+        let layout = self.page_layout();
+        let top = layout
+            .margin
+            .top
+            .map_or(0.0, super::super::value::Length::points);
+        let bottom = layout
+            .margin
+            .bottom
+            .map_or(0.0, super::super::value::Length::points);
+        (layout.height.points() - top - bottom).max(1.0)
+    }
+
     /// The document's headings, as an outline for navigating it: each heading's
     /// level, its text, and its position among the body's children.
     ///
