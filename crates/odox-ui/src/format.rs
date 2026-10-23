@@ -169,7 +169,13 @@ pub fn text_format(
         _ => (1.0, Align::BOTTOM),
     };
 
-    let color = properties.color.map_or(palette.ink, color32);
+    // Pure black is read as no colour at all: spreadsheet producers write it
+    // into every cell whether an author chose it or not, as they write a
+    // link's blue, and left as set it is black on a dark window's paper.
+    let color = properties
+        .color
+        .filter(|color| *color != Color { r: 0, g: 0, b: 0 })
+        .map_or(palette.ink, color32);
     let line = Stroke::new((size * zoom * 0.06).max(1.0), color);
 
     TextFormat {
@@ -279,6 +285,18 @@ mod tests {
         let navy = Color32::from_rgb(0x1f, 0x3a, 0x68);
         assert_eq!(light.on(navy).ink, dark.ink);
         assert_eq!(dark.on(Color32::TRANSPARENT).ink, dark.ink, "no ground");
+    }
+
+    #[test]
+    fn pure_black_follows_the_theme_as_no_colour_does() {
+        let black = TextProperties {
+            color: Some(Color { r: 0, g: 0, b: 0 }),
+            ..TextProperties::default()
+        };
+        let dark = Palette::for_theme(true);
+        assert_eq!(text_format(&black, 12.0, 1.0, dark).color, dark.ink);
+        let light = Palette::for_theme(false);
+        assert_eq!(text_format(&black, 12.0, 1.0, light).color, light.ink);
     }
 
     #[test]

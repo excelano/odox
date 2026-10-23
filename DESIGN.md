@@ -140,7 +140,9 @@ and ink turn dark together with a dark window, matching the chrome around
 them, so a document that colours nothing stays legible in either. A colour the
 document does set is drawn as set regardless — including text coloured dark
 against a page left unset, which the theme cannot then save from landing on
-now-dark paper.
+now-dark paper. Pure black is the exception and counts as no colour: spreadsheet
+producers write it into every cell whether an author chose it or not, so left
+as set it would put most real workbooks black on a dark window.
 
 **Uncoloured text on a ground the document paints takes the ink that stands out
 against it.** A cell's or a paragraph's fill, a slide's background and a
