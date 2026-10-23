@@ -29,6 +29,7 @@ use crate::find::Highlights;
 use crate::flow::{Flow, Pictures};
 use crate::flow_model::PageEditor;
 use crate::format::{self, Palette};
+use crate::i18n::t;
 
 /// A page, and where on screen it is being drawn.
 pub struct Canvas<'a> {
@@ -474,7 +475,28 @@ impl Canvas<'_> {
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
         self.lay_out(ui, &content, placed, picture, false, prefix.as_ref());
+        self.hint(ui, shape, &content, rect, prefix.is_some() && !picture);
         self.palette = palette;
+    }
+
+    /// What an empty placeholder on a slide being edited is for, said faintly
+    /// across it, so that a new slide shows where to type.
+    fn hint(&self, ui: &Ui, shape: &Element, content: &Element, rect: Rect, own: bool) {
+        if !own || self.page_editor.is_none() || !content.plain_text().trim().is_empty() {
+            return;
+        }
+        let hint = match shape.attr(&Ns::Presentation, "class") {
+            Some("title") => t("Click to add a title"),
+            Some("subtitle" | "outline" | "text") => t("Click to add text"),
+            _ => return,
+        };
+        self.painter(ui).text(
+            rect.center(),
+            eframe::egui::Align2::CENTER_CENTER,
+            hint,
+            eframe::egui::FontId::proportional(18.0 * self.scale),
+            self.palette.ink.gamma_multiply(0.4),
+        );
     }
 
     /// A picture in a frame that is turned, drawn as its own four corners.

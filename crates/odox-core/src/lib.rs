@@ -29,6 +29,7 @@
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod blank;
 pub mod doc;
 pub mod draw;
 pub mod edit;

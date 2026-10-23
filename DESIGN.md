@@ -220,6 +220,19 @@ its keys, puts the window full screen and fills the central panel with black,
 and the view draws one slide as large as the screen allows, keeping its shape.
 It is the view's own mode, so the keys that move through a show are the view's.
 
+**File > New, and Ctrl+N, starts a blank document** in a window that has none,
+and otherwise starts another copy of the application with `--new`, which opens
+one in a window of its own: a window holds one document, as it does for Open.
+`odox_core::blank` writes each kind as a whole package that is then read like
+any other: a text document with one empty paragraph, a spreadsheet with one
+sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
+an empty title. The default text style is in the reader's language, and the page
+is Letter where the reader's country prints on it (the United States and
+Canada) and A4 elsewhere. A blank document opens in edit mode, untitled, with
+the caret in the first paragraph where the view has one; Save asks where to
+write it, offering "Untitled". On a slide being edited, an empty title or text
+placeholder says faintly what it is for.
+
 ## §8 Language
 
 Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.

@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use eframe::egui::{self, Ui};
-use egui_richedit::Selection;
+use egui_richedit::{Model, Selection};
 use odox_core::Document;
 use odox_core::doc::TextDocument;
 use odox_ui::find::{Match, Replaced, in_paragraphs};
@@ -34,6 +34,9 @@ pub struct TextView {
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
+    /// A blank document was opened, and the caret is to go into its first
+    /// paragraph when the page is next drawn.
+    begin: bool,
     export: Export,
 }
 
@@ -48,6 +51,7 @@ impl Default for TextView {
             found: Found::default(),
             menu: MenuState::offering_blocks(true),
             command: None,
+            begin: false,
             export: Export::default(),
         }
     }
@@ -75,6 +79,14 @@ impl View for TextView {
         self.found.clear();
         self.load_fonts(ctx);
         Ok(())
+    }
+
+    fn blank(&self, language: &str) -> Vec<u8> {
+        odox_core::blank::text(language)
+    }
+
+    fn begin(&mut self) {
+        self.begin = true;
     }
 
     fn close(&mut self) {
@@ -189,6 +201,12 @@ impl View for TextView {
                 content, styles, ..
             } = &mut document.document;
             let mut model = FlowModel::new(content, styles, root, editing);
+            if std::mem::take(&mut self.begin)
+                && let Some(first) = model.first()
+            {
+                self.page
+                    .select(Selection::caret(egui_richedit::Position::new(first, 0)));
+            }
             let pressed = toolbar::text(ui, &self.page, &model);
             let command = self.command.take();
             let mark = pressed.mark.or(match command {

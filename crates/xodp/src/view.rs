@@ -149,6 +149,10 @@ impl View for SlideView {
         Ok(())
     }
 
+    fn blank(&self, language: &str) -> Vec<u8> {
+        odox_core::blank::presentation(language)
+    }
+
     fn close(&mut self) {
         self.document = None;
         self.pictures.clear();

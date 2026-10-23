@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-22 22:40-0500\n"
+"POT-Creation-Date: 2026-10-22 22:50-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,7 +25,9 @@ msgstr ""
 msgid "The pictures could not be described: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:149
+#: crates/odox-ui/src/export.rs:149 crates/odox-ui/src/shell.rs:287
+#: crates/odox-ui/src/shell.rs:368 crates/odox-ui/src/shell.rs:450
+#: crates/odox-ui/src/shell.rs:466
 msgid "Untitled"
 msgstr ""
 
@@ -45,7 +47,7 @@ msgstr ""
 msgid "{family} may not be embedded, so {used} was used instead."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:190 crates/odox-ui/src/shell.rs:362
+#: crates/odox-ui/src/export.rs:190 crates/odox-ui/src/shell.rs:405
 msgid "{file} could not be saved: {reason}"
 msgstr ""
 
@@ -96,8 +98,8 @@ msgstr ""
 msgid "Mark the rest as decoration"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:301 crates/odox-ui/src/shell.rs:433
-#: crates/xods/src/view.rs:823
+#: crates/odox-ui/src/export.rs:301 crates/odox-ui/src/shell.rs:480
+#: crates/xods/src/view.rs:835
 msgid "Cancel"
 msgstr ""
 
@@ -121,7 +123,7 @@ msgstr ""
 msgid "{current} of {count}"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:179 crates/odox-ui/src/shell.rs:634
+#: crates/odox-ui/src/find_bar.rs:179 crates/odox-ui/src/shell.rs:685
 msgid "Close"
 msgstr ""
 
@@ -138,126 +140,146 @@ msgid "Replace all"
 msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:97 crates/odox-ui/src/i18n.rs:101
-#: crates/odox-ui/src/shell.rs:620 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/shell.rs:667 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:124
-#: crates/xods/src/view.rs:390 crates/xodt/src/view.rs:60
+#: crates/xods/src/view.rs:390 crates/xodt/src/view.rs:64
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:253
+#: crates/odox-ui/src/shapes.rs:489
+msgid "Click to add a title"
+msgstr ""
+
+#: crates/odox-ui/src/shapes.rs:490
+msgid "Click to add text"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:265
 msgid "{file} could not be read: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:423
+#: crates/odox-ui/src/shell.rs:280
+msgid "A new window could not be opened: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:470
 msgid "Save changes to {file}?"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:424
+#: crates/odox-ui/src/shell.rs:471
 msgid "The document has changes that are not saved."
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:427 crates/odox-ui/src/shell.rs:643
+#: crates/odox-ui/src/shell.rs:474 crates/odox-ui/src/shell.rs:694
 msgid "Save"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:430
+#: crates/odox-ui/src/shell.rs:477
 msgid "Discard"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:576 crates/odox-ui/src/shell.rs:587
+#: crates/odox-ui/src/shell.rs:623 crates/odox-ui/src/shell.rs:634
 msgid "Dismiss"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:621 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:668
+msgid "New"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:672 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:627 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:678 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:650
+#: crates/odox-ui/src/shell.rs:701
 msgid "Save as…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:660
+#: crates/odox-ui/src/shell.rs:711
 msgid "Quit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:665
+#: crates/odox-ui/src/shell.rs:716
 msgid "Edit"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:669
+#: crates/odox-ui/src/shell.rs:720
 msgid "View"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:670
+#: crates/odox-ui/src/shell.rs:721
 msgid "Zoom in"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:673
+#: crates/odox-ui/src/shell.rs:724
 msgid "Zoom out"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:676
+#: crates/odox-ui/src/shell.rs:727
 msgid "Actual size"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:680
+#: crates/odox-ui/src/shell.rs:731
 msgid "Show the side panel"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:686
+#: crates/odox-ui/src/shell.rs:737
 msgid "{percent}%"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:689
+#: crates/odox-ui/src/shell.rs:740
 msgid "Editing"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:699
+#: crates/odox-ui/src/shell.rs:750
 msgid "Undo"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:706
+#: crates/odox-ui/src/shell.rs:757
 msgid "Redo"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:714
+#: crates/odox-ui/src/shell.rs:765
 msgid "Find…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:723
+#: crates/odox-ui/src/shell.rs:774
 msgid "Replace…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:731
+#: crates/odox-ui/src/shell.rs:782
 msgid "Edit mode"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:735
+#: crates/odox-ui/src/shell.rs:786
 msgid "Open documents in edit mode"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:741
+#: crates/odox-ui/src/shell.rs:792
 msgid "The setting could not be saved: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:799
+#: crates/odox-ui/src/shell.rs:850
 msgid "{replaced} replaced"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:802
+#: crates/odox-ui/src/shell.rs:853
 msgid "{replaced} replaced, {skipped} left"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:833
+#: crates/odox-ui/src/shell.rs:884
 msgid "Open a document…"
+msgstr ""
+
+#: crates/odox-ui/src/shell.rs:888
+msgid "Start a new one"
 msgstr ""
 
 #: crates/odox-ui/src/toolbar.rs:47 crates/odox-ui/src/toolbar.rs:136
@@ -324,219 +346,219 @@ msgstr ""
 msgid "OpenDocument Presentation"
 msgstr ""
 
-#: crates/xodp/src/view.rs:229 crates/xodt/src/view.rs:130
+#: crates/xodp/src/view.rs:233 crates/xodt/src/view.rs:142
 msgid "Format"
 msgstr ""
 
-#: crates/xodp/src/view.rs:239
+#: crates/xodp/src/view.rs:243
 msgid "Slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:241
+#: crates/xodp/src/view.rs:245
 msgid "Duplicate slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:242
+#: crates/xodp/src/view.rs:246
 msgid "Delete slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:244
+#: crates/xodp/src/view.rs:248
 msgid "Move slide earlier"
 msgstr ""
 
-#: crates/xodp/src/view.rs:249
+#: crates/xodp/src/view.rs:253
 msgid "Move slide later"
 msgstr ""
 
-#: crates/xodp/src/view.rs:344
+#: crates/xodp/src/view.rs:348
 msgid "This presentation has no slides."
 msgstr ""
 
-#: crates/xodp/src/view.rs:471
+#: crates/xodp/src/view.rs:475
 msgid "Slides"
 msgstr ""
 
-#: crates/xodp/src/view.rs:504
+#: crates/xodp/src/view.rs:508
 msgid "Show the speaker's notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:506
+#: crates/xodp/src/view.rs:510
 msgid "Start the slideshow"
 msgstr ""
 
-#: crates/xodp/src/view.rs:511
+#: crates/xodp/src/view.rs:515
 msgid "Start the slideshow from this slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:943
+#: crates/xodp/src/view.rs:947
 msgid "Notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:952
+#: crates/xodp/src/view.rs:956
 msgid "This slide has no notes."
 msgstr ""
 
-#: crates/xods/src/view.rs:485
-msgid "Sheet"
-msgstr ""
-
-#: crates/xods/src/view.rs:487
-msgid "Insert row above"
-msgstr ""
-
-#: crates/xods/src/view.rs:488
-msgid "Insert row below"
-msgstr ""
-
-#: crates/xods/src/view.rs:489
-msgid "Insert column left"
-msgstr ""
-
-#: crates/xods/src/view.rs:490
-msgid "Insert column right"
-msgstr ""
-
-#: crates/xods/src/view.rs:491
-msgid "Delete row"
-msgstr ""
-
-#: crates/xods/src/view.rs:492
-msgid "Delete column"
-msgstr ""
-
-#: crates/xods/src/view.rs:611
-msgid "Freeze rows and columns"
-msgstr ""
-
-#: crates/xods/src/view.rs:613
-msgid "Unfreeze rows and columns"
-msgstr ""
-
-#: crates/xods/src/view.rs:620
-msgid "Copy the sheet as tab-separated text"
-msgstr ""
-
-#: crates/xods/src/view.rs:713
-msgid "Add a sheet"
-msgstr ""
-
-#: crates/xods/src/view.rs:714
-msgid "Rename the sheet…"
-msgstr ""
-
-#: crates/xods/src/view.rs:715
-msgid "Delete the sheet"
-msgstr ""
-
-#: crates/xods/src/view.rs:717
-msgid "Move the sheet left"
-msgstr ""
-
-#: crates/xods/src/view.rs:722
-msgid "Move the sheet right"
-msgstr ""
-
-#: crates/xods/src/view.rs:804
-msgid "Rename the sheet"
-msgstr ""
-
-#: crates/xods/src/view.rs:820
-msgid "Rename"
-msgstr ""
-
-#: crates/xods/src/view.rs:948
-msgid "Sum: {sum}"
-msgstr ""
-
-#: crates/xods/src/view.rs:950
-msgid "Average: {average}"
-msgstr ""
-
-#: crates/xods/src/view.rs:955
-msgid "Count: {count}"
-msgstr ""
-
-#: crates/xods/src/view.rs:1862
+#: crates/xods/src/view.rs:425 crates/xods/src/view.rs:1877
 msgid "Sheet{number}"
 msgstr ""
 
-#: crates/xods/src/view.rs:1871
+#: crates/xods/src/view.rs:497
+msgid "Sheet"
+msgstr ""
+
+#: crates/xods/src/view.rs:499
+msgid "Insert row above"
+msgstr ""
+
+#: crates/xods/src/view.rs:500
+msgid "Insert row below"
+msgstr ""
+
+#: crates/xods/src/view.rs:501
+msgid "Insert column left"
+msgstr ""
+
+#: crates/xods/src/view.rs:502
+msgid "Insert column right"
+msgstr ""
+
+#: crates/xods/src/view.rs:503
+msgid "Delete row"
+msgstr ""
+
+#: crates/xods/src/view.rs:504
+msgid "Delete column"
+msgstr ""
+
+#: crates/xods/src/view.rs:623
+msgid "Freeze rows and columns"
+msgstr ""
+
+#: crates/xods/src/view.rs:625
+msgid "Unfreeze rows and columns"
+msgstr ""
+
+#: crates/xods/src/view.rs:632
+msgid "Copy the sheet as tab-separated text"
+msgstr ""
+
+#: crates/xods/src/view.rs:725
+msgid "Add a sheet"
+msgstr ""
+
+#: crates/xods/src/view.rs:726
+msgid "Rename the sheet…"
+msgstr ""
+
+#: crates/xods/src/view.rs:727
+msgid "Delete the sheet"
+msgstr ""
+
+#: crates/xods/src/view.rs:729
+msgid "Move the sheet left"
+msgstr ""
+
+#: crates/xods/src/view.rs:734
+msgid "Move the sheet right"
+msgstr ""
+
+#: crates/xods/src/view.rs:816
+msgid "Rename the sheet"
+msgstr ""
+
+#: crates/xods/src/view.rs:832
+msgid "Rename"
+msgstr ""
+
+#: crates/xods/src/view.rs:960
+msgid "Sum: {sum}"
+msgstr ""
+
+#: crates/xods/src/view.rs:962
+msgid "Average: {average}"
+msgstr ""
+
+#: crates/xods/src/view.rs:967
+msgid "Count: {count}"
+msgstr ""
+
+#: crates/xods/src/view.rs:1886
 msgid "There is nothing there to change."
 msgstr ""
 
-#: crates/xods/src/view.rs:1872
+#: crates/xods/src/view.rs:1887
 msgid "A merged cell is in the way: this would cut through it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1874
+#: crates/xods/src/view.rs:1889
 msgid "A formula holds [{reference}], which this version cannot read."
 msgstr ""
 
-#: crates/xods/src/view.rs:1878
+#: crates/xods/src/view.rs:1893
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr ""
 
-#: crates/xods/src/view.rs:1881
+#: crates/xods/src/view.rs:1896
 msgid "Another sheet already has that name."
 msgstr ""
 
-#: crates/xods/src/view.rs:1883
+#: crates/xods/src/view.rs:1898
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
 msgstr ""
 
-#: crates/xods/src/view.rs:1885
+#: crates/xods/src/view.rs:1900
 msgid "A workbook keeps at least one sheet to show."
 msgstr ""
 
-#: crates/xods/src/view.rs:1888
+#: crates/xods/src/view.rs:1903
 msgid "conditional formats"
 msgstr ""
 
-#: crates/xods/src/view.rs:1889
+#: crates/xods/src/view.rs:1904
 msgid "validations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1890
+#: crates/xods/src/view.rs:1905
 msgid "database ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1891
+#: crates/xods/src/view.rs:1906
 msgid "pivot tables"
 msgstr ""
 
-#: crates/xods/src/view.rs:1892
+#: crates/xods/src/view.rs:1907
 msgid "consolidations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1893
+#: crates/xods/src/view.rs:1908
 msgid "charts and objects"
 msgstr ""
 
-#: crates/xods/src/view.rs:1894
+#: crates/xods/src/view.rs:1909
 msgid "print ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1895
+#: crates/xods/src/view.rs:1910
 msgid "shapes anchored to cells"
 msgstr ""
 
-#: crates/xods/src/view.rs:1898
+#: crates/xods/src/view.rs:1913
 msgid "This document has {what}, which this version cannot update to match."
 msgstr ""
 
-#: crates/xods/src/view.rs:1908
+#: crates/xods/src/view.rs:1923
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 
-#: crates/xods/src/view.rs:1909
+#: crates/xods/src/view.rs:1924
 msgid "This cell is covered by the one that spans it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1913
+#: crates/xods/src/view.rs:1928
 msgid "There is no cell there."
 msgstr ""
 
-#: crates/xods/src/view.rs:1954
+#: crates/xods/src/view.rs:1969
 msgid "{whole}.{fraction}"
 msgstr ""
 
@@ -544,18 +566,18 @@ msgstr ""
 msgid "OpenDocument Text"
 msgstr ""
 
-#: crates/xodt/src/view.rs:175
+#: crates/xodt/src/view.rs:187
 msgid "This document has no text in it."
 msgstr ""
 
-#: crates/xodt/src/view.rs:263
+#: crates/xodt/src/view.rs:281
 msgid "Outline"
 msgstr ""
 
-#: crates/xodt/src/view.rs:272
+#: crates/xodt/src/view.rs:290
 msgid "(untitled)"
 msgstr ""
 
-#: crates/xodt/src/view.rs:305
+#: crates/xodt/src/view.rs:323
 msgid "Copy the document as text"
 msgstr ""

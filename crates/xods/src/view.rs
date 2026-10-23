@@ -421,6 +421,10 @@ impl View for SheetView {
         Ok(())
     }
 
+    fn blank(&self, language: &str) -> Vec<u8> {
+        odox_core::blank::spreadsheet(language, &fill(t("Sheet{number}"), &[("number", "1")]))
+    }
+
     fn close(&mut self) {
         self.document = None;
         self.metrics = None;

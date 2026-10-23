@@ -61,6 +61,14 @@ pub trait View {
     /// A message to show the person, already translated.
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String>;
 
+    /// A new document of the view's kind, with nothing in it, for a person
+    /// who reads `language`: what File > New opens.
+    fn blank(&self, language: &str) -> Vec<u8>;
+
+    /// A blank document was just opened, for a person to begin writing in:
+    /// the caret goes where they begin, for a view that has one.
+    fn begin(&mut self) {}
+
     /// Forget the document.
     fn close(&mut self);
 
@@ -200,6 +208,10 @@ enum Pending {
     Quit,
 }
 
+/// The argument a window is started with to begin a new document, which is
+/// how File > New opens one beside a document already open.
+const NEW: &str = "--new";
+
 /// How far a zoom step moves, and the limits.
 const ZOOM_STEP: f32 = 1.1;
 const ZOOM_MIN: f32 = 0.4;
@@ -254,6 +266,35 @@ impl<V: View> Shell<V> {
                     &[("file", &name_of(path)), ("reason", &e.to_string())],
                 ));
             }
+        }
+    }
+
+    /// Start a new document: in this window when it has none, and otherwise
+    /// in a window of its own, which is another of this application.
+    fn new_document(&mut self, ctx: &egui::Context) {
+        if self.view.is_open() {
+            let started = std::env::current_exe()
+                .and_then(|program| std::process::Command::new(program).arg(NEW).spawn());
+            if let Err(e) = started {
+                self.error = Some(fill(
+                    t("A new window could not be opened: {reason}"),
+                    &[("reason", &e.to_string())],
+                ));
+            }
+            return;
+        }
+        let bytes = self.view.blank(&crate::i18n::reading_language());
+        match self.view.open(ctx, &bytes, Path::new(t("Untitled"))) {
+            Ok(()) => {
+                self.path = None;
+                self.error = None;
+                self.settling = true;
+                self.editing.reset();
+                // A blank document is there to be written in.
+                self.editing.on = true;
+                self.view.begin();
+            }
+            Err(message) => self.error = Some(message),
         }
     }
 
@@ -323,6 +364,8 @@ impl<V: View> Shell<V> {
             if let Some(directory) = path.parent() {
                 dialog = dialog.set_directory(directory);
             }
+        } else {
+            dialog = dialog.set_file_name(format!("{}.{}", t("Untitled"), self.product.extension));
         }
         let Some(mut path) = dialog.save_file() else {
             return false;
@@ -403,7 +446,8 @@ impl<V: View> Shell<V> {
             .view
             .title()
             .filter(|title| !title.trim().is_empty())
-            .or_else(|| self.path.as_deref().map(name_of));
+            .or_else(|| self.path.as_deref().map(name_of))
+            .or_else(|| self.view.is_open().then(|| t("Untitled").to_owned()));
         let mark = if self.editing.modified() { "● " } else { "" };
         match document {
             Some(name) => format!("{mark}{name} — {}", self.product.id),
@@ -416,7 +460,10 @@ impl<V: View> Shell<V> {
         if self.pending.is_none() {
             return;
         }
-        let file = self.path.as_deref().map(name_of).unwrap_or_default();
+        let file = self
+            .path
+            .as_deref()
+            .map_or_else(|| t("Untitled").to_owned(), name_of);
         // Save, discard, or neither. `None` until the person answers.
         let mut answer = None;
         egui::Modal::new(egui::Id::new("unsaved")).show(ctx, |ui| {
@@ -618,13 +665,17 @@ impl<V: View> Shell<V> {
     fn menu_bar(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button(t("File"), |ui| {
+                if ui.button(t("New")).clicked() {
+                    ui.close();
+                    self.new_document(ctx);
+                }
                 if ui.button(t("Open…")).clicked() {
                     ui.close();
                     self.request(ctx, Pending::AskForAFile);
                 }
-                let open = self.path.is_some();
+                let open = self.view.is_open();
                 if ui
-                    .add_enabled(open, egui::Button::new(t("Reload")))
+                    .add_enabled(self.path.is_some(), egui::Button::new(t("Reload")))
                     .clicked()
                 {
                     ui.close();
@@ -834,6 +885,10 @@ impl<V: View> Shell<V> {
                 let ctx = ui.ctx().clone();
                 self.ask_for_a_file(&ctx);
             }
+            if ui.button(t("Start a new one")).clicked() {
+                let ctx = ui.ctx().clone();
+                self.new_document(&ctx);
+            }
         });
     }
 
@@ -893,6 +948,9 @@ impl<V: View> Shell<V> {
         }
         if pressed(Key::E) && self.view.is_open() {
             self.editing.on = !self.editing.on;
+        }
+        if pressed(Key::N) {
+            self.new_document(ctx);
         }
         if pressed(Key::O) {
             self.request(ctx, Pending::AskForAFile);
@@ -1045,8 +1103,12 @@ pub fn run<V: View + 'static>(
             #[cfg(target_os = "macos")]
             crate::opened_document::wake_with(&cc.egui_ctx);
             let mut shell = Shell::new(product, build(&cc.egui_ctx));
-            if let Some(path) = first {
-                shell.open(&cc.egui_ctx, &path);
+            match first {
+                Some(argument) if argument.as_os_str() == NEW => {
+                    shell.new_document(&cc.egui_ctx);
+                }
+                Some(path) => shell.open(&cc.egui_ctx, &path),
+                None => {}
             }
             Ok(Box::new(shell))
         }),

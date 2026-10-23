@@ -51,6 +51,17 @@ pub struct Package {
 const MIMETYPE: &str = "mimetype";
 
 impl Package {
+    /// A package of these entries, in this order, with the media type the
+    /// `mimetype` entry among them declares.
+    pub(crate) fn from_parts(parts: Vec<Part>) -> Self {
+        let media_type = parts
+            .iter()
+            .find(|part| part.name == MIMETYPE)
+            .and_then(|part| std::str::from_utf8(&part.data).ok())
+            .map(ToOwned::to_owned);
+        Self { parts, media_type }
+    }
+
     /// Read a package from its bytes.
     ///
     /// # Errors
