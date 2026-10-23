@@ -537,3 +537,52 @@ fn the_corpus_spreadsheet_takes_a_value_in_the_prefixes_it_declares() {
         "LibreOffice's own type copy is written where the document declares calcext"
     );
 }
+
+fn export_fixture() -> SheetDocument {
+    let bytes = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../corpus/libreoffice/export.ods"),
+    )
+    .expect("the export fixture");
+    SheetDocument::read(&bytes).expect("it reads")
+}
+
+/// `LibreOffice` hides a sheet in its table style, not on the table.
+#[test]
+fn a_sheet_hidden_in_its_style_is_not_shown_and_hidden_rows_and_columns_are_known() {
+    let document = export_fixture();
+    let shown: Vec<(&str, bool)> = document
+        .sheets()
+        .iter()
+        .map(|sheet| (sheet.name.as_str(), sheet.visible))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            ("Orders", true),
+            ("Summary", true),
+            ("Hidden", false),
+            ("Empty", true)
+        ]
+    );
+    let orders = &document.sheets()[0];
+    assert!(orders.is_header_row(0));
+    assert!(!orders.is_header_row(1));
+    assert!(!orders.row_shown(5));
+    assert!(orders.row_shown(4));
+    assert!(!orders.column_shown(2));
+    assert!(orders.column_shown(3));
+}
+
+#[test]
+fn a_sheet_knows_its_page_and_its_print_range() {
+    let document = export_fixture();
+    let summary = &document.sheets()[1];
+    let page = document.page_layout(summary);
+    assert_eq!(page.fit, odox_core::Fit::Pages(1));
+    assert!(!page.down_first);
+    assert_eq!(document.print_range(summary), Some((0..4, 0..3)));
+    let orders = &document.sheets()[0];
+    assert!(document.page_layout(orders).down_first);
+    assert_eq!(document.print_range(orders), None);
+}

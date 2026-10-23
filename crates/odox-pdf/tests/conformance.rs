@@ -1,5 +1,5 @@
-//! Every text document in the corpus exports, and every export passes
-//! veraPDF's PDF/UA-1 profile.
+//! Every document in the corpus that a window exports exports, and every
+//! export passes veraPDF's PDF/UA-1 profile.
 //!
 //! veraPDF is a Java program and not a dependency of the build. Where it is
 //! not on the path, the exports are still made and this says that the check
@@ -11,18 +11,18 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use odox_core::doc::TextDocument;
+use odox_core::doc::{Presentation, SheetDocument, TextDocument};
 use odox_core::edit;
-use odox_pdf::{Options, Refusal, export, undescribed};
+use odox_pdf::{Exportable, Options, Refusal};
 
-fn corpus(directory: &Path, into: &mut Vec<PathBuf>) {
+fn corpus(directory: &Path, extension: &str, into: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(directory) else {
         return;
     };
     for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
         if path.is_dir() {
-            corpus(&path, into);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("odt") {
+            corpus(&path, extension, into);
+        } else if path.extension().and_then(|e| e.to_str()) == Some(extension) {
             into.push(path);
         }
     }
@@ -32,39 +32,47 @@ fn options() -> Options {
     Options {
         title: "Untitled".to_owned(),
         language: "en-US".to_owned(),
+        untitled_slide: "Slide {number}".to_owned(),
     }
 }
 
 /// The document with every undescribed figure marked decorative, which is
-/// what the export dialog's "mark all decorative" does.
-fn described(mut document: TextDocument) -> TextDocument {
-    for path in undescribed(&document).into_iter().rev() {
-        edit::set_decorative(
-            &mut document.document.content,
-            &path,
-            &mut document.document.styles,
-        )
-        .expect("marked decorative");
+/// what the export dialog's "mark the rest as decoration" does.
+fn described<D: Exportable>(mut document: D) -> D {
+    for path in document.undescribed().into_iter().rev() {
+        let odox_core::Document {
+            content, styles, ..
+        } = document.document_mut();
+        edit::set_decorative(content, &path, styles).expect("marked decorative");
     }
+    assert!(
+        document.undescribed().is_empty(),
+        "nothing left to describe"
+    );
     document
 }
 
-#[test]
-fn every_text_document_in_the_corpus_exports_as_pdf_ua() {
+/// Export every document of a kind in the corpus and put the PDFs through
+/// veraPDF.
+fn conforms<D: Exportable>(extension: &str, read: fn(&[u8]) -> Result<D, odox_core::Error>) {
     let mut paths = Vec::new();
     corpus(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus"),
+        extension,
         &mut paths,
     );
     assert!(!paths.is_empty(), "the corpus is where it was");
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("conformance");
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("conformance")
+        .join(extension);
     std::fs::create_dir_all(&out).expect("an output directory");
 
     let mut written = Vec::new();
     for path in &paths {
         let bytes = std::fs::read(path).expect("a corpus document reads");
-        let document = described(TextDocument::read(&bytes).expect("it parses"));
-        let exported = export(&document, &options())
+        let document = described(read(&bytes).expect("it parses"));
+        let exported = document
+            .export(&options())
             .unwrap_or_else(|refusal| panic!("{}: {refusal}", path.display()));
         let target = out
             .join(path.file_stem().expect("a name"))
@@ -90,6 +98,21 @@ fn every_text_document_in_the_corpus_exports_as_pdf_ua() {
 }
 
 #[test]
+fn every_text_document_in_the_corpus_exports_as_pdf_ua() {
+    conforms("odt", TextDocument::read);
+}
+
+#[test]
+fn every_spreadsheet_in_the_corpus_exports_as_pdf_ua() {
+    conforms("ods", SheetDocument::read);
+}
+
+#[test]
+fn every_presentation_in_the_corpus_exports_as_pdf_ua() {
+    conforms("odp", Presentation::read);
+}
+
+#[test]
 fn a_figure_with_nothing_to_say_is_refused_until_it_is_described() {
     let bytes = std::fs::read(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/export.odt"),
@@ -112,12 +135,12 @@ fn a_figure_with_nothing_to_say_is_refused_until_it_is_described() {
             |n| !matches!(n, odox_core::Node::Element(e) if e.is(&odox_core::Ns::Svg, "title")),
         );
 
-    assert_eq!(undescribed(&document), std::slice::from_ref(&chart));
+    assert_eq!(document.undescribed(), std::slice::from_ref(&chart));
     assert_eq!(
-        export(&document, &options()).err(),
+        document.export(&options()).err(),
         Some(Refusal::Undescribed(vec![chart.clone()]))
     );
     edit::set_alternative_text(&mut document.document.content, &chart, "A chart")
         .expect("described");
-    assert!(export(&document, &options()).is_ok());
+    assert!(document.export(&options()).is_ok());
 }

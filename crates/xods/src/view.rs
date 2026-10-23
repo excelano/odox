@@ -13,7 +13,7 @@ use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Editing, Found, View, fonts};
+use odox_ui::{Editing, Export, Found, Notice, View, fonts};
 
 use crate::grid::{Metrics, address, column_name};
 
@@ -40,6 +40,7 @@ pub struct SheetView {
     found: Found,
     /// What the Sheet menu last chose.
     sheet_command: Option<SheetCommand>,
+    export: Export,
 }
 
 /// A cell being typed into.
@@ -101,7 +102,7 @@ impl View for SheetView {
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);
         }
-        ctx.set_fonts(fonts::for_document(&parts));
+        fonts::install(ctx, &parts);
 
         // The first sheet a person can see, which is not always the first sheet:
         // a workbook may open on a hidden one.
@@ -116,6 +117,7 @@ impl View for SheetView {
         self.editor = None;
         self.notice = None;
         self.found.clear();
+        self.export = Export::default();
         Ok(())
     }
 
@@ -125,6 +127,7 @@ impl View for SheetView {
         self.editor = None;
         self.notice = None;
         self.found.clear();
+        self.export = Export::default();
     }
 
     fn is_open(&self) -> bool {
@@ -256,6 +259,9 @@ impl View for SheetView {
         if let Some(command) = self.sheet_command.take() {
             self.change_sheet(command, editing);
         }
+        if let Some(document) = &mut self.document {
+            self.export.show(ui.ctx(), document, editing);
+        }
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
         self.grid(ui, zoom, editing);
@@ -266,6 +272,15 @@ impl View for SheetView {
         // A workbook's sheets are its tabs along the bottom, where a person
         // reaches for them, so there is nothing to put beside the grid.
         false
+    }
+
+    fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {
+        ui.separator();
+        self.export.menu(ui, path);
+    }
+
+    fn take_notice(&mut self) -> Option<Notice> {
+        self.export.take_notice()
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {

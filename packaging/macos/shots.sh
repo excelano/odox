@@ -31,8 +31,9 @@
 # the reference frame as well, and edit mode, which is the Edit menu's second
 # item. The Edit menu's items are the shell's and sit in the same place in all
 # three applications: Find at 68,116 and Edit mode at 95,146, both under the
-# menu button at 53,39. Typing into a cell goes in two goes because the first
-# character opens the cell and the next two arrive before it has.
+# menu button at 53,39. The File menu is the shell's too: Export as PDF/UA at
+# 74,187 under the button at 18,39. Typing into a cell goes in two goes because
+# the first character opens the cell and the next two arrive before it has.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -85,6 +86,8 @@ for_language() {
 EDIT_MENU="--click 53,39"
 EDIT_MODE="--click 53,39 --click 95,146"
 FIND="--click 53,39 --click 68,116"
+FILE_MENU="--click 18,39"
+EXPORT="--click 18,39 --click 74,187"
 
 # One application's frames. Named with the application's own key first,
 # because all three land in the same locale directory and only the prefix
@@ -104,17 +107,23 @@ shots() {
             # A paragraph made a heading, which the outline then lists.
             shot "${key}-03-heading" $EDIT_MODE --click 840,755 --click 401,69
             shot "${key}-04-find" $FIND --type and --key return
+            # The export, offered where every application offers it.
+            shot "${key}-05-export" $FILE_MENU
             ;;
         xods)
             shot "${key}-01-document"
             shot "${key}-02-cell" --click 127,169 --type H --settle 1 --type "ex nut M6"
             shot "${key}-03-range" --click 188,147 --key shift+down --key shift+down --key shift+down --key shift+right
             shot "${key}-04-find" $FIND --type TRUE --key return
+            shot "${key}-05-export" $FILE_MENU
             ;;
         xodp)
             shot "${key}-01-document" --settle 8
             shot "${key}-02-editing" --settle 8 $EDIT_MODE --click 40,116 --double 654,428 --click 234,74 --click 256,74
             shot "${key}-03-find" --settle 8 $FIND --type 70 --key return
+            # The export asking about the deck's two undescribed pictures: the
+            # first described, the second marked as decoration.
+            shot "${key}-04-export" --settle 8 $EXPORT --settle 2 --click 730,409 --type "The Growing Liberty emblem" --click 570,515
             ;;
     esac
 }

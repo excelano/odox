@@ -500,6 +500,7 @@ impl<V: View> eframe::App for Shell<V> {
         }
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
+        crate::fonts::follow_input(&ctx);
 
         if !presenting {
             self.chrome(ui, &ctx);

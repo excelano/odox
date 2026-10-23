@@ -123,3 +123,65 @@ fn a_document_that_never_declared_libreoffices_namespace_is_given_it_to_mark_dec
     let again = TextDocument::read(&bytes).expect("it reads");
     assert_eq!(described(&again)[0].1, Description::Decorative);
 }
+
+/// A picture in one of a slide's own placeholders names a presentation style
+/// rather than a graphic one, and is marked in a style of that family: a frame
+/// may name one or the other, not both.
+#[test]
+fn a_placeholder_picture_is_marked_decorative_in_its_presentation_style() {
+    use odox_core::doc::Presentation;
+    use odox_core::{Node, Ns};
+
+    let bytes = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/export.odp"),
+    )
+    .expect("the export fixture");
+    let mut presentation = Presentation::read(&bytes).expect("it reads");
+    let path = edit::figures(&presentation.document.content)
+        .into_iter()
+        .find(|path| {
+            presentation
+                .document
+                .content
+                .at(path)
+                .and_then(|f| f.attr(&Ns::Draw, "name"))
+                == Some("Undescribed")
+        })
+        .expect("the undescribed picture");
+    let name = presentation.document.name(&Ns::Presentation, "style-name");
+    let frame = presentation
+        .document
+        .content
+        .at_mut(&path)
+        .expect("the frame");
+    frame.remove_attr(&Ns::Draw, "style-name");
+    frame.set_attr(name, "pr1");
+
+    let odox_core::Document {
+        content, styles, ..
+    } = &mut presentation.document;
+    edit::set_decorative(content, &path, styles).expect("marked");
+    let bytes = presentation.document.write_verified().expect("saved");
+    let again = Presentation::read(&bytes).expect("it reads");
+    let content = &again.document.content;
+    let frame = content.at(&path).expect("the frame");
+    assert_eq!(frame.attr(&Ns::Draw, "style-name"), None);
+    let style = frame
+        .attr(&Ns::Presentation, "style-name")
+        .expect("a presentation style");
+    let declared = content
+        .child(&Ns::Office, "automatic-styles")
+        .into_iter()
+        .flat_map(|styles| styles.children.iter())
+        .filter_map(|n| match n {
+            Node::Element(e) => Some(e),
+            _ => None,
+        })
+        .find(|e| e.attr(&Ns::Style, "name") == Some(style))
+        .expect("the style is declared");
+    assert_eq!(declared.attr(&Ns::Style, "family"), Some("presentation"));
+    assert_eq!(
+        edit::description(frame, &again.document.styles),
+        Description::Decorative
+    );
+}

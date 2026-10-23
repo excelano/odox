@@ -2396,6 +2396,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "odox-core",
  "odox-fonts",
+ "odox-pdf",
  "potext",
  "rfd",
  "zbus",
@@ -4537,9 +4538,7 @@ dependencies = [
  "eframe",
  "egui_richedit",
  "odox-core",
- "odox-pdf",
  "odox-ui",
- "rfd",
 ]
 
 [[package]]

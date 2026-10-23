@@ -192,6 +192,16 @@ impl Presentation {
             .map_or(Fill::None, |properties| properties.graphic.fill())
     }
 
+    /// Whether a slide is left out of a show, which its drawing-page style
+    /// says.
+    pub fn is_hidden(&self, slide: &Slide<'_>) -> bool {
+        slide
+            .style_name()
+            .map(|name| self.document.styles.resolve(&Family::DrawingPage, name))
+            .and_then(|properties| properties.hidden)
+            .unwrap_or(false)
+    }
+
     /// The master page's decorations: what is drawn behind a slide before
     /// anything on the slide itself.
     ///
@@ -248,6 +258,6 @@ fn presentation_default() -> PageLayout {
     PageLayout {
         width: portrait.height,
         height: portrait.width,
-        margin: portrait.margin,
+        ..portrait
     }
 }

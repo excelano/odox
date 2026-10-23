@@ -13,10 +13,9 @@ use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
-    Caret, Editing, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, fonts, page_editor,
+    Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, fonts,
+    page_editor,
 };
-
-use crate::export::Export;
 
 /// A text document, open or not.
 pub struct TextView {
@@ -160,8 +159,7 @@ impl View for TextView {
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         if let Some(document) = &mut self.document {
-            self.export
-                .show(ui.ctx(), document, &mut self.pictures, editing);
+            self.export.show(ui.ctx(), document, editing);
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
@@ -326,6 +324,6 @@ impl TextView {
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);
         }
-        ctx.set_fonts(fonts::for_document(&parts));
+        fonts::install(ctx, &parts);
     }
 }

@@ -95,6 +95,12 @@ $XODP_SLIDE2 = '40,117'
 $XODP_LABEL = '630,403'
 $XODP_BOLD = '237,70'
 $XODP_ITALIC = '259,70'
+# The File menu is the shell's and sits in the same place in all three, and
+# the export's question is centred in the window.
+$FILE_MENU = '18,40'
+$EXPORT = '74,188'
+$XODP_FIRST_PICTURE = '697,343'
+$XODP_SECOND_DECORATION = '534,449'
 
 # --- finding the built executables ------------------------------------------
 
@@ -177,6 +183,8 @@ function Get-Shots {
                 # A paragraph made a heading, which the outline then lists.
                 Frame '03-heading' @('key ctrl+e', "click $XODT_CENTRED", "click $XODT_H2")
                 Frame '04-find' @('key ctrl+f', 'type and', 'key return')
+                # The export, offered where every application offers it.
+                Frame '05-export' @("click $FILE_MENU")
             }
             'xods' {
                 Frame '01-document'
@@ -184,11 +192,15 @@ function Get-Shots {
                 # A formula's cell, with the formula shown above the grid.
                 Frame '03-formula' @("click $XODS_D5")
                 Frame '04-find' @('key ctrl+f', 'type TRUE', 'key return')
+                Frame '05-export' @("click $FILE_MENU")
             }
             'xodp' {
                 Frame '01-document'
                 Frame '02-editing' @('key ctrl+e', "click $XODP_SLIDE2", "double $XODP_LABEL", "click $XODP_BOLD", "click $XODP_ITALIC")
                 Frame '03-find' @('key ctrl+f', 'type 70', 'key return')
+                # The export asking about the deck's two undescribed pictures:
+                # the first described, the second marked as decoration.
+                Frame '04-export' @("click $FILE_MENU", "click $EXPORT", "click $XODP_FIRST_PICTURE", 'type The Growing Liberty emblem', "click $XODP_SECOND_DECORATION")
             }
         }
     }

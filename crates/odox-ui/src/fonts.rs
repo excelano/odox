@@ -11,15 +11,17 @@
 //!
 //! Faces are loaded once per document, not once per frame: egui rebuilds its
 //! glyph atlas when the font definitions change, so the families a document uses
-//! are resolved when it opens and handed over in one call.
+//! are resolved when it opens and handed over in one call. A character typed
+//! later that no loaded face has is given one then, which is the only other
+//! time the definitions change.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use eframe::egui::{FontData, FontDefinitions, FontFamily};
+use eframe::egui::{Context, Event, FontData, FontDefinitions, FontFamily, Id, ImeEvent};
 use odox_core::{Element, Ns};
 
 pub use odox_fonts::Variant;
@@ -43,6 +45,76 @@ pub fn family_of(family: &str, variant: Variant) -> FontFamily {
 /// styles name and the characters its text holds.
 pub fn for_document(parts: &[&Element]) -> FontDefinitions {
     definitions(&families_used(parts), &characters_used(parts))
+}
+
+/// The fonts a window draws with and the characters already checked against
+/// them, kept so that a character typed or pasted later that none of them has
+/// can be given a face then.
+struct Installed {
+    definitions: FontDefinitions,
+    checked: BTreeSet<char>,
+}
+
+fn installed_id() -> Id {
+    Id::new("odox-fonts-installed")
+}
+
+/// Hand a window the fonts for a document, and keep them for
+/// [`follow_input`].
+pub fn install(ctx: &Context, parts: &[&Element]) {
+    let checked = characters_used(parts);
+    let definitions = definitions(&families_used(parts), &checked);
+    ctx.set_fonts(definitions.clone());
+    let installed = Arc::new(Mutex::new(Installed {
+        definitions,
+        checked,
+    }));
+    ctx.data_mut(|data| data.insert_temp(installed_id(), installed));
+}
+
+/// Give a face to a character typed, pasted or composed this frame that none
+/// of the window's fonts has.
+///
+/// Each character is checked once, so typing costs a lookup; the glyph atlas
+/// is rebuilt only when a face is added, which for a script the document did
+/// not hold is its first character. The face takes effect from the next
+/// frame, and the family names do not change, so nothing laid out this frame
+/// asks for one that is not there.
+pub fn follow_input(ctx: &Context) {
+    let typed: BTreeSet<char> = ctx.input(|input| {
+        input
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                Event::Text(text)
+                | Event::Paste(text)
+                | Event::Ime(ImeEvent::Commit(text) | ImeEvent::Preedit { text, .. }) => Some(text),
+                _ => None,
+            })
+            .flat_map(|text| text.chars())
+            .collect()
+    });
+    if typed.is_empty() {
+        return;
+    }
+    let Some(installed) = ctx.data(|data| data.get_temp::<Arc<Mutex<Installed>>>(installed_id()))
+    else {
+        return;
+    };
+    let Ok(mut installed) = installed.lock() else {
+        return;
+    };
+    let fresh: Vec<char> = typed
+        .into_iter()
+        .filter(|c| !installed.checked.contains(c))
+        .collect();
+    if fresh.is_empty() {
+        return;
+    }
+    installed.checked.extend(fresh.iter().copied());
+    if cover(&mut installed.definitions, fresh, None) {
+        ctx.set_fonts(installed.definitions.clone());
+    }
 }
 
 /// Build the font definitions for a document: egui's own, plus a face for every
@@ -86,8 +158,20 @@ pub fn definitions(families: &BTreeSet<String>, characters: &BTreeSet<char>) -> 
         }
     }
 
+    cover(&mut definitions, characters.iter().copied(), Some(database));
+    definitions
+}
+
+/// Add a machine face for each character no face in the definitions has, at
+/// the end of every chain. Answers whether any was added. The machine's fonts
+/// are listed only once a character needs them.
+fn cover(
+    definitions: &mut FontDefinitions,
+    characters: impl IntoIterator<Item = char>,
+    mut database: Option<odox_fonts::fontdb::Database>,
+) -> bool {
     let mut added = Vec::new();
-    for &character in characters {
+    for character in characters {
         if character.is_whitespace() || character.is_control() {
             continue;
         }
@@ -98,21 +182,30 @@ pub fn definitions(families: &BTreeSet<String>, characters: &BTreeSet<char>) -> 
         if drawn {
             continue;
         }
-        let Some(face) = odox_fonts::faces_with(&database, character, Variant::default())
+        let database = database.get_or_insert_with(odox_fonts::database);
+        let Some(face) = odox_fonts::faces_with(database, character, Variant::default())
             .next()
-            .and_then(|id| load(&database, id))
+            .and_then(|id| load(database, id))
         else {
             continue;
         };
-        let key = format!("machine fallback {}", added.len());
+        let count = definitions
+            .font_data
+            .keys()
+            .filter(|key| key.starts_with(FALLBACK))
+            .count();
+        let key = format!("{FALLBACK} {count}");
         definitions.font_data.insert(key.clone(), Arc::new(face));
         added.push(key);
     }
     for chain in definitions.families.values_mut() {
         chain.extend(added.iter().cloned());
     }
-    definitions
+    !added.is_empty()
 }
+
+/// What a face added for characters the document's own fonts lack is called.
+const FALLBACK: &str = "machine fallback";
 
 /// One face of the machine's, read.
 fn load(database: &odox_fonts::fontdb::Database, id: odox_fonts::fontdb::ID) -> Option<FontData> {
@@ -242,5 +335,46 @@ mod tests {
         assert_eq!(chain.last(), Some(added[0]), "it comes last");
         let face = &defs.font_data[added[0]];
         assert!(odox_fonts::covers(&face.font, face.index, '日'));
+    }
+
+    #[test]
+    fn a_character_typed_that_no_face_has_is_given_one_once() {
+        let database = odox_fonts::database();
+        if odox_fonts::faces_with(&database, '日', Variant::default())
+            .next()
+            .is_none()
+        {
+            eprintln!("no face on this machine has 日: nothing to check");
+            return;
+        }
+        let ctx = Context::default();
+        install(&ctx, &[]);
+        let fallbacks = |ctx: &Context| {
+            let installed = ctx
+                .data(|data| data.get_temp::<Arc<Mutex<Installed>>>(installed_id()))
+                .expect("installed");
+            let installed = installed.lock().expect("not poisoned");
+            installed
+                .definitions
+                .font_data
+                .keys()
+                .filter(|key| key.starts_with(FALLBACK))
+                .count()
+        };
+        let type_in = |text: &str| {
+            let input = eframe::egui::RawInput {
+                events: vec![Event::Text(text.to_owned())],
+                ..Default::default()
+            };
+            ctx.run_ui(input, |ui| follow_input(ui.ctx()))
+                .textures_delta
+                .clear();
+        };
+        type_in("a");
+        assert_eq!(fallbacks(&ctx), 0, "egui's own font draws a");
+        type_in("日");
+        assert_eq!(fallbacks(&ctx), 1);
+        type_in("日本");
+        assert_eq!(fallbacks(&ctx), 1, "the face added draws the rest too");
     }
 }

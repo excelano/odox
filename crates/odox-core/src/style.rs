@@ -466,6 +466,8 @@ pub struct Properties {
     pub background_visible: Option<bool>,
     /// Whether the master page's decorations are drawn.
     pub background_objects_visible: Option<bool>,
+    /// Whether a slide is left out of a show, from `presentation:visibility`.
+    pub hidden: Option<bool>,
     /// A column's width, from a `table-column` style.
     pub column_width: Option<Length>,
     /// A row's height, from a `table-row` style.
@@ -481,6 +483,29 @@ pub struct PageLayout {
     pub height: Length,
     /// The margins inside it.
     pub margin: Edges<Length>,
+    /// How a spreadsheet printed on it is fitted to its pages.
+    pub fit: Fit,
+    /// Whether a spreadsheet's pages run down its columns first and then
+    /// across, which is ODF's default, or across its rows first.
+    pub down_first: bool,
+}
+
+/// How a spreadsheet is fitted to its pages, from `style:scale-to`,
+/// `style:scale-to-pages` and `scale-to-X` with `scale-to-Y`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Fit {
+    /// Drawn at a share of its size: 1 is as it is.
+    Scale(f32),
+    /// Drawn as large as it can be on no more than this many pages.
+    Pages(u32),
+    /// Drawn as large as it can be no more than this many pages across and
+    /// this many down, where each is said.
+    Within {
+        /// Pages across.
+        across: Option<u32>,
+        /// Pages down.
+        down: Option<u32>,
+    },
 }
 
 impl Default for PageLayout {
@@ -502,6 +527,8 @@ impl Default for PageLayout {
                 top: Some(Length(72.0)),
                 bottom: Some(Length(72.0)),
             },
+            fit: Fit::Scale(1.0),
+            down_first: true,
         }
     }
 }
@@ -882,6 +909,27 @@ fn page_layout(element: &Element) -> PageLayout {
         layout.margin.right = margin.right.or(layout.margin.right);
         layout.margin.top = margin.top.or(layout.margin.top);
         layout.margin.bottom = margin.bottom.or(layout.margin.bottom);
+
+        let count = |local: &str| {
+            properties
+                .attr(&Ns::Style, local)
+                .or_else(|| properties.attr(&Ns::Loext, local))
+                .and_then(|n| n.trim().parse::<u32>().ok())
+                .filter(|n| *n > 0)
+        };
+        let (across, down) = (count("scale-to-X"), count("scale-to-Y"));
+        if across.is_some() || down.is_some() {
+            layout.fit = Fit::Within { across, down };
+        } else if let Some(pages) = count("scale-to-pages") {
+            layout.fit = Fit::Pages(pages);
+        } else if let Some(share) = properties
+            .attr(&Ns::Style, "scale-to")
+            .and_then(|percent| percent.trim().strip_suffix('%')?.trim().parse::<f32>().ok())
+            .filter(|percent| *percent > 0.0)
+        {
+            layout.fit = Fit::Scale(share / 100.0);
+        }
+        layout.down_first = properties.attr(&Ns::Style, "print-page-order") != Some("ltr");
     }
     layout
 }
@@ -960,6 +1008,9 @@ impl Properties {
                     .and_then(crate::value::boolean)
                 {
                     self.background_objects_visible = Some(visible);
+                }
+                if let Some(visibility) = properties.attr(&Ns::Presentation, "visibility") {
+                    self.hidden = Some(visibility == "hidden");
                 }
             } else if properties.is(&Ns::Style, "table-column-properties") {
                 if let Some(width) = properties

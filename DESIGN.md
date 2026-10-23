@@ -30,11 +30,10 @@ turned back into a `Vec<u8>`, so one library serves a window, a sandboxed macOS
 application and a test that never reads a disk.
 
 `odox-fonts` answers which of the machine's faces a family a document names
-resolves to, and `odox-pdf` lays a text document out onto pages and writes it as
+resolves to, and `odox-pdf` lays a document out onto pages and writes it as
 tagged PDF (§12). Both sit beside `odox-ui` rather than under it: the window and
 an export ask `odox-fonts` the same question and so get the same face, and
-`odox-pdf` links neither egui nor anything that draws, which is how only `xodt`,
-the one application that exports, carries the PDF writer.
+`odox-pdf` links neither egui nor anything that draws.
 
 `egui_richedit` sits below `odox-ui` and knows nothing of ODF: it is the caret,
 the selection and the keys over paragraphs an application lays out itself, and
@@ -545,40 +544,70 @@ so a formula that is deleted with its row is not asked about what it pointed at.
 
 ## §12 Export
 
-**A text document exports as PDF/UA-1**, the accessible profile of PDF, from
-`xodt`'s File menu and nowhere else. The label says PDF/UA because the output is
-checked: krilla, the writer, runs its PDF/UA-1 validation as it writes and fails
-the export rather than producing a file that only claims to conform, and
-`crates/odox-pdf/tests/conformance.rs` puts every `.odt` in the corpus through
-veraPDF's ua1 profile. veraPDF is a Java program and not a build dependency, so
-the test says it skipped the check where it is not installed;
-`packaging/verapdf.sh` runs the same check over any documents by hand.
+**Each of the three applications exports its document as PDF/UA-1**, the
+accessible profile of PDF, from its File menu. The label says PDF/UA because the
+output is checked: krilla, the writer, runs its PDF/UA-1 validation as it writes
+and fails the export rather than producing a file that only claims to conform,
+and `crates/odox-pdf/tests/conformance.rs` puts every `.odt`, `.ods` and `.odp`
+in the corpus through veraPDF's ua1 profile. veraPDF is a Java program and not a
+build dependency, so the test says it skipped the check where it is not
+installed; `packaging/verapdf.sh` runs the same check over any documents by
+hand. The export is one flow in `odox-ui` for all three windows, over one trait
+in `odox-pdf` that each kind of document implements with a layout of its own.
 
-**The PDF holds what the window shows, in the same order.** `odox-pdf` reads the
-body into blocks with the same decisions the window's flow makes, which live in
+**The PDF holds what the window shows, in the same order.** `odox-pdf` reads
+text into blocks with the same decisions the window's flow makes, which live in
 `odox-core` for both to call: which elements are blocks and which pass their
 text through, how a list level writes its numbers, a tab as four spaces, a
 picture anchored in a paragraph after it. An object with no picture of its own,
-which the window shows as an empty box, is left out. A note is the one thing
-the PDF holds that the window does not show: its citation stays in the text, and
-its own text goes to the end of the document with the other notes, in the order
-they are cited, below a short rule, each tagged as a Note with its citation as
-its label.
+which the window shows as an empty box, is left out. A note in a text document
+is the one thing the PDF holds that the window does not show: its citation stays
+in the text, and its own text goes to the end of the document with the other
+notes, in the order they are cited, below a short rule, each tagged as a Note
+with its citation as its label. A sheet's name above its cells is the other.
+Every page is white with black ink where the document names no colour, whatever
+the window's theme.
 
-**The window has no pages; an export does.** The body is laid out at the text
-width of the first page style and filled into pages of its size and margins.
-Text is shaped by rustybuzz in the faces `odox-fonts` resolves, a character the
-face lacks in the first face on the machine that has it, and left to right as the
-window draws it. Lines break where the Unicode line breaking algorithm allows, a
-word wider than the line where it has to. A proportional line height is a share
-of the face's own line height, which is what ODF means by it. A page is filled
-with whole pieces: a line, a table row, a picture. A heading stays on the page
-with the line after it, a page break the document asks for is taken, a table's
-header rows are drawn again above the rest of it on a new page, and only a piece
-taller than a page is cut. There are no headers, footers, widow control, floats
-or columns. The window and the PDF measure text with different shapers, so a
-paragraph can wrap a word differently in each; there are no page breaks in the
-window for the PDF's to disagree with.
+**The windows have no pages; an export does.** Text is shaped by rustybuzz in
+the faces `odox-fonts` resolves, a character the face lacks in the first face on
+the machine that has it, and left to right as the window draws it. The window
+and the PDF measure text with different shapers, so a line can wrap a word
+differently in each; there are no page breaks in a window for the PDF's to
+disagree with.
+
+A text document's body is laid out at the text width of the first page style
+and filled into pages of its size and margins. Lines break where the Unicode
+line breaking algorithm allows, a word wider than the line where it has to. A
+proportional line height is a share of the face's own line height, which is
+what ODF means by it. A page is filled with whole pieces: a line, a table row, a
+picture. A heading stays on the page with the line after it, a page break the
+document asks for is taken, a table's header rows are drawn again above the rest
+of it on a new page, and only a piece taller than a page is cut. There are no
+headers, footers, widow control, floats or columns.
+
+A spreadsheet prints each sheet that is shown on the page its table style's
+master page gives, beginning a new page with the sheet's name. What it prints is
+its print range, as far as the cells in use, since a print area written as whole
+columns reaches the last row a sheet can have, or every cell up to the last that
+holds anything; a print range of several areas prints the rectangle around them.
+Rows and columns the sheet hides are left out, and so are a hidden sheet and one
+with nothing in it. Columns that do not fit across the page continue on pages of
+their own, down the sheet first and then across unless the page style's print
+order says across first, and the rows the sheet marks as its header
+(`table:table-header-rows`) are drawn again at the top of every page below the
+first. The page style's scale, or the number of pages it asks the sheet to fit,
+across, down or in all, decides how large the cells are drawn, down to a tenth.
+A cell is drawn as the window draws it: its fill and borders, and its text on
+one line from the top, cut at the cell's edge; there are no grid lines. The
+window draws none of the pictures or charts a sheet can hold, and neither does
+the export.
+
+A presentation is a page per slide at the slide's size, and a slide the show
+skips (`presentation:visibility`) is left out. A slide is drawn as the window
+draws it: its ground, the master page's decorations, then its own shapes back to
+front, each filled, outlined and labelled, and a shape the window leaves undrawn
+is left out too, as is a turned shape's label. The speaker's notes are not
+exported.
 
 **Everything drawn is tagged as what it is, or marked as decoration.** The
 structure tree is built during layout, in reading order. Headings are H1 to H6,
@@ -590,24 +619,42 @@ for the header rows and TD, with column and row spans, and an empty cell is
 still a cell. A picture is a Figure with its alternative text. A link to an
 address outside the document is a Link with its annotation, whose text is the
 address; a link to a place inside it is read as its text. Backgrounds, borders,
-underlines, a repeated table header and a decorative picture are artifacts. The
-title is `dc:title`, or the file's name; the language is the default paragraph
-style's, then `dc:language`, then the language of the person exporting. The
-outline is the headings.
+underlines, a repeated table header and a decorative picture are artifacts.
+
+Each sheet is a section: its name as an H1, then one table however many pages
+it takes, read row by row across all of them. The marked header rows are its TH
+rows, and a sheet that marks none has its first row read as the header, since a
+table without one tells a listener nothing about its columns. Each slide is a
+section too: its title placeholder first, as an H1, and then its own shapes in
+the order the document lists them, which is the order they are stacked in. A
+shape with no text that says what it shows in `svg:title` is a Figure; any other
+outline, and everything from the master page, is decoration.
+
+The title is `dc:title`, or the file's name; the language is the document's
+default style's for its kind (paragraph, cell or drawing), then `dc:language`,
+then the language of the person exporting. The outline is the headings, the
+sheets' names, or the slides' titles, an untitled slide named by its number.
 
 **A picture has to say what it shows, or that it is decoration.** Its
 alternative text is the frame's `svg:title`, or failing that its `svg:desc`; a
 decorative one is marked as `LibreOffice` marks it, `loext:decorative` in the
-frame's graphic style, so a document says the same in either application. An
-export with a picture that says neither is refused, and `xodt` asks about each
-one first, with the picture beside a field for its text and a box for
-decoration; the answers are written into the document as one step to undo, and
-a document that does not declare the SVG or `LibreOffice` namespace is given the
-declaration. Nothing unanswered is written under the PDF/UA label.
+frame's graphic style, or in the presentation style of a slide's placeholder,
+which names that family rather than the other, so a document says the same in
+either application. An export with a picture that says neither is refused, and
+the window asks about each one first, with the picture beside a field for its
+text and a box for decoration; the answers are written into the document as one
+step to undo, and a document that does not declare the SVG or `LibreOffice`
+namespace is given the declaration. Only a picture that would be drawn is asked
+about: not one on a hidden slide or on the master page, whose pictures are
+decoration. Nothing unanswered is written under the PDF/UA label.
 
 **A font is embedded only where its licence allows it.** A face whose OS/2
 flags restrict embedding or forbid subsetting is replaced by its metric
 substitute or the generic family, and the export says so when it finishes. A
 family with no embeddable face at all, and a character no face on the machine
 has, refuse the export by name, since a PDF/UA file may hold no glyph that stands
-for nothing.
+for nothing. A document with nothing in it to draw, every slide hidden or every
+sheet empty, is refused as well.
+
+**The export runs in the window's own thread**, so a large sheet holds the
+window while it is written: a sheet of 200,000 cells takes about five seconds.

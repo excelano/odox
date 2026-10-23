@@ -20,7 +20,7 @@ use odox_core::{
 use odox_fonts::Variant;
 
 /// The size text is drawn at where a document names none, as in the window.
-const DEFAULT_SIZE: f32 = 12.0;
+pub(crate) const DEFAULT_SIZE: f32 = 12.0;
 /// How large a superscript or subscript is, as a proportion of its run.
 pub(crate) const SCRIPT_SCALE: f32 = 0.58;
 /// How large a footnote's citation is, as a proportion of its run.
@@ -639,13 +639,13 @@ fn is_invisible(c: char) -> bool {
     matches!(c, '\u{200B}'..='\u{200F}' | '\u{2060}'..='\u{2064}' | '\u{FEFF}')
 }
 
-fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
+pub(crate) fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
     properties
         .size
         .map_or(inherited, |measure| measure.resolve(inherited))
 }
 
-fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
+pub(crate) fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
     let (scale, rise) = match properties.position {
         Some(Position::Super) => (SCRIPT_SCALE, size * 0.33),
         Some(Position::Sub) => (SCRIPT_SCALE, -size * 0.08),
@@ -669,7 +669,7 @@ fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
 
 /// A picture in a format krilla embeds: PNG, JPEG, GIF or WebP, by its first
 /// bytes.
-fn decode(bytes: &[u8]) -> Option<krilla::image::Image> {
+pub(crate) fn decode(bytes: &[u8]) -> Option<krilla::image::Image> {
     let data: krilla::Data = std::sync::Arc::new(bytes.to_vec()).into();
     let image = match bytes {
         [0x89, b'P', b'N', b'G', ..] => krilla::image::Image::from_png(data, true),
@@ -751,4 +751,28 @@ fn label(
         return format!("{prefix}{}{suffix}", numbers.join("."));
     }
     "\u{2022}".to_owned()
+}
+
+/// The figures among blocks that say nothing in place of their picture.
+pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
+    for block in blocks {
+        match block {
+            Block::Figure(figure) if figure.description == Description::Missing => {
+                into.push(figure.path.clone());
+            }
+            Block::List(list) => {
+                for item in &list.items {
+                    undescribed(&item.blocks, into);
+                }
+            }
+            Block::Table(table) => {
+                for cell in table.rows.iter().flatten() {
+                    undescribed(&cell.blocks, into);
+                }
+            }
+            Block::TextBox(text_box) => undescribed(&text_box.blocks, into),
+            Block::Note(note) => undescribed(&note.blocks, into),
+            _ => {}
+        }
+    }
 }
