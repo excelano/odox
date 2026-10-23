@@ -451,27 +451,27 @@ msgstr "Tabellenblatt als tabulatorgetrennten Text kopieren"
 
 #: crates/xods/src/view.rs:725
 msgid "Add a sheet"
-msgstr "Tabelle hinzufügen"
+msgstr "Blatt hinzufügen"
 
 #: crates/xods/src/view.rs:726
 msgid "Rename the sheet…"
-msgstr "Tabelle umbenennen …"
+msgstr "Blatt umbenennen …"
 
 #: crates/xods/src/view.rs:727
 msgid "Delete the sheet"
-msgstr "Tabelle löschen"
+msgstr "Blatt löschen"
 
 #: crates/xods/src/view.rs:729
 msgid "Move the sheet left"
-msgstr "Tabelle nach links verschieben"
+msgstr "Blatt nach links verschieben"
 
 #: crates/xods/src/view.rs:734
 msgid "Move the sheet right"
-msgstr "Tabelle nach rechts verschieben"
+msgstr "Blatt nach rechts verschieben"
 
 #: crates/xods/src/view.rs:816
 msgid "Rename the sheet"
-msgstr "Tabelle umbenennen"
+msgstr "Blatt umbenennen"
 
 #: crates/xods/src/view.rs:832
 msgid "Rename"
@@ -508,17 +508,15 @@ msgstr "Eine Formel verweist auf [{reference}], das gelöscht würde."
 
 #: crates/xods/src/view.rs:1896
 msgid "Another sheet already has that name."
-msgstr "Eine andere Tabelle hat bereits diesen Namen."
+msgstr "Ein anderes Blatt hat bereits diesen Namen."
 
 #: crates/xods/src/view.rs:1898
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
-msgstr ""
-"Der Name einer Tabelle darf nicht leer sein und keines der Zeichen [ ] "
-"* ? : / oder \\ enthalten."
+msgstr "Der Name eines Blatts darf nicht leer sein und keines der Zeichen [ ] * ? : / oder \\ enthalten."
 
 #: crates/xods/src/view.rs:1900
 msgid "A workbook keeps at least one sheet to show."
-msgstr "Eine Arbeitsmappe behält mindestens eine sichtbare Tabelle."
+msgstr "Ein Tabellendokument behält mindestens ein sichtbares Blatt."
 
 #: crates/xods/src/view.rs:1903
 msgid "conditional formats"

@@ -108,17 +108,27 @@ off. The Format menu offers the same commands, and in `xodp` the marks. Undo put
 was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
-styles, one tab per sheet, and shows the formula behind whichever cell you pick.
+styles, text wrapped where a cell says so, one tab per sheet, and shows the
+formula behind whichever cell you pick.
 Typing on the picked cell replaces it, Enter or F2 opens it with what it holds,
 Enter commits and moves down, Tab commits and moves right, Escape puts it back,
 and Delete clears it. A number is a number, `true` and `false` are booleans,
 anything else is text. A cell that holds a formula is not edited, and once
-anything in the sheet has changed every formula's result is drawn faint until a
+a value has changed every formula's result is drawn faint until a
 spreadsheet application recalculates it. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
 show it, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste or a delete that reaches a cell it
 cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
+The same menu, and a right click on a tab, add, rename, delete and move sheets;
+a double click on a tab renames it, and formulas that name a renamed sheet
+follow it. Dragging the edge of a column's or a row's header resizes it, and a
+double click on a column's fits it to its text. View > Freeze rows and columns
+keeps the rows above and the columns left of the picked cell in view. Ctrl and
+the arrows go to the edge of the data, Page Up and Page Down move a screen,
+Ctrl+Home and Ctrl+End go to the first and last used cells and Ctrl+A selects
+them, Shift with any of them stretching the selection; a selection's sum,
+average and count are shown above the grid.
 
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
@@ -152,6 +162,11 @@ and Escape closes it. Every match is lit, `xodp` searches the notes as well as
 the slides, and `xods` searches every sheet. In edit mode, and always in `xods`, Ctrl+H adds a row to replace the
 current match or every match, as one step to undo; `xods` replaces in cells that
 hold text and says how many it left, formulas and numbers among them.
+
+File > New, or Ctrl+N, starts a blank document of the application's kind, in a
+new window when one is already open: a page of the paper your country prints
+on, a workbook with one sheet, or a deck with one wide slide and a title to type
+into.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.

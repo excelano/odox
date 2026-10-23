@@ -1710,7 +1710,7 @@ impl SheetView {
             if jump {
                 self.pick((0, 0));
                 self.extend(last_used);
-                // The whole of it is selected where the person is looking.
+                // All of it is selected, and the grid stays where the person is looking.
                 self.scroll = Scroll::Stay;
             }
             return;
