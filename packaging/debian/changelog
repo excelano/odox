@@ -1,3 +1,9 @@
+odox (0.8.0) unstable; urgency=low
+
+  * 0.8.0: export a spreadsheet and a presentation as PDF/UA (#47)
+
+ -- David M. Anderson <david.anderson@excelano.com>  Thu, 22 Oct 2026 19:58:27 -0500
+
 odox (0.7.0) unstable; urgency=low
 
   * 0.7.0: export a text document as PDF/UA (#43)
