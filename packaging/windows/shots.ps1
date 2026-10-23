@@ -98,7 +98,7 @@ $XODP_ITALIC = '259,70'
 # The File menu is the shell's and sits in the same place in all three, and
 # the export's question is centred in the window.
 $FILE_MENU = '18,40'
-$EXPORT = '74,188'
+$EXPORT = '74,209'
 $XODP_FIRST_PICTURE = '697,343'
 $XODP_SECOND_DECORATION = '534,449'
 

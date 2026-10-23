@@ -44,6 +44,11 @@ pub struct Package {
     media_type: Option<String>,
 }
 
+/// Entries of a package by name, with their bytes or with none where the
+/// entry was absent.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Kept(Vec<(String, Option<Vec<u8>>)>);
+
 /// The entry that carries the package's media type. It is first, stored rather
 /// than deflated, and the one entry whose position in the archive the
 /// specification fixes, so that a reader can identify the format from the first
@@ -51,6 +56,17 @@ pub struct Package {
 const MIMETYPE: &str = "mimetype";
 
 impl Package {
+    /// A package of these entries, in this order, with the media type the
+    /// `mimetype` entry among them declares.
+    pub(crate) fn from_parts(parts: Vec<Part>) -> Self {
+        let media_type = parts
+            .iter()
+            .find(|part| part.name == MIMETYPE)
+            .and_then(|part| std::str::from_utf8(&part.data).ok())
+            .map(ToOwned::to_owned);
+        Self { parts, media_type }
+    }
+
     /// Read a package from its bytes.
     ///
     /// # Errors
@@ -175,6 +191,60 @@ impl Package {
             stored: false,
             directory: false,
         });
+    }
+
+    /// List an entry in the manifest, where it is not listed already, so that
+    /// a part written here for the first time is one a reader looks for.
+    pub fn list(&mut self, name: &str, media_type: &str) {
+        const MANIFEST: &str = "META-INF/manifest.xml";
+        let Some(Ok(mut root)) = self
+            .part(MANIFEST)
+            .map(|part| xml::parse(&part.data, MANIFEST))
+        else {
+            return;
+        };
+        let listed = root.elements().any(|e| {
+            e.is(&Ns::Manifest, "file-entry") && e.attr(&Ns::Manifest, "full-path") == Some(name)
+        });
+        if listed {
+            return;
+        }
+        let mut entry = xml::Element {
+            name: root.name_for(&Ns::Manifest, "file-entry"),
+            attrs: Vec::new(),
+            children: Vec::new(),
+            self_closing: true,
+        };
+        entry.set_attr(root.name_for(&Ns::Manifest, "full-path"), name);
+        entry.set_attr(root.name_for(&Ns::Manifest, "media-type"), media_type);
+        root.children.push(xml::Node::Element(entry));
+        root.self_closing = false;
+        self.set_xml(MANIFEST, &root);
+    }
+
+    /// Some entries as they stand, to be put back with [`Package::restore`]:
+    /// what an undo step holds of a change outside the content tree.
+    pub fn keep(&self, names: &[&str]) -> Kept {
+        Kept(
+            names
+                .iter()
+                .map(|&name| (name.to_owned(), self.part(name).map(|p| p.data.clone())))
+                .collect(),
+        )
+    }
+
+    /// Put entries back as they were kept, removing one that was absent.
+    /// Answers what they hold now, kept the same way.
+    pub fn restore(&mut self, kept: Kept) -> Kept {
+        let names: Vec<&str> = kept.0.iter().map(|(name, _)| name.as_str()).collect();
+        let now = self.keep(&names);
+        for (name, data) in kept.0 {
+            match data {
+                Some(data) => self.set_part(&name, data),
+                None => self.parts.retain(|p| p.name != name),
+            }
+        }
+        now
     }
 
     /// Replace an entry with a serialized XML tree.

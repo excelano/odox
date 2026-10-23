@@ -184,7 +184,7 @@ fn heading_style(
 /// The name of an automatic style that says what this one does: one the
 /// document already has, or this one written under the first name no style of
 /// the family has, which is answered as the style to write.
-pub(super) fn name_for(
+pub(crate) fn name_for(
     content: &Element,
     styles: &mut Styles,
     mut style: Element,

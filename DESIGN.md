@@ -132,14 +132,26 @@ export asks too, and which embeds the face it answers (§12). egui's own fonts,
 which every chain ends in, cover few scripts, so a character in the document
 that no face loaded has is drawn from the first face on the machine that has
 it, added at the end of every chain; the export draws it from the same face.
-The characters are read when the document opens, as the families are.
+The characters are read when the document opens, as the families are, and
+again as each character a person types, pastes or composes arrives.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
 them, so a document that colours nothing stays legible in either. A colour the
 document does set is drawn as set regardless — including text coloured dark
 against a page left unset, which the theme cannot then save from landing on
-now-dark paper.
+now-dark paper. Pure black is the exception and counts as no colour: spreadsheet
+producers write it into every cell whether an author chose it or not, so left
+as set it would put most real workbooks black on a dark window.
+
+**Uncoloured text on a ground the document paints takes the ink that stands out
+against it.** A cell's or a paragraph's fill, a slide's background and a
+shape's fill are the document's own colours, so the theme's ink, chosen for the
+theme's paper, can land light on light. Text there is drawn in whichever of the
+light and dark palettes' inks has the higher contrast with the ground, and its
+links in that palette's link colour, which is what ODF's automatic font colour
+means. A gradient is judged by its middle colour; a picture is not judged, and
+text on one keeps the theme's ink.
 
 **A hyperlink is the one exception**: every link is drawn in the theme's link
 colour even where the document's own character style resolves one, because
@@ -207,6 +219,19 @@ while it is true the shell draws no menu, no panel and no bar, takes none of
 its keys, puts the window full screen and fills the central panel with black,
 and the view draws one slide as large as the screen allows, keeping its shape.
 It is the view's own mode, so the keys that move through a show are the view's.
+
+**File > New, and Ctrl+N, starts a blank document** in a window that has none,
+and otherwise starts another copy of the application with `--new`, which opens
+one in a window of its own: a window holds one document, as it does for Open.
+`odox_core::blank` writes each kind as a whole package that is then read like
+any other: a text document with one empty paragraph, a spreadsheet with one
+sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
+an empty title. The default text style is in the reader's language, and the page
+is Letter where the reader's country prints on it (the United States and
+Canada) and A4 elsewhere. A blank document opens in edit mode, untitled, with
+the caret in the first paragraph where the view has one; Save asks where to
+write it, offering "Untitled". On a slide being edited, an empty title or text
+placeholder says faintly what it is for.
 
 ## §8 Language
 
@@ -283,7 +308,7 @@ moves right, Escape puts it back, and Delete clears it; the text box sits in
 the cell in the cell's own font. What is typed is read the way a spreadsheet
 reads it: a number is a number, `true` and `false` are booleans, anything else
 is text, and a formula is not recognised. A cell that holds a formula is not
-opened, and once anything in the document has changed every formula's cached
+opened, and once a value in the document has changed every formula's cached
 result is drawn faint, because which of them went stale cannot be told without
 evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
@@ -298,6 +323,79 @@ would be read, from the top left of the selection. A paste, a cut or a delete is
 one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
 range leaves cells the document never wrote unwritten.
+
+**A cell's text is cut at the cell's edge.** It is drawn on one line from the
+top, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
+inside the cell's width with each line aligned as the cell is. Either way what
+does not fit the cell's height or width is not drawn: a row keeps the height the
+document gives it, and does not grow while a person types. A merged cell is one
+cell, and the grid's lines stop at its edge.
+
+**A workbook's sheets are added, renamed, deleted and moved from the Sheet menu
+and from a tab's own menu**, and a double-click on a tab renames it; each is one
+step to undo. What refers to a sheet refers to it by name, so a move only
+reorders the `table:table` elements. A new sheet is empty, goes after the one it
+was asked from in that sheet's table style, and is named "Sheet" and the first
+free number from the count of sheets on. A rename renames the sheet in every
+reference that names it: the formulas and named expressions, whose references
+are in brackets, and every attribute that holds addresses alone (a print range,
+a named range, a database range, a conditional format's or a validation's
+cells), quoting a name that is not letters, digits and underscores; the sheet's
+view settings, its freeze among them, follow it. A rename is refused where a
+reference cannot be read, or where a chart, an object, a validation's condition
+or a conditional format's formula holds the name in a form this does not
+rewrite. A delete is refused while anything outside the sheet refers into it,
+for the same reason a row's is, and for the last sheet shown. A name may not be
+empty, hold `[ ] * ? : / \`, start or end with a quote, or be another sheet's.
+
+**A column's width and a row's height are dragged at the header's edge.** A
+double-click on a column's edge fits it to the widest text in it. The size is
+written into a style of the column's or the row's own, the style it had with
+the size changed and named as an automatic style the document already holds
+wherever one says the same, after the column or row is split out of a repeated
+run; a row given a height is marked as no longer fitted to its text. Each
+resize is one step to undo, and changes no value, so no formula is drawn faint
+for it.
+
+**Hidden rows and columns are drawn at no size.** A row or column whose
+element says `table:visibility` other than "visible" takes no room in the
+grid and has no header; a thicker stroke in the headers marks where it is. A
+pointer finds the one after it, and the arrows and the other keys step over
+it the way they were going, or back where nothing is shown past it. The Sheet
+menu hides the selected rows or columns, writing "collapse" on their elements
+once the ends are split out of their runs, and shows hidden ones by removing
+the attribute: those in the selection and those next to it, so that a person
+picks a cell beside what is hidden, since it cannot be picked itself. Each is
+one step to undo.
+
+**Frozen rows and columns stay in view.** A freeze is a view setting, which ODF
+has no element for and every producer writes as `LibreOffice` does, into
+`settings.xml` under the first view, per sheet by name: split mode 2 and a
+position, for the rows and for the columns. The grid is then drawn as four
+panes, each inside its own edges: the part that scrolls both ways, the frozen
+rows above it, the frozen columns beside it, and the corner where they meet,
+with a line where the frozen part ends; a press is read against the pane it
+lands in. View > Freeze rows and columns freezes those above and left of the
+picked cell, and the same item unfreezes, each one step to undo; a package
+with no `settings.xml` is given one and the manifest lists it. Ctrl+Home scrolls
+the grid back to its start as well as picking the first cell, which a frozen
+cell being picked does not do by itself.
+
+**The keyboard walks a sheet.** The arrows move one cell, into the empty grid
+past the data too; Ctrl and an arrow go to the end of the block of filled cells
+the pick is in, or from an empty cell or a block's end to the next filled cell,
+and to the grid's edge when there is none. Page Up and Page Down move by the
+rows the grid last showed, Home and End to the first and the last written
+column, Ctrl+Home and Ctrl+End to the first and the last used cell, and Ctrl+A
+selects the used cells. Shift with any of them stretches the selection. Each
+key is read with the modifiers it came with, because a press and the release of
+Ctrl can arrive in one frame.
+
+**A selection says what it holds.** With more than one cell selected, the cell
+bar gives the sum and the average of the numbers in it, percentages and
+currencies counted as their numbers, and the count of cells that hold anything.
+A formula counts as the result it shows. The figures are to six decimal places
+at most, with the reader's decimal separator.
 
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
@@ -416,7 +514,9 @@ Every edit records the tree as it stands and then mutates, except that a run
 of typing, or of deleting, on the page is one step, ended by a move of the
 caret or an edit of another kind. A snapshot also holds where the caret stood,
 so undo puts the caret where the edit began and redo where it was when the
-edit was undone. The document is modified when the stack is not at the depth
+edit was undone, and the package entries the edit wrote outside the tree, as
+a freeze or a sheet's rename writes `settings.xml` and the manifest, as they
+were before it. The document is modified when the stack is not at the depth
 it had when the file was last read or written, so undoing back to that depth
 is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a
@@ -597,8 +697,10 @@ order says across first, and the rows the sheet marks as its header
 (`table:table-header-rows`) are drawn again at the top of every page below the
 first. The page style's scale, or the number of pages it asks the sheet to fit,
 across, down or in all, decides how large the cells are drawn, down to a tenth.
-A cell is drawn as the window draws it: its fill and borders, and its text on
-one line from the top, cut at the cell's edge; there are no grid lines. The
+A cell is drawn as the window draws it: its fill and borders, and its text
+from the top, on one line or, where the cell says to wrap
+(`fo:wrap-option="wrap"`), wrapped inside its width, and cut at the cell's
+edge; there are no grid lines. The
 window draws none of the pictures or charts a sheet can hold, and neither does
 the export.
 

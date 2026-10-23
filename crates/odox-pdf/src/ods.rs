@@ -473,10 +473,10 @@ impl Sheets<'_, '_, '_> {
             .collect())
     }
 
-    /// A cell's text on one line from its top, a line to each of its
-    /// paragraphs: text against the left edge and numbers against the right,
-    /// unless its paragraph style says otherwise, as ODF and the window have
-    /// it.
+    /// A cell's text from its top, a line to each of its paragraphs, or
+    /// wrapped inside the column where the cell says so: text against the
+    /// left edge and numbers against the right, unless its paragraph style
+    /// says otherwise, as ODF and the window have it.
     fn text(
         &mut self,
         text: &str,
@@ -495,17 +495,39 @@ impl Sheets<'_, '_, '_> {
             .map(|line| text::width(text, &glyphs, line))
             .fold(0.0_f32, f32::max);
         let padding = PADDING * share;
+        if style.cell.wrap == Some(true) {
+            // Wrapped inside the column, each line aligned the way the cell is.
+            let mut paragraph = paragraph;
+            paragraph.align = match style.paragraph.align {
+                None if numeric => TextAlign::End,
+                Some(align) => align,
+                None => TextAlign::Start,
+            };
+            return self.stack(paragraph, x + padding, width - padding * 2.0, y, parent);
+        }
         let start = match style.paragraph.align {
             Some(TextAlign::Center) => x + (width - natural) / 2.0,
             Some(TextAlign::End) => x + width - padding - natural,
             None if numeric => x + width - padding - natural,
             _ => x + padding,
         };
+        self.stack(paragraph, start, natural + 1.0, y, parent)
+    }
+
+    /// Lay a paragraph out at a width, its first line at the top `y`.
+    fn stack(
+        &mut self,
+        paragraph: Paragraph,
+        x: f32,
+        width: f32,
+        y: f32,
+        parent: NodeId,
+    ) -> Result<Vec<Item>, Refusal> {
         let mut pieces = Vec::new();
         self.layout.blocks(
             &[Block::Paragraph(paragraph)],
-            start,
-            natural + 1.0,
+            x,
+            width.max(1.0),
             Some(parent),
             &mut pieces,
         )?;
@@ -627,6 +649,33 @@ mod tests {
             "column D is outside the print range"
         );
         assert!(!shown.contains(&"Region 4"), "row 5 is outside it");
+    }
+
+    #[test]
+    fn a_wrapped_cell_breaks_its_text_inside_the_column() {
+        fn lines(item: &Item, into: &mut Vec<(String, f32)>) {
+            match item {
+                Item::Text { text, baseline, .. } => into.push((text.clone(), *baseline)),
+                Item::Clipped { item, .. } => lines(item, into),
+                _ => {}
+            }
+        }
+        let laid = laid();
+        let mut found = Vec::new();
+        for (_, item) in &laid.pages[4].items {
+            lines(item, &mut found);
+        }
+        let baseline = |word: &str| {
+            found
+                .iter()
+                .find(|(text, _)| text.contains(word))
+                .map(|&(_, baseline)| baseline)
+                .expect(word)
+        };
+        assert!(
+            baseline("east") > baseline("three"),
+            "the end of the text is on a later line: {found:?}"
+        );
     }
 
     #[test]

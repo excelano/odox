@@ -87,7 +87,7 @@ EDIT_MENU="--click 53,39"
 EDIT_MODE="--click 53,39 --click 95,146"
 FIND="--click 53,39 --click 68,116"
 FILE_MENU="--click 18,39"
-EXPORT="--click 18,39 --click 74,187"
+EXPORT="--click 18,39 --click 74,208"
 
 # One application's frames. Named with the application's own key first,
 # because all three land in the same locale directory and only the prefix

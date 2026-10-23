@@ -79,6 +79,13 @@ pub enum Blocked {
     /// The document holds something that names a range of cells and is not
     /// moved: what, in the words a window can put in a sentence.
     Names(&'static str),
+    /// Another sheet has the name.
+    Taken,
+    /// The name may not be a sheet's: empty, or holding a character a
+    /// reference reserves.
+    Unnamed,
+    /// It is the last sheet shown, and a workbook shows one.
+    Last,
 }
 
 impl SheetDocument {
@@ -215,7 +222,7 @@ fn is_column_container(element: &Element) -> bool {
 
 /// Each row element of a table in order, with the row it begins at, how many
 /// it stands for, and the route to it.
-fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
+pub(super) fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
     fn walk(
         parent: &Element,
         path: &mut Vec<usize>,
@@ -243,7 +250,7 @@ fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
 }
 
 /// The same for the column definitions.
-fn columns_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
+pub(super) fn columns_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
     fn walk(
         parent: &Element,
         path: &mut Vec<usize>,

@@ -600,12 +600,23 @@ mod tests {
     use super::FlowModel;
     use crate::Editing;
     use egui_richedit::{Edit, Model, Position};
-    use odox_core::{Element, Node, Ns, Styles};
+    use odox_core::{Document, Element, Node, Ns, Styles};
 
     fn element(prefix: &str, local: &str, ns: Ns, children: Vec<Node>) -> Node {
         let mut e = Element::new(prefix, local, ns);
         e.children = children;
         Node::Element(e)
+    }
+
+    /// A document holding this content, for an undo to go back over.
+    fn holding(content: &Element) -> Document {
+        let mut document = Document::read(
+            &odox_core::blank::text("en"),
+            &[odox_core::media_type::TEXT],
+        )
+        .expect("a blank document");
+        document.content = content.clone();
+        document
     }
 
     fn p(text: &str) -> Node {
@@ -740,8 +751,9 @@ mod tests {
             },
             true,
         );
-        let current = content.clone();
-        let (_, caret) = editing.undo(&current, None).expect("a step to undo");
+        let caret = editing
+            .undo(&mut holding(&content), None)
+            .expect("a step to undo");
         assert_eq!(caret, Some(Position::new(vec![7, 0], 1)));
     }
 
@@ -791,9 +803,8 @@ mod tests {
         assert_eq!(done.replaced, 2);
         assert_eq!(model.text(&vec![0]).as_deref(), Some("TTiTTle"));
         let mut undone = 0;
-        let mut current = content.clone();
-        while let Some((previous, _)) = editing.undo(&current, None) {
-            current = previous;
+        let mut current = holding(&content);
+        while editing.undo(&mut current, None).is_some() {
             undone += 1;
         }
         assert_eq!(undone, 1);
@@ -824,7 +835,7 @@ mod tests {
             ),
             "{written}"
         );
-        assert_eq!(editing.undo(&content.clone(), None).map(|_| ()), Some(()));
+        assert!(editing.undo(&mut holding(&content), None).is_some());
         assert!(!editing.can_undo(), "one step");
     }
 
@@ -902,9 +913,8 @@ mod tests {
         assert_eq!(refused, None);
         assert!(editing.can_undo());
         let mut undone = 0;
-        let mut current = content.clone();
-        while let Some(previous) = editing.undo(&current, None).map(|(tree, _)| tree) {
-            current = previous;
+        let mut current = holding(&content);
+        while editing.undo(&mut current, None).is_some() {
             undone += 1;
         }
         assert_eq!(undone, 1);

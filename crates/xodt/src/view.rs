@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use eframe::egui::{self, Ui};
-use egui_richedit::Selection;
+use egui_richedit::{Model, Selection};
 use odox_core::Document;
 use odox_core::doc::TextDocument;
 use odox_ui::find::{Match, Replaced, in_paragraphs};
@@ -34,6 +34,9 @@ pub struct TextView {
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
+    /// A blank document was opened, and the caret is to go into its first
+    /// paragraph when the page is next drawn.
+    begin: bool,
     export: Export,
 }
 
@@ -48,6 +51,7 @@ impl Default for TextView {
             found: Found::default(),
             menu: MenuState::offering_blocks(true),
             command: None,
+            begin: false,
             export: Export::default(),
         }
     }
@@ -75,6 +79,14 @@ impl View for TextView {
         self.found.clear();
         self.load_fonts(ctx);
         Ok(())
+    }
+
+    fn blank(&self, language: &str) -> Vec<u8> {
+        odox_core::blank::text(language)
+    }
+
+    fn begin(&mut self) {
+        self.begin = true;
     }
 
     fn close(&mut self) {
@@ -182,6 +194,7 @@ impl View for TextView {
         // width the document asked for; wider, the page shrinks to fit rather
         // than being cut off.
         let page = document.text_width() * zoom;
+        let page_height = document.text_height() * zoom;
         let margin = 24.0 * zoom;
 
         if edit_mode && let Some(root) = document.body_path() {
@@ -189,6 +202,12 @@ impl View for TextView {
                 content, styles, ..
             } = &mut document.document;
             let mut model = FlowModel::new(content, styles, root, editing);
+            if std::mem::take(&mut self.begin)
+                && let Some(first) = model.first()
+            {
+                self.page
+                    .select(Selection::caret(egui_richedit::Position::new(first, 0)));
+            }
             let pressed = toolbar::text(ui, &self.page, &model);
             let command = self.command.take();
             let mark = pressed.mark.or(match command {
@@ -235,6 +254,10 @@ impl View for TextView {
                         .inner_margin(margin)
                         .show(ui, |ui| {
                             ui.set_width(width);
+                            // At least one page tall, however little is on
+                            // it, shrunk with the page when the window is
+                            // narrower.
+                            ui.set_min_height(page_height * width / page);
                             let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
                             flow.palette = palette;
                             flow.scroll_to_heading = self.scroll_to.take();
