@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-23 13:44-0500\n"
+"POT-Creation-Date: 2026-10-23 14:11-0500\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -152,16 +152,16 @@ msgid "File"
 msgstr "Datei"
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:124
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:125
 #: crates/xods/src/view.rs:400 crates/xodt/src/view.rs:64
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
-#: crates/odox-ui/src/shapes.rs:489
+#: crates/odox-ui/src/shapes.rs:508
 msgid "Click to add a title"
 msgstr "Klicken, um einen Titel hinzuzufügen"
 
-#: crates/odox-ui/src/shapes.rs:490
+#: crates/odox-ui/src/shapes.rs:509
 msgid "Click to add text"
 msgstr "Klicken, um Text hinzuzufügen"
 
@@ -353,55 +353,59 @@ msgstr "OpenDocument-Tabellendokument"
 msgid "OpenDocument Presentation"
 msgstr "OpenDocument-Präsentation"
 
-#: crates/xodp/src/view.rs:233 crates/xodt/src/view.rs:142
+#: crates/xodp/src/view.rs:234 crates/xodt/src/view.rs:142
 msgid "Format"
 msgstr "Format"
 
-#: crates/xodp/src/view.rs:243
+#: crates/xodp/src/view.rs:244
 msgid "Slide"
 msgstr "Folie"
 
-#: crates/xodp/src/view.rs:245
+#: crates/xodp/src/view.rs:246
+msgid "New slide"
+msgstr "Neue Folie"
+
+#: crates/xodp/src/view.rs:247
 msgid "Duplicate slide"
 msgstr "Folie duplizieren"
 
-#: crates/xodp/src/view.rs:246
+#: crates/xodp/src/view.rs:248
 msgid "Delete slide"
 msgstr "Folie löschen"
 
-#: crates/xodp/src/view.rs:248
+#: crates/xodp/src/view.rs:250
 msgid "Move slide earlier"
 msgstr "Folie nach vorn"
 
-#: crates/xodp/src/view.rs:253
+#: crates/xodp/src/view.rs:255
 msgid "Move slide later"
 msgstr "Folie nach hinten"
 
-#: crates/xodp/src/view.rs:348
+#: crates/xodp/src/view.rs:350
 msgid "This presentation has no slides."
 msgstr "Diese Präsentation hat keine Folien."
 
-#: crates/xodp/src/view.rs:475
+#: crates/xodp/src/view.rs:477
 msgid "Slides"
 msgstr "Folien"
 
-#: crates/xodp/src/view.rs:508
+#: crates/xodp/src/view.rs:510
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
 
-#: crates/xodp/src/view.rs:510
+#: crates/xodp/src/view.rs:512
 msgid "Start the slideshow"
 msgstr "Bildschirmpräsentation starten"
 
-#: crates/xodp/src/view.rs:515
+#: crates/xodp/src/view.rs:517
 msgid "Start the slideshow from this slide"
 msgstr "Bildschirmpräsentation ab dieser Folie starten"
 
-#: crates/xodp/src/view.rs:947
+#: crates/xodp/src/view.rs:979
 msgid "Notes"
 msgstr "Notizen"
 
-#: crates/xodp/src/view.rs:956
+#: crates/xodp/src/view.rs:988
 msgid "This slide has no notes."
 msgstr "Diese Folie hat keine Notizen."
 

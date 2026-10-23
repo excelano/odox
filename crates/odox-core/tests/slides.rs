@@ -235,3 +235,96 @@ fn a_deleted_slide_leaves_the_custom_shows_and_the_start_page() {
         "the show that listed it keeps the others and the one that held only it is gone"
     );
 }
+
+fn frame_of<'a>(page: &'a Element, class: &str) -> &'a Element {
+    page.elements()
+        .find(|e| e.attr(&Ns::Presentation, "class") == Some(class))
+        .expect("a frame of the class")
+}
+
+#[test]
+fn an_added_slide_follows_its_master_and_names_only_what_it_can_see() {
+    let mut deck = deck("deck.odp");
+    let (position, master) = {
+        let first = &deck.slides()[0];
+        (first.position, first.master_page.map(ToOwned::to_owned))
+    };
+    let before = names(&deck);
+    let at = deck.add_slide(position).expect("added");
+    let slides = deck.slides();
+    let added = slides
+        .iter()
+        .find(|s| s.position == at)
+        .expect("the new slide");
+    assert_eq!(added.master_page.map(ToOwned::to_owned), master);
+    assert!(!before.contains(&added.name.expect("named").to_owned()));
+    let title = frame_of(added.element, "title");
+    assert_eq!(
+        title.attr(&Ns::Svg, "y"),
+        Some("4.438cm"),
+        "where the master puts it"
+    );
+    assert!(title.attr(&Ns::Draw, "layer").is_none());
+    assert_eq!(
+        title.attr(&Ns::Presentation, "style-name"),
+        Some("pr1"),
+        "the title before it, not the master's own automatic style"
+    );
+    let paragraph = title.descendant(&Ns::Text, "p").expect("a paragraph");
+    assert_eq!(paragraph.attr(&Ns::Text, "style-name"), Some("P1"));
+    assert!(paragraph.plain_text().is_empty());
+    let outline = frame_of(added.element, "outline");
+    assert_eq!(
+        outline.attr(&Ns::Presentation, "style-name"),
+        Some("Title_20_Slide-outline1")
+    );
+    drop(slides);
+    let written = deck
+        .document
+        .write_verified()
+        .expect("it comes back the same");
+    assert_eq!(
+        names(&Presentation::read(&written).expect("reads")),
+        names(&deck)
+    );
+}
+
+#[test]
+fn a_slide_added_where_the_master_has_no_placeholders_is_laid_out_across_the_page() {
+    let mut deck = deck("deck.odp");
+    let master = deck.slides()[0].master_page.expect("a master").to_owned();
+    let page = deck
+        .document
+        .styles_part
+        .as_mut()
+        .and_then(|styles| styles.child_mut(&Ns::Office, "master-styles"))
+        .and_then(|masters| {
+            masters.children.iter_mut().find_map(|node| match node {
+                Node::Element(e) if e.attr(&Ns::Style, "name") == Some(master.as_str()) => Some(e),
+                _ => None,
+            })
+        })
+        .expect("the master page");
+    page.children.retain(
+        |node| !matches!(node, Node::Element(e) if e.attr(&Ns::Presentation, "class").is_some()),
+    );
+    let mut deck = Presentation::read(&deck.document.write().expect("written")).expect("reads");
+    let position = deck.slides()[0].position;
+    let at = deck.add_slide(position).expect("added");
+    let slides = deck.slides();
+    let added = slides
+        .iter()
+        .find(|s| s.position == at)
+        .expect("the new slide");
+    let title = frame_of(added.element, "title");
+    let outline = frame_of(added.element, "outline");
+    let y = |frame: &Element| {
+        frame
+            .attr(&Ns::Svg, "y")
+            .and_then(|y| y.trim_end_matches("cm").parse::<f32>().ok())
+            .expect("a position")
+    };
+    assert!(y(title) < y(outline), "the title above the text");
+    drop(slides);
+    assert_eq!(deck.add_slide(usize::MAX), Err(Refused::NotFound));
+}

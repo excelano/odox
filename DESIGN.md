@@ -117,7 +117,12 @@ each shape is put where the document says. A slide is drawn back to front: the
 ground, the master page's contribution, the slide's own shapes. A child of a
 master page carrying a `presentation:class` is a slot and not a decoration: the
 slide's own frame of that class takes its place. The class is the test;
-`presentation:placeholder` is not written reliably and is not consulted.
+`presentation:placeholder` is not written reliably and is not consulted. A
+shape's text is laid over the shape's own style: where a paragraph's style and
+its spans do not say, its face, size, weight and alignment are its frame's, the
+presentation style of a placeholder or the graphic style of a drawing, which is
+where `LibreOffice` keeps a typed title's size. The window and the PDF lay it
+the same way.
 
 ## §6 Drawing
 
@@ -226,12 +231,14 @@ one in a window of its own: a window holds one document, as it does for Open.
 `odox_core::blank` writes each kind as a whole package that is then read like
 any other: a text document with one empty paragraph, a spreadsheet with one
 sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
-an empty title. The default text style is in the reader's language, and the page
+an empty title, on a master that places a title and a text frame in the common
+paragraph styles "Title" and "Text". The default text style is in the reader's language, and the page
 is Letter where the reader's country prints on it (the United States and
 Canada) and A4 elsewhere. A blank document opens in edit mode, untitled, with
 the caret in the first paragraph where the view has one; Save asks where to
 write it, offering "Untitled". On a slide being edited, an empty title or text
-placeholder says faintly what it is for.
+placeholder says faintly what it is for, and a click anywhere on it puts the
+caret in it.
 
 ## §8 Language
 
@@ -615,7 +622,7 @@ style; in a list each is an item. A model that keeps no formatting leaves the tw
 `Model` methods as they are and every paste is plain. Across windows needs HTML
 on the system clipboard and is not done.
 
-**A deck's slides can be duplicated, deleted and moved, and not added.** A slide
+**A deck's slides can be added, duplicated, deleted and moved.** A slide
 is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and
 that name is what links, custom shows and the start page refer to it by. Moving
 swaps it with the neighbouring page and so changes nothing that refers to it.
@@ -627,10 +634,15 @@ the notes included, with the references that name those ids inside the copy
 (`draw:start-shape`, `draw:end-shape`, `smil:targetElement`) pointing at the
 copy's own. Styles are shared with the original, which is safe because a
 format edit picks or writes a style and never changes one that another span
-uses. A blank slide is not offered: it would hold only the master page's
-decorations, and nothing here adds a shape to fill it, so a duplicate is how a
-new slide is made. The Slide menu offers the four in edit mode, and each is one
-undo step with the view following the slide.
+uses. A new slide goes after the one in view, on its master, named `page` and
+the first free number from the count of slides on, with an empty title frame
+and an empty text frame where that master puts its title and outline
+placeholders, or across the page where it has none. A placeholder's own layer
+and any style only `styles.xml` can see are left behind; its paragraph style
+is kept where it is a common one. Where the slide it follows has a frame of the
+class, the new frame takes that frame's style and its first paragraph's, so a
+new title looks like the one before it. The Slide menu offers the five in edit
+mode, and each is one undo step with the view following the slide.
 
 **Rows and columns can be inserted and deleted, with the formulas that name
 them following.** A row or a column is not always one element, since

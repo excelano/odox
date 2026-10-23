@@ -72,6 +72,7 @@ impl Default for SlideView {
 /// What the Slide menu asked for, applied when the page is next drawn.
 #[derive(Clone, Copy)]
 enum SlideCommand {
+    Add,
     Duplicate,
     Delete,
     Earlier,
@@ -242,6 +243,7 @@ impl View for SlideView {
         let can = editing.on && !editing.asking;
         ui.menu_button(t("Slide"), |ui| {
             let entries = [
+                (t("New slide"), SlideCommand::Add, can),
                 (t("Duplicate slide"), SlideCommand::Duplicate, can),
                 (t("Delete slide"), SlideCommand::Delete, can && count > 1),
                 (
@@ -567,6 +569,12 @@ impl SlideView {
             Action::Pick(shape) => {
                 self.picked = shape;
                 self.drag = None;
+                // An empty placeholder has its one line at an edge, away from
+                // where its hint asks to be clicked.
+                if let Some(paragraph) = shape.and_then(|shape| self.empty_placeholder(shape)) {
+                    self.page_editor
+                        .select(Selection::caret(Caret::new(paragraph, 0)));
+                }
             }
             Action::Begin(drag) => {
                 if let Some(document) = &self.document {
@@ -667,8 +675,9 @@ impl SlideView {
         self.export.asking()
     }
 
-    /// Duplicate, delete or move the slide in view, as one step to undo, and
-    /// follow it: the copy, the slide after a deleted one, the moved slide.
+    /// Add a slide after the one in view, or duplicate, delete or move that
+    /// one, as one step to undo, and follow it: the new slide, the copy, the
+    /// slide after a deleted one, the moved slide.
     fn change_slides(&mut self, command: SlideCommand, editing: &mut Editing) {
         let Some(document) = &mut self.document else {
             return;
@@ -682,6 +691,7 @@ impl SlideView {
         };
         let before = document.document.content.clone();
         let done = match command {
+            SlideCommand::Add => document.add_slide(position).map(|_| self.slide + 1),
             SlideCommand::Duplicate => document.duplicate_slide(position).map(|_| self.slide + 1),
             SlideCommand::Delete => document
                 .delete_slide(position)
@@ -698,6 +708,28 @@ impl SlideView {
         self.drag = None;
         self.page_editor.clear();
         self.found.clear();
+    }
+
+    /// The paragraph of a placeholder on the slide in view that holds no text,
+    /// as a path from the slide.
+    fn empty_placeholder(&self, index: usize) -> Option<Vec<usize>> {
+        let document = self.document.as_ref()?;
+        let slides = document.slides();
+        let (_, shape) = slides
+            .get(self.slide)?
+            .shapes_indexed()
+            .find(|(i, _)| *i == index)?;
+        if shape.attr(&Ns::Presentation, "class").is_none() || !shape.plain_text().trim().is_empty()
+        {
+            return None;
+        }
+        let (box_at, text_box) = shape
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Draw, "text-box"))?;
+        let (paragraph_at, _) = text_box
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Text, "p"))?;
+        Some(vec![index, box_at, paragraph_at])
     }
 
     /// F5 starts the slideshow at the first slide and Shift+F5 at this one.

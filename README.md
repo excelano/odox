@@ -135,7 +135,7 @@ average and count are shown above the grid.
 `xodp` draws each slide at the size the document sets, with the speaker's notes
 under it. In edit mode a click picks one of the slide's shapes, a drag moves it,
 a drag on a corner resizes it, and a click on the text in one puts the caret
-there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
+there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, adds a slide after the one in view, with a title and a text frame where its master places them, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
 at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
 or a right click go back, and Escape ends it. The notes are not shown.
