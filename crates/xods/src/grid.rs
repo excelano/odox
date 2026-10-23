@@ -11,7 +11,8 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use odox_core::doc::{
-    DEFAULT_COLUMN_WIDTH as DEFAULT_COLUMN, DEFAULT_ROW_HEIGHT as DEFAULT_ROW, Sheet, SheetDocument,
+    DEFAULT_COLUMN_WIDTH as DEFAULT_COLUMN, DEFAULT_ROW_HEIGHT as DEFAULT_ROW, Merged, Sheet,
+    SheetDocument,
 };
 
 /// The smallest a row or column may be drawn and still be found by a pointer.
@@ -31,6 +32,8 @@ pub struct Metrics {
     pub rows: Vec<f32>,
     /// The left of each column, and finally the right of the last.
     pub columns: Vec<f32>,
+    /// The sheet's merged cells.
+    pub merges: Vec<Merged>,
 }
 
 impl Metrics {
@@ -65,7 +68,20 @@ impl Metrics {
         }
         columns.push(at);
 
-        Self { rows, columns }
+        Self {
+            rows,
+            columns,
+            merges: document.merges(sheet),
+        }
+    }
+
+    /// The merged cell a cell is part of, or the cell alone.
+    pub fn extent(&self, row: usize, column: usize) -> Merged {
+        self.merges
+            .iter()
+            .find(|(rows, columns)| rows.contains(&row) && columns.contains(&column))
+            .cloned()
+            .unwrap_or((row..=row, column..=column))
     }
 
     /// The whole grid's size.
@@ -180,6 +196,7 @@ mod tests {
         Metrics {
             rows: vec![0.0, 10.0, 25.0, 45.0],
             columns: vec![0.0, 20.0, 40.0],
+            merges: vec![(1..=2, 0..=1)],
         }
     }
 
@@ -199,10 +216,18 @@ mod tests {
         let metrics = Metrics {
             rows: vec![0.0, 10.0, 10.0, 20.0],
             columns: vec![0.0, 20.0],
+            merges: Vec::new(),
         };
         assert_eq!(metrics.row(1), (10.0, 0.0));
         assert_eq!(metrics.row_at(10.0), 2);
         assert_eq!(metrics.row_at(9.9), 0);
+    }
+
+    #[test]
+    fn a_cell_in_a_merge_extends_to_the_whole_of_it() {
+        let metrics = metrics();
+        assert_eq!(metrics.extent(2, 1), (1..=2, 0..=1));
+        assert_eq!(metrics.extent(0, 1), (0..=0, 1..=1));
     }
 
     #[test]
@@ -215,6 +240,7 @@ mod tests {
         let empty = Metrics {
             rows: Vec::new(),
             columns: Vec::new(),
+            merges: Vec::new(),
         };
         assert_eq!(empty.size(), (0.0, 0.0));
     }

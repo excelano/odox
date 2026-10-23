@@ -47,7 +47,8 @@ pub enum Refused {
     /// There is no such sheet, slide, shape or paragraph.
     NotFound,
     /// An end of the range is inside a table, a cell or a frame the range
-    /// does not wholly contain, which a join of text does not take apart.
+    /// does not wholly contain, which a join of text does not take apart; or,
+    /// on a sheet, a merged cell lies across the edge of the range.
     Structure,
     /// It is the only slide, and a deck keeps one.
     LastOne,

@@ -331,6 +331,17 @@ does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one
 cell, and the grid's lines stop at its edge.
 
+**A merged cell is picked, outlined and stepped over as one.** A press anywhere
+on it picks its top left corner, the outline goes round all of it, and an arrow
+leaves it from its far side. The Sheet menu merges the selection into its top
+left cell, which takes `table:number-columns-spanned` and
+`table:number-rows-spanned`, and writes each other cell as
+`table:covered-table-cell` with what it held kept, as ODF allows and
+`LibreOffice` does, so that unmerging gives each back. A merge wholly inside the
+selection becomes part of the new one; one across its edge refuses the merge.
+Unmerging takes apart the merge the picked cell is in. A copy leaves out what a
+covered cell holds, since it is not shown. Each is one step to undo.
+
 **A workbook's sheets are added, renamed, deleted and moved from the Sheet menu
 and from a tab's own menu**, and a double-click on a tab renames it; each is one
 step to undo. What refers to a sheet refers to it by name, so a move only

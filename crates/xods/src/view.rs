@@ -356,6 +356,8 @@ enum SheetCommand {
     ShowRows,
     HideColumns,
     ShowColumns,
+    Merge,
+    Unmerge,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -517,7 +519,11 @@ impl View for SheetView {
                 (t("Hide columns"), SheetCommand::HideColumns),
                 (t("Show hidden columns"), SheetCommand::ShowColumns),
             ];
-            for group in [&entries[..], &shown[..]] {
+            let merged = [
+                (t("Merge cells"), SheetCommand::Merge),
+                (t("Unmerge cells"), SheetCommand::Unmerge),
+            ];
+            for group in [&entries[..], &shown[..], &merged[..]] {
                 for &(name, command) in group {
                     if ui.add_enabled(can, egui::Button::new(name)).clicked() {
                         self.sheet_command = Some(command);
@@ -692,6 +698,10 @@ impl SheetView {
                 self.change_shown(command, editing);
                 return;
             }
+            SheetCommand::Merge | SheetCommand::Unmerge => {
+                self.change_merged(command, editing);
+                return;
+            }
         };
         let Some(document) = &mut self.document else {
             return;
@@ -792,6 +802,49 @@ impl SheetView {
         );
         if picked != self.selected {
             self.pick(picked);
+        }
+    }
+
+    /// Merge the selection into its top left cell, or take apart the merge
+    /// the picked cell is in, as one step to undo.
+    fn change_merged(&mut self, command: SheetCommand, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let (row, column) = self.selected;
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let merge = matches!(command, SheetCommand::Merge);
+        if merge && (top, left) == (bottom, right) {
+            return;
+        }
+        if !merge && document.merge_at(sheet, row, column).is_none() {
+            return;
+        }
+        let before = document.document.content.clone();
+        let done = if merge {
+            document.merge(self.sheet, top..=bottom, left..=right)
+        } else {
+            document.unmerge(self.sheet, row, column)
+        };
+        match done {
+            Ok(()) => editing.record_snapshot(before, None),
+            Err(Refused::Structure) => {
+                self.notice =
+                    Some(t("A merged cell crosses the edge of the selection.").to_owned());
+                return;
+            }
+            Err(refused) => {
+                self.notice = Some(notice(&refused));
+                return;
+            }
+        }
+        self.metrics = None;
+        self.editor = None;
+        if merge {
+            self.pick((top, left));
         }
     }
 
@@ -1256,7 +1309,11 @@ impl SheetView {
                 // The picked cell, over everything in it.
                 let (row, column) = selected;
                 let at = place.at(metrics, row, column);
-                let size = vec2(metrics.column(column).1, metrics.row(row).1);
+                let (down, across) = metrics.extent(row, column);
+                let size = vec2(
+                    across.map(|c| metrics.column(c).1).sum(),
+                    down.map(|r| metrics.row(r).1).sum(),
+                );
                 if scroll == Scroll::Start {
                     ui.scroll_to_rect(Rect::from_min_size(area.min, vec2(1.0, 1.0)), None);
                 } else if scroll == Scroll::Picked {
@@ -1545,6 +1602,14 @@ impl SheetView {
         if let Some(outcome) = outcome {
             self.finish_editing(outcome, editing);
         }
+        // A press anywhere on a merged cell picks it, at its corner.
+        let pointed = pointed.map(|(cell, extend)| match (&self.metrics, extend) {
+            (Some(metrics), false) => {
+                let (rows, columns) = metrics.extent(cell.0, cell.1);
+                ((*rows.start(), *columns.start()), false)
+            }
+            _ => (cell, extend),
+        });
         match pointed {
             Some((cell, true)) if cell != self.selected => self.extend(cell),
             Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
@@ -1840,11 +1905,16 @@ impl SheetView {
             })
         };
         let (row, column) = self.selected;
+        // A merged cell is stepped off from its far side.
+        let (rows, columns) = self
+            .metrics
+            .as_ref()
+            .map_or((row..=row, column..=column), |m| m.extent(row, column));
         let cell = match (key, jump) {
-            (Key::ArrowDown, false) => (row + 1, column),
-            (Key::ArrowUp, false) => (row.saturating_sub(1), column),
-            (Key::ArrowRight, false) => (row, column + 1),
-            (Key::ArrowLeft, false) => (row, column.saturating_sub(1)),
+            (Key::ArrowDown, false) => (rows.end() + 1, column),
+            (Key::ArrowUp, false) => (rows.start().saturating_sub(1), column),
+            (Key::ArrowRight, false) => (row, columns.end() + 1),
+            (Key::ArrowLeft, false) => (row, columns.start().saturating_sub(1)),
             (Key::ArrowDown, true) => (edge(row, last_row, true, |r| filled(r, column)), column),
             (Key::ArrowUp, true) => (edge(row, last_row, false, |r| filled(r, column)), column),
             (Key::ArrowRight, true) => (row, edge(column, last_column, true, |c| filled(row, c))),
@@ -1866,6 +1936,14 @@ impl SheetView {
             })
             .unwrap_or(column),
         );
+        // Onto a merged cell at its corner, unless the selection is stretching.
+        let cell = match &self.metrics {
+            Some(metrics) if !extend => {
+                let (rows, columns) = metrics.extent(cell.0, cell.1);
+                (*rows.start(), *columns.start())
+            }
+            _ => cell,
+        };
         if cell != self.selected {
             if extend {
                 self.extend(cell);
@@ -2142,7 +2220,8 @@ fn text_of(
             if at > 0 {
                 out.push('\t');
             }
-            if let Some(cell) = document.cell(sheet, row, column) {
+            // A cell under a merge keeps what it held, which is not shown.
+            if let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) {
                 // A tab or a newline inside a cell would make the row unreadable
                 // as a row, so each becomes a space.
                 out.push_str(&cell.text().replace(['\t', '\n'], " "));
@@ -2420,6 +2499,29 @@ mod tests {
         view.clear_range(&mut editing);
         assert_eq!(text_at(&view, row, 1), kept, "a hidden cell is left");
         assert_eq!(text_at(&view, after, 1), "", "a shown one is emptied");
+    }
+
+    #[test]
+    fn a_merge_is_one_step_and_unmerges_from_any_cell_in_it() {
+        let (mut view, mut editing) = opened();
+        let merged = |view: &SheetView, row, column| {
+            let document = view.document.as_ref().expect("open");
+            document.merge_at(&document.sheets()[0], row, column)
+        };
+        view.pick((20, 0));
+        view.extend((21, 2));
+        view.change_sheet(SheetCommand::Merge, &mut editing);
+        assert_eq!(merged(&view, 21, 2), Some((20..=21, 0..=2)));
+        assert_eq!(view.range(), ((20, 0), (20, 0)), "the corner picked");
+        view.pick((21, 1));
+        view.change_sheet(SheetCommand::Unmerge, &mut editing);
+        assert!(merged(&view, 20, 0).is_none());
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&mut document.document, None)
+            .expect("one step");
+        document.reindex();
+        assert!(merged(&view, 20, 0).is_some(), "the unmerge undone");
     }
 
     #[test]
