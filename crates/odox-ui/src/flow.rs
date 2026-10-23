@@ -108,6 +108,9 @@ pub struct Flow<'a> {
     /// Whether text in the page can be dragged over to select it. Off on a
     /// slide in edit mode, where a drag moves the shape instead.
     pub selectable: bool,
+    /// The style of the shape the flow is drawn in, under each paragraph's
+    /// own, as [`Properties::in_shape`] lays them.
+    pub under: Option<std::rc::Rc<Properties>>,
     /// Where the flow is, as a path of child indices from the root, or from
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
@@ -133,6 +136,7 @@ impl<'a> Flow<'a> {
             page: None,
             find: None,
             selectable: true,
+            under: None,
             path: Vec::new(),
             detached: false,
         }
@@ -279,6 +283,15 @@ impl Flow<'_> {
         self.document.styles.resolve(family, name)
     }
 
+    /// A paragraph's style, over the shape's it is drawn in where there is one.
+    fn paragraph_style(&self, element: &Element) -> std::rc::Rc<Properties> {
+        let properties = self.style_of(element, &Family::Paragraph);
+        match &self.under {
+            Some(shape) => std::rc::Rc::new(properties.in_shape(shape)),
+            None => properties,
+        }
+    }
+
     /// Colour the matches of a search in a paragraph, and scroll to the current
     /// one when a search has just moved to it.
     fn show_matches(&self, ui: &Ui, galley: &mut Arc<Galley>, map: &OffsetMap, origin: Pos2) {
@@ -362,7 +375,7 @@ impl Flow<'_> {
 
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
-        let properties = self.style_of(element, &Family::Paragraph);
+        let properties = self.paragraph_style(element);
         let zoom = self.zoom;
         let size = format::size_of(&properties.text, DEFAULT_SIZE);
 

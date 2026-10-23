@@ -68,7 +68,7 @@ fn collect_undescribed(
     if placement(shape).is_some_and(Placement::is_upright)
         && let Some((content, content_path)) = label(shape, &path)
     {
-        model::undescribed(&model::read(document, content, content_path), into);
+        model::undescribed(&model::read(document, content, content_path, None), into);
     }
 }
 
@@ -185,7 +185,7 @@ fn lay_out(
 /// called in the outline.
 fn label_text(document: &Document, shape: &Element) -> Option<String> {
     let (content, _) = label(shape, &[])?;
-    let words: Vec<String> = model::read(document, content, Vec::new())
+    let words: Vec<String> = model::read(document, content, Vec::new(), None)
         .iter()
         .filter_map(|block| match block {
             Block::Paragraph(paragraph) => Some(paragraph.text.trim().to_owned()),
@@ -483,7 +483,13 @@ impl Slides<'_, '_, '_> {
         if !place.is_upright() {
             return Ok(Vec::new());
         }
-        let mut blocks = model::read(self.document, content, path);
+        let style = style_of(self.document, shape);
+        let mut blocks = model::read(
+            self.document,
+            content,
+            path,
+            Some(std::rc::Rc::clone(&style)),
+        );
         if heading && let Some(Block::Paragraph(paragraph)) = blocks.first_mut() {
             paragraph.heading = Some(1);
         }
@@ -498,10 +504,7 @@ impl Slides<'_, '_, '_> {
             placed.push((at, piece.items));
             at += piece.height + piece.after;
         }
-        let anchor = style_of(self.document, shape)
-            .graphic
-            .text_anchor
-            .unwrap_or(Anchor::Top);
+        let anchor = style.graphic.text_anchor.unwrap_or(Anchor::Top);
         let top = y + (height - at.min(height)) * anchor.share();
         Ok(placed
             .into_iter()

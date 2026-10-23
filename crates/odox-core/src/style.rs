@@ -977,6 +977,21 @@ fn read_edges<T: Copy>(
 }
 
 impl Properties {
+    /// A paragraph's properties over those of the shape it is drawn in: a
+    /// slide's text takes its face, its size and its alignment from its
+    /// frame's style where the paragraph does not say.
+    #[must_use]
+    pub fn in_shape(&self, shape: &Self) -> Self {
+        Self {
+            text: self.text.over(&shape.text),
+            paragraph: ParagraphProperties {
+                align: self.paragraph.align.or(shape.paragraph.align),
+                ..self.paragraph.clone()
+            },
+            ..self.clone()
+        }
+    }
+
     /// Apply one style's property elements over what is already here.
     ///
     /// Only a property the element states is changed; everything else keeps the

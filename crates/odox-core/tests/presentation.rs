@@ -279,3 +279,25 @@ fn a_shape_is_moved_and_sized_in_the_unit_it_was_written_in() {
     );
     deck.document.write_verified().expect("saves");
 }
+
+#[test]
+fn a_placeholders_text_takes_what_its_paragraph_does_not_say_from_the_frame() {
+    let Some(deck) = fixture("growing-liberty.odp") else {
+        return;
+    };
+    let styles = &deck.document.styles;
+    let frame = styles.resolve(&Family::Presentation, "pr1");
+    let paragraph = styles.resolve(&Family::Paragraph, "Standard");
+    let laid = paragraph.in_shape(&frame);
+    assert_eq!(laid.text.bold, Some(true), "the title style's weight");
+    assert_eq!(laid.text.size, frame.text.size);
+    assert!(laid.text.size.is_some());
+
+    let mut own = (*paragraph).clone();
+    own.text.bold = Some(false);
+    assert_eq!(
+        own.in_shape(&frame).text.bold,
+        Some(false),
+        "the paragraph's own wins"
+    );
+}

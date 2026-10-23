@@ -58,6 +58,14 @@ pub struct Canvas<'a> {
     at: Option<usize>,
 }
 
+/// What is drawn inside a shape: its text, or the frame of a picture, and the
+/// shape's style, which its paragraphs are laid over.
+struct Label {
+    content: Element,
+    style: std::rc::Rc<Properties>,
+    picture: bool,
+}
+
 /// Where a shape's own box lands on the screen.
 ///
 /// A shape is drawn in a box of its own, and this is the map from that box onto
@@ -463,6 +471,11 @@ impl Canvas<'_> {
         if let Some(ground) = self.flat(&properties.graphic.fill(), properties.graphic.opacity) {
             self.palette = palette.on(ground);
         }
+        let label = Label {
+            content,
+            style: properties,
+            picture,
+        };
         let mut top = rect.top();
         if anchor != Anchor::Top {
             // Where the label goes depends on how tall it turns out to be, and
@@ -470,12 +483,18 @@ impl Canvas<'_> {
             // so it is laid out twice: once into a ui that draws nothing, to
             // measure, and then once for real at the offset that measurement
             // gives.
-            let sized = self.lay_out(ui, &content, rect, picture, true, prefix.as_ref());
+            let sized = self.lay_out(ui, &label, rect, true, prefix.as_ref());
             top += (rect.height() - sized.min(rect.height())) * anchor.share();
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
-        self.lay_out(ui, &content, placed, picture, false, prefix.as_ref());
-        self.hint(ui, shape, &content, rect, prefix.is_some() && !picture);
+        self.lay_out(ui, &label, placed, false, prefix.as_ref());
+        self.hint(
+            ui,
+            shape,
+            &label.content,
+            rect,
+            prefix.is_some() && !picture,
+        );
         self.palette = palette;
     }
 
@@ -538,13 +557,13 @@ impl Canvas<'_> {
     }
 
     /// Draw a shape's content into a rectangle, or measure how tall it is
-    /// without drawing it. Returns the height it took.
+    /// without drawing it, its paragraphs over the shape's own style. Returns
+    /// the height it took.
     fn lay_out(
         &mut self,
         ui: &mut Ui,
-        content: &Element,
+        label: &Label,
         rect: Rect,
-        picture: bool,
         measuring: bool,
         prefix: Option<&Vec<usize>>,
     ) -> f32 {
@@ -567,16 +586,17 @@ impl Canvas<'_> {
             ui.set_clip_rect(rect.intersect(page));
             let mut flow = Flow::new(document, pictures, scale);
             flow.palette = palette;
+            flow.under = Some(std::rc::Rc::clone(&label.style));
             flow.selectable = !edit_mode;
             flow.page = page_editor;
             flow.find = self.find.clone().filter(|_| prefix.is_some() && !measuring);
             if let Some(prefix) = prefix {
                 flow.start_at(prefix.clone());
             }
-            if picture {
-                flow.frame(ui, content, rect.width());
+            if label.picture {
+                flow.frame(ui, &label.content, rect.width());
             } else {
-                flow.blocks(ui, content, rect.width());
+                flow.blocks(ui, &label.content, rect.width());
             }
             if flow.followed.is_some() {
                 self.followed = flow.followed.take();

@@ -181,10 +181,16 @@ pub(crate) struct Note {
 /// A PDF has pages and could hold a footnote at the foot of one, but laying
 /// one out there means taking room from the page the line citing it is on;
 /// the notes are gathered at the end of the document instead.
-pub(crate) fn read(document: &Document, root: &Element, path: Vec<usize>) -> Vec<Block> {
+pub(crate) fn read(
+    document: &Document,
+    root: &Element,
+    path: Vec<usize>,
+    shape: Option<std::rc::Rc<Properties>>,
+) -> Vec<Block> {
     let mut reader = Reader {
         document,
         path,
+        shape,
         notes: Vec::new(),
     };
     let mut blocks = Vec::new();
@@ -196,6 +202,8 @@ pub(crate) fn read(document: &Document, root: &Element, path: Vec<usize>) -> Vec
 struct Reader<'a> {
     document: &'a Document,
     path: Vec<usize>,
+    /// The style of the shape the text is in, under each paragraph's own.
+    shape: Option<std::rc::Rc<Properties>>,
     /// The notes cited so far.
     notes: Vec<Note>,
 }
@@ -257,6 +265,10 @@ impl Reader<'_> {
 
     fn paragraph(&mut self, element: &Element, into: &mut Vec<Block>) {
         let properties = self.style_of(element, &Family::Paragraph);
+        let properties = match &self.shape {
+            Some(shape) => std::rc::Rc::new(properties.in_shape(shape)),
+            None => properties,
+        };
         let size = size_of(&properties.text, DEFAULT_SIZE);
         let base = style(&properties.text, size, None);
         let mut text = Text {
