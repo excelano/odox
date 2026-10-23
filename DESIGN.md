@@ -318,6 +318,23 @@ does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one
 cell, and the grid's lines stop at its edge.
 
+**A workbook's sheets are added, renamed, deleted and moved from the Sheet menu
+and from a tab's own menu**, and a double-click on a tab renames it; each is one
+step to undo. What refers to a sheet refers to it by name, so a move only
+reorders the `table:table` elements. A new sheet is empty, goes after the one it
+was asked from in that sheet's table style, and is named "Sheet" and the first
+free number from the count of sheets on. A rename renames the sheet in every
+reference that names it: the formulas and named expressions, whose references
+are in brackets, and every attribute that holds addresses alone (a print range,
+a named range, a database range, a conditional format's or a validation's
+cells), quoting a name that is not letters, digits and underscores; the sheet's
+view settings, its freeze among them, follow it. A rename is refused where a
+reference cannot be read, or where a chart, an object, a validation's condition
+or a conditional format's formula holds the name in a form this does not
+rewrite. A delete is refused while anything outside the sheet refers into it,
+for the same reason a row's is, and for the last sheet shown. A name may not be
+empty, hold `[ ] * ? : / \`, start or end with a quote, or be another sheet's.
+
 **A column's width and a row's height are dragged at the header's edge.** A
 double-click on a column's edge fits it to the widest text in it. The size is
 written into a style of the column's or the row's own, the style it had with

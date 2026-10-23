@@ -370,48 +370,9 @@ pub fn shift_formula(
     own_sheet: Option<&str>,
     change: &Change,
 ) -> Result<String, Refusal> {
-    let mut out = String::with_capacity(formula.len());
-    let mut chars = formula.char_indices().peekable();
-    while let Some((at, c)) = chars.next() {
-        match c {
-            '"' => {
-                out.push(c);
-                // A string runs to the next quote that is not doubled.
-                while let Some((_, s)) = chars.next() {
-                    out.push(s);
-                    if s == '"' {
-                        if chars.peek().is_some_and(|(_, next)| *next == '"') {
-                            out.extend(chars.next().map(|(_, q)| q));
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
-            '[' => {
-                // To the matching bracket, with single quotes holding any.
-                let start = at + 1;
-                let mut quoted = false;
-                let mut end = None;
-                for (i, s) in chars.by_ref() {
-                    match s {
-                        '\'' => quoted = !quoted,
-                        ']' if !quoted => {
-                            end = Some(i);
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-                let end = end.ok_or_else(|| Refusal::Unreadable(formula[start..].to_owned()))?;
-                out.push('[');
-                out.push_str(&shift_reference(&formula[start..end], own_sheet, change)?);
-                out.push(']');
-            }
-            other => out.push(other),
-        }
-    }
-    Ok(out)
+    each_reference(formula, |reference| {
+        shift_reference(reference, own_sheet, change)
+    })
 }
 
 /// An address that stands alone, as a named range or a base cell gives one:
@@ -434,9 +395,205 @@ pub fn address_sheet(address: &str) -> Option<String> {
     read_end(split_range(address).first()?)?.sheet
 }
 
+/// A sheet's name as a reference writes it: bare where it is letters, digits
+/// and underscores not starting with a digit, and in single quotes, with any
+/// quote in it doubled, otherwise.
+fn written_sheet(name: &str) -> String {
+    let bare = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_alphanumeric() || c == '_');
+    if bare {
+        name.to_owned()
+    } else {
+        format!("'{}'", name.replace('\'', "''"))
+    }
+}
+
+/// Visit every reference in a formula, the text between each pair of brackets
+/// outside a string, and replace it with what `each` gives.
+fn each_reference(
+    formula: &str,
+    mut each: impl FnMut(&str) -> Result<String, Refusal>,
+) -> Result<String, Refusal> {
+    let mut out = String::with_capacity(formula.len());
+    let mut chars = formula.char_indices().peekable();
+    while let Some((at, c)) = chars.next() {
+        match c {
+            '"' => {
+                out.push(c);
+                while let Some((_, s)) = chars.next() {
+                    out.push(s);
+                    if s == '"' {
+                        if chars.peek().is_some_and(|(_, next)| *next == '"') {
+                            out.extend(chars.next().map(|(_, q)| q));
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            '[' => {
+                let start = at + 1;
+                let mut quoted = false;
+                let mut end = None;
+                for (i, s) in chars.by_ref() {
+                    match s {
+                        '\'' => quoted = !quoted,
+                        ']' if !quoted => {
+                            end = Some(i);
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                let end = end.ok_or_else(|| Refusal::Unreadable(formula[start..].to_owned()))?;
+                out.push('[');
+                out.push_str(&each(&formula[start..end])?);
+                out.push(']');
+            }
+            other => out.push(other),
+        }
+    }
+    Ok(out)
+}
+
+/// A reference with every end that names the sheet `from` naming `to`
+/// instead, the `$` before it kept.
+fn rename_reference(text: &str, from: &str, to: &str) -> Result<String, Refusal> {
+    if text == ".#REF!" || text.starts_with("#REF!") {
+        return Ok(text.to_owned());
+    }
+    let unreadable = || Refusal::Unreadable(text.to_owned());
+    let mut ends = split_range(text)
+        .into_iter()
+        .map(read_end)
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(unreadable)?;
+    for end in &mut ends {
+        if end.sheet.as_deref() == Some(from) {
+            let dollar = if end.sheet_text.starts_with('$') {
+                "$"
+            } else {
+                ""
+            };
+            end.sheet_text = format!("{dollar}{}.", written_sheet(to));
+            end.sheet = Some(to.to_owned());
+        }
+    }
+    Ok(ends.iter().map(write_end).collect::<Vec<_>>().join(":"))
+}
+
+/// A formula with the sheet `from` renamed `to` in every reference that
+/// names it.
+///
+/// # Errors
+///
+/// A reference this module cannot read.
+pub fn rename_in_formula(formula: &str, from: &str, to: &str) -> Result<String, Refusal> {
+    each_reference(formula, |reference| rename_reference(reference, from, to))
+}
+
+/// The same for addresses that stand alone, as an attribute lists them,
+/// separated by spaces: `Sheet1.A1:Sheet1.D9 Sheet2.B2`.
+///
+/// # Errors
+///
+/// An address this module cannot read.
+pub fn rename_in_addresses(addresses: &str, from: &str, to: &str) -> Result<String, Refusal> {
+    addresses
+        .split(' ')
+        .map(|address| {
+            if address.is_empty() {
+                Ok(String::new())
+            } else {
+                rename_reference(address, from, to)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|parts| parts.join(" "))
+}
+
+/// The first reference in a formula that names a sheet, or that cannot be
+/// read and so might.
+pub fn naming_in_formula(formula: &str, sheet: &str) -> Option<String> {
+    let mut found = None;
+    let _ = each_reference(formula, |reference| {
+        if found.is_none() && names(reference, sheet) {
+            found = Some(reference.to_owned());
+        }
+        Ok(reference.to_owned())
+    });
+    found
+}
+
+/// The same for addresses that stand alone.
+pub fn naming_in_addresses(addresses: &str, sheet: &str) -> Option<String> {
+    addresses
+        .split(' ')
+        .find(|address| !address.is_empty() && names(address, sheet))
+        .map(ToOwned::to_owned)
+}
+
+/// Whether a reference names a sheet, or cannot be read and so might.
+fn names(reference: &str, sheet: &str) -> bool {
+    if reference == ".#REF!" || reference.starts_with("#REF!") {
+        return false;
+    }
+    split_range(reference)
+        .into_iter()
+        .map(read_end)
+        .collect::<Option<Vec<_>>>()
+        .is_none_or(|ends| ends.iter().any(|end| end.sheet.as_deref() == Some(sheet)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_renamed_sheet_is_renamed_in_every_reference_and_nowhere_else() {
+        assert_eq!(
+            rename_in_formula(
+                "of:=[$Sheet1.A1]+[.B2]+[Sheet1.$C$3:.D4]+\"[Sheet1.A1]\"",
+                "Sheet1",
+                "Totals"
+            )
+            .unwrap(),
+            "of:=[$Totals.A1]+[.B2]+[Totals.$C$3:.D4]+\"[Sheet1.A1]\""
+        );
+        assert_eq!(
+            rename_in_formula("of:=[$Other.A1]", "Sheet1", "Totals").unwrap(),
+            "of:=[$Other.A1]"
+        );
+        assert_eq!(
+            rename_in_formula("of:=[$Sheet1.A1]", "Sheet1", "My sheet's").unwrap(),
+            "of:=[$'My sheet''s'.A1]"
+        );
+        assert_eq!(
+            rename_in_formula("of:=[$'My sheet''s'.A1]", "My sheet's", "B").unwrap(),
+            "of:=[$B.A1]"
+        );
+        assert_eq!(
+            rename_in_addresses("Sheet1.A1:Sheet1.D9 Other.B2", "Sheet1", "Q 1").unwrap(),
+            "'Q 1'.A1:'Q 1'.D9 Other.B2"
+        );
+    }
+
+    #[test]
+    fn what_names_a_sheet_is_found() {
+        assert_eq!(
+            naming_in_formula("of:=[.A1]+[$Data.B2]", "Data").as_deref(),
+            Some("$Data.B2")
+        );
+        assert_eq!(naming_in_formula("of:=[.A1]+[$Other.B2]", "Data"), None);
+        assert!(naming_in_formula("of:=['file:///x.ods'#$Data.A1]", "Data").is_some());
+        assert_eq!(
+            naming_in_addresses("Other.A1 Data.A1:Data.B2", "Data").as_deref(),
+            Some("Data.A1:Data.B2")
+        );
+    }
 
     fn rows(sheet: &str, at: usize, kind: Kind) -> Change {
         Change {

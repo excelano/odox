@@ -12,6 +12,7 @@
 
 mod freeze;
 mod restructure;
+mod sheets;
 mod size;
 pub use freeze::Frozen;
 pub use restructure::{Blocked, Restructure};

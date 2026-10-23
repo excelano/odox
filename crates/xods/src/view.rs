@@ -42,6 +42,10 @@ pub struct SheetView {
     sheet_command: Option<SheetCommand>,
     /// The View menu asked to freeze or unfreeze.
     freeze_asked: bool,
+    /// What the Sheet menu or a tab's menu asked of a sheet, and which.
+    book_command: Option<(BookCommand, usize)>,
+    /// The sheet being renamed, while the question is up.
+    renaming: Option<Renaming>,
     /// How many rows the grid last showed, which is how far Page Up and Page
     /// Down go.
     page_rows: usize,
@@ -346,6 +350,26 @@ enum SheetCommand {
     DeleteColumns,
 }
 
+/// What is asked of one of the workbook's sheets.
+#[derive(Clone, Copy)]
+enum BookCommand {
+    Add,
+    Rename,
+    Delete,
+    Left,
+    Right,
+}
+
+/// A sheet's new name, as it is typed.
+struct Renaming {
+    sheet: usize,
+    name: String,
+    /// Why the name typed so far was not taken.
+    problem: Option<String>,
+    /// The question was put up this frame and has yet to take the focus.
+    opened: bool,
+}
+
 /// What the editor asked for when it closed.
 enum Outcome {
     Commit(Step),
@@ -421,6 +445,19 @@ impl View for SheetView {
     fn reindex(&mut self) {
         if let Some(document) = &mut self.document {
             document.reindex();
+            // An undo can take away the sheet being looked at.
+            if document
+                .sheets()
+                .get(self.sheet)
+                .is_none_or(|sheet| !sheet.visible)
+            {
+                self.sheet = document
+                    .sheets()
+                    .iter()
+                    .position(|s| s.visible)
+                    .unwrap_or(0);
+                self.pick((0, 0));
+            }
         }
         self.metrics = None;
         self.editor = None;
@@ -468,6 +505,8 @@ impl View for SheetView {
                     ui.close();
                 }
             }
+            ui.separator();
+            self.book_menu(ui, self.sheet, can);
         });
     }
 
@@ -539,11 +578,16 @@ impl View for SheetView {
         if std::mem::take(&mut self.freeze_asked) {
             self.freeze(editing);
         }
+        if let Some((command, sheet)) = self.book_command.take() {
+            self.change_book(command, sheet, editing);
+        }
+        self.rename_question(ui.ctx(), editing);
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
+        let can = !editing.asking && self.editor.is_none();
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
-        egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui));
+        egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui, can));
         self.grid(ui, zoom, editing);
         self.found.drawn();
     }
@@ -648,6 +692,163 @@ impl SheetView {
                 self.extend(to);
             }
             None => self.pick((top, left)),
+        }
+    }
+
+    /// Look at another sheet, from its first cell.
+    fn show_sheet(&mut self, index: usize) {
+        self.sheet = index;
+        self.pick((0, 0));
+        self.metrics = None;
+        self.editor = None;
+        self.notice = None;
+    }
+
+    /// The items that add, rename, delete and move a sheet, for the Sheet
+    /// menu and for a tab's own.
+    fn book_menu(&mut self, ui: &mut Ui, sheet: usize, can: bool) {
+        let Some(document) = &self.document else {
+            return;
+        };
+        let shown: Vec<usize> = document
+            .sheets()
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.visible)
+            .map(|(index, _)| index)
+            .collect();
+        let entries = [
+            (t("Add a sheet"), BookCommand::Add, true),
+            (t("Rename the sheet…"), BookCommand::Rename, true),
+            (t("Delete the sheet"), BookCommand::Delete, shown.len() > 1),
+            (
+                t("Move the sheet left"),
+                BookCommand::Left,
+                shown.first().is_some_and(|&first| first < sheet),
+            ),
+            (
+                t("Move the sheet right"),
+                BookCommand::Right,
+                shown.last().is_some_and(|&last| last > sheet),
+            ),
+        ];
+        for (name, command, possible) in entries {
+            if ui
+                .add_enabled(can && possible, egui::Button::new(name))
+                .clicked()
+            {
+                self.book_command = Some((command, sheet));
+                ui.close();
+            }
+        }
+    }
+
+    /// Add, delete or move a sheet as one step to undo, or put up the
+    /// question that renames one.
+    fn change_book(&mut self, command: BookCommand, sheet: usize, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        if let BookCommand::Rename = command {
+            let name = document
+                .sheets()
+                .get(sheet)
+                .map(|s| s.name.clone())
+                .unwrap_or_default();
+            self.renaming = Some(Renaming {
+                sheet,
+                name,
+                problem: None,
+                opened: true,
+            });
+            return;
+        }
+        let before = document.document.content.clone();
+        let shown = |document: &SheetDocument, forward: bool| {
+            let visible = |&index: &usize| document.sheets()[index].visible;
+            if forward {
+                (sheet + 1..document.sheets().len()).find(visible)
+            } else {
+                (0..sheet).rev().find(visible)
+            }
+        };
+        let done = match command {
+            BookCommand::Add => {
+                let name = fresh_name(document);
+                document.add_sheet(sheet, &name)
+            }
+            BookCommand::Delete => document.delete_sheet(sheet).map(|()| {
+                let after = document.sheets().len().saturating_sub(1).min(sheet);
+                (0..=after)
+                    .rev()
+                    .chain(after..document.sheets().len())
+                    .find(|&index| document.sheets()[index].visible)
+                    .unwrap_or(0)
+            }),
+            BookCommand::Left | BookCommand::Right => {
+                match shown(document, matches!(command, BookCommand::Right)) {
+                    Some(to) => document.move_sheet(sheet, to).map(|()| to),
+                    None => return,
+                }
+            }
+            BookCommand::Rename => return,
+        };
+        match done {
+            Ok(index) => {
+                editing.record_snapshot(before, None);
+                self.show_sheet(index);
+            }
+            Err(blocked) => self.notice = Some(blocked_notice(&blocked)),
+        }
+    }
+
+    /// The question that renames a sheet, while it is up.
+    fn rename_question(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let Some(renaming) = &mut self.renaming else {
+            return;
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::new("rename-sheet")).show(ctx, |ui| {
+            ui.heading(t("Rename the sheet"));
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut renaming.name)
+                    .id(egui::Id::new("sheet-name"))
+                    .desired_width(260.0),
+            );
+            if renaming.opened {
+                renaming.opened = false;
+                response.request_focus();
+            }
+            if let Some(problem) = &renaming.problem {
+                ui.colored_label(ui.visuals().warn_fg_color, problem);
+            }
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                let entered = response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                if ui.button(t("Rename")).clicked() || entered {
+                    answer = Some(true);
+                }
+                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                    answer = Some(false);
+                }
+            });
+        });
+        match answer {
+            Some(true) => {
+                let Some(document) = &mut self.document else {
+                    return;
+                };
+                let before = document.document.content.clone();
+                match document.rename_sheet(renaming.sheet, renaming.name.trim()) {
+                    Ok(()) => {
+                        editing.record_snapshot(before, None);
+                        self.renaming = None;
+                    }
+                    Err(blocked) => renaming.problem = Some(blocked_notice(&blocked)),
+                }
+            }
+            Some(false) => self.renaming = None,
+            None => {}
         }
     }
 
@@ -771,7 +972,7 @@ impl SheetView {
     }
 
     /// The tabs along the bottom, one per sheet a person can see.
-    fn sheet_tabs(&mut self, ui: &mut Ui) {
+    fn sheet_tabs(&mut self, ui: &mut Ui, can: bool) {
         let Some(document) = &self.document else {
             return;
         };
@@ -792,13 +993,14 @@ impl SheetView {
                 ui.horizontal(|ui| {
                     for (index, name) in names {
                         let picked = index == self.sheet;
-                        if ui.selectable_label(picked, name).clicked() {
-                            self.sheet = index;
-                            self.pick((0, 0));
-                            self.metrics = None;
-                            self.editor = None;
-                            self.notice = None;
+                        let response = ui.selectable_label(picked, name);
+                        if response.clicked() {
+                            self.show_sheet(index);
                         }
+                        if response.double_clicked() && can {
+                            self.book_command = Some((BookCommand::Rename, index));
+                        }
+                        response.context_menu(|ui| self.book_menu(ui, index, can));
                     }
                 });
             });
@@ -1232,7 +1434,7 @@ impl SheetView {
             Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
             _ => {}
         }
-        if self.editor.is_some() || editing.asking {
+        if self.editor.is_some() || editing.asking || self.renaming.is_some() {
             return;
         }
         if !was_editing {
@@ -1661,6 +1863,18 @@ fn edge(from: usize, last: usize, forward: bool, filled: impl Fn(usize) -> bool)
     at
 }
 
+/// A name for a new sheet that no sheet has: "Sheet" and the first number
+/// from the count of sheets on that is free.
+fn fresh_name(document: &SheetDocument) -> String {
+    // As many numbers as there are sheets, and one more, hold one that is
+    // free.
+    let count = document.sheets().len();
+    (count + 1..=count * 2 + 1)
+        .map(|number| fill(t("Sheet{number}"), &[("number", &number.to_string())]))
+        .find(|name| document.check_sheet_name(name, None).is_ok())
+        .unwrap_or_default()
+}
+
 /// What the cell bar says when rows or columns could not be inserted or
 /// deleted.
 fn blocked_notice(blocked: &Blocked) -> String {
@@ -1668,13 +1882,18 @@ fn blocked_notice(blocked: &Blocked) -> String {
         Blocked::NotFound => t("There is nothing there to change.").to_owned(),
         Blocked::Merged => t("A merged cell is in the way: this would cut through it.").to_owned(),
         Blocked::Unreadable(reference) => fill(
-            t("A formula holds [{reference}], which this version cannot move."),
+            t("A formula holds [{reference}], which this version cannot read."),
             &[("reference", reference)],
         ),
         Blocked::Deleted(reference) => fill(
             t("A formula points at [{reference}], which would be deleted."),
             &[("reference", reference)],
         ),
+        Blocked::Taken => t("Another sheet already has that name.").to_owned(),
+        Blocked::Unnamed => {
+            t("A sheet's name cannot be empty or hold [ ] * ? : / or \\.").to_owned()
+        }
+        Blocked::Last => t("A workbook keeps at least one sheet to show.").to_owned(),
         Blocked::Names(what) => {
             let what = match *what {
                 "conditional formats" => t("conditional formats"),
@@ -1687,7 +1906,7 @@ fn blocked_notice(blocked: &Blocked) -> String {
                 _ => t("shapes anchored to cells"),
             };
             fill(
-                t("This document has {what}, which this version cannot move."),
+                t("This document has {what}, which this version cannot update to match."),
                 &[("what", what)],
             )
         }

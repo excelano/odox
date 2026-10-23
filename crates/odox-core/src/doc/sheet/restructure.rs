@@ -79,6 +79,13 @@ pub enum Blocked {
     /// The document holds something that names a range of cells and is not
     /// moved: what, in the words a window can put in a sentence.
     Names(&'static str),
+    /// Another sheet has the name.
+    Taken,
+    /// The name may not be a sheet's: empty, or holding a character a
+    /// reference reserves.
+    Unnamed,
+    /// It is the last sheet shown, and a workbook shows one.
+    Last,
 }
 
 impl SheetDocument {
