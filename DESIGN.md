@@ -365,8 +365,7 @@ panes, each inside its own edges: the part that scrolls both ways, the frozen
 rows above it, the frozen columns beside it, and the corner where they meet,
 with a line where the frozen part ends; a press is read against the pane it
 lands in. View > Freeze rows and columns freezes those above and left of the
-picked cell, and the same item unfreezes. It changes no content and is not a
-step to undo, but leaves the document to be saved, which writes it; a package
+picked cell, and the same item unfreezes, each one step to undo; a package
 with no `settings.xml` is given one and the manifest lists it. Ctrl+Home scrolls
 the grid back to its start as well as picking the first cell, which a frozen
 cell being picked does not do by itself.
@@ -504,7 +503,9 @@ Every edit records the tree as it stands and then mutates, except that a run
 of typing, or of deleting, on the page is one step, ended by a move of the
 caret or an edit of another kind. A snapshot also holds where the caret stood,
 so undo puts the caret where the edit began and redo where it was when the
-edit was undone. The document is modified when the stack is not at the depth
+edit was undone, and the package entries the edit wrote outside the tree, as
+a freeze or a sheet's rename writes `settings.xml` and the manifest, as they
+were before it. The document is modified when the stack is not at the depth
 it had when the file was last read or written, so undoing back to that depth
 is a document with nothing to save.
 Close, Open, Reload, Quit and the window's own close button ask before a

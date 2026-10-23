@@ -45,7 +45,7 @@ pub use doc::Document;
 pub use edit::Refused;
 pub use error::Error;
 pub use meta::Meta;
-pub use package::{Package, Part};
+pub use package::{Kept, Package, Part};
 pub use place::Transform;
 pub use style::{
     Anchor, Border, Break, CellProperties, Edges, Family, Fill, Fit, Gradient, GradientStyle,

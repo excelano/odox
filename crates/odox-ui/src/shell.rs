@@ -413,9 +413,8 @@ impl<V: View> Shell<V> {
     fn undo(&mut self) {
         let caret = self.view.caret();
         if let Some(document) = self.view.document_mut()
-            && let Some((previous, caret)) = self.editing.undo(&document.content, caret)
+            && let Some(caret) = self.editing.undo(document, caret)
         {
-            document.content = previous;
             self.after_history(caret);
         }
     }
@@ -423,9 +422,8 @@ impl<V: View> Shell<V> {
     fn redo(&mut self) {
         let caret = self.view.caret();
         if let Some(document) = self.view.document_mut()
-            && let Some((next, caret)) = self.editing.redo(&document.content, caret)
+            && let Some(caret) = self.editing.redo(document, caret)
         {
-            document.content = next;
             self.after_history(caret);
         }
     }

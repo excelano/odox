@@ -12,11 +12,15 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::SheetDocument;
+use crate::Kept;
 use crate::edit::Refused;
 use crate::xml::{self, Element, Node, Ns};
 
 /// The part the settings live in.
-const SETTINGS: &str = "settings.xml";
+pub(super) const SETTINGS: &str = "settings.xml";
+
+/// The manifest, which lists the settings part when a freeze first writes it.
+const MANIFEST: &str = "META-INF/manifest.xml";
 
 /// How many rows and columns of a sheet are frozen, from the top and the
 /// left.
@@ -58,10 +62,15 @@ impl SheetDocument {
         }
     }
 
+    /// The parts a freeze or a rename writes outside the content, as they
+    /// stand, for an undo step to put back.
+    pub fn keep_settings(&self) -> Kept {
+        self.document.package.keep(&[SETTINGS, MANIFEST])
+    }
+
     /// Freeze a sheet's top rows and left columns, or with nothing frozen
     /// unfreeze it. The settings are written into the package, where a save
-    /// takes them, and are not part of the content an undo goes back over:
-    /// a freeze is how the sheet is looked at, as the zoom is.
+    /// takes them.
     ///
     /// # Errors
     ///

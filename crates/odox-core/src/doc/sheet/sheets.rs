@@ -13,6 +13,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::SheetDocument;
+use super::freeze::SETTINGS;
 use super::restructure::Blocked;
 use crate::doc::refs::{self, Refusal};
 use crate::xml::{Attribute, Element, Node, Ns};
@@ -264,7 +265,6 @@ impl SheetDocument {
 
     /// Carry a sheet's view settings, its freeze among them, to its new name.
     fn rename_in_settings(&mut self, from: &str, to: &str) {
-        const SETTINGS: &str = "settings.xml";
         let package = &mut self.document.package;
         let Ok(Some(mut root)) = package.optional_xml(SETTINGS) else {
             return;

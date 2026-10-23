@@ -44,6 +44,11 @@ pub struct Package {
     media_type: Option<String>,
 }
 
+/// Entries of a package by name, with their bytes or with none where the
+/// entry was absent.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Kept(Vec<(String, Option<Vec<u8>>)>);
+
 /// The entry that carries the package's media type. It is first, stored rather
 /// than deflated, and the one entry whose position in the archive the
 /// specification fixes, so that a reader can identify the format from the first
@@ -215,6 +220,31 @@ impl Package {
         root.children.push(xml::Node::Element(entry));
         root.self_closing = false;
         self.set_xml(MANIFEST, &root);
+    }
+
+    /// Some entries as they stand, to be put back with [`Package::restore`]:
+    /// what an undo step holds of a change outside the content tree.
+    pub fn keep(&self, names: &[&str]) -> Kept {
+        Kept(
+            names
+                .iter()
+                .map(|&name| (name.to_owned(), self.part(name).map(|p| p.data.clone())))
+                .collect(),
+        )
+    }
+
+    /// Put entries back as they were kept, removing one that was absent.
+    /// Answers what they hold now, kept the same way.
+    pub fn restore(&mut self, kept: Kept) -> Kept {
+        let names: Vec<&str> = kept.0.iter().map(|(name, _)| name.as_str()).collect();
+        let now = self.keep(&names);
+        for (name, data) in kept.0 {
+            match data {
+                Some(data) => self.set_part(&name, data),
+                None => self.parts.retain(|p| p.name != name),
+            }
+        }
+        now
     }
 
     /// Replace an entry with a serialized XML tree.

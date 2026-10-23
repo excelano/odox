@@ -842,10 +842,10 @@ impl SheetView {
                 let Some(document) = &mut self.document else {
                     return;
                 };
-                let before = document.document.content.clone();
+                let (before, parts) = (document.document.content.clone(), document.keep_settings());
                 match document.rename_sheet(renaming.sheet, renaming.name.trim()) {
                     Ok(()) => {
-                        editing.record_snapshot(before, None);
+                        editing.record_step(before, parts, None);
                         self.renaming = None;
                     }
                     Err(blocked) => renaming.problem = Some(blocked_notice(&blocked)),
@@ -857,8 +857,7 @@ impl SheetView {
     }
 
     /// Freeze the rows above and the columns left of the picked cell, or,
-    /// with any frozen, unfreeze them. A setting rather than a step to undo,
-    /// and one the next save writes.
+    /// with any frozen, unfreeze them, as one step to undo.
     fn freeze(&mut self, editing: &mut Editing) {
         let Some(document) = &mut self.document else {
             return;
@@ -874,8 +873,9 @@ impl SheetView {
         } else {
             odox_core::doc::Frozen::default()
         };
+        let (before, parts) = (document.document.content.clone(), document.keep_settings());
         match document.set_frozen(self.sheet, frozen) {
-            Ok(()) => editing.change_settings(),
+            Ok(()) => editing.record_step(before, parts, None),
             Err(refused) => self.notice = Some(notice(&refused)),
         }
         self.scroll = Scroll::Picked;
@@ -2091,10 +2091,9 @@ mod tests {
         assert_eq!(view.range(), ((6, 1), (7, 2)));
         assert!(editing.modified());
         let document = view.document.as_mut().expect("open");
-        let (previous, _) = editing
-            .undo(&document.document.content, None)
+        editing
+            .undo(&mut document.document, None)
             .expect("one step");
-        document.document.content = previous;
         document.reindex();
         assert!(!editing.can_undo(), "the paste was a single step");
         assert_eq!(text_at(&view, 6, 1), "");
@@ -2279,7 +2278,7 @@ mod tests {
         assert_eq!(text_at(&view, 3, 0), "Washer");
         let document = view.document.as_mut().expect("open");
         editing
-            .undo(&document.document.content, None)
+            .undo(&mut document.document, None)
             .expect("one step");
         assert!(!editing.can_undo(), "both cells were one step");
     }
@@ -2324,10 +2323,9 @@ mod tests {
             "the new rows are what is selected"
         );
         let document = view.document.as_mut().expect("open");
-        let (previous, _) = editing
-            .undo(&document.document.content, None)
+        editing
+            .undo(&mut document.document, None)
             .expect("one step");
-        document.document.content = previous;
         document.reindex();
         assert_eq!(text_at(&view, 1, 0), "Bolt M6");
         assert!(!editing.can_undo());
@@ -2353,5 +2351,28 @@ mod tests {
         view.pick((4, 3));
         view.extend((1, 5));
         assert_eq!(view.range(), ((1, 3), (4, 5)));
+    }
+
+    #[test]
+    fn a_freeze_is_undone_and_redone() {
+        let (mut view, mut editing) = opened();
+        view.pick((1, 1));
+        view.freeze(&mut editing);
+        let frozen = |view: &SheetView| view.document.as_ref().expect("open").sheets()[0].frozen;
+        assert_eq!(frozen(&view).rows, 1);
+        assert!(editing.modified());
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&mut document.document, None)
+            .expect("one step");
+        document.reindex();
+        assert_eq!(frozen(&view), odox_core::doc::Frozen::default());
+        assert!(!editing.modified(), "back to what the file holds");
+        let document = view.document.as_mut().expect("open");
+        editing
+            .redo(&mut document.document, None)
+            .expect("one step");
+        document.reindex();
+        assert_eq!(frozen(&view).columns, 1);
     }
 }
