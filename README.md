@@ -123,8 +123,9 @@ cannot write, a formula or one under a merge, changes nothing. The Sheet menu in
 The same menu, and a right click on a tab, add, rename, delete and move sheets;
 a double click on a tab renames it, and formulas that name a renamed sheet
 follow it. Dragging the edge of a column's or a row's header resizes it, and a
-double click on a column's fits it to its text. View > Freeze rows and columns
-keeps the rows above and the columns left of the picked cell in view. Ctrl and
+double click on a column's fits it to its text. The Sheet menu hides the
+selected rows or columns and shows the hidden ones in or beside the selection.
+View > Freeze rows and columns keeps the rows above and the columns left of the picked cell in view. Ctrl and
 the arrows go to the edge of the data, Page Up and Page Down move a screen,
 Ctrl+Home and Ctrl+End go to the first and last used cells and Ctrl+A selects
 them, Shift with any of them stretching the selection; a selection's sum,

@@ -357,6 +357,17 @@ run; a row given a height is marked as no longer fitted to its text. Each
 resize is one step to undo, and changes no value, so no formula is drawn faint
 for it.
 
+**Hidden rows and columns are drawn at no size.** A row or column whose
+element says `table:visibility` other than "visible" takes no room in the
+grid and has no header; a thicker stroke in the headers marks where it is. A
+pointer finds the one after it, and the arrows and the other keys step over
+it the way they were going, or back where nothing is shown past it. The Sheet
+menu hides the selected rows or columns, writing "collapse" on their elements
+once the ends are split out of their runs, and shows hidden ones by removing
+the attribute: those in the selection and those next to it, so that a person
+picks a cell beside what is hidden, since it cannot be picked itself. Each is
+one step to undo.
+
 **Frozen rows and columns stay in view.** A freeze is a view setting, which ODF
 has no element for and every producer writes as `LibreOffice` does, into
 `settings.xml` under the first view, per sheet by name: split mode 2 and a

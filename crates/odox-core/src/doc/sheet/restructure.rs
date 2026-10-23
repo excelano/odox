@@ -222,7 +222,7 @@ fn is_column_container(element: &Element) -> bool {
 
 /// Each row element of a table in order, with the row it begins at, how many
 /// it stands for, and the route to it.
-fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
+pub(super) fn rows_of(table: &Element) -> Vec<(Vec<usize>, usize, usize)> {
     fn walk(
         parent: &Element,
         path: &mut Vec<usize>,

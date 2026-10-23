@@ -15,6 +15,7 @@ use odox_core::doc::{
 };
 
 /// The smallest a row or column may be drawn and still be found by a pointer.
+/// A hidden one is drawn at no size, and a pointer finds the one after it.
 const MINIMUM: f32 = 4.0;
 
 /// How many empty rows and columns are shown past the end of a sheet's content,
@@ -42,10 +43,12 @@ impl Metrics {
         let mut at = 0.0;
         for row in 0..row_count {
             rows.push(at);
-            let height = document
-                .row_height(sheet, row)
-                .map_or(DEFAULT_ROW, odox_core::Length::points);
-            at += (height * zoom).max(MINIMUM);
+            if sheet.row_shown(row) {
+                let height = document
+                    .row_height(sheet, row)
+                    .map_or(DEFAULT_ROW, odox_core::Length::points);
+                at += (height * zoom).max(MINIMUM);
+            }
         }
         rows.push(at);
 
@@ -53,10 +56,12 @@ impl Metrics {
         let mut at = 0.0;
         for column in 0..column_count {
             columns.push(at);
-            let width = sheet
-                .column_width(column)
-                .map_or(DEFAULT_COLUMN, odox_core::Length::points);
-            at += (width * zoom).max(MINIMUM);
+            if sheet.column_shown(column) {
+                let width = sheet
+                    .column_width(column)
+                    .map_or(DEFAULT_COLUMN, odox_core::Length::points);
+                at += (width * zoom).max(MINIMUM);
+            }
         }
         columns.push(at);
 
@@ -187,6 +192,17 @@ mod tests {
         metrics.set_column(0, width + 10.0);
         assert_eq!(metrics.column(1).0, left + 10.0);
         assert_eq!(metrics.size().0, total + 10.0);
+    }
+
+    #[test]
+    fn a_hidden_row_is_never_the_one_a_pointer_finds() {
+        let metrics = Metrics {
+            rows: vec![0.0, 10.0, 10.0, 20.0],
+            columns: vec![0.0, 20.0],
+        };
+        assert_eq!(metrics.row(1), (10.0, 0.0));
+        assert_eq!(metrics.row_at(10.0), 2);
+        assert_eq!(metrics.row_at(9.9), 0);
     }
 
     #[test]

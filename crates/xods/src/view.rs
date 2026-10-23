@@ -146,11 +146,11 @@ impl Paint<'_> {
         let right = place.x(metrics, last_column) + metrics.column(last_column).1;
         let top = place.y(metrics, rows.start);
         let bottom = place.y(metrics, last_row) + metrics.row(last_row).1;
-        for row in rows.clone() {
+        for row in rows.clone().filter(|&row| metrics.row(row).1 > 0.0) {
             let y = place.y(metrics, row) + metrics.row(row).1;
             painter.hline(left..=right, y, Stroke::new(1.0, colour));
         }
-        for column in columns.clone() {
+        for column in columns.clone().filter(|&c| metrics.column(c).1 > 0.0) {
             let x = place.x(metrics, column) + metrics.column(column).1;
             painter.vline(x, top..=bottom, Stroke::new(1.0, colour));
         }
@@ -184,6 +184,10 @@ impl Paint<'_> {
             place.at(metrics, row, column),
             vec2(width.max(column_width), height.max(row_height)),
         );
+        // Hidden, or the whole of a merge is.
+        if rect.width() <= 0.0 || rect.height() <= 0.0 {
+            return;
+        }
 
         if let Some(fill) = style.cell.background {
             painter.rect_filled(rect, 0.0, format::color32(fill));
@@ -348,6 +352,10 @@ enum SheetCommand {
     ColumnRight,
     DeleteRows,
     DeleteColumns,
+    HideRows,
+    ShowRows,
+    HideColumns,
+    ShowColumns,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -503,13 +511,21 @@ impl View for SheetView {
                 (t("Delete row"), SheetCommand::DeleteRows),
                 (t("Delete column"), SheetCommand::DeleteColumns),
             ];
-            for (name, command) in entries {
-                if ui.add_enabled(can, egui::Button::new(name)).clicked() {
-                    self.sheet_command = Some(command);
-                    ui.close();
+            let shown = [
+                (t("Hide rows"), SheetCommand::HideRows),
+                (t("Show hidden rows"), SheetCommand::ShowRows),
+                (t("Hide columns"), SheetCommand::HideColumns),
+                (t("Show hidden columns"), SheetCommand::ShowColumns),
+            ];
+            for group in [&entries[..], &shown[..]] {
+                for &(name, command) in group {
+                    if ui.add_enabled(can, egui::Button::new(name)).clicked() {
+                        self.sheet_command = Some(command);
+                        ui.close();
+                    }
                 }
+                ui.separator();
             }
-            ui.separator();
             self.book_menu(ui, self.sheet, can);
         });
     }
@@ -669,6 +685,13 @@ impl SheetView {
                 at: left,
                 count: columns,
             },
+            SheetCommand::HideRows
+            | SheetCommand::ShowRows
+            | SheetCommand::HideColumns
+            | SheetCommand::ShowColumns => {
+                self.change_shown(command, editing);
+                return;
+            }
         };
         let Some(document) = &mut self.document else {
             return;
@@ -688,7 +711,7 @@ impl SheetView {
             }
             SheetCommand::RowBelow => Some(((bottom + 1, left), (bottom + rows, right))),
             SheetCommand::ColumnRight => Some(((top, right + 1), (bottom, right + columns))),
-            SheetCommand::DeleteRows | SheetCommand::DeleteColumns => None,
+            _ => None,
         };
         match new {
             Some((from, to)) => {
@@ -696,6 +719,79 @@ impl SheetView {
                 self.extend(to);
             }
             None => self.pick((top, left)),
+        }
+    }
+
+    /// Hide the rows or the columns the selection covers, or show the hidden
+    /// ones in it and next to it, as one step to undo. What is picked moves
+    /// off a row or column that is hidden under it.
+    fn change_shown(&mut self, command: SheetCommand, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let rows = matches!(command, SheetCommand::HideRows | SheetCommand::ShowRows);
+        // As far as the grid is drawn.
+        let (last_row, last_column) = self
+            .metrics
+            .as_ref()
+            .map_or((bottom, right), |m| (m.rows.len() - 2, m.columns.len() - 2));
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let show = matches!(command, SheetCommand::ShowRows | SheetCommand::ShowColumns);
+        let (from, to) = if rows { (top, bottom) } else { (left, right) };
+        let shown = |n: usize| {
+            if rows {
+                sheet.row_shown(n)
+            } else {
+                sheet.column_shown(n)
+            }
+        };
+        let lines = if show {
+            // Out over the hidden ones on either side, which cannot be picked
+            // to be selected.
+            let end = if rows { last_row } else { last_column };
+            let first = (0..from)
+                .rev()
+                .take_while(|&n| !shown(n))
+                .last()
+                .unwrap_or(from);
+            let last = (to + 1..=end)
+                .take_while(|&n| !shown(n))
+                .last()
+                .unwrap_or(to);
+            if (first..=last).all(shown) {
+                return;
+            }
+            first..=last
+        } else {
+            from..=to
+        };
+        let before = document.document.content.clone();
+        let done = if rows {
+            document.set_rows_shown(self.sheet, lines, show)
+        } else {
+            document.set_columns_shown(self.sheet, lines, show)
+        };
+        match done {
+            Ok(()) => editing.record_snapshot(before, None),
+            Err(refused) => {
+                self.notice = Some(notice(&refused));
+                return;
+            }
+        }
+        self.metrics = None;
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let (row, column) = self.selected;
+        let picked = (
+            shown_near(row, true, last_row + 1, |r| sheet.row_shown(r)).unwrap_or(row),
+            shown_near(column, true, last_column + 1, |c| sheet.column_shown(c)).unwrap_or(column),
+        );
+        if picked != self.selected {
+            self.pick(picked);
         }
     }
 
@@ -1267,29 +1363,45 @@ impl SheetView {
                         header_text,
                     );
                 };
+                // A hidden row or column has no header, and a stroke where
+                // it would be, over the headers beside it, says that something
+                // is hidden there.
+                let mut hidden = Vec::new();
                 for column in (0..frozen.1).chain(columns.clone()) {
                     let x = place.x(metrics, column);
-                    let rect = Rect::from_min_size(
-                        pos2(x, top),
-                        vec2(metrics.column(column).1, header_height),
-                    );
                     let clip = if column < frozen.1 {
                         Rect::from_min_max(pos2(pinned.x, top), pos2(body.min.x, pinned.y))
                     } else {
                         Rect::from_min_max(pos2(body.min.x, top), pos2(body.max.x, pinned.y))
                     };
+                    let width = metrics.column(column).1;
+                    if width <= 0.0 {
+                        hidden.push((clip, [pos2(x, top), pos2(x, pinned.y)]));
+                        continue;
+                    }
+                    let rect = Rect::from_min_size(pos2(x, top), vec2(width, header_height));
                     header(rect, clip, column_name(column));
                 }
                 for row in (0..frozen.0).chain(rows.clone()) {
                     let y = place.y(metrics, row);
-                    let rect =
-                        Rect::from_min_size(pos2(left, y), vec2(header_width, metrics.row(row).1));
                     let clip = if row < frozen.0 {
                         Rect::from_min_max(pos2(left, pinned.y), pos2(pinned.x, body.min.y))
                     } else {
                         Rect::from_min_max(pos2(left, body.min.y), pos2(pinned.x, body.max.y))
                     };
+                    let height = metrics.row(row).1;
+                    if height <= 0.0 {
+                        hidden.push((clip, [pos2(left, y), pos2(pinned.x, y)]));
+                        continue;
+                    }
+                    let rect = Rect::from_min_size(pos2(left, y), vec2(header_width, height));
                     header(rect, clip, (row + 1).to_string());
+                }
+                let stroke = Stroke::new(2.0 * zoom, header_text.gamma_multiply(0.6));
+                for (clip, ends) in hidden {
+                    painter
+                        .with_clip_rect(clip.intersect(visible))
+                        .line_segment(ends, stroke);
                 }
                 // The square where the two headers meet, which would otherwise show
                 // the grid scrolling behind them.
@@ -1313,10 +1425,10 @@ impl SheetView {
                 // take hold of.
                 for column in (0..frozen.1).chain(columns.clone()) {
                     let x = place.x(metrics, column) + metrics.column(column).1;
-                    if column >= frozen.1 && x < body.min.x {
+                    let width = metrics.column(column).1;
+                    if (column >= frozen.1 && x < body.min.x) || width <= 0.0 {
                         continue;
                     }
-                    let width = metrics.column(column).1;
                     let rect = Rect::from_min_size(pos2(x - 3.0, top), vec2(6.0, header_height));
                     let response = ui
                         .interact(
@@ -1342,10 +1454,10 @@ impl SheetView {
                 }
                 for row in (0..frozen.0).chain(rows.clone()) {
                     let y = place.y(metrics, row) + metrics.row(row).1;
-                    if row >= frozen.0 && y < body.min.y {
+                    let height = metrics.row(row).1;
+                    if (row >= frozen.0 && y < body.min.y) || height <= 0.0 {
                         continue;
                     }
-                    let height = metrics.row(row).1;
                     let rect = Rect::from_min_size(pos2(left, y - 3.0), vec2(header_width, 6.0));
                     let response = ui
                         .interact(rect, ui.id().with(("row-edge", row)), Sense::drag())
@@ -1744,6 +1856,15 @@ impl SheetView {
             _ => last_used,
         };
         let cell = (cell.0.min(last_row), cell.1.min(last_column));
+        // Never onto a hidden row or column: on past it the way the key was
+        // going, or back where there is nothing shown past it.
+        let cell = (
+            shown_near(cell.0, cell.0 >= row, last_row, |r| sheet.row_shown(r)).unwrap_or(row),
+            shown_near(cell.1, cell.1 >= column, last_column, |c| {
+                sheet.column_shown(c)
+            })
+            .unwrap_or(column),
+        );
         if cell != self.selected {
             if extend {
                 self.extend(cell);
@@ -1865,6 +1986,23 @@ fn edge(from: usize, last: usize, forward: bool, filled: impl Fn(usize) -> bool)
         }
     }
     at
+}
+
+/// The shown line nearest `at`, looking towards `last` when `forward` and
+/// towards 0 otherwise, and the other way when there is none that way.
+fn shown_near(
+    at: usize,
+    forward: bool,
+    last: usize,
+    shown: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    let ahead = (at..=last).find(|&n| shown(n));
+    let behind = (0..=at.min(last)).rev().find(|&n| shown(n));
+    if forward {
+        ahead.or(behind)
+    } else {
+        behind.or(ahead)
+    }
 }
 
 /// A name for a new sheet that no sheet has: "Sheet" and the first number
@@ -2374,5 +2512,33 @@ mod tests {
             .expect("one step");
         document.reindex();
         assert_eq!(frozen(&view).columns, 1);
+    }
+
+    #[test]
+    fn hidden_rows_are_stepped_over_and_shown_from_beside_them() {
+        let (mut view, mut editing) = opened();
+        view.pick((1, 0));
+        view.extend((2, 0));
+        view.change_sheet(SheetCommand::HideRows, &mut editing);
+        let shown = |view: &SheetView, row| {
+            view.document.as_ref().expect("open").sheets()[0].row_shown(row)
+        };
+        assert!(!shown(&view, 1) && !shown(&view, 2));
+        assert_eq!(view.selected, (3, 0), "off the hidden rows");
+        pressed(&mut view, Key::ArrowUp, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (0, 0), "over them");
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (3, 0));
+        view.change_sheet(SheetCommand::ShowRows, &mut editing);
+        assert!(
+            shown(&view, 1) && shown(&view, 2),
+            "shown from the row below"
+        );
+        let document = view.document.as_mut().expect("open");
+        editing
+            .undo(&mut document.document, None)
+            .expect("one step");
+        document.reindex();
+        assert!(!shown(&view, 1), "the show undone");
     }
 }

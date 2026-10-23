@@ -11,6 +11,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod freeze;
+mod hide;
 mod restructure;
 mod sheets;
 mod size;
@@ -564,6 +565,7 @@ impl Sheet {
 /// The names a cell write spells, in the document's own prefixes.
 struct CellNames {
     row: Name,
+    column: Name,
     cell: Name,
     rows_repeated: Name,
     columns_repeated: Name,
@@ -581,6 +583,7 @@ impl CellNames {
     fn of(document: &Document) -> Self {
         Self {
             row: document.name(&Ns::Table, "table-row"),
+            column: document.name(&Ns::Table, "table-column"),
             cell: document.name(&Ns::Table, "table-cell"),
             rows_repeated: document.name(&Ns::Table, "number-rows-repeated"),
             columns_repeated: document.name(&Ns::Table, "number-columns-repeated"),

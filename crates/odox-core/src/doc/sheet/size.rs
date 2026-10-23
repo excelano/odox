@@ -54,47 +54,9 @@ impl SheetDocument {
         if !self.document.declares(&Ns::Style) {
             return Err(Refused::Namespace);
         }
-        let repeated = self.document.name(&Ns::Table, "number-columns-repeated");
-        let column_name = self.document.name(&Ns::Table, "table-column");
+        let names = CellNames::of(&self.document);
         let table = table_mut(&mut self.document, table_at)?;
-        let defs = columns_of(table);
-        let path = if let Some((steps, first, repeat)) = defs
-            .iter()
-            .find(|(_, first, repeat)| (*first..first + repeat).contains(&column))
-        {
-            let (last, above) = steps.split_last().ok_or(Refused::NotFound)?;
-            let parent = table.at_mut(above).ok_or(Refused::NotFound)?;
-            let at = split_run(parent, *last, column - first, *repeat, &repeated);
-            [above, &[at]].concat()
-        } else {
-            // Past the columns the table defines: the gap is a run of
-            // plain columns and the column comes after it.
-            let written = defs.last().map_or(0, |(_, first, repeat)| first + repeat);
-            let (parent_path, mut at) = if let Some((steps, ..)) = defs.last() {
-                let (last, above) = steps.split_last().ok_or(Refused::NotFound)?;
-                (above.to_vec(), last + 1)
-            } else {
-                let first_row = table.children.iter().position(|n| {
-                        matches!(n, Node::Element(e) if is_row_container(e) || e.is(&Ns::Table, "table-row"))
-                    });
-                (Vec::new(), first_row.unwrap_or(table.children.len()))
-            };
-            let parent = table.at_mut(&parent_path).ok_or(Refused::NotFound)?;
-            let gap = column - written;
-            if gap > 0 {
-                let mut filler = element(column_name.clone());
-                if gap > 1 {
-                    filler.set_attr(repeated.clone(), gap.to_string());
-                }
-                parent.children.insert(at, Node::Element(filler));
-                at += 1;
-            }
-            parent
-                .children
-                .insert(at, Node::Element(element(column_name)));
-            parent.self_closing = false;
-            [parent_path, vec![at]].concat()
-        };
+        let path = reach_column(table, column, &names)?;
         self.restyle(table_at, &path, Axis::Column, width)?;
         self.reindex();
         Ok(())
@@ -212,7 +174,53 @@ impl SheetDocument {
     }
 }
 
-fn table_mut(document: &mut Document, table_at: usize) -> Result<&mut Element, Refused> {
+/// The path under a table of the column element that holds one column
+/// alone: split out of its run, or written after the columns the table
+/// defines, with a run of plain columns filling the gap.
+pub(super) fn reach_column(
+    table: &mut Element,
+    column: usize,
+    names: &CellNames,
+) -> Result<Vec<usize>, Refused> {
+    let (repeated, column_name) = (&names.columns_repeated, &names.column);
+    let defs = columns_of(table);
+    if let Some((steps, first, repeat)) = defs
+        .iter()
+        .find(|(_, first, repeat)| (*first..first + repeat).contains(&column))
+    {
+        let (last, above) = steps.split_last().ok_or(Refused::NotFound)?;
+        let parent = table.at_mut(above).ok_or(Refused::NotFound)?;
+        let at = split_run(parent, *last, column - first, *repeat, repeated);
+        return Ok([above, &[at]].concat());
+    }
+    let written = defs.last().map_or(0, |(_, first, repeat)| first + repeat);
+    let (parent_path, mut at) = if let Some((steps, ..)) = defs.last() {
+        let (last, above) = steps.split_last().ok_or(Refused::NotFound)?;
+        (above.to_vec(), last + 1)
+    } else {
+        let first_row = table.children.iter().position(|n| {
+            matches!(n, Node::Element(e) if is_row_container(e) || e.is(&Ns::Table, "table-row"))
+        });
+        (Vec::new(), first_row.unwrap_or(table.children.len()))
+    };
+    let parent = table.at_mut(&parent_path).ok_or(Refused::NotFound)?;
+    let gap = column - written;
+    if gap > 0 {
+        let mut filler = element(column_name.clone());
+        if gap > 1 {
+            filler.set_attr(repeated.clone(), gap.to_string());
+        }
+        parent.children.insert(at, Node::Element(filler));
+        at += 1;
+    }
+    parent
+        .children
+        .insert(at, Node::Element(element(column_name.clone())));
+    parent.self_closing = false;
+    Ok([parent_path, vec![at]].concat())
+}
+
+pub(super) fn table_mut(document: &mut Document, table_at: usize) -> Result<&mut Element, Refused> {
     table_mut_in(&mut document.content, table_at)
 }
 
