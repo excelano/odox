@@ -309,6 +309,13 @@ one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
 range leaves cells the document never wrote unwritten.
 
+**A cell's text is cut at the cell's edge.** It is drawn on one line from the
+top, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
+inside the cell's width with each line aligned as the cell is. Either way what
+does not fit the cell's height or width is not drawn: a row keeps the height the
+document gives it, and does not grow while a person types. A merged cell is one
+cell, and the grid's lines stop at its edge.
+
 **The keyboard walks a sheet.** The arrows move one cell, into the empty grid
 past the data too; Ctrl and an arrow go to the end of the block of filled cells
 the pick is in, or from an empty cell or a block's end to the next filled cell,
@@ -623,8 +630,10 @@ order says across first, and the rows the sheet marks as its header
 (`table:table-header-rows`) are drawn again at the top of every page below the
 first. The page style's scale, or the number of pages it asks the sheet to fit,
 across, down or in all, decides how large the cells are drawn, down to a tenth.
-A cell is drawn as the window draws it: its fill and borders, and its text on
-one line from the top, cut at the cell's edge; there are no grid lines. The
+A cell is drawn as the window draws it: its fill and borders, and its text
+from the top, on one line or, where the cell says to wrap
+(`fo:wrap-option="wrap"`), wrapped inside its width, and cut at the cell's
+edge; there are no grid lines. The
 window draws none of the pictures or charts a sheet can hold, and neither does
 the export.
 

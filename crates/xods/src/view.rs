@@ -612,6 +612,9 @@ impl SheetView {
 
                         if let Some(fill) = style.cell.background {
                             painter.rect_filled(rect, 0.0, format::color32(fill));
+                        } else if across > 1 || down > 1 {
+                            // One cell, so the grid's lines stop at its edge.
+                            painter.rect_filled(rect.shrink(0.5), 0.0, palette.paper);
                         }
                         for (from, to, border) in [
                             (rect.left_top(), rect.left_bottom(), style.cell.border.left),
@@ -690,9 +693,21 @@ impl SheetView {
                             Align::Center => pos2(drawn.center().x, drawn.top()),
                             Align::Max => pos2(drawn.right() - padding, drawn.top()),
                         };
-                        painter
-                            .with_clip_rect(drawn.intersect(ui.clip_rect()))
-                            .text(
+                        let painter = painter.with_clip_rect(drawn.intersect(ui.clip_rect()));
+                        if style.cell.wrap == Some(true) {
+                            // Wrapped inside the column, each line aligned the
+                            // way the cell is, and cut off at the row's height.
+                            let mut job = egui::text::LayoutJob::simple(
+                                text,
+                                format.font_id.clone(),
+                                format.color,
+                                (drawn.width() - padding * 2.0).max(1.0),
+                            );
+                            job.halign = align;
+                            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+                            painter.galley(anchor, galley, format.color);
+                        } else {
+                            painter.text(
                                 anchor,
                                 match align {
                                     Align::Min => egui::Align2::LEFT_TOP,
@@ -703,6 +718,7 @@ impl SheetView {
                                 format.font_id.clone(),
                                 format.color,
                             );
+                        }
                     }
                 }
 
