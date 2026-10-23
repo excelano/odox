@@ -9,6 +9,7 @@ use eframe::egui::{
     self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
 use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
+use odox_core::edit::html;
 use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
@@ -1757,8 +1758,8 @@ impl SheetView {
             return;
         };
         let ((top, left), (bottom, right)) = self.range();
-        ui.ctx()
-            .copy_text(text_of(document, sheet, top..bottom + 1, left..right + 1));
+        let cells = cells_of_range(document, sheet, top..bottom + 1, left..right + 1);
+        odox_ui::clipboard::put(ui.ctx(), &tab_separated(&cells), Some(&html::table(&cells)));
     }
 
     /// Empty the selected cells that are shown. A cell under a merged
@@ -2197,36 +2198,51 @@ fn shown(number: f64) -> String {
 
 /// A sheet as text, for handing to something else.
 fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
-    text_of(document, sheet, 0..sheet.used_rows, 0..sheet.used_columns)
+    tab_separated(&cells_of_range(
+        document,
+        sheet,
+        0..sheet.used_rows,
+        0..sheet.used_columns,
+    ))
 }
 
-/// The rows and columns of a sheet that are shown, as text.
-///
-/// Tab separated and taking each cell as the document displays it, because that
-/// is the string the producing application formatted and the one a person sees.
-fn text_of(
+/// The cells of the rows and columns of a sheet that are shown, each as the
+/// document displays it, because that is the string the producing application
+/// formatted and the one a person sees.
+fn cells_of_range(
     document: &SheetDocument,
     sheet: &Sheet,
     rows: std::ops::Range<usize>,
     columns: std::ops::Range<usize>,
-) -> String {
+) -> Vec<Vec<String>> {
+    rows.filter(|&r| sheet.row_shown(r))
+        .map(|row| {
+            columns
+                .clone()
+                .filter(|&c| sheet.column_shown(c))
+                .map(|column| {
+                    // A cell under a merge keeps what it held, which is not shown.
+                    document
+                        .cell(sheet, row, column)
+                        .filter(|c| !c.covered)
+                        .map(|cell| cell.text())
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Rows of cells as tab separated text. A tab or a newline inside a cell would
+/// make the row unreadable as a row, so each becomes a space.
+fn tab_separated(cells: &[Vec<String>]) -> String {
     let mut out = String::new();
-    for row in rows.filter(|&r| sheet.row_shown(r)) {
-        for (at, column) in columns
-            .clone()
-            .filter(|&c| sheet.column_shown(c))
-            .enumerate()
-        {
-            if at > 0 {
-                out.push('\t');
-            }
-            // A cell under a merge keeps what it held, which is not shown.
-            if let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) {
-                // A tab or a newline inside a cell would make the row unreadable
-                // as a row, so each becomes a space.
-                out.push_str(&cell.text().replace(['\t', '\n'], " "));
-            }
-        }
+    for row in cells {
+        let row: Vec<String> = row
+            .iter()
+            .map(|cell| cell.replace(['\t', '\n'], " "))
+            .collect();
+        out.push_str(&row.join("\t"));
         out.push('\n');
     }
     out
@@ -2490,7 +2506,7 @@ mod tests {
         let document = view.document.as_ref().expect("open");
         let sheet = &document.sheets()[0];
         assert_eq!(summarize(document, sheet, ((0, 1), (40, 1))).numbers, 3);
-        let text = text_of(document, sheet, row - 1..row + 2, 1..2);
+        let text = tab_separated(&cells_of_range(document, sheet, row - 1..row + 2, 1..2));
         assert_eq!(text.lines().count(), 2, "the hidden row left out");
         assert!(!text.contains(&kept));
         let after = numbers(&view)[1];

@@ -98,8 +98,9 @@ as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one
 before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
-processor. Text copied in a window and pasted back into it keeps its bold, italic, underline,
-strikethrough and paragraph kinds; pasted anywhere else it is plain text. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+processor. Copied text keeps its bold, italic, underline, strikethrough, headings and lists
+pasted back into the window, into another window, or into another program that reads HTML,
+and text copied from a browser or a word processor keeps the same pasted in. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
@@ -117,7 +118,7 @@ anything else is text. A cell that holds a formula is not edited, and once
 a value has changed every formula's result is drawn faint until a
 spreadsheet application recalculates it. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
-show it, Ctrl+V puts such text down from the picked cell, as the values typing
+show it, and as a table for a word processor, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste or a delete that reaches a cell it
 cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
 The same menu, and a right click on a tab, add, rename, delete and move sheets;

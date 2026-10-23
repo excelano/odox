@@ -144,6 +144,18 @@ impl Mark {
     pub const ALL: [Self; 4] = [Self::Bold, Self::Italic, Self::Underline, Self::Strike];
 }
 
+/// The system clipboard, as far past egui's as an application reaches: egui
+/// carries plain text, and a copy that keeps its formatting into another
+/// program needs HTML beside it. An editor given none uses egui's.
+pub trait Clipboard {
+    /// Put a copy on the clipboard: its text, and its HTML where the model
+    /// wrote some.
+    fn put(&self, ctx: &egui::Context, text: &str, html: Option<&str>);
+
+    /// The HTML the clipboard holds beside its text, if it holds any.
+    fn html(&self) -> Option<String>;
+}
+
 /// A copy of part of the document that keeps what a string cannot: the
 /// formatting and the kinds of paragraph. Only the model that made one can read
 /// it, so it is whatever that model likes behind a type the editor never sees.
@@ -211,6 +223,20 @@ pub trait Model {
         to: &Position<Self::Paragraph>,
     ) -> Option<Fragment> {
         let _ = (from, to);
+        None
+    }
+
+    /// A fragment this model made, as HTML for another program to read.
+    /// `None` puts only the plain text on the clipboard.
+    fn html(&self, fragment: &Fragment) -> Option<String> {
+        let _ = fragment;
+        None
+    }
+
+    /// HTML another program put on the clipboard, read into a fragment
+    /// [`Self::paste_fragment`] takes. `None` leaves the paste plain.
+    fn fragment_from_html(&self, html: &str) -> Option<Fragment> {
+        let _ = html;
         None
     }
 

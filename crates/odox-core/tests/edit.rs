@@ -640,3 +640,21 @@ fn pasted_paragraphs_in_a_list_become_items_and_an_empty_item_stays_a_list() {
     );
     assert_eq!((caret, offset), (vec![0, 1, 0], 6));
 }
+
+#[test]
+fn a_paragraph_pasted_onto_an_empty_line_keeps_its_own_kind() {
+    let mut root = body("<text:p text:style-name=\"P1\"/>");
+    let mut two = fragment_of_two();
+    two.reverse();
+    paste_fragment(&mut root, &[0], 0, &two).expect("it goes in");
+    assert_eq!(
+        inner(&root),
+        "<text:h text:outline-level=\"2\">second</text:h><text:p>first <text:span text:style-name=\"T1\">one</text:span></text:p>"
+    );
+    let mut root = body("<text:p text:style-name=\"P1\"/>");
+    paste_fragment(&mut root, &[0], 0, &two[..1]).expect("it goes in");
+    assert_eq!(
+        inner(&root),
+        "<text:h text:outline-level=\"2\">second</text:h>"
+    );
+}

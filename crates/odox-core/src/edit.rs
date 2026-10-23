@@ -20,6 +20,7 @@
 mod block;
 mod figure;
 mod format;
+pub mod html;
 
 use std::fmt;
 use std::ops::Range;
@@ -432,7 +433,10 @@ fn insert_paragraph_after(
 /// The first merges into the paragraph at the offset and takes its style, as
 /// text typed there would; the ones between keep their own; the last merges
 /// with what followed the offset, which keeps the paragraph's style. One
-/// paragraph is a run of text and no paragraph is added.
+/// paragraph is a run of text and no paragraph is added. Outside a list, a
+/// paragraph pasted where the caret has no text before it, or the last where
+/// it has none after, keeps its own kind and style, so that a heading pasted
+/// on an empty line is a heading.
 ///
 /// # Errors
 ///
@@ -447,22 +451,30 @@ pub fn paste_fragment(
         .at(path)
         .filter(|e| is_paragraph(e))
         .ok_or(Refused::NotFound)?;
-    let at = offset.min(text(target).chars().count());
+    let length = |e: &Element| text(e).chars().count();
+    let at = offset.min(length(target));
+    let in_list = path.split_last().is_some_and(|(_, above)| {
+        root.at(above)
+            .is_some_and(|parent| parent.is(&Ns::Text, "list-item"))
+    });
+    let (alone_before, alone_after) = (!in_list && at == 0, !in_list && at == length(target));
     let Some((first, rest)) = fragment.split_first() else {
         return Ok((path.to_vec(), at));
     };
-    let length = |e: &Element| text(e).chars().count();
     let Some((last, middle)) = rest.split_last() else {
-        insert_inline(
-            root.at_mut(path).ok_or(Refused::NotFound)?,
-            at,
-            &first.children,
-        );
+        let target = root.at_mut(path).ok_or(Refused::NotFound)?;
+        if alone_before && alone_after {
+            take_kind(target, first);
+        }
+        insert_inline(target, at, &first.children);
         return Ok((path.to_vec(), at + length(first)));
     };
 
     split_keeping_item(root, path, at)?;
     let head = root.at_mut(path).ok_or(Refused::NotFound)?;
+    if alone_before {
+        take_kind(head, first);
+    }
     head.children.extend(first.children.iter().cloned());
     normalize(head);
     let mut current = path.to_vec();
@@ -471,11 +483,23 @@ pub fn paste_fragment(
     }
     let tail_at = slot_after(root, &current).ok_or(Refused::NotFound)?;
     let tail = root.at_mut(&tail_at).ok_or(Refused::NotFound)?;
+    if alone_after {
+        take_kind(tail, last);
+    }
     let mut contents = last.children.clone();
     contents.append(&mut tail.children);
     tail.children = contents;
     normalize(tail);
     Ok((tail_at, length(last)))
+}
+
+/// Give a paragraph another's kind and style, keeping its own ids.
+fn take_kind(paragraph: &mut Element, from: &Element) {
+    paragraph.name = from.name.clone();
+    paragraph.attrs.retain(is_id);
+    paragraph
+        .attrs
+        .extend(from.attrs.iter().filter(|a| !is_id(a)).cloned());
 }
 
 /// The hyperlinks in a paragraph: the characters each covers, in the same

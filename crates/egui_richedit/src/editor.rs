@@ -21,7 +21,7 @@ use egui::{
     Response, Sense, Ui, vec2,
 };
 
-use crate::{Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
+use crate::{Clipboard, Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
 
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
@@ -87,6 +87,9 @@ pub struct RichEdit<P> {
     /// The last copy, with the plain text it put on the clipboard: a paste of
     /// that text is a paste of the copy, formatting and all.
     clip: Option<(String, Fragment)>,
+    /// Where a copy goes beside egui's text, and a paste from elsewhere is
+    /// looked for in HTML.
+    clipboard: Option<&'static dyn Clipboard>,
 }
 
 /// Marks given or taken off with a caret and nothing selected. The next text
@@ -149,7 +152,15 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             last_interaction: 0.0,
             pending: None,
             clip: None,
+            clipboard: None,
         }
+    }
+
+    /// Copy to and paste from a clipboard that carries HTML as well as text.
+    #[must_use]
+    pub fn with_clipboard(mut self, clipboard: &'static dyn Clipboard) -> Self {
+        self.clipboard = Some(clipboard);
+        self
     }
 
     /// The selection, or `None` when there is no caret.
@@ -624,18 +635,20 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         true
     }
 
-    /// Paste text, each of its lines after the first a paragraph of its own,
-    /// in one undo step. It stops at the first part the model refuses, so a
-    /// selection that cannot be replaced is left as it was.
     /// Paste the last copy where the caret is, in place of the selection,
-    /// when the clipboard still holds the text it put there. `None` when it
-    /// does not or the model will not, and the paste is plain.
+    /// when the clipboard still holds the text it put there, or else what
+    /// another program put there as HTML, as the model reads it. `None` when
+    /// it is neither or the model will not, and the paste is plain.
     fn paste_copy<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> Option<bool> {
         let fragment = self
             .clip
             .as_ref()
             .filter(|(plain, _)| plain == text)
-            .map(|(_, fragment)| fragment.clone())?;
+            .map(|(_, fragment)| fragment.clone())
+            .or_else(|| {
+                let html = self.clipboard?.html()?;
+                model.fragment_from_html(&html)
+            })?;
         self.selection.as_ref()?;
         let deleted = self.delete_selection(model, Group::Other);
         let at = self.selection.as_ref().map(|s| s.focus.clone())?;
@@ -645,24 +658,33 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         Some(true)
     }
 
-    /// Put the selection on the clipboard as text, and keep a copy of it that
-    /// has its formatting for a paste of that text. Answers whether there was a
-    /// selection.
+    /// Put the selection on the clipboard as text, with HTML of it where the
+    /// model writes some, and keep a copy of it that has its formatting for a
+    /// paste of that text. Answers whether there was a selection.
     fn copy<M: Model<Paragraph = P>>(&mut self, ui: &Ui, model: &M) -> bool {
         let Some(text) = self.selected_text(model) else {
             return false;
         };
-        ui.ctx().copy_text(text.clone());
-        self.clip = self
+        let fragment = self
             .selection
             .as_ref()
             .map(|selection| self.ordered(selection))
-            .and_then(|(from, to)| model.fragment(&from, &to))
-            .map(|fragment| (text, fragment));
+            .and_then(|(from, to)| model.fragment(&from, &to));
+        match self.clipboard {
+            Some(clipboard) => {
+                let html = fragment.as_ref().and_then(|fragment| model.html(fragment));
+                clipboard.put(ui.ctx(), &text, html.as_deref());
+            }
+            None => ui.ctx().copy_text(text.clone()),
+        }
+        self.clip = fragment.map(|fragment| (text, fragment));
         true
     }
 
-    /// Paste what the clipboard holds, as the copy it came from if it is that.
+    /// Paste what the clipboard holds, as [`Self::paste_copy`] reads it where
+    /// it can, and otherwise as text, each of its lines after the first a
+    /// paragraph of its own, in one undo step. It stops at the first part the
+    /// model refuses, so a selection that cannot be replaced is left as it was.
     fn paste<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let text = text.replace("\r\n", "\n").replace('\r', "\n");
         self.group = None;

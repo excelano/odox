@@ -321,11 +321,12 @@ evaluating them and a spreadsheet application recalculates on opening the
 file. Leaving a cell as it was is not an edit, so stepping through a currency
 does not retype it as a number.
 
-**A selection is a range, and the clipboard carries it as text.** A press picks
-the cell under it, Shift or a drag stretches the selection to another, and the
-range is the rectangle between the two corners. Copy and cut hand over the cells
-as tab separated rows, each as it is displayed, which is what every other
-program can read; paste reads the same shape back, each cell as a typed value
+**A selection is a range, and the clipboard carries it as text and as a
+table.** A press picks the cell under it, Shift or a drag stretches the
+selection to another, and the range is the rectangle between the two corners.
+Copy and cut hand over the cells as tab separated rows, each as it is
+displayed, which is what every other program can read, and as an HTML table of
+the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a typed value
 would be read, from the top left of the selection. A paste, a cut or a delete is
 one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
@@ -608,19 +609,32 @@ reported as a caret at its end here, because one node cannot name a position in
 another. Slide labels go through the same flow and so are told the same way. A
 sheet's grid is painted cell by cell and is not yet.
 
-**A copy keeps its formatting inside the window it was made in.** The system
-clipboard carries plain text, so the editor puts the selection there as text and
-keeps beside it a `Fragment` its model made: the covered paragraphs cut to the
-range, each with its own style and kind, and the spans and links in it, without
-the ids, bookmarks, frames and notes that name one place in a document and would
-then be there twice. A paste of exactly the text it put on the clipboard is a
-paste of the fragment; any other text, a copy from another program or from
-another window, is plain. The first pasted paragraph merges into the paragraph at
+**A copy keeps its formatting, in the window and out of it.** The editor puts
+the selection on the clipboard as text and as HTML, and keeps beside them a
+`Fragment` its model made: the covered paragraphs cut to the range, each with its
+own style and kind, and the spans and links in it, without the ids, bookmarks,
+frames and notes that name one place in a document and would then be there
+twice. A paste of exactly the text it put on the clipboard is a paste of the
+fragment. Any other paste, from another window or another program, looks for
+HTML beside the text and reads the part of it that every program writes
+(`odox_core::edit::html`): paragraphs, headings of six levels, the items of
+bulleted and numbered lists, line breaks, and bold, italic, underline and
+strikethrough, by their tags or by a `style` attribute that says them, as a
+browser writes them; a table gives its rows as paragraphs with a tab between
+cells, and anything else gives its text. What is written is the same part, with
+links. A read paragraph's marks become the automatic styles a mark put on by
+hand would have, and its kind is made as the Format menu makes it, all in the
+paste's one undo step. The first pasted paragraph merges into the paragraph at
 the caret and takes its style, as typed text would; the ones between keep their
 own; the last merges with what followed the caret and keeps the paragraph's
-style; in a list each is an item. A model that keeps no formatting leaves the two
-`Model` methods as they are and every paste is plain. Across windows needs HTML
-on the system clipboard and is not done.
+style; in a list each is an item. Outside a list, a paragraph pasted where the
+caret has no text before it, or the last where it has none after, keeps its own
+kind, so that a heading pasted on an empty line is a heading. The clipboard is
+the system's through `arboard`, one kept for as long as the application runs;
+on Linux that is X11's, which under Wayland is Xwayland's and the desktop hands
+on, and where none can be had a copy is egui's text alone. A model that keeps
+no formatting leaves the four `Model` methods as they are and every paste is
+plain.
 
 **A deck's slides can be added, duplicated, deleted and moved.** A slide
 is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and

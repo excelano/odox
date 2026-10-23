@@ -19,6 +19,11 @@ odox-fonts.workspace = true
 odox-pdf.workspace = true
 image.workspace = true
 potext.workspace = true
+# The system clipboard's HTML beside its text, which egui's clipboard does not
+# carry. Already in the tree under `egui-winit`, at the same version; on Linux it
+# reaches the clipboard through X11, which under Wayland is Xwayland's, and the
+# desktop hands that on to Wayland's.
+arboard = { version = "3.7", default-features = false }
 
 # The desktop's light-or-dark setting, which `winit` answers on the other two
 # platforms and not on this one. zbus is pure Rust with no build script and is
