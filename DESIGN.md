@@ -366,7 +366,9 @@ menu hides the selected rows or columns, writing "collapse" on their elements
 once the ends are split out of their runs, and shows hidden ones by removing
 the attribute: those in the selection and those next to it, so that a person
 picks a cell beside what is hidden, since it cannot be picked itself. Each is
-one step to undo.
+one step to undo. A selection is what it shows: a copy, the summary in the cell
+bar and emptying the range all leave hidden cells out, and only a paste writes
+through them, the way a block put down covers whatever is under it.
 
 **Frozen rows and columns stay in view.** A freeze is a view setting, which ODF
 has no element for and every producer writes as `LibreOffice` does, into

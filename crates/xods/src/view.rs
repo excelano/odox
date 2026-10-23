@@ -1696,8 +1696,9 @@ impl SheetView {
             .copy_text(text_of(document, sheet, top..bottom + 1, left..right + 1));
     }
 
-    /// Empty the selected cells. A cell under a merged neighbour holds nothing
-    /// to empty and is left; a formula refuses the whole of it.
+    /// Empty the selected cells that are shown. A cell under a merged
+    /// neighbour holds nothing to empty and is left, as is one in a hidden row
+    /// or column; a formula refuses the whole of it.
     fn clear_range(&mut self, editing: &mut Editing) {
         let ((top, left), (bottom, right)) = self.range();
         let block: Vec<Vec<Value>> = (top..=bottom)
@@ -1721,13 +1722,13 @@ impl SheetView {
     /// Write a block of values with its top left corner at a cell, as one
     /// step to undo. Nothing is written unless every cell can be: the first
     /// one that cannot is what the notice says. A block of empty values leaves
-    /// alone a cell that is not there, and with `leave_covered` one that is
-    /// under a merge. Answers whether anything was written.
+    /// alone a cell that is not there, and with `leave_unseen` one that is
+    /// under a merge or hidden. Answers whether anything was written.
     fn write_block(
         &mut self,
         (top, left): (usize, usize),
         block: &[Vec<Value>],
-        leave_covered: bool,
+        leave_unseen: bool,
         editing: &mut Editing,
     ) -> bool {
         let Some(document) = &mut self.document else {
@@ -1738,14 +1739,14 @@ impl SheetView {
         for (down, row) in block.iter().enumerate() {
             for (across, value) in row.iter().enumerate() {
                 let (r, c) = (top + down, left + across);
-                let existing = document
-                    .sheets()
-                    .get(sheet)
-                    .and_then(|sheet| document.cell(sheet, r, c));
+                let current = document.sheets().get(sheet);
+                let existing = current.and_then(|sheet| document.cell(sheet, r, c));
+                let hidden =
+                    current.is_some_and(|sheet| !sheet.row_shown(r) || !sheet.column_shown(c));
                 if matches!(value, Value::Empty)
                     && existing
                         .as_ref()
-                        .is_none_or(|cell| leave_covered && cell.covered)
+                        .is_none_or(|cell| leave_unseen && (cell.covered || hidden))
                 {
                     continue;
                 }
@@ -2069,16 +2070,21 @@ fn notice(refused: &Refused) -> String {
     .to_owned()
 }
 
-/// Count what a range holds, as far as the sheet has cells: a selection
-/// stretched into the empty grid past them holds nothing more.
+/// Count what a range shows, as far as the sheet has cells: a selection
+/// stretched into the empty grid past them holds nothing more, and a hidden
+/// row or column holds nothing counted.
 fn summarize(
     document: &SheetDocument,
     sheet: &Sheet,
     ((top, left), (bottom, right)): Range,
 ) -> Summary {
     let mut summary = Summary::default();
-    for row in top..=bottom.min(sheet.used_rows.saturating_sub(1)) {
-        for column in left..=right.min(sheet.used_columns.saturating_sub(1)) {
+    let rows =
+        (top..=bottom.min(sheet.used_rows.saturating_sub(1))).filter(|&r| sheet.row_shown(r));
+    for row in rows {
+        let columns = (left..=right.min(sheet.used_columns.saturating_sub(1)))
+            .filter(|&c| sheet.column_shown(c));
+        for column in columns {
             let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) else {
                 continue;
             };
@@ -2116,7 +2122,7 @@ fn as_text(document: &SheetDocument, sheet: &Sheet) -> String {
     text_of(document, sheet, 0..sheet.used_rows, 0..sheet.used_columns)
 }
 
-/// Some rows and columns of a sheet as text.
+/// The rows and columns of a sheet that are shown, as text.
 ///
 /// Tab separated and taking each cell as the document displays it, because that
 /// is the string the producing application formatted and the one a person sees.
@@ -2127,8 +2133,12 @@ fn text_of(
     columns: std::ops::Range<usize>,
 ) -> String {
     let mut out = String::new();
-    for row in rows {
-        for (at, column) in columns.clone().enumerate() {
+    for row in rows.filter(|&r| sheet.row_shown(r)) {
+        for (at, column) in columns
+            .clone()
+            .filter(|&c| sheet.column_shown(c))
+            .enumerate()
+        {
             if at > 0 {
                 out.push('\t');
             }
@@ -2379,6 +2389,37 @@ mod tests {
         assert_eq!(summary.numbers, 4, "12, 300, 88 and 400");
         assert_eq!(summary.filled, 5, "and the heading");
         assert!((summary.sum - 800.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn hidden_cells_are_not_copied_counted_or_cleared() {
+        let (mut view, mut editing) = opened();
+        let numbers = |view: &SheetView| {
+            let document = view.document.as_ref().expect("open");
+            (0..=40)
+                .filter(|&row| {
+                    document
+                        .cell(&document.sheets()[0], row, 1)
+                        .is_some_and(|cell| matches!(cell.value(), Value::Number(_)))
+                })
+                .collect::<Vec<_>>()
+        };
+        let row = numbers(&view)[0];
+        let kept = text_at(&view, row, 1);
+        view.pick((row, 0));
+        view.change_sheet(SheetCommand::HideRows, &mut editing);
+        let document = view.document.as_ref().expect("open");
+        let sheet = &document.sheets()[0];
+        assert_eq!(summarize(document, sheet, ((0, 1), (40, 1))).numbers, 3);
+        let text = text_of(document, sheet, row - 1..row + 2, 1..2);
+        assert_eq!(text.lines().count(), 2, "the hidden row left out");
+        assert!(!text.contains(&kept));
+        let after = numbers(&view)[1];
+        view.pick((row - 1, 1));
+        view.extend((after, 1));
+        view.clear_range(&mut editing);
+        assert_eq!(text_at(&view, row, 1), kept, "a hidden cell is left");
+        assert_eq!(text_at(&view, after, 1), "", "a shown one is emptied");
     }
 
     #[test]
