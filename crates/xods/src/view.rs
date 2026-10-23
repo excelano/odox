@@ -40,7 +40,25 @@ pub struct SheetView {
     found: Found,
     /// What the Sheet menu last chose.
     sheet_command: Option<SheetCommand>,
+    /// How many rows the grid last showed, which is how far Page Up and Page
+    /// Down go.
+    page_rows: usize,
+    /// What the selection holds, kept for the sheet and range it was counted
+    /// over until the document changes.
+    summary: Option<(usize, Range, Summary)>,
     export: Export,
+}
+
+/// The first and last row and the first and last column, each counted in.
+type Range = ((usize, usize), (usize, usize));
+
+/// What a selection holds: the numbers in it and every cell that says
+/// anything.
+#[derive(Clone, Copy, Default)]
+struct Summary {
+    sum: f64,
+    numbers: usize,
+    filled: usize,
 }
 
 /// A cell being typed into.
@@ -378,7 +396,7 @@ impl SheetView {
 
     /// The selected cells as the first and last row and the first and last
     /// column, each counted in.
-    fn range(&self) -> ((usize, usize), (usize, usize)) {
+    fn range(&self) -> Range {
         let ((a_row, a_column), (row, column)) = (self.anchor, self.selected);
         (
             (a_row.min(row), a_column.min(column)),
@@ -418,6 +436,35 @@ impl SheetView {
                 ui.weak(text);
             } else {
                 ui.label(text);
+            }
+            if first != last {
+                let range = (first, last);
+                let summary = match self.summary {
+                    Some((sheet, counted, summary))
+                        if sheet == self.sheet && counted == range && self.metrics.is_some() =>
+                    {
+                        summary
+                    }
+                    _ => {
+                        let summary = summarize(document, sheet, range);
+                        self.summary = Some((self.sheet, range, summary));
+                        summary
+                    }
+                };
+                ui.separator();
+                if summary.numbers > 0 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let average = summary.sum / summary.numbers as f64;
+                    ui.label(fill(t("Sum: {sum}"), &[("sum", &shown(summary.sum))]));
+                    ui.label(fill(
+                        t("Average: {average}"),
+                        &[("average", &shown(average))],
+                    ));
+                }
+                ui.label(fill(
+                    t("Count: {count}"),
+                    &[("count", &summary.filled.to_string())],
+                ));
             }
             if let Some(notice) = &self.notice {
                 ui.separator();
@@ -492,6 +539,7 @@ impl SheetView {
         let highlights = self.found.highlights(self.sheet);
         let editor = &mut self.editor;
         let mut outcome = None;
+        let mut page_rows = self.page_rows;
 
         egui::ScrollArea::both()
             .auto_shrink([false, false])
@@ -511,6 +559,9 @@ impl SheetView {
                 );
                 let columns = metrics
                     .columns_between(viewport.min.x - header_width, viewport.max.x - header_width);
+                // The last row is seldom all in view, and a page keeps one row of
+                // the one before it in sight.
+                page_rows = rows.len().saturating_sub(2);
 
                 // The lines first, so that a cell with a fill covers them the way a
                 // spreadsheet's do.
@@ -832,6 +883,7 @@ impl SheetView {
                 }
             });
 
+        self.page_rows = page_rows;
         let used = (sheet.used_rows, sheet.used_columns);
         let grid = self
             .metrics
@@ -1063,39 +1115,72 @@ impl SheetView {
         }
     }
 
-    /// Move the picked cell with the arrow keys, which is how a person walks a
-    /// sheet without reaching for the pointer.
+    /// Move the picked cell from the keyboard, which is how a person walks a
+    /// sheet without reaching for the pointer. Shift with any move stretches
+    /// the selection instead.
     fn arrow_keys(&mut self, ui: &Ui, grid: (usize, usize), used: (usize, usize)) {
-        let (mut row, mut column) = self.selected;
         // The arrows go as far as the grid is drawn, empty cells included, so
         // that a person can walk to one to type in it. End is the last column
         // the document wrote.
         let last_row = grid.0.saturating_sub(1);
         let last_column = grid.1.saturating_sub(1);
-        let last_written = used.1.saturating_sub(1);
-        let mut extend = false;
-        ui.input(|input| {
-            extend = input.modifiers.shift;
-            if input.key_pressed(egui::Key::ArrowDown) {
-                row = row.saturating_add(1);
-            }
-            if input.key_pressed(egui::Key::ArrowUp) {
-                row = row.saturating_sub(1);
-            }
-            if input.key_pressed(egui::Key::ArrowRight) {
-                column = column.saturating_add(1);
-            }
-            if input.key_pressed(egui::Key::ArrowLeft) {
-                column = column.saturating_sub(1);
-            }
-            if input.key_pressed(egui::Key::Home) {
-                column = 0;
-            }
-            if input.key_pressed(egui::Key::End) {
-                column = last_written;
-            }
+        let last_used = (used.0.saturating_sub(1), used.1.saturating_sub(1));
+        let page = self.page_rows.max(1);
+        // Each key's own modifiers rather than the frame's: a press and its
+        // release can arrive in one frame, which leaves the frame's modifiers
+        // saying nothing was held.
+        let pressed = ui.input(|input| {
+            input.events.iter().find_map(|event| match event {
+                Event::Key {
+                    key,
+                    pressed: true,
+                    modifiers,
+                    ..
+                } if MOVES.contains(key) => Some((*key, modifiers.command, modifiers.shift)),
+                _ => None,
+            })
         });
-        let cell = (row.min(last_row), column.min(last_column));
+        let Some((key, jump, extend)) = pressed else {
+            return;
+        };
+        if key == Key::A {
+            if jump {
+                self.pick((0, 0));
+                self.extend(last_used);
+                // The whole of it is selected where the person is looking.
+                self.follow = false;
+            }
+            return;
+        }
+        let Some(document) = &self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let filled = |row: usize, column: usize| {
+            document.cell(sheet, row, column).is_some_and(|cell| {
+                !cell.covered && (cell.formula().is_some() || !cell.text().is_empty())
+            })
+        };
+        let (row, column) = self.selected;
+        let cell = match (key, jump) {
+            (Key::ArrowDown, false) => (row + 1, column),
+            (Key::ArrowUp, false) => (row.saturating_sub(1), column),
+            (Key::ArrowRight, false) => (row, column + 1),
+            (Key::ArrowLeft, false) => (row, column.saturating_sub(1)),
+            (Key::ArrowDown, true) => (edge(row, last_row, true, |r| filled(r, column)), column),
+            (Key::ArrowUp, true) => (edge(row, last_row, false, |r| filled(r, column)), column),
+            (Key::ArrowRight, true) => (row, edge(column, last_column, true, |c| filled(row, c))),
+            (Key::ArrowLeft, true) => (row, edge(column, last_column, false, |c| filled(row, c))),
+            (Key::PageDown, _) => (row + page, column),
+            (Key::PageUp, _) => (row.saturating_sub(page), column),
+            (Key::Home, false) => (row, 0),
+            (Key::Home, true) => (0, 0),
+            (Key::End, false) => (row, last_used.1),
+            _ => last_used,
+        };
+        let cell = (cell.0.min(last_row), cell.1.min(last_column));
         if cell != self.selected {
             if extend {
                 self.extend(cell);
@@ -1104,6 +1189,49 @@ impl SheetView {
             }
         }
     }
+}
+
+/// The keys that move the picked cell, with Ctrl and Shift or without.
+const MOVES: [Key; 9] = [
+    Key::ArrowDown,
+    Key::ArrowUp,
+    Key::ArrowRight,
+    Key::ArrowLeft,
+    Key::PageDown,
+    Key::PageUp,
+    Key::Home,
+    Key::End,
+    Key::A,
+];
+
+/// Where Ctrl and an arrow go along one row or column, from `from` towards 0
+/// or towards `last`: to the end of the block of filled cells it is in, or,
+/// starting at that end or in an empty cell, to the next filled cell, and to
+/// the edge when there is none.
+fn edge(from: usize, last: usize, forward: bool, filled: impl Fn(usize) -> bool) -> usize {
+    let step = |at: usize| {
+        if forward {
+            (at < last).then_some(at + 1)
+        } else {
+            at.checked_sub(1)
+        }
+    };
+    let Some(mut at) = step(from) else {
+        return from;
+    };
+    if filled(from) && filled(at) {
+        while let Some(next) = step(at).filter(|&next| filled(next)) {
+            at = next;
+        }
+    } else {
+        while !filled(at) {
+            match step(at) {
+                Some(next) => at = next,
+                None => break,
+            }
+        }
+    }
+    at
 }
 
 /// What the cell bar says when rows or columns could not be inserted or
@@ -1151,6 +1279,48 @@ fn notice(refused: &Refused) -> String {
         }
     }
     .to_owned()
+}
+
+/// Count what a range holds, as far as the sheet has cells: a selection
+/// stretched into the empty grid past them holds nothing more.
+fn summarize(
+    document: &SheetDocument,
+    sheet: &Sheet,
+    ((top, left), (bottom, right)): Range,
+) -> Summary {
+    let mut summary = Summary::default();
+    for row in top..=bottom.min(sheet.used_rows.saturating_sub(1)) {
+        for column in left..=right.min(sheet.used_columns.saturating_sub(1)) {
+            let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) else {
+                continue;
+            };
+            match cell.value() {
+                Value::Number(n) | Value::Percentage(n) | Value::Currency(n, _) => {
+                    summary.sum += n;
+                    summary.numbers += 1;
+                    summary.filled += 1;
+                }
+                Value::Empty => {}
+                _ => summary.filled += 1,
+            }
+        }
+    }
+    summary
+}
+
+/// A number as the summary shows it: to six decimal places at most, so that
+/// the sum of 0.1 and 0.2 is 0.3, with the reader's decimal separator.
+fn shown(number: f64) -> String {
+    let text = format!("{number:.6}");
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    let text = if text == "-0" { "0" } else { text };
+    match text.split_once('.') {
+        Some((whole, fraction)) => fill(
+            t("{whole}.{fraction}"),
+            &[("whole", whole), ("fraction", fraction)],
+        ),
+        None => text.to_owned(),
+    }
 }
 
 /// A sheet as text, for handing to something else.
@@ -1346,6 +1516,92 @@ mod tests {
             ((5, 7), (6, 7)),
             "Shift stretches past the data too"
         );
+    }
+
+    #[test]
+    fn ctrl_and_an_arrow_go_to_the_edge_of_the_data() {
+        let (mut view, _) = opened();
+        view.pick((0, 1));
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::COMMAND);
+        assert_eq!(view.selected, (4, 1), "the end of the filled column");
+        pressed(&mut view, Key::ArrowRight, egui::Modifiers::COMMAND);
+        assert_eq!(
+            view.selected,
+            (4, 3),
+            "over the empty cell to the next filled one"
+        );
+        pressed(&mut view, Key::ArrowDown, egui::Modifiers::COMMAND);
+        assert_eq!(
+            view.selected,
+            (44, 3),
+            "nothing below: the edge of the grid"
+        );
+        pressed(&mut view, Key::ArrowUp, egui::Modifiers::COMMAND);
+        assert_eq!(view.selected, (4, 3), "back to the last filled cell");
+    }
+
+    #[test]
+    fn ctrl_home_and_ctrl_end_go_to_the_corners_of_the_data() {
+        let (mut view, _) = opened();
+        view.pick((2, 2));
+        pressed(&mut view, Key::End, egui::Modifiers::COMMAND);
+        assert_eq!(view.selected, (4, 6));
+        pressed(
+            &mut view,
+            Key::Home,
+            egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+        );
+        assert_eq!(view.range(), ((0, 0), (4, 6)));
+    }
+
+    #[test]
+    fn ctrl_a_selects_what_the_sheet_holds() {
+        let (mut view, _) = opened();
+        view.pick((2, 2));
+        pressed(&mut view, Key::A, egui::Modifiers::COMMAND);
+        assert_eq!(view.range(), ((0, 0), (4, 6)));
+        pressed(&mut view, Key::A, egui::Modifiers::NONE);
+        assert_eq!(
+            view.range(),
+            ((0, 0), (4, 6)),
+            "a plain A is typing, not a move"
+        );
+    }
+
+    #[test]
+    fn page_down_and_up_move_by_what_the_grid_showed() {
+        let (mut view, _) = opened();
+        view.page_rows = 20;
+        view.pick((3, 1));
+        pressed(&mut view, Key::PageDown, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (23, 1));
+        pressed(&mut view, Key::PageDown, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (43, 1));
+        pressed(&mut view, Key::PageDown, egui::Modifiers::NONE);
+        assert_eq!(view.selected, (44, 1), "no further than the grid");
+        pressed(&mut view, Key::PageUp, egui::Modifiers::SHIFT);
+        assert_eq!(view.range(), ((24, 1), (44, 1)));
+    }
+
+    #[test]
+    fn the_summary_counts_numbers_and_every_filled_cell() {
+        let (view, _) = opened();
+        let document = view.document.as_ref().expect("open");
+        let sheet = &document.sheets()[0];
+        let summary = summarize(document, sheet, ((0, 1), (40, 1)));
+        assert_eq!(summary.numbers, 4, "12, 300, 88 and 400");
+        assert_eq!(summary.filled, 5, "and the heading");
+        assert!((summary.sum - 800.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_shown_number_drops_the_noise_of_binary_fractions() {
+        assert_eq!(shown(0.1 + 0.2), "0.3");
+        assert_eq!(shown(136.4), "136.4");
+        assert_eq!(shown(800.0), "800");
+        assert_eq!(shown(-0.000_000_1), "0");
+        assert_eq!(shown(76.826_428_571_4), "76.826429");
+        assert_eq!(shown(-2.5), "-2.5");
     }
 
     #[test]

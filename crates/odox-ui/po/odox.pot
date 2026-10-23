@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-22 17:43-0500\n"
+"POT-Creation-Date: 2026-10-22 22:04-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -80,23 +80,23 @@ msgid ""
 "neither yet."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:266
+#: crates/odox-ui/src/export.rs:275
 msgid "What the picture shows"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:269
+#: crates/odox-ui/src/export.rs:278
 msgid "Decoration only"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:280
+#: crates/odox-ui/src/export.rs:289
 msgid "Export"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:285
+#: crates/odox-ui/src/export.rs:294
 msgid "Mark the rest as decoration"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:292 crates/odox-ui/src/shell.rs:433
+#: crates/odox-ui/src/export.rs:301 crates/odox-ui/src/shell.rs:433
 msgid "Cancel"
 msgstr ""
 
@@ -143,7 +143,7 @@ msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:124
-#: crates/xods/src/view.rs:91 crates/xodt/src/view.rs:60
+#: crates/xods/src/view.rs:109 crates/xodt/src/view.rs:60
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
@@ -375,100 +375,116 @@ msgstr ""
 msgid "This slide has no notes."
 msgstr ""
 
-#: crates/xods/src/view.rs:180
+#: crates/xods/src/view.rs:198
 msgid "Sheet"
 msgstr ""
 
-#: crates/xods/src/view.rs:182
+#: crates/xods/src/view.rs:200
 msgid "Insert row above"
 msgstr ""
 
-#: crates/xods/src/view.rs:183
+#: crates/xods/src/view.rs:201
 msgid "Insert row below"
 msgstr ""
 
-#: crates/xods/src/view.rs:184
+#: crates/xods/src/view.rs:202
 msgid "Insert column left"
 msgstr ""
 
-#: crates/xods/src/view.rs:185
+#: crates/xods/src/view.rs:203
 msgid "Insert column right"
 msgstr ""
 
-#: crates/xods/src/view.rs:186
+#: crates/xods/src/view.rs:204
 msgid "Delete row"
 msgstr ""
 
-#: crates/xods/src/view.rs:187
+#: crates/xods/src/view.rs:205
 msgid "Delete column"
 msgstr ""
 
-#: crates/xods/src/view.rs:295
+#: crates/xods/src/view.rs:313
 msgid "Copy the sheet as tab-separated text"
 msgstr ""
 
-#: crates/xods/src/view.rs:1113
+#: crates/xods/src/view.rs:458
+msgid "Sum: {sum}"
+msgstr ""
+
+#: crates/xods/src/view.rs:460
+msgid "Average: {average}"
+msgstr ""
+
+#: crates/xods/src/view.rs:465
+msgid "Count: {count}"
+msgstr ""
+
+#: crates/xods/src/view.rs:1228
 msgid "There is nothing there to change."
 msgstr ""
 
-#: crates/xods/src/view.rs:1114
+#: crates/xods/src/view.rs:1229
 msgid "A merged cell is in the way: this would cut through it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1116
+#: crates/xods/src/view.rs:1231
 msgid "A formula holds [{reference}], which this version cannot move."
 msgstr ""
 
-#: crates/xods/src/view.rs:1120
+#: crates/xods/src/view.rs:1235
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr ""
 
-#: crates/xods/src/view.rs:1125
+#: crates/xods/src/view.rs:1240
 msgid "conditional formats"
 msgstr ""
 
-#: crates/xods/src/view.rs:1126
+#: crates/xods/src/view.rs:1241
 msgid "validations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1127
+#: crates/xods/src/view.rs:1242
 msgid "database ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1128
+#: crates/xods/src/view.rs:1243
 msgid "pivot tables"
 msgstr ""
 
-#: crates/xods/src/view.rs:1129
+#: crates/xods/src/view.rs:1244
 msgid "consolidations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1130
+#: crates/xods/src/view.rs:1245
 msgid "charts and objects"
 msgstr ""
 
-#: crates/xods/src/view.rs:1131
+#: crates/xods/src/view.rs:1246
 msgid "print ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1132
+#: crates/xods/src/view.rs:1247
 msgid "shapes anchored to cells"
 msgstr ""
 
-#: crates/xods/src/view.rs:1135
+#: crates/xods/src/view.rs:1250
 msgid "This document has {what}, which this version cannot move."
 msgstr ""
 
-#: crates/xods/src/view.rs:1145
+#: crates/xods/src/view.rs:1260
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 
-#: crates/xods/src/view.rs:1146
+#: crates/xods/src/view.rs:1261
 msgid "This cell is covered by the one that spans it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1150
+#: crates/xods/src/view.rs:1265
 msgid "There is no cell there."
+msgstr ""
+
+#: crates/xods/src/view.rs:1306
+msgid "{whole}.{fraction}"
 msgstr ""
 
 #: crates/xodt/src/main.rs:27

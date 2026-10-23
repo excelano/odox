@@ -299,6 +299,22 @@ one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
 range leaves cells the document never wrote unwritten.
 
+**The keyboard walks a sheet.** The arrows move one cell, into the empty grid
+past the data too; Ctrl and an arrow go to the end of the block of filled cells
+the pick is in, or from an empty cell or a block's end to the next filled cell,
+and to the grid's edge when there is none. Page Up and Page Down move by the
+rows the grid last showed, Home and End to the first and the last written
+column, Ctrl+Home and Ctrl+End to the first and the last used cell, and Ctrl+A
+selects the used cells. Shift with any of them stretches the selection. Each
+key is read with the modifiers it came with, because a press and the release of
+Ctrl can arrive in one frame.
+
+**A selection says what it holds.** With more than one cell selected, the cell
+bar gives the sum and the average of the numbers in it, percentages and
+currencies counted as their numbers, and the count of cells that hold anything.
+A formula counts as the result it shows. The figures are to six decimal places
+at most, with the reader's decimal separator.
+
 **Nothing is written until Save, and then only the file that was opened or the
 one Save As named.** The shell owns the write as it owns the read. Before the
 bytes touch the disk they are read back and compared with the tree they were
