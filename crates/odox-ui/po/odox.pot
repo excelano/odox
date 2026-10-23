@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-10-22 22:04-0500\n"
+"POT-Creation-Date: 2026-10-22 22:33-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -143,7 +143,7 @@ msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
 #: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:124
-#: crates/xods/src/view.rs:109 crates/xodt/src/view.rs:60
+#: crates/xods/src/view.rs:345 crates/xodt/src/view.rs:60
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
@@ -375,115 +375,123 @@ msgstr ""
 msgid "This slide has no notes."
 msgstr ""
 
-#: crates/xods/src/view.rs:198
+#: crates/xods/src/view.rs:435
 msgid "Sheet"
 msgstr ""
 
-#: crates/xods/src/view.rs:200
+#: crates/xods/src/view.rs:437
 msgid "Insert row above"
 msgstr ""
 
-#: crates/xods/src/view.rs:201
+#: crates/xods/src/view.rs:438
 msgid "Insert row below"
 msgstr ""
 
-#: crates/xods/src/view.rs:202
+#: crates/xods/src/view.rs:439
 msgid "Insert column left"
 msgstr ""
 
-#: crates/xods/src/view.rs:203
+#: crates/xods/src/view.rs:440
 msgid "Insert column right"
 msgstr ""
 
-#: crates/xods/src/view.rs:204
+#: crates/xods/src/view.rs:441
 msgid "Delete row"
 msgstr ""
 
-#: crates/xods/src/view.rs:205
+#: crates/xods/src/view.rs:442
 msgid "Delete column"
 msgstr ""
 
-#: crates/xods/src/view.rs:313
+#: crates/xods/src/view.rs:554
+msgid "Freeze rows and columns"
+msgstr ""
+
+#: crates/xods/src/view.rs:556
+msgid "Unfreeze rows and columns"
+msgstr ""
+
+#: crates/xods/src/view.rs:563
 msgid "Copy the sheet as tab-separated text"
 msgstr ""
 
-#: crates/xods/src/view.rs:458
+#: crates/xods/src/view.rs:734
 msgid "Sum: {sum}"
 msgstr ""
 
-#: crates/xods/src/view.rs:460
+#: crates/xods/src/view.rs:736
 msgid "Average: {average}"
 msgstr ""
 
-#: crates/xods/src/view.rs:465
+#: crates/xods/src/view.rs:741
 msgid "Count: {count}"
 msgstr ""
 
-#: crates/xods/src/view.rs:1228
+#: crates/xods/src/view.rs:1648
 msgid "There is nothing there to change."
 msgstr ""
 
-#: crates/xods/src/view.rs:1229
+#: crates/xods/src/view.rs:1649
 msgid "A merged cell is in the way: this would cut through it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1231
+#: crates/xods/src/view.rs:1651
 msgid "A formula holds [{reference}], which this version cannot move."
 msgstr ""
 
-#: crates/xods/src/view.rs:1235
+#: crates/xods/src/view.rs:1655
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr ""
 
-#: crates/xods/src/view.rs:1240
+#: crates/xods/src/view.rs:1660
 msgid "conditional formats"
 msgstr ""
 
-#: crates/xods/src/view.rs:1241
+#: crates/xods/src/view.rs:1661
 msgid "validations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1242
+#: crates/xods/src/view.rs:1662
 msgid "database ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1243
+#: crates/xods/src/view.rs:1663
 msgid "pivot tables"
 msgstr ""
 
-#: crates/xods/src/view.rs:1244
+#: crates/xods/src/view.rs:1664
 msgid "consolidations"
 msgstr ""
 
-#: crates/xods/src/view.rs:1245
+#: crates/xods/src/view.rs:1665
 msgid "charts and objects"
 msgstr ""
 
-#: crates/xods/src/view.rs:1246
+#: crates/xods/src/view.rs:1666
 msgid "print ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:1247
+#: crates/xods/src/view.rs:1667
 msgid "shapes anchored to cells"
 msgstr ""
 
-#: crates/xods/src/view.rs:1250
+#: crates/xods/src/view.rs:1670
 msgid "This document has {what}, which this version cannot move."
 msgstr ""
 
-#: crates/xods/src/view.rs:1260
+#: crates/xods/src/view.rs:1680
 msgid "This cell holds a formula, which this version does not edit."
 msgstr ""
 
-#: crates/xods/src/view.rs:1261
+#: crates/xods/src/view.rs:1681
 msgid "This cell is covered by the one that spans it."
 msgstr ""
 
-#: crates/xods/src/view.rs:1265
+#: crates/xods/src/view.rs:1685
 msgid "There is no cell there."
 msgstr ""
 
-#: crates/xods/src/view.rs:1306
+#: crates/xods/src/view.rs:1726
 msgid "{whole}.{fraction}"
 msgstr ""
 

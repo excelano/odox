@@ -327,6 +327,20 @@ run; a row given a height is marked as no longer fitted to its text. Each
 resize is one step to undo, and changes no value, so no formula is drawn faint
 for it.
 
+**Frozen rows and columns stay in view.** A freeze is a view setting, which ODF
+has no element for and every producer writes as `LibreOffice` does, into
+`settings.xml` under the first view, per sheet by name: split mode 2 and a
+position, for the rows and for the columns. The grid is then drawn as four
+panes, each inside its own edges: the part that scrolls both ways, the frozen
+rows above it, the frozen columns beside it, and the corner where they meet,
+with a line where the frozen part ends; a press is read against the pane it
+lands in. View > Freeze rows and columns freezes those above and left of the
+picked cell, and the same item unfreezes. It changes no content and is not a
+step to undo, but leaves the document to be saved, which writes it; a package
+with no `settings.xml` is given one and the manifest lists it. Ctrl+Home scrolls
+the grid back to its start as well as picking the first cell, which a frozen
+cell being picked does not do by itself.
+
 **The keyboard walks a sheet.** The arrows move one cell, into the empty grid
 past the data too; Ctrl and an arrow go to the end of the block of filled cells
 the pick is in, or from an empty cell or a block's end to the next filled cell,

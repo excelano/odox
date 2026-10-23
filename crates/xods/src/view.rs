@@ -26,8 +26,8 @@ pub struct SheetView {
     /// The corner of the selection opposite `selected`, which is where it was
     /// begun: the two are the corners of the range a copy takes.
     anchor: (usize, usize),
-    /// The grid is to scroll to `selected` when it is next drawn.
-    follow: bool,
+    /// Where the grid is to scroll when it is next drawn.
+    scroll: Scroll,
     metrics: Option<Metrics>,
     /// What the metrics were measured for, so that they are measured again when
     /// the sheet or the zoom changes and not on every frame.
@@ -40,6 +40,8 @@ pub struct SheetView {
     found: Found,
     /// What the Sheet menu last chose.
     sheet_command: Option<SheetCommand>,
+    /// The View menu asked to freeze or unfreeze.
+    freeze_asked: bool,
     /// How many rows the grid last showed, which is how far Page Up and Page
     /// Down go.
     page_rows: usize,
@@ -56,12 +58,244 @@ pub struct SheetView {
     export: Export,
 }
 
+/// Where the grid scrolls to.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum Scroll {
+    /// Where it is.
+    #[default]
+    Stay,
+    /// To the picked cell.
+    Picked,
+    /// Back to its start, which a frozen cell being picked does not ask for
+    /// by itself.
+    Start,
+}
+
 /// A column's width or a row's height, being changed.
 #[derive(Clone, Copy, PartialEq)]
 struct Resize {
     column: bool,
     index: usize,
     size: f32,
+}
+
+/// Where a cell is drawn: from the grid's origin, which scrolls, or for a
+/// frozen row or column from where the frozen ones stay.
+#[derive(Clone, Copy)]
+struct Place {
+    origin: egui::Pos2,
+    pinned: egui::Pos2,
+    /// The frozen rows and columns.
+    frozen: (usize, usize),
+}
+
+impl Place {
+    fn x(self, metrics: &Metrics, column: usize) -> f32 {
+        let from = if column < self.frozen.1 {
+            self.pinned.x
+        } else {
+            self.origin.x
+        };
+        from + metrics.column(column).0
+    }
+
+    fn y(self, metrics: &Metrics, row: usize) -> f32 {
+        let from = if row < self.frozen.0 {
+            self.pinned.y
+        } else {
+            self.origin.y
+        };
+        from + metrics.row(row).0
+    }
+
+    /// A cell's top left corner.
+    fn at(self, metrics: &Metrics, row: usize, column: usize) -> egui::Pos2 {
+        pos2(self.x(metrics, column), self.y(metrics, row))
+    }
+}
+
+/// What a frame paints cells with.
+struct Paint<'a> {
+    document: &'a SheetDocument,
+    sheet: &'a Sheet,
+    metrics: &'a Metrics,
+    palette: format::Palette,
+    zoom: f32,
+    values_changed: bool,
+    highlights: Option<odox_ui::Highlights<'a>>,
+}
+
+impl Paint<'_> {
+    /// The grid's lines between some rows and columns, first, so that a cell
+    /// with a fill covers them the way a spreadsheet's do.
+    fn lines(
+        &self,
+        painter: &egui::Painter,
+        place: Place,
+        rows: &std::ops::Range<usize>,
+        columns: &std::ops::Range<usize>,
+        colour: egui::Color32,
+    ) {
+        let metrics = self.metrics;
+        let (last_row, last_column) = (rows.end - 1, columns.end - 1);
+        let left = place.x(metrics, columns.start);
+        let right = place.x(metrics, last_column) + metrics.column(last_column).1;
+        let top = place.y(metrics, rows.start);
+        let bottom = place.y(metrics, last_row) + metrics.row(last_row).1;
+        for row in rows.clone() {
+            let y = place.y(metrics, row) + metrics.row(row).1;
+            painter.hline(left..=right, y, Stroke::new(1.0, colour));
+        }
+        for column in columns.clone() {
+            let x = place.x(metrics, column) + metrics.column(column).1;
+            painter.vline(x, top..=bottom, Stroke::new(1.0, colour));
+        }
+    }
+
+    /// One cell: its fill, its borders and its text.
+    fn cell(&self, ui: &Ui, painter: &egui::Painter, place: Place, row: usize, column: usize) {
+        let (document, sheet, metrics, palette, zoom) = (
+            self.document,
+            self.sheet,
+            self.metrics,
+            self.palette,
+            self.zoom,
+        );
+        let (_, row_height) = metrics.row(row);
+        let (_, column_width) = metrics.column(column);
+        let cell = document.cell(sheet, row, column);
+        let style = document.cell_style(sheet, cell.as_ref(), column);
+
+        // A merged cell is one cell over several columns and rows. Its fill,
+        // its borders and its text all belong to the whole rectangle rather
+        // than to the first column of it, so the extent is worked out before
+        // anything is painted.
+        let across = cell
+            .as_ref()
+            .map_or(1, odox_core::doc::Cell::columns_spanned);
+        let down = cell.as_ref().map_or(1, odox_core::doc::Cell::rows_spanned);
+        let width: f32 = (0..across).map(|n| metrics.column(column + n).1).sum();
+        let height: f32 = (0..down).map(|n| metrics.row(row + n).1).sum();
+        let rect = Rect::from_min_size(
+            place.at(metrics, row, column),
+            vec2(width.max(column_width), height.max(row_height)),
+        );
+
+        if let Some(fill) = style.cell.background {
+            painter.rect_filled(rect, 0.0, format::color32(fill));
+        } else if across > 1 || down > 1 {
+            // One cell, so the grid's lines stop at its edge.
+            painter.rect_filled(rect.shrink(0.5), 0.0, palette.paper);
+        }
+        for (from, to, border) in [
+            (rect.left_top(), rect.left_bottom(), style.cell.border.left),
+            (
+                rect.right_top(),
+                rect.right_bottom(),
+                style.cell.border.right,
+            ),
+            (rect.left_top(), rect.right_top(), style.cell.border.top),
+            (
+                rect.left_bottom(),
+                rect.right_bottom(),
+                style.cell.border.bottom,
+            ),
+        ] {
+            if let Some(border) = border {
+                painter.line_segment(
+                    [from, to],
+                    Stroke::new(
+                        (border.width.points() * zoom).max(1.0),
+                        format::color32(border.color),
+                    ),
+                );
+            }
+        }
+
+        if let Some(cell) = cell.filter(|cell| !cell.covered) {
+            self.text(ui, painter, rect, &cell, &style, (row, column));
+        }
+    }
+
+    /// A cell's text, inside the rectangle it is drawn in.
+    fn text(
+        &self,
+        ui: &Ui,
+        painter: &egui::Painter,
+        rect: Rect,
+        cell: &odox_core::doc::Cell<'_>,
+        style: &odox_core::Properties,
+        (row, column): (usize, usize),
+    ) {
+        let (palette, zoom) = (self.palette, self.zoom);
+        let text = cell.text();
+        if text.is_empty() {
+            return;
+        }
+        let ground = style
+            .cell
+            .background
+            .map_or(palette, |fill| palette.on(format::color32(fill)));
+        let mut format = format::text_format(&style.text, DEFAULT_SIZE, zoom, ground);
+        if let Some(highlights) = &self.highlights {
+            let hits = highlights.within(&[row, column]);
+            if !hits.is_empty() {
+                let current = hits.iter().any(|&(_, current)| current);
+                painter.rect_filled(rect, 0.0, format::match_fill(current));
+                format.color = egui::Color32::BLACK;
+                if current && highlights.reveal() {
+                    ui.scroll_to_rect(rect, Some(Align::Center));
+                }
+            }
+        }
+        // A formula's cached result may be out of date once a value has
+        // changed, and which ones are cannot be told without evaluating them;
+        // every one is drawn faint until the file is opened by something that
+        // recalculates. DESIGN.md §11.
+        if self.values_changed && cell.formula().is_some() {
+            format.color = format.color.gamma_multiply(0.45);
+        }
+        let align = match style.paragraph.align {
+            Some(odox_core::TextAlign::Center) => Align::Center,
+            Some(odox_core::TextAlign::End) => Align::Max,
+            // Text against the left edge and every other type against the
+            // right, which is ODF's own rule.
+            None if cell.value().is_numeric() => Align::Max,
+            _ => Align::Min,
+        };
+        let padding = 3.0 * zoom;
+        let anchor = match align {
+            Align::Min => pos2(rect.left() + padding, rect.top()),
+            Align::Center => pos2(rect.center().x, rect.top()),
+            Align::Max => pos2(rect.right() - padding, rect.top()),
+        };
+        let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
+        if style.cell.wrap == Some(true) {
+            // Wrapped inside the column, each line aligned the way the cell
+            // is, and cut off at the row's height.
+            let mut job = egui::text::LayoutJob::simple(
+                text,
+                format.font_id.clone(),
+                format.color,
+                (rect.width() - padding * 2.0).max(1.0),
+            );
+            job.halign = align;
+            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+            painter.galley(anchor, galley, format.color);
+        } else {
+            painter.text(
+                anchor,
+                match align {
+                    Align::Min => egui::Align2::LEFT_TOP,
+                    Align::Center => egui::Align2::CENTER_TOP,
+                    Align::Max => egui::Align2::RIGHT_TOP,
+                },
+                text,
+                format.font_id.clone(),
+                format.color,
+            );
+        }
+    }
 }
 
 /// What a header's edge was asked for in a frame.
@@ -302,6 +536,9 @@ impl View for SheetView {
         if let Some(command) = self.sheet_command.take() {
             self.change_sheet(command, editing);
         }
+        if std::mem::take(&mut self.freeze_asked) {
+            self.freeze(editing);
+        }
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -334,6 +571,15 @@ impl View for SheetView {
             return;
         };
         ui.separator();
+        let label = if sheet.frozen == odox_core::doc::Frozen::default() {
+            t("Freeze rows and columns")
+        } else {
+            t("Unfreeze rows and columns")
+        };
+        if ui.button(label).clicked() {
+            self.freeze_asked = true;
+            ui.close();
+        }
         if ui
             .button(t("Copy the sheet as tab-separated text"))
             .clicked()
@@ -405,18 +651,43 @@ impl SheetView {
         }
     }
 
+    /// Freeze the rows above and the columns left of the picked cell, or,
+    /// with any frozen, unfreeze them. A setting rather than a step to undo,
+    /// and one the next save writes.
+    fn freeze(&mut self, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let frozen = if sheet.frozen == odox_core::doc::Frozen::default() {
+            odox_core::doc::Frozen {
+                rows: self.selected.0,
+                columns: self.selected.1,
+            }
+        } else {
+            odox_core::doc::Frozen::default()
+        };
+        match document.set_frozen(self.sheet, frozen) {
+            Ok(()) => editing.change_settings(),
+            Err(refused) => self.notice = Some(notice(&refused)),
+        }
+        self.scroll = Scroll::Picked;
+    }
+
     /// Select one cell, which is then the whole selection.
     fn pick(&mut self, cell: (usize, usize)) {
         self.selected = cell;
         self.anchor = cell;
-        self.follow = true;
+        self.scroll = Scroll::Picked;
         self.notice = None;
     }
 
     /// Stretch the selection from where it began to a cell.
     fn extend(&mut self, cell: (usize, usize)) {
         self.selected = cell;
-        self.follow = true;
+        self.scroll = Scroll::Picked;
         self.notice = None;
     }
 
@@ -537,7 +808,6 @@ impl SheetView {
     #[allow(clippy::too_many_lines)]
     fn grid(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
         let was_editing = self.editor.is_some();
-        let values_changed = self.values_changed;
         let Some(document) = &self.document else {
             return;
         };
@@ -559,10 +829,26 @@ impl SheetView {
         let faint = palette.ink.gamma_multiply(0.18);
         let header_fill = ui.visuals().faint_bg_color;
         let header_text = ui.visuals().text_color();
+        let paint = Paint {
+            document,
+            sheet,
+            metrics,
+            palette,
+            zoom,
+            values_changed: self.values_changed,
+            highlights: self.found.highlights(self.sheet),
+        };
+        // No more frozen than the grid has.
+        let frozen = (
+            sheet.frozen.rows.min(metrics.rows.len() - 1),
+            sheet.frozen.columns.min(metrics.columns.len() - 1),
+        );
+        // How much of the grid the frozen rows and columns take.
+        let band = vec2(metrics.column(frozen.1).0, metrics.row(frozen.0).0);
         let mut pointed = None;
-        let follow = std::mem::take(&mut self.follow);
+        let scroll = std::mem::take(&mut self.scroll);
         let (range_start, range_end) = self.range();
-        let highlights = self.found.highlights(self.sheet);
+        let selected = self.selected;
         let editor = &mut self.editor;
         let mut outcome = None;
         let mut page_rows = self.page_rows;
@@ -578,234 +864,137 @@ impl SheetView {
                     Sense::click_and_drag(),
                 );
                 let origin = area.min + vec2(header_width, header_height);
+                // Where the frozen rows and columns stay: at the edge of what
+                // is in view, under the headers.
+                let pinned = area.min + viewport.min.to_vec2() + vec2(header_width, header_height);
+                let place = Place {
+                    origin,
+                    pinned,
+                    frozen,
+                };
                 let painter = ui.painter().clone();
                 painter.rect_filled(Rect::from_min_max(origin, area.max), 0.0, palette.paper);
 
-                let rows = metrics.rows_between(
-                    viewport.min.y - header_height,
-                    viewport.max.y - header_height,
-                );
-                let columns = metrics
-                    .columns_between(viewport.min.x - header_width, viewport.max.x - header_width);
+                // The rows and columns that scroll, from the first one the
+                // frozen ones leave in view.
+                let rows =
+                    metrics.rows_between(viewport.min.y + band.y, viewport.max.y - header_height);
+                let rows = rows.start.max(frozen.0)..rows.end.max(frozen.0);
+                let columns =
+                    metrics.columns_between(viewport.min.x + band.x, viewport.max.x - header_width);
+                let columns = columns.start.max(frozen.1)..columns.end.max(frozen.1);
                 // The last row is seldom all in view, and a page keeps one row of
                 // the one before it in sight.
                 page_rows = rows.len().saturating_sub(2);
 
-                // The lines first, so that a cell with a fill covers them the way a
-                // spreadsheet's do.
-                for row in rows.clone() {
-                    let (top, height) = metrics.row(row);
-                    painter.hline(
-                        (origin.x + metrics.column(columns.start).0)
-                            ..=(origin.x
-                                + metrics.column(columns.end.saturating_sub(1)).0
-                                + metrics.column(columns.end.saturating_sub(1)).1),
-                        origin.y + top + height,
-                        Stroke::new(1.0, faint),
-                    );
-                }
-                for column in columns.clone() {
-                    let (left, width) = metrics.column(column);
-                    painter.vline(
-                        origin.x + left + width,
-                        (origin.y + metrics.row(rows.start).0)
-                            ..=(origin.y
-                                + metrics.row(rows.end.saturating_sub(1)).0
-                                + metrics.row(rows.end.saturating_sub(1)).1),
-                        Stroke::new(1.0, faint),
-                    );
-                }
-
-                for row in rows.clone() {
-                    let (top, row_height) = metrics.row(row);
-                    for column in columns.clone() {
-                        let (left, column_width) = metrics.column(column);
-                        let cell = document.cell(sheet, row, column);
-                        let style = document.cell_style(sheet, cell.as_ref(), column);
-
-                        // A merged cell is one cell over several columns and rows.
-                        // Its fill, its borders and its text all belong to the whole
-                        // rectangle rather than to the first column of it, so the
-                        // extent is worked out before anything is painted.
-                        let across = cell
-                            .as_ref()
-                            .map_or(1, odox_core::doc::Cell::columns_spanned);
-                        let down = cell.as_ref().map_or(1, odox_core::doc::Cell::rows_spanned);
-                        let width: f32 = (0..across).map(|n| metrics.column(column + n).1).sum();
-                        let height: f32 = (0..down).map(|n| metrics.row(row + n).1).sum();
-                        let rect = Rect::from_min_size(
-                            pos2(origin.x + left, origin.y + top),
-                            vec2(width.max(column_width), height.max(row_height)),
+                let visible = ui.clip_rect();
+                let body = Rect::from_min_max(pinned + band, visible.max);
+                // Four panes, each drawn inside its own edges so that what
+                // scrolls under the frozen rows and columns is not seen: the
+                // part that scrolls both ways, the frozen rows above it, the
+                // frozen columns beside it, and the corner where they meet.
+                let panes = [
+                    (rows.clone(), columns.clone(), body),
+                    (
+                        0..frozen.0,
+                        columns.clone(),
+                        Rect::from_min_max(
+                            pos2(body.min.x, pinned.y),
+                            pos2(body.max.x, body.min.y),
+                        ),
+                    ),
+                    (
+                        rows.clone(),
+                        0..frozen.1,
+                        Rect::from_min_max(
+                            pos2(pinned.x, body.min.y),
+                            pos2(body.min.x, body.max.y),
+                        ),
+                    ),
+                    (
+                        0..frozen.0,
+                        0..frozen.1,
+                        Rect::from_min_max(pinned, body.min),
+                    ),
+                ];
+                let pane_of = |row: usize, column: usize| {
+                    panes[usize::from(row < frozen.0) + 2 * usize::from(column < frozen.1)].2
+                };
+                for (rows, columns, clip) in &panes {
+                    if rows.is_empty() || columns.is_empty() {
+                        continue;
+                    }
+                    let painter = painter.with_clip_rect(clip.intersect(visible));
+                    painter.rect_filled(*clip, 0.0, palette.paper);
+                    paint.lines(&painter, place, rows, columns, faint);
+                    for row in rows.clone() {
+                        for column in columns.clone() {
+                            paint.cell(ui, &painter, place, row, column);
+                        }
+                    }
+                    // The selected range, tinted over the cells of it in this
+                    // pane.
+                    let top = range_start.0.max(rows.start);
+                    let bottom = range_end.0.min(rows.end - 1);
+                    let left = range_start.1.max(columns.start);
+                    let right = range_end.1.min(columns.end - 1);
+                    if range_start != range_end && top <= bottom && left <= right {
+                        painter.rect_filled(
+                            Rect::from_min_max(
+                                place.at(metrics, top, left),
+                                place.at(metrics, bottom, right)
+                                    + vec2(metrics.column(right).1, metrics.row(bottom).1),
+                            ),
+                            0.0,
+                            ui.visuals().selection.bg_fill.gamma_multiply(0.35),
                         );
-
-                        if let Some(fill) = style.cell.background {
-                            painter.rect_filled(rect, 0.0, format::color32(fill));
-                        } else if across > 1 || down > 1 {
-                            // One cell, so the grid's lines stop at its edge.
-                            painter.rect_filled(rect.shrink(0.5), 0.0, palette.paper);
-                        }
-                        for (from, to, border) in [
-                            (rect.left_top(), rect.left_bottom(), style.cell.border.left),
-                            (
-                                rect.right_top(),
-                                rect.right_bottom(),
-                                style.cell.border.right,
-                            ),
-                            (rect.left_top(), rect.right_top(), style.cell.border.top),
-                            (
-                                rect.left_bottom(),
-                                rect.right_bottom(),
-                                style.cell.border.bottom,
-                            ),
-                        ] {
-                            if let Some(border) = border {
-                                painter.line_segment(
-                                    [from, to],
-                                    Stroke::new(
-                                        (border.width.points() * zoom).max(1.0),
-                                        format::color32(border.color),
-                                    ),
-                                );
-                            }
-                        }
-
-                        let Some(cell) = cell else { continue };
-                        if cell.covered {
-                            continue;
-                        }
-                        let text = cell.text();
-                        if text.is_empty() {
-                            continue;
-                        }
-                        let drawn = rect;
-
-                        let ground = style
-                            .cell
-                            .background
-                            .map_or(palette, |fill| palette.on(format::color32(fill)));
-                        let mut format =
-                            format::text_format(&style.text, DEFAULT_SIZE, zoom, ground);
-                        if let Some(highlights) = &highlights {
-                            let hits = highlights.within(&[row, column]);
-                            if !hits.is_empty() {
-                                let current = hits.iter().any(|&(_, current)| current);
-                                painter.rect_filled(drawn, 0.0, format::match_fill(current));
-                                format.color = egui::Color32::BLACK;
-                                if current && highlights.reveal() {
-                                    ui.scroll_to_rect(drawn, Some(Align::Center));
-                                }
-                            }
-                        }
-                        // A formula's cached result may be out of date once
-                        // a value has changed, and which ones are cannot be
-                        // told without evaluating them; every one is drawn
-                        // faint until the file is opened by something that
-                        // recalculates. DESIGN.md §11.
-                        if values_changed && cell.formula().is_some() {
-                            format.color = format.color.gamma_multiply(0.45);
-                        }
-                        // Text against the left edge and numbers against the right,
-                        // which is ODF's own default and every spreadsheet's, unless
-                        // the cell's paragraph style says otherwise.
-                        let align = match style.paragraph.align {
-                            Some(odox_core::TextAlign::Center) => Align::Center,
-                            Some(odox_core::TextAlign::End) => Align::Max,
-                            // Text against the left edge and every other type
-                            // against the right, which is ODF's own rule.
-                            None if cell.value().is_numeric() => Align::Max,
-                            _ => Align::Min,
-                        };
-                        let padding = 3.0 * zoom;
-                        let anchor = match align {
-                            Align::Min => pos2(drawn.left() + padding, drawn.top()),
-                            Align::Center => pos2(drawn.center().x, drawn.top()),
-                            Align::Max => pos2(drawn.right() - padding, drawn.top()),
-                        };
-                        let painter = painter.with_clip_rect(drawn.intersect(ui.clip_rect()));
-                        if style.cell.wrap == Some(true) {
-                            // Wrapped inside the column, each line aligned the
-                            // way the cell is, and cut off at the row's height.
-                            let mut job = egui::text::LayoutJob::simple(
-                                text,
-                                format.font_id.clone(),
-                                format.color,
-                                (drawn.width() - padding * 2.0).max(1.0),
-                            );
-                            job.halign = align;
-                            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
-                            painter.galley(anchor, galley, format.color);
-                        } else {
-                            painter.text(
-                                anchor,
-                                match align {
-                                    Align::Min => egui::Align2::LEFT_TOP,
-                                    Align::Center => egui::Align2::CENTER_TOP,
-                                    Align::Max => egui::Align2::RIGHT_TOP,
-                                },
-                                text,
-                                format.font_id.clone(),
-                                format.color,
-                            );
-                        }
                     }
                 }
 
-                // The selected range, tinted over the cells in it.
-                if range_start != range_end {
-                    let (top, _) = metrics.row(range_start.0);
-                    let (left, _) = metrics.column(range_start.1);
-                    let (bottom, bottom_height) = metrics.row(range_end.0);
-                    let (right, right_width) = metrics.column(range_end.1);
-                    painter.rect_filled(
-                        Rect::from_min_max(
-                            pos2(origin.x + left, origin.y + top),
-                            pos2(
-                                origin.x + right + right_width,
-                                origin.y + bottom + bottom_height,
-                            ),
-                        ),
-                        0.0,
-                        ui.visuals().selection.bg_fill.gamma_multiply(0.35),
-                    );
-                }
-
                 // The picked cell, over everything in it.
-                let (row, column) = (self.selected.0, self.selected.1);
-                if follow {
-                    let (top, height) = metrics.row(row);
-                    let (left, width) = metrics.column(column);
-                    // Out from under the headers, which cover the grid's edge.
-                    ui.scroll_to_rect(
-                        Rect::from_min_size(
-                            pos2(origin.x + left, origin.y + top)
-                                - vec2(header_width, header_height),
-                            vec2(width + header_width, height + header_height),
-                        ),
-                        None,
+                let (row, column) = selected;
+                let at = place.at(metrics, row, column);
+                let size = vec2(metrics.column(column).1, metrics.row(row).1);
+                if scroll == Scroll::Start {
+                    ui.scroll_to_rect(Rect::from_min_size(area.min, vec2(1.0, 1.0)), None);
+                } else if scroll == Scroll::Picked {
+                    // Out from under the headers and the frozen rows and
+                    // columns, which cover the grid's edge; a frozen row or
+                    // column is in view already and is not scrolled to.
+                    let min = pos2(
+                        if column < frozen.1 {
+                            at.x
+                        } else {
+                            at.x - header_width - band.x
+                        },
+                        if row < frozen.0 {
+                            at.y
+                        } else {
+                            at.y - header_height - band.y
+                        },
                     );
+                    ui.scroll_to_rect(Rect::from_min_max(min, at + size), None);
                 }
-                if rows.contains(&row) && columns.contains(&column) {
-                    let (top, row_height) = metrics.row(row);
-                    let (left, column_width) = metrics.column(column);
-                    painter.rect_stroke(
-                        Rect::from_min_size(
-                            pos2(origin.x + left, origin.y + top),
-                            vec2(column_width, row_height),
-                        ),
+                painter
+                    .with_clip_rect(pane_of(row, column).intersect(visible))
+                    .rect_stroke(
+                        Rect::from_min_size(at, size),
                         0.0,
                         Stroke::new(2.0, ui.visuals().selection.stroke.color),
                         StrokeKind::Inside,
                     );
-                }
 
                 // The cell being typed into, as a text box where the cell is.
                 if let Some(editor) = editor.as_mut() {
-                    if rows.contains(&editor.row) && columns.contains(&editor.column) {
-                        let (top, row_height) = metrics.row(editor.row);
-                        let (left, column_width) = metrics.column(editor.column);
+                    let in_view = (editor.row < frozen.0 || rows.contains(&editor.row))
+                        && (editor.column < frozen.1 || columns.contains(&editor.column));
+                    if in_view {
+                        let at = place.at(metrics, editor.row, editor.column);
+                        let (_, row_height) = metrics.row(editor.row);
+                        let (_, column_width) = metrics.column(editor.column);
                         // Wide enough to type in, whatever the column is.
                         let rect = Rect::from_min_size(
-                            pos2(origin.x + left, origin.y + top),
+                            at,
                             vec2(column_width.max(120.0 * zoom), row_height),
                         );
                         let cell = document.cell(sheet, editor.row, editor.column);
@@ -855,37 +1044,46 @@ impl SheetView {
                 }
 
                 // The headers last and at the edge of what is visible, so that they
-                // stay where a person is looking while the grid scrolls under them.
+                // stay where a person is looking while the grid scrolls under them;
+                // a frozen row's or column's stays with it.
                 let header_font = FontId::proportional(11.0 * zoom);
-                let top = area.min.y + viewport.min.y;
-                let left = area.min.x + viewport.min.x;
-                for column in columns.clone() {
-                    let (x, width) = metrics.column(column);
-                    let rect =
-                        Rect::from_min_size(pos2(origin.x + x, top), vec2(width, header_height));
+                let top = pinned.y - header_height;
+                let left = pinned.x - header_width;
+                let header = |rect: Rect, clip: Rect, label: String| {
+                    let painter = painter.with_clip_rect(clip.intersect(visible));
                     painter.rect_filled(rect, 0.0, header_fill);
                     painter.rect_stroke(rect, 0.0, Stroke::new(1.0, faint), StrokeKind::Inside);
                     painter.text(
                         rect.center(),
                         egui::Align2::CENTER_CENTER,
-                        column_name(column),
+                        label,
                         header_font.clone(),
                         header_text,
                     );
+                };
+                for column in (0..frozen.1).chain(columns.clone()) {
+                    let x = place.x(metrics, column);
+                    let rect = Rect::from_min_size(
+                        pos2(x, top),
+                        vec2(metrics.column(column).1, header_height),
+                    );
+                    let clip = if column < frozen.1 {
+                        Rect::from_min_max(pos2(pinned.x, top), pos2(body.min.x, pinned.y))
+                    } else {
+                        Rect::from_min_max(pos2(body.min.x, top), pos2(body.max.x, pinned.y))
+                    };
+                    header(rect, clip, column_name(column));
                 }
-                for row in rows.clone() {
-                    let (y, height) = metrics.row(row);
+                for row in (0..frozen.0).chain(rows.clone()) {
+                    let y = place.y(metrics, row);
                     let rect =
-                        Rect::from_min_size(pos2(left, origin.y + y), vec2(header_width, height));
-                    painter.rect_filled(rect, 0.0, header_fill);
-                    painter.rect_stroke(rect, 0.0, Stroke::new(1.0, faint), StrokeKind::Inside);
-                    painter.text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        (row + 1).to_string(),
-                        header_font.clone(),
-                        header_text,
-                    );
+                        Rect::from_min_size(pos2(left, y), vec2(header_width, metrics.row(row).1));
+                    let clip = if row < frozen.0 {
+                        Rect::from_min_max(pos2(left, pinned.y), pos2(pinned.x, body.min.y))
+                    } else {
+                        Rect::from_min_max(pos2(left, body.min.y), pos2(pinned.x, body.max.y))
+                    };
+                    header(rect, clip, (row + 1).to_string());
                 }
                 // The square where the two headers meet, which would otherwise show
                 // the grid scrolling behind them.
@@ -894,15 +1092,26 @@ impl SheetView {
                     0.0,
                     header_fill,
                 );
+                // Where the frozen rows and columns end.
+                let line = Stroke::new(1.5, palette.ink.gamma_multiply(0.5));
+                if frozen.0 > 0 {
+                    painter.hline(pinned.x..=body.max.x, body.min.y, line);
+                }
+                if frozen.1 > 0 {
+                    painter.vline(body.min.x, pinned.y..=body.max.y, line);
+                }
 
                 // The edge of a column's or a row's header is dragged to
                 // resize it, and a column's is double-clicked to fit its text.
-                for column in columns.clone() {
-                    let (x, width) = metrics.column(column);
-                    let rect = Rect::from_min_size(
-                        pos2(origin.x + x + width - 3.0, top),
-                        vec2(6.0, header_height),
-                    );
+                // One that has scrolled under the frozen ones is not there to
+                // take hold of.
+                for column in (0..frozen.1).chain(columns.clone()) {
+                    let x = place.x(metrics, column) + metrics.column(column).1;
+                    if column >= frozen.1 && x < body.min.x {
+                        continue;
+                    }
+                    let width = metrics.column(column).1;
+                    let rect = Rect::from_min_size(pos2(x - 3.0, top), vec2(6.0, header_height));
                     let response = ui
                         .interact(
                             rect,
@@ -925,12 +1134,13 @@ impl SheetView {
                         edge = Some(change);
                     }
                 }
-                for row in rows.clone() {
-                    let (y, height) = metrics.row(row);
-                    let rect = Rect::from_min_size(
-                        pos2(left, origin.y + y + height - 3.0),
-                        vec2(header_width, 6.0),
-                    );
+                for row in (0..frozen.0).chain(rows.clone()) {
+                    let y = place.y(metrics, row) + metrics.row(row).1;
+                    if row >= frozen.0 && y < body.min.y {
+                        continue;
+                    }
+                    let height = metrics.row(row).1;
+                    let rect = Rect::from_min_size(pos2(left, y - 3.0), vec2(header_width, 6.0));
                     let response = ui
                         .interact(rect, ui.id().with(("row-edge", row)), Sense::drag())
                         .on_hover_cursor(egui::CursorIcon::ResizeRow);
@@ -946,10 +1156,18 @@ impl SheetView {
                 // is the one under where the button went down: a frame can
                 // see the press and the pointer's travel together.
                 let cell_at = |at: egui::Pos2| {
-                    (at.x > origin.x && at.y > origin.y).then(|| {
+                    (at.x > pinned.x && at.y > pinned.y).then(|| {
                         (
-                            metrics.row_at(at.y - origin.y),
-                            metrics.column_at(at.x - origin.x),
+                            if at.y < body.min.y {
+                                metrics.row_at(at.y - pinned.y)
+                            } else {
+                                metrics.row_at(at.y - origin.y)
+                            },
+                            if at.x < body.min.x {
+                                metrics.column_at(at.x - pinned.x)
+                            } else {
+                                metrics.column_at(at.x - origin.x)
+                            },
                         )
                     })
                 };
@@ -1287,7 +1505,7 @@ impl SheetView {
                 self.pick((0, 0));
                 self.extend(last_used);
                 // The whole of it is selected where the person is looking.
-                self.follow = false;
+                self.scroll = Scroll::Stay;
             }
             return;
         }
@@ -1326,6 +1544,9 @@ impl SheetView {
             } else {
                 self.pick(cell);
             }
+        }
+        if (key, jump) == (Key::Home, true) {
+            self.scroll = Scroll::Start;
         }
     }
 }

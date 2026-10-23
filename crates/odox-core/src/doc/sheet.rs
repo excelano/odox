@@ -10,8 +10,10 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod freeze;
 mod restructure;
 mod size;
+pub use freeze::Frozen;
 pub use restructure::{Blocked, Restructure};
 
 use std::ops::Range;
@@ -53,6 +55,8 @@ pub struct Sheet {
     pub used_columns: usize,
     /// Whether the sheet is hidden, from `table:display`.
     pub visible: bool,
+    /// The rows and columns that stay in place while the rest scrolls.
+    pub frozen: Frozen,
     rows: Vec<RowRange>,
     /// Where the `table:table` element sits among the body's children, so that
     /// the element can be reached again without holding a reference to it.
@@ -827,6 +831,7 @@ fn index_sheets(document: &Document) -> Vec<Sheet> {
     let Some(body) = document.body_of("spreadsheet") else {
         return Vec::new();
     };
+    let settings = freeze::settings_of(&document.package);
     let mut sheets = Vec::new();
     for (position, node) in body.children.iter().enumerate() {
         let crate::xml::Node::Element(table) = node else {
@@ -835,7 +840,9 @@ fn index_sheets(document: &Document) -> Vec<Sheet> {
         if !table.is(&Ns::Table, "table") {
             continue;
         }
-        sheets.push(index_sheet(document, table, position));
+        let mut sheet = index_sheet(document, table, position);
+        sheet.frozen = SheetDocument::read_frozen(settings.as_ref(), &sheet.name);
+        sheets.push(sheet);
     }
     sheets
 }
@@ -860,6 +867,7 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         used_rows: index.used_rows,
         used_columns: index.used_columns,
         visible: shown(document, table),
+        frozen: Frozen::default(),
         rows: index.rows,
         table: position,
     }

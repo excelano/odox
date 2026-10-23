@@ -177,6 +177,35 @@ impl Package {
         });
     }
 
+    /// List an entry in the manifest, where it is not listed already, so that
+    /// a part written here for the first time is one a reader looks for.
+    pub fn list(&mut self, name: &str, media_type: &str) {
+        const MANIFEST: &str = "META-INF/manifest.xml";
+        let Some(Ok(mut root)) = self
+            .part(MANIFEST)
+            .map(|part| xml::parse(&part.data, MANIFEST))
+        else {
+            return;
+        };
+        let listed = root.elements().any(|e| {
+            e.is(&Ns::Manifest, "file-entry") && e.attr(&Ns::Manifest, "full-path") == Some(name)
+        });
+        if listed {
+            return;
+        }
+        let mut entry = xml::Element {
+            name: root.name_for(&Ns::Manifest, "file-entry"),
+            attrs: Vec::new(),
+            children: Vec::new(),
+            self_closing: true,
+        };
+        entry.set_attr(root.name_for(&Ns::Manifest, "full-path"), name);
+        entry.set_attr(root.name_for(&Ns::Manifest, "media-type"), media_type);
+        root.children.push(xml::Node::Element(entry));
+        root.self_closing = false;
+        self.set_xml(MANIFEST, &root);
+    }
+
     /// Replace an entry with a serialized XML tree.
     pub fn set_xml(&mut self, name: &str, root: &Element) {
         self.set_part(name, xml::serialize(root));

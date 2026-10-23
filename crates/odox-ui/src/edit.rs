@@ -47,6 +47,9 @@ pub struct Editing {
     /// Counts every change to the content, including the ones an undo step
     /// absorbs, so that whatever is derived from the text can tell it is stale.
     revision: u64,
+    /// Something outside the content changed since the last save, such as how
+    /// a sheet is frozen, which no undo step covers.
+    settings_changed: bool,
 }
 
 impl Editing {
@@ -55,7 +58,14 @@ impl Editing {
         self.undo.clear();
         self.redo.clear();
         self.saved_at = Some(0);
+        self.settings_changed = false;
         self.touch();
+    }
+
+    /// A setting the document carries outside its content changed, which
+    /// leaves it to be saved without being a step to undo.
+    pub fn change_settings(&mut self) {
+        self.settings_changed = true;
     }
 
     /// The content changed, in a way that need not have begun an undo step.
@@ -139,12 +149,13 @@ impl Editing {
     /// Whether the document differs from the file it was read from or last
     /// saved to. Undoing back to that state answers false again.
     pub fn modified(&self) -> bool {
-        self.saved_at != Some(self.undo.len())
+        self.settings_changed || self.saved_at != Some(self.undo.len())
     }
 
     /// The document was written: what it holds now is what the file holds.
     pub fn mark_saved(&mut self) {
         self.saved_at = Some(self.undo.len());
+        self.settings_changed = false;
     }
 }
 
