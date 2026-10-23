@@ -91,6 +91,51 @@ impl Palette {
             Self::default()
         }
     }
+
+    /// The palette for text on a ground the document paints itself: a cell's
+    /// or a paragraph's fill, a slide's background, a shape's fill.
+    ///
+    /// The theme's ink is meant for the theme's paper, and on a light fill in
+    /// dark mode it is light on light. Text the document does not colour is
+    /// given whichever of the two palettes' inks stands out more against the
+    /// ground, which is what ODF's automatic font colour asks for; the link
+    /// colour goes with it. A ground mostly transparent is not one the text
+    /// sits on, and changes nothing.
+    #[must_use]
+    pub fn on(self, ground: Color32) -> Self {
+        if ground.a() < 128 {
+            return self;
+        }
+        let ground_luminance = luminance(ground);
+        let contrast = |ink: Color32| {
+            let ink = luminance(ink);
+            (ink.max(ground_luminance) + 0.05) / (ink.min(ground_luminance) + 0.05)
+        };
+        let (light, dark) = (Self::for_theme(false), Self::for_theme(true));
+        let chosen = if contrast(light.ink) >= contrast(dark.ink) {
+            light
+        } else {
+            dark
+        };
+        Self {
+            paper: ground,
+            ink: chosen.ink,
+            link: chosen.link,
+        }
+    }
+}
+
+/// A colour's relative luminance, as WCAG measures contrast with it.
+fn luminance(colour: Color32) -> f32 {
+    let channel = |value: u8| {
+        let value = f32::from(value) / 255.0;
+        if value <= 0.040_45 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(colour.r()) + 0.7152 * channel(colour.g()) + 0.0722 * channel(colour.b())
 }
 
 /// What a resolved run of text is drawn with.
@@ -222,6 +267,18 @@ mod tests {
         assert_ne!(dark.paper, light.paper);
         assert_ne!(dark.ink, light.ink);
         assert_ne!(dark.link, light.link);
+    }
+
+    #[test]
+    fn text_on_a_ground_the_document_paints_takes_the_ink_that_stands_out() {
+        let dark = Palette::for_theme(true);
+        let light = Palette::for_theme(false);
+        let pale_yellow = Color32::from_rgb(0xff, 0xf2, 0xcc);
+        assert_eq!(dark.on(pale_yellow).ink, light.ink);
+        assert_eq!(dark.on(pale_yellow).link, light.link);
+        let navy = Color32::from_rgb(0x1f, 0x3a, 0x68);
+        assert_eq!(light.on(navy).ink, dark.ink);
+        assert_eq!(dark.on(Color32::TRANSPARENT).ink, dark.ink, "no ground");
     }
 
     #[test]

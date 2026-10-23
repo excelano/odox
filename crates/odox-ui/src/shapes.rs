@@ -143,8 +143,12 @@ impl<'a> Canvas<'a> {
 }
 
 impl Canvas<'_> {
-    /// Fill the page.
+    /// Fill the page, and take the ink for the text on it from what it is
+    /// filled with.
     pub fn background(&mut self, ui: &Ui, fill: &Fill) {
+        if let Some(ground) = self.flat(fill, None) {
+            self.palette = self.palette.on(ground);
+        }
         let page = self.page;
         self.fill(
             ui,
@@ -447,14 +451,17 @@ impl Canvas<'_> {
         }
         let rect = place.bounds();
 
+        let properties = self.style_of(shape);
         let anchor = if picture {
             Anchor::Top
         } else {
-            self.style_of(shape)
-                .graphic
-                .text_anchor
-                .unwrap_or(Anchor::Top)
+            properties.graphic.text_anchor.unwrap_or(Anchor::Top)
         };
+        // A label on a filled shape is read against the fill.
+        let palette = self.palette;
+        if let Some(ground) = self.flat(&properties.graphic.fill(), properties.graphic.opacity) {
+            self.palette = palette.on(ground);
+        }
         let mut top = rect.top();
         if anchor != Anchor::Top {
             // Where the label goes depends on how tall it turns out to be, and
@@ -467,6 +474,7 @@ impl Canvas<'_> {
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
         self.lay_out(ui, &content, placed, picture, false, prefix.as_ref());
+        self.palette = palette;
     }
 
     /// A picture in a frame that is turned, drawn as its own four corners.

@@ -384,9 +384,14 @@ impl Flow<'_> {
             ui.add_space(before);
         }
 
+        let palette = self.palette;
+        if let Some(fill) = properties.paragraph.background {
+            self.palette = palette.on(format::color32(fill));
+        }
         let base = format::text_format(&properties.text, DEFAULT_SIZE, zoom, self.palette);
 
         let (job, frames) = self.layout_job(element, &properties, &base, size, wrap);
+        self.palette = palette;
         let (job, map) = job.into_parts();
 
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
@@ -863,7 +868,12 @@ impl Flow<'_> {
                                     self.path.push(cell_index);
                                     let was_detached = self.detached;
                                     self.detached |= copy > 0;
+                                    let palette = self.palette;
+                                    if let Some(fill) = properties.cell.background {
+                                        self.palette = palette.on(format::color32(fill));
+                                    }
                                     self.blocks(ui, cell, content);
+                                    self.palette = palette;
                                     self.detached = was_detached;
                                     self.path.pop();
                                     ui.add_space(padding);

@@ -648,8 +648,12 @@ impl SheetView {
                         }
                         let drawn = rect;
 
+                        let ground = style
+                            .cell
+                            .background
+                            .map_or(palette, |fill| palette.on(format::color32(fill)));
                         let mut format =
-                            format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
+                            format::text_format(&style.text, DEFAULT_SIZE, zoom, ground);
                         if let Some(highlights) = &highlights {
                             let hits = highlights.within(&[row, column]);
                             if !hits.is_empty() {

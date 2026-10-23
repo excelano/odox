@@ -132,7 +132,8 @@ export asks too, and which embeds the face it answers (§12). egui's own fonts,
 which every chain ends in, cover few scripts, so a character in the document
 that no face loaded has is drawn from the first face on the machine that has
 it, added at the end of every chain; the export draws it from the same face.
-The characters are read when the document opens, as the families are.
+The characters are read when the document opens, as the families are, and
+again as each character a person types, pastes or composes arrives.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
@@ -140,6 +141,15 @@ them, so a document that colours nothing stays legible in either. A colour the
 document does set is drawn as set regardless — including text coloured dark
 against a page left unset, which the theme cannot then save from landing on
 now-dark paper.
+
+**Uncoloured text on a ground the document paints takes the ink that stands out
+against it.** A cell's or a paragraph's fill, a slide's background and a
+shape's fill are the document's own colours, so the theme's ink, chosen for the
+theme's paper, can land light on light. Text there is drawn in whichever of the
+light and dark palettes' inks has the higher contrast with the ground, and its
+links in that palette's link colour, which is what ODF's automatic font colour
+means. A gradient is judged by its middle colour; a picture is not judged, and
+text on one keeps the theme's ink.
 
 **A hyperlink is the one exception**: every link is drawn in the theme's link
 colour even where the document's own character style resolves one, because
