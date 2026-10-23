@@ -1,3 +1,15 @@
+odox (0.10.0) unstable; urgency=low
+
+  * Release notes and store copy for 0.10.0
+  * xods: the grid told to a screen reader as rows and cells, with the picked cell said as it moves (#41)
+  * HTML on the system clipboard beside the text: copy keeps its formatting in other windows and programs, and a paste from them reads it (#39)
+  * xodp: add a slide, on the master of the one in view (#68)
+  * A slide's text takes what its paragraph does not say from its frame's style, in the window and the PDF
+  * xods: merge and unmerge cells; a merged cell is picked and stepped over as one (#64)
+  * xods: copy, the summary and clearing skip hidden rows and columns (#67)
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 23 Oct 2026 14:43:58 -0500
+
 odox (0.9.0) unstable; urgency=low
 
   * Remove test captures committed by mistake (#66)
