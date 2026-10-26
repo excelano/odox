@@ -6,6 +6,9 @@
 # feature nobody named is invisible in `Cargo.toml` and present in `/proc/PID/maps`.
 # Run it once under Wayland and once under X11, because the backends load
 # different libraries and only one of them is loaded on any given run.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

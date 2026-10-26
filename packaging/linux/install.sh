@@ -8,6 +8,9 @@
 # that these applications can open one.
 #
 # `--default` also makes each application the default for the types it opens.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

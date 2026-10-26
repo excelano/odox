@@ -31,5 +31,5 @@ resvg = { version = "0.48", default-features = false }
 ico = "0.5"
 # The macOS icon family. Pure Rust, and the reason none of this needs a Mac:
 # the fleet's other repositories render their `.icns` with `sips` and
-# `iconutil`, which exist only there. DESIGN.md §9 and ~/notes/mac_icons_on_linux.md.
+# `iconutil`, which exist only there. DESIGN.md §9.
 icns = "0.4"

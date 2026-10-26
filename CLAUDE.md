@@ -23,14 +23,25 @@ attribute or whitespace has to be argued against the round-trip test.
 
 Every sentence a person reads goes through `odox_ui::i18n::t`; a literal built
 before a catalogue is in force is wrapped in `i18n::mark`. After changing one, run
-`update-po.sh` and commit what it changes; CI refuses a stale template.
+`update-po.sh` and commit what it changes.
 
 Clippy runs with `-D warnings`. `cargo test` and `cargo clippy` do not write
 `target/debug/<app>`, so `cargo build` before looking at a window. A renderer is
 verified by looking at it, on X11 here because the capture tool cannot see
 Wayland: `env -u WAYLAND_DISPLAY DISPLAY=:0 cargo run -p xodt -- <file> &`, then
-`import -window <id>`. `pkill -x xodt` stops it; `pkill -f` kills the shell too.
-The target directory is shared across the fleet: `df -h /` before a long build.
+`import -window <id>`. A window driven with `xdotool` runs on a nested server,
+since keystrokes sent to `:0` have landed in other windows: `Xephyr :7 -screen
+1280x800 -ac &`, then `env -u WAYLAND_DISPLAY -u XDG_CURRENT_DESKTOP DISPLAY=:7
+dbus-run-session -- <binary> <file> &` and `DISPLAY=:7 xdotool` (`windowfocus`,
+find the window by `--pid`). The private bus with the environment set outside
+it keeps rfd's file dialog inside Xephyr instead of on the real desktop; kill
+the portal processes it started when done. Xephyr has no window manager, so
+Fullscreen does nothing. A fake `BROWSER=<script>` records what a link click
+opens without opening it. The binary is `~/.cache/cargo-target/debug/<app>`,
+not `./target/debug/<app>`, because the target directory is shared across the
+fleet (`df -h /` before a long build). Stop an app with `kill <pid>` for the
+pid you started: `pkill -x xodt` can reach David's own window, and `pkill -f`
+kills the shell too.
 
 Linux is `packaging/linux` and `packaging/debian`. `packaging/windows` and
 `packaging/macos` are edited from here too — `ssh winwork` reaches the Windows

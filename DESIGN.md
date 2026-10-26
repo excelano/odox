@@ -56,14 +56,8 @@ xkbcommon arrive through `dlopen` at run time, which is why §9's Debian
 dependencies come from a running process rather than from the linker.
 
 The renderer is wgpu, which is eframe's default and the rest of the fleet's:
-Direct3D on Windows, Metal on macOS, Vulkan here. The alternative eframe offers
-is `glow`, over OpenGL, and it is the wrong one on two platforms — on Windows
-OpenGL arrives with the graphics vendor's driver and is Microsoft's 1.1 stand-in
-without one, below what egui accepts, so the application exits rather than
-opening a window; and Apple deprecated OpenGL in 2018 and runs it as a
-translation layer over Metal. Switching cost nothing this section claims: the
-`NEEDED` list above is the same either way, because wgpu reaches Vulkan through
-the same `dlopen` glow used for OpenGL.
+Direct3D on Windows, Metal on macOS, Vulkan here. It reaches Vulkan through
+`dlopen`, so it adds nothing to the `NEEDED` list above.
 
 One `unsafe` module, on one platform. macOS delivers a double-clicked document as
 an Apple Event, and receiving one needs a single Objective-C method: `odox-ui`'s
@@ -165,8 +159,7 @@ something an author chose, unlike a heading someone coloured by hand.
 
 **A proportional line height is a proportion of each run's own size**, so a
 span set larger than its paragraph takes a taller line; an absolute one is the
-same for every run. Resolved against the paragraph's size alone, a title whose
-size lives on its span sat in a line thirteen points tall.
+same for every run.
 
 **Text in the page can be selected and copied**, by dragging, double-click,
 triple-click and Ctrl+C. Outside edit mode the paragraph hands its laid-out
@@ -215,9 +208,8 @@ One shell, `crates/odox-ui/src/shell.rs`, with a `View` for the part that
 differs. The shell owns the menu, the keys, the file dialog, the error line, the
 zoom and the side panel, and every read from disk, so a view is handed bytes and
 never a path. The desktop's light and dark setting is read through the XDG portal
-on Linux, because `winit` returns `None` from `system_theme()` there;
-`src/system_theme.rs` is slipcase-desktop's module, unchanged but for the
-thread's name.
+on Linux (`src/system_theme.rs`), because `winit` returns `None` from
+`system_theme()` there.
 
 A view can take the whole window. `View::presenting` is the slideshow's flag:
 while it is true the shell draws no menu, no panel and no bar, takes none of
@@ -257,8 +249,7 @@ fleet glossary in Comma's `de.po` and LibreOffice's own German for the rest.
 `en-x-pseudo`, compiled into debug builds alone, returns every message accented,
 bracketed and 40% longer, and shows a string that never went through `t`, a
 sentence the catalogue never saw, and a label built to the width of English.
-`po/update-po.sh` re-extracts and merges; CI refuses a push whose template is
-behind the source. `msgmerge` marks a reworded message `#, fuzzy` and `potext`
+`po/update-po.sh` re-extracts and merges. `msgmerge` marks a reworded message `#, fuzzy` and `potext`
 refuses to load one, so a translation is current or visibly absent, never
 silently wrong, which is the property a key-value catalogue cannot offer.
 
@@ -271,7 +262,7 @@ rather than kill the window with no message.
 Each application's `build.rs` embeds the Windows application manifest, which
 declares DPI awareness before any of the program's code runs, and stages the
 window icon; it is two linker arguments and no resource compiler. The three
-copies are byte identical and CI refuses a push where they have drifted. The
+copies are byte identical. The
 manifest is above each crate's directory, which `cargo package` does not carry,
 so a build that cannot find it skips it with a warning. `+crt-static` is in
 `.cargo/config.toml` for the MSVC targets, and `packaging/windows/check-imports.ps1`
@@ -811,4 +802,4 @@ for nothing. A document with nothing in it to draw, every slide hidden or every
 sheet empty, is refused as well.
 
 **The export runs in the window's own thread**, so a large sheet holds the
-window while it is written: a sheet of 200,000 cells takes about five seconds.
+window while it is written.

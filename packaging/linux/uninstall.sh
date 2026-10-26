@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Undo install.sh.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -euo pipefail
 
 apps="$HOME/.local/share/applications"

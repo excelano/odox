@@ -44,6 +44,9 @@
 # committed template, writing nothing. CI runs that: the template carries the
 # moment it was extracted, so a check that rewrote the file it was checking
 # would leave the tree dirty after every run.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

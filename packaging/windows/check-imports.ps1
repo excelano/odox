@@ -34,6 +34,9 @@
     parse fails a long way from the line that caused it. Comments may carry
     whatever they like; printed text may not. slipcase-desktop's
     packaging/windows/README.md records the morning that cost.
+
+    Author: David M. Anderson
+    Built with AI assistance (Claude, Anthropic)
 #>
 [CmdletBinding()]
 param(

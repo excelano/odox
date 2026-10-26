@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 """Write the spreadsheet and presentation fixtures.
 
 The text fixtures beside these were produced by a real producer and this pair
