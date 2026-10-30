@@ -237,7 +237,7 @@ fn ask(
     pictures: &mut Pictures,
 ) -> Option<bool> {
     let mut answer = None;
-    egui::Modal::new(egui::Id::new("export-pictures")).show(ctx, |ui| {
+    egui::Modal::new(egui::Id::unique("export-pictures")).show(ctx, |ui| {
         ui.set_max_width(520.0);
         ui.heading(t("Describe the pictures"));
         ui.label(t(

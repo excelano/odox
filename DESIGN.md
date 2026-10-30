@@ -635,7 +635,8 @@ style; in a list each is an item. Outside a list, a paragraph pasted where the
 caret has no text before it, or the last where it has none after, keeps its own
 kind, so that a heading pasted on an empty line is a heading. The clipboard is
 the system's through `arboard`, one kept for as long as the application runs;
-on Linux that is X11's, which under Wayland is Xwayland's and the desktop hands
+on Linux that is Wayland's data-control protocol where the compositor offers it
+and X11's otherwise, which under Wayland is Xwayland's and the desktop hands
 on, and where none can be had a copy is egui's text alone. A model that keeps
 no formatting leaves the four `Model` methods as they are and every paste is
 plain.

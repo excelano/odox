@@ -203,7 +203,7 @@ impl Harness {
     fn new(paragraphs: &[&str]) -> Self {
         let mut harness = Self {
             ctx: Context::default(),
-            editor: RichEdit::new(Id::new("editor")),
+            editor: RichEdit::new(Id::unique("editor")),
             model: Plain::new(paragraphs),
             access: None,
         };
@@ -491,7 +491,7 @@ impl Model for Refusing {
 #[test]
 fn a_selection_the_model_refuses_is_left_whole_by_paste_and_enter() {
     let ctx = Context::default();
-    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut editor = RichEdit::new(Id::unique("editor"));
     let mut model = Refusing(Plain::new(&["ab", "cd"]));
     let selection = Selection {
         anchor: Position::new(0, 1),
@@ -600,7 +600,7 @@ fn a_drag_past_the_last_paragraph_takes_its_end_and_past_the_first_takes_its_sta
 fn a_drag_stays_in_the_paragraph_it_is_over_when_another_sits_beside_it() {
     // Two paragraphs side by side, as two cells of a table row are.
     let ctx = Context::default();
-    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut editor = RichEdit::new(Id::unique("editor"));
     let mut model = Plain::new(&["left cell text", "right"]);
     let mut frame = |events: Vec<Event>| {
         let input = RawInput {
@@ -693,7 +693,7 @@ fn page_down_moves_a_view_s_height_and_page_up_comes_back() {
 #[test]
 fn a_paragraph_that_leaves_drags_takes_a_caret_on_a_click_and_not_on_a_drag() {
     let ctx = Context::default();
-    let mut editor = RichEdit::new(Id::new("editor"));
+    let mut editor = RichEdit::new(Id::unique("editor"));
     let mut model = Plain::new(&["a label on a slide"]);
     let mut frame = |events: Vec<Event>| {
         let input = RawInput {

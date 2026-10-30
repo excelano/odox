@@ -464,7 +464,7 @@ impl<V: View> Shell<V> {
             .map_or_else(|| t("Untitled").to_owned(), name_of);
         // Save, discard, or neither. `None` until the person answers.
         let mut answer = None;
-        egui::Modal::new(egui::Id::new("unsaved")).show(ctx, |ui| {
+        egui::Modal::new(egui::Id::unique("unsaved")).show(ctx, |ui| {
             ui.heading(fill(t("Save changes to {file}?"), &[("file", &file)]));
             ui.label(t("The document has changes that are not saved."));
             ui.add_space(8.0);
@@ -1081,6 +1081,7 @@ pub fn run<V: View + 'static>(
 
     let options = eframe::NativeOptions {
         viewport,
+        system_font_fallback: false,
         ..eframe::NativeOptions::default()
     };
 

@@ -7,7 +7,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use egui::accesskit::Role;
 use egui::emath::TSTransform;
 use egui::output::IMEOutput;
 use egui::text::{CCursor, CCursorRange, CharIndex};
@@ -18,7 +17,7 @@ use egui::text_selection::text_cursor_state::{
 use egui::text_selection::visuals::{paint_text_cursor, paint_text_selection};
 use egui::{
     CursorIcon, Event, EventFilter, Galley, IMEPurpose, Id, ImeEvent, Key, Modifiers, Pos2,
-    Response, Sense, Ui, vec2,
+    Response, Role, Sense, Ui, WidgetInfo, vec2,
 };
 
 use crate::{Clipboard, Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
@@ -394,11 +393,11 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             .ctx()
             .layer_transform_to_global(ui.layer_id())
             .unwrap_or_default();
+        response.widget_info(|| WidgetInfo::new(Role::Paragraph));
         update_accesskit_for_text_widget(
             ui.ctx(),
             response.id,
             cursor_range,
-            Role::Paragraph,
             to_global * TSTransform::from_translation(origin.to_vec2()),
             galley,
         );

@@ -81,7 +81,7 @@ impl Package {
             // skipped because an office application writes several, and a
             // package written back without them is not the package that was
             // read.
-            let name = entry.name().to_owned();
+            let name = entry.name()?.into_owned();
             let stored = entry.compression() == CompressionMethod::Stored;
             if name.ends_with('/') {
                 parts.push(Part {

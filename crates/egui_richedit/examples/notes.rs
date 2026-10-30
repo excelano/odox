@@ -138,7 +138,7 @@ fn main() -> eframe::Result {
         eframe::NativeOptions::default(),
         Box::new(|cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::light());
-            let mut editor = RichEdit::new(Id::new("notes"));
+            let mut editor = RichEdit::new(Id::unique("notes"));
             editor.select(Selection::caret(Position::new(1, 0)));
             Ok(Box::new(App { notes, editor }))
         }),
