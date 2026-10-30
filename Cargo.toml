@@ -29,8 +29,8 @@ license = "MIT"
 repository = "https://github.com/excelano/odox"
 # eframe's number, not this code's. Nothing written here needs past edition
 # 2024's 1.85, and every other crate in the tree sits below eframe, so this
-# rises whenever egui raises its own. Measure rather than trust the line: the
-# msrv job builds at it. The same reasoning slipcase-desktop's manifest records.
+# rises whenever egui raises its own. The same reasoning slipcase-desktop's
+# manifest records.
 rust-version = "1.95"
 
 # No crate names a `readme`. There is one README and it is the repository's front

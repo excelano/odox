@@ -39,9 +39,8 @@ the portal processes it started when done. Xephyr has no window manager, so
 Fullscreen does nothing. A fake `BROWSER=<script>` records what a link click
 opens without opening it. The binary is `~/.cache/cargo-target/debug/<app>`,
 not `./target/debug/<app>`, because the target directory is shared across the
-fleet (`df -h /` before a long build). Stop an app with `kill <pid>` for the
-pid you started: `pkill -x xodt` can reach David's own window, and `pkill -f`
-kills the shell too.
+fleet. Stop an app with `kill <pid>` for the pid you started: `pkill -x xodt`
+can reach David's own window, and `pkill -f` kills the shell too.
 
 Linux is `packaging/linux` and `packaging/debian`. `packaging/windows` and
 `packaging/macos` are edited from here too — `ssh winwork` reaches the Windows
