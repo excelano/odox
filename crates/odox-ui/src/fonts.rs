@@ -56,7 +56,7 @@ struct Installed {
 }
 
 fn installed_id() -> Id {
-    Id::new("odox-fonts-installed")
+    Id::unique("odox-fonts-installed")
 }
 
 /// Hand a window the fonts for a document, and keep them for
@@ -178,7 +178,7 @@ fn cover(
         let drawn = definitions
             .font_data
             .values()
-            .any(|face| odox_fonts::covers(&face.font, face.index, character));
+            .any(|face| odox_fonts::covers(face.bytes(), face.index, character));
         if drawn {
             continue;
         }
@@ -210,13 +210,11 @@ const FALLBACK: &str = "machine fallback";
 /// One face of the machine's, read.
 fn load(database: &odox_fonts::fontdb::Database, id: odox_fonts::fontdb::ID) -> Option<FontData> {
     let index = database.face(id)?.index;
-    database.with_face_data(id, |data, face_index| FontData {
-        font: data.to_vec().into(),
+    database.with_face_data(id, |data, face_index| {
         // A font collection holds several faces in one file and `fontdb` reports
         // which of them answered; handing over the file without the index draws
         // the wrong one.
-        index: face_index.max(index),
-        tweak: eframe::egui::FontTweak::default(),
+        FontData::from_blob(Arc::new(data.to_vec()), face_index.max(index))
     })
 }
 
@@ -334,7 +332,7 @@ mod tests {
         assert_eq!(added.len(), 1, "one face for the one character missing");
         assert_eq!(chain.last(), Some(added[0]), "it comes last");
         let face = &defs.font_data[added[0]];
-        assert!(odox_fonts::covers(&face.font, face.index, '日'));
+        assert!(odox_fonts::covers(face.bytes(), face.index, '日'));
     }
 
     #[test]

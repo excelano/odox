@@ -963,11 +963,11 @@ impl SheetView {
             return;
         };
         let mut answer = None;
-        egui::Modal::new(egui::Id::new("rename-sheet")).show(ctx, |ui| {
+        egui::Modal::new(egui::Id::unique("rename-sheet")).show(ctx, |ui| {
             ui.heading(t("Rename the sheet"));
             let response = ui.add(
                 egui::TextEdit::singleline(&mut renaming.name)
-                    .id(egui::Id::new("sheet-name"))
+                    .id(egui::Id::unique("sheet-name"))
                     .desired_width(260.0),
             );
             if renaming.opened {
@@ -1390,7 +1390,7 @@ impl SheetView {
                         let cell = document.cell(sheet, editor.row, editor.column);
                         let style = document.cell_style(sheet, cell.as_ref(), editor.column);
                         let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
-                        let id = egui::Id::new("cell-editor");
+                        let id = egui::Id::unique("cell-editor");
                         let response = ui.put(
                             rect,
                             egui::TextEdit::singleline(&mut editor.text)
@@ -1399,7 +1399,7 @@ impl SheetView {
                                 .text_color(format.color)
                                 .background_color(palette.paper)
                                 .margin(vec2(3.0 * zoom, 0.0))
-                                .vertical_align(Align::Center),
+                                .align(egui::Align2::LEFT_CENTER),
                         );
                         // What a screen reader calls the box: the cell.
                         ui.ctx().accesskit_node_builder(response.id, |node| {
@@ -1525,7 +1525,7 @@ impl SheetView {
                     let response = ui
                         .interact(
                             rect,
-                            ui.id().with(("column-edge", column)),
+                            ui.scope_id().with(("column-edge", column)),
                             Sense::click_and_drag(),
                         )
                         .on_hover_cursor(egui::CursorIcon::ResizeColumn);
@@ -1552,7 +1552,7 @@ impl SheetView {
                     }
                     let rect = Rect::from_min_size(pos2(left, y - 3.0), vec2(header_width, 6.0));
                     let response = ui
-                        .interact(rect, ui.id().with(("row-edge", row)), Sense::drag())
+                        .interact(rect, ui.scope_id().with(("row-edge", row)), Sense::drag())
                         .on_hover_cursor(egui::CursorIcon::ResizeRow);
                     if let Some(change) =
                         dragged(&response, resizing, false, row, height / zoom, zoom)

@@ -130,7 +130,7 @@ impl FindBar {
         let mut pressed = Pressed::default();
         let step = &mut pressed.step;
         ui.horizontal(|ui| {
-            let id = egui::Id::new("odox-find");
+            let id = egui::Id::unique("odox-find");
             let mut output = egui::TextEdit::singleline(&mut self.query)
                 .id(id)
                 .hint_text(t("Find"))
@@ -188,7 +188,7 @@ impl FindBar {
     }
 
     fn replace_row(&mut self, ui: &mut Ui, count: usize, pressed: &mut Pressed) {
-        let id = egui::Id::new("odox-replace");
+        let id = egui::Id::unique("odox-replace");
         let output = egui::TextEdit::singleline(&mut self.replacement)
             .id(id)
             .hint_text(t("Replace with"))

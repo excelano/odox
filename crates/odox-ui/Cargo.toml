@@ -20,9 +20,9 @@ odox-pdf.workspace = true
 image.workspace = true
 potext.workspace = true
 # The system clipboard's HTML beside its text, which egui's clipboard does not
-# carry. Already in the tree under `egui-winit`, at the same version; on Linux it
-# reaches the clipboard through X11, which under Wayland is Xwayland's, and the
-# desktop hands that on to Wayland's.
+# carry. Already in the tree under `egui-winit`, at the same version and with the
+# same features; on Linux it uses Wayland's data-control protocol where the
+# compositor offers it and X11 otherwise, which under Wayland is Xwayland's.
 arboard = { version = "3.7", default-features = false }
 
 # The desktop's light-or-dark setting, which `winit` answers on the other two
@@ -33,6 +33,9 @@ arboard = { version = "3.7", default-features = false }
 # reasoning is in that repository, as duckling's copy also says.
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+# Named for features only, which the workspace manifest gives; no code here
+# calls it.
+winit.workspace = true
 
 # The window's icon on Windows, which has no other way to get one: the shell
 # reads it from a resource compiled into the executable and this build compiles

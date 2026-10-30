@@ -28,7 +28,7 @@ pub type PageEditor = RichEdit<Vec<usize>>;
 /// The id the page editor takes the keyboard under. The shell reads it to
 /// know that typing on the page still leaves its shortcuts to it.
 pub(crate) fn page_editor_id() -> Id {
-    Id::new("odox-page-editor")
+    Id::unique("odox-page-editor")
 }
 
 /// A page editor with nothing selected.

@@ -16,12 +16,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use eframe::egui::accesskit::Role;
 use eframe::egui::emath::TSTransform;
 use eframe::egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use eframe::egui::{
-    Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Sense, Stroke,
-    StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, pos2,
+    Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Role, Sense,
+    Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, WidgetInfo, pos2,
     text::{CCursor, CCursorRange, LayoutJob},
     text_selection::{LabelSelectionState, visuals::paint_text_selection},
     vec2,
@@ -1139,15 +1138,17 @@ fn expose(
             .ctx()
             .layer_transform_to_global(ui.layer_id())
             .unwrap_or_default();
+        response.widget_info(|| {
+            WidgetInfo::new(if heading.is_some() {
+                Role::Heading
+            } else {
+                Role::Paragraph
+            })
+        });
         update_accesskit_for_text_widget(
             ui.ctx(),
             response.id,
             None,
-            if heading.is_some() {
-                Role::Heading
-            } else {
-                Role::Paragraph
-            },
             to_global * TSTransform::from_translation(origin.to_vec2()),
             galley,
         );
