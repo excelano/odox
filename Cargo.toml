@@ -61,7 +61,7 @@ quick-xml = "0.42"
 # Package assembly. Defaults pull zstd, xz and bzip2; OpenDocument permits
 # stored and deflated entries and nothing else, and the zlib-rs backend is pure
 # Rust. Same line as waddle's, for the same reason.
-zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 # The window. The features are eframe's defaults less `system_fonts`, which
 # searches the machine for a character no loaded face has: `odox-ui` does that

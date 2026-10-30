@@ -147,6 +147,33 @@ fn a_document_writes_back_what_it_read() {
     }
 }
 
+#[test]
+fn the_media_type_is_at_byte_38() {
+    for path in corpus() {
+        let bytes = std::fs::read(&path).expect("the document");
+        let package = Package::read(&bytes).expect("a package");
+        let Some(media_type) = package.media_type() else {
+            continue;
+        };
+        let written = package.write().expect("a written package");
+        let u16_at = |at: usize| u16::from_le_bytes([written[at], written[at + 1]]);
+        let shown = path.display();
+        assert_eq!(
+            &written[..4],
+            b"PK\x03\x04",
+            "{shown}: a local header first"
+        );
+        assert_eq!(u16_at(8), 0, "{shown}: mimetype stored");
+        assert_eq!(u16_at(28), 0, "{shown}: mimetype with no extra field");
+        assert_eq!(&written[30..38], b"mimetype", "{shown}: mimetype first");
+        assert_eq!(
+            &written[38..38 + media_type.len()],
+            media_type.as_bytes(),
+            "{shown}: the media type at byte 38"
+        );
+    }
+}
+
 /// What a save asks before it writes: the bytes read back as the tree they
 /// were written from, for every document of every format.
 #[test]
