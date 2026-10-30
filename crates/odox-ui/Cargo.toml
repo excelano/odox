@@ -43,7 +43,7 @@ winit.workspace = true
 # startup. Pure Rust, and off every other target, so it costs the Linux and
 # macOS binaries nothing.
 [target.'cfg(windows)'.dependencies]
-ico = "0.5"
+ico = "0.6"
 
 # Receiving a document from macOS, which is `src/opened_document.rs` and nothing
 # else. Features are named rather than taken, and not for weight alone: `cargo
