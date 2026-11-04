@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.10.0"
+version = "0.10.1"
 
 [products.xodt.locales.en-us]
-whats-new = "Copying keeps its formatting outside the window: bold, italic, underline, strikethrough, headings and lists paste into another window and into word processors and browsers, and text copied from them keeps the same when it is pasted in."
+whats-new = "Security release: the ZIP library Odox Text opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
 
 [products.xodt.locales.de-de]
-whats-new = "Kopieren behält die Formatierung auch außerhalb des Fensters: Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften und Listen lassen sich in ein anderes Fenster und in Textverarbeitungen und Browser einfügen, und aus ihnen kopierter Text behält beim Einfügen dasselbe."
+whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Text Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
 
 [products.xods.locales.en-us]
-whats-new = "Merge a selection into one cell, and unmerge it, from the Sheet menu; a merged cell is picked, outlined and stepped over as one. A copied range reaches a word processor as a table. Copy, the selection's sum, average and count, Cut and Delete now leave hidden rows and columns alone. A screen reader can walk the cells in view as a grid, and says the picked cell as it moves."
+whats-new = "Security release: the ZIP library Odox Grid opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
 
 [products.xods.locales.de-de]
-whats-new = "Eine Auswahl im Menü Blatt zu einer Zelle verbinden und den Verbund wieder aufheben; eine verbundene Zelle wird als eine gewählt, umrandet und übersprungen. Ein kopierter Bereich kommt in einer Textverarbeitung als Tabelle an. Kopieren, Summe, Mittelwert und Anzahl einer Auswahl, Ausschneiden und Löschen lassen ausgeblendete Zeilen und Spalten jetzt unberührt. Ein Bildschirmleser kann die sichtbaren Zellen als Gitter durchgehen und nennt die gewählte Zelle, wenn sie wechselt."
+whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Grid Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
 
 [products.xodp.locales.en-us]
-whats-new = "Slide > New slide adds a slide after the one in view, with a title and a text frame where its master puts them, the title looking like the one before it, and a click anywhere on an empty placeholder puts the caret in it. Titles and text typed in LibreOffice now take the size their slide's styles give them, on screen and in the PDF. Copying keeps its formatting in other windows and programs, and text copied from them keeps it when it is pasted in."
+whats-new = "Security release: the ZIP library Odox Deck opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
 
 [products.xodp.locales.de-de]
-whats-new = "Folie > Neue Folie fügt nach der angezeigten Folie eine Folie ein, mit Titel und Textrahmen dort, wo ihr Master sie vorsieht, der Titel wie der davor, und ein Klick irgendwo auf einen leeren Platzhalter setzt die Einfügemarke hinein. In LibreOffice getippte Titel und Texte erhalten jetzt die Größe, die die Formate ihrer Folie vorgeben, am Bildschirm und im PDF. Kopieren behält die Formatierung in anderen Fenstern und Programmen, und aus ihnen kopierter Text behält sie beim Einfügen."
+whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Deck Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
