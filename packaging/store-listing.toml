@@ -85,7 +85,7 @@ What an editor has to do and most do not is keep the whole document. Every eleme
 Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Text&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xodt.locales."en-us".apple]
@@ -144,7 +144,7 @@ Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Text&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xodt.locales."de-de".apple]
@@ -239,7 +239,7 @@ What an editor has to do and most do not is keep the whole document. Every eleme
 Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Grid&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xods.locales."en-us".apple]
@@ -300,7 +300,7 @@ Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Grid&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xods.locales."de-de".apple]
@@ -395,7 +395,7 @@ What an editor has to do and most do not is keep the whole document. Every eleme
 Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Deck&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xodp.locales."en-us".apple]
@@ -456,7 +456,7 @@ Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
-support = "https://excelano.com/odox/#support"
+support = "https://excelano.com/support/?app=Odox%20Deck&channel=Mac%20App%20Store"
 privacy = "https://excelano.com/legal/#odox"
 
 [products.xodp.locales."de-de".apple]
