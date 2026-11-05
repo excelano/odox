@@ -141,6 +141,17 @@ pub trait View {
         false
     }
 
+    /// Whether a window opens with the side panel showing.
+    fn side_at_start(&self) -> bool {
+        true
+    }
+
+    /// The zoom at which the document fills a width, for a view that can be
+    /// fitted to its window.
+    fn fit_zoom(&self, _width: f32) -> Option<f32> {
+        None
+    }
+
     /// Add the application's own items to the View menu.
     fn view_menu(&mut self, _ui: &mut Ui) {}
 
@@ -176,7 +187,7 @@ pub struct Shell<V: View> {
     ///
     /// See the comment where it is read in [`eframe::App::ui`].
     settling: bool,
-    zoom: f32,
+    zoom: Zoom,
     show_side: bool,
     editing: Editing,
     settings: Settings,
@@ -217,9 +228,39 @@ const ZOOM_STEP: f32 = 1.1;
 const ZOOM_MIN: f32 = 0.4;
 const ZOOM_MAX: f32 = 4.0;
 
+struct Zoom {
+    factor: f32,
+    fit: bool,
+}
+
+impl Default for Zoom {
+    fn default() -> Self {
+        Self {
+            factor: 1.0,
+            fit: true,
+        }
+    }
+}
+
+impl Zoom {
+    fn set(&mut self, factor: f32) {
+        self.factor = factor.clamp(ZOOM_MIN, ZOOM_MAX);
+        self.fit = false;
+    }
+
+    fn zoom_in(&mut self) {
+        self.set(self.factor * ZOOM_STEP);
+    }
+
+    fn zoom_out(&mut self) {
+        self.set(self.factor / ZOOM_STEP);
+    }
+}
+
 impl<V: View> Shell<V> {
     /// A window with nothing open.
     pub fn new(product: Product, view: V) -> Self {
+        let show_side = view.side_at_start();
         Self {
             view,
             product,
@@ -227,8 +268,8 @@ impl<V: View> Shell<V> {
             error: None,
             notice: None,
             settling: false,
-            zoom: 1.0,
-            show_side: true,
+            zoom: Zoom::default(),
+            show_side,
             editing: Editing::default(),
             settings: Settings::load(),
             find: FindBar::default(),
@@ -446,7 +487,7 @@ impl<V: View> Shell<V> {
             .filter(|title| !title.trim().is_empty())
             .or_else(|| self.path.as_deref().map(name_of))
             .or_else(|| self.view.is_open().then(|| t("Untitled").to_owned()));
-        let mark = if self.editing.modified() { "● " } else { "" };
+        let mark = if self.editing.modified() { "*" } else { "" };
         match document {
             Some(name) => format!("{mark}{name} — {}", self.product.id),
             None => self.product.id.to_owned(),
@@ -586,7 +627,12 @@ impl<V: View> eframe::App for Shell<V> {
                 // nothing-open message here instead would flash it between a
                 // double-click and the document.
             } else if self.view.is_open() {
-                self.view.central(ui, self.zoom, &mut self.editing);
+                if self.zoom.fit
+                    && let Some(factor) = self.view.fit_zoom(ui.available_width())
+                {
+                    self.zoom.factor = factor.clamp(ZOOM_MIN, ZOOM_MAX);
+                }
+                self.view.central(ui, self.zoom.factor, &mut self.editing);
             } else {
                 self.nothing_open(ui);
             }
@@ -717,13 +763,16 @@ impl<V: View> Shell<V> {
             }
             ui.menu_button(t("View"), |ui| {
                 if ui.button(t("Zoom in")).clicked() {
-                    self.zoom = (self.zoom * ZOOM_STEP).min(ZOOM_MAX);
+                    self.zoom.zoom_in();
                 }
                 if ui.button(t("Zoom out")).clicked() {
-                    self.zoom = (self.zoom / ZOOM_STEP).max(ZOOM_MIN);
+                    self.zoom.zoom_out();
                 }
                 if ui.button(t("Actual size")).clicked() {
-                    self.zoom = 1.0;
+                    self.zoom.set(1.0);
+                }
+                if self.view.fit_zoom(1.0).is_some() {
+                    ui.checkbox(&mut self.zoom.fit, t("Fit to the window"));
                 }
                 ui.separator();
                 ui.checkbox(&mut self.show_side, t("Show the side panel"));
@@ -731,7 +780,7 @@ impl<V: View> Shell<V> {
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                let percent = (self.zoom * 100.0).round() as u32;
+                let percent = (self.zoom.factor * 100.0).round() as u32;
                 ui.label(fill(t("{percent}%"), &[("percent", &percent.to_string())]));
                 if self.editing.on && self.view.is_open() {
                     ui.separator();
@@ -962,13 +1011,17 @@ impl<V: View> Shell<V> {
         // `Plus` is what the key sends with shift held and `Equals` without, and
         // a person pressing the same physical key means the same thing either way.
         if pressed(Key::Plus) || pressed(Key::Equals) {
-            self.zoom = (self.zoom * ZOOM_STEP).min(ZOOM_MAX);
+            self.zoom.zoom_in();
         }
         if pressed(Key::Minus) {
-            self.zoom = (self.zoom / ZOOM_STEP).max(ZOOM_MIN);
+            self.zoom.zoom_out();
         }
         if pressed(Key::Num0) {
-            self.zoom = 1.0;
+            self.zoom.set(1.0);
+        }
+        let pinched = ctx.input(egui::InputState::zoom_delta);
+        if (pinched - 1.0).abs() > f32::EPSILON {
+            self.zoom.set(self.zoom.factor * pinched);
         }
     }
 }
@@ -1097,6 +1150,8 @@ pub fn run<V: View + 'static>(
         options,
         Box::new(move |cc| {
             crate::system_theme::follow(&cc.egui_ctx);
+            cc.egui_ctx
+                .options_mut(|o| o.input_options.scroll_zoom_speed = 1.0 / 400.0);
             // Now that there is a context, a document that arrives has
             // somewhere to wake.
             #[cfg(target_os = "macos")]

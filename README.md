@@ -79,8 +79,10 @@ how each lane is run.
 
 ## Using them
 
-Give a document on the command line or press Ctrl+O. Ctrl+R re-reads the file from disk, Ctrl+W closes it, and Ctrl+plus, Ctrl+minus
-and Ctrl+0 change the zoom.
+Give a document on the command line or press Ctrl+O. Ctrl+R re-reads the file from disk, Ctrl+W closes it, and Ctrl+plus, Ctrl+minus,
+Ctrl+0 and Ctrl with the mouse wheel change the zoom. A text document opens
+fitted to the width of the window, and keeps fitting it until the zoom is
+changed by hand; Fit to the window in the View menu turns that back on.
 
 A window opens reading. Ctrl+E, or Edit mode in the Edit menu, turns editing
 on, and a preference in the same menu opens every document that way. Ctrl+S

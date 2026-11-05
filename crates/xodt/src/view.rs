@@ -17,6 +17,9 @@ use odox_ui::{
     page_editor,
 };
 
+const MARGIN: f32 = 24.0;
+const PIXELS_PER_POINT: f32 = 96.0 / 72.0;
+
 /// A text document, open or not.
 pub struct TextView {
     document: Option<TextDocument>,
@@ -170,6 +173,7 @@ impl View for TextView {
     }
 
     fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
+        let zoom = zoom * PIXELS_PER_POINT;
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -195,7 +199,7 @@ impl View for TextView {
         // than being cut off.
         let page = document.text_width() * zoom;
         let page_height = document.text_height() * zoom;
-        let margin = 24.0 * zoom;
+        let margin = MARGIN * zoom;
 
         if edit_mode && let Some(root) = document.body_path() {
             let Document {
@@ -273,6 +277,16 @@ impl View for TextView {
                 });
             });
         self.found.drawn();
+    }
+
+    fn side_at_start(&self) -> bool {
+        false
+    }
+
+    fn fit_zoom(&self, width: f32) -> Option<f32> {
+        let document = self.document.as_ref()?;
+        let page = document.text_width() + MARGIN * 2.0;
+        Some(width / (page * PIXELS_PER_POINT))
     }
 
     fn side(&mut self, ui: &mut Ui) -> bool {
