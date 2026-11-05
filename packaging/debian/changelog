@@ -1,3 +1,17 @@
+odox (0.10.1) unstable; urgency=low
+
+  * Release notes for 0.10.1: zip 9.1 fixes GHSA-m665-v7pm-7grj (critical) and four high/medium advisories in archive reading
+  * Drop two notes that were not true: a disk check on the wrong filesystem, an msrv job CI does not run
+  * DESIGN.md: the clipboard on Linux under arboard's Wayland backend
+  * ico 0.6
+  * zip 9
+  * egui and eframe 0.37
+  * Lockfile takes the compatible patch and minor releases
+  * Screenshot scripts drop the generated-by-ship line
+  * CLAUDE.md carries the Xephyr recipe for driving a window with xdotool; DESIGN.md states the wgpu, theme and po facts without the alternatives weighed; SECURITY.md describes what the apps write, the settings file and the unsafe policy as released; attribution headers in scripts
+
+ -- David M. Anderson <david.anderson@excelano.com>  Wed, 04 Nov 2026 21:15:51 -0600
+
 odox (0.10.0) unstable; urgency=low
 
   * Release notes and store copy for 0.10.0
