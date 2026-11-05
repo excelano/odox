@@ -14,7 +14,7 @@ use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Editing, Export, Found, Notice, View, fonts};
+use odox_ui::{Editing, Export, Found, Notice, View, Zoom, fonts};
 
 use crate::access;
 use crate::grid::{Metrics, address, column_name};
@@ -596,7 +596,7 @@ impl View for SheetView {
         done
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
+    fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing) {
         if self.document.is_none() {
             return;
         }
@@ -616,7 +616,7 @@ impl View for SheetView {
         let can = !editing.asking && self.editor.is_none();
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui, can));
-        self.grid(ui, zoom, editing);
+        self.grid(ui, zoom.scale(), editing);
         self.found.drawn();
     }
 

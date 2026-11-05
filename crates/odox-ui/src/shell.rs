@@ -133,7 +133,7 @@ pub trait View {
     /// Draw the document. The shell has already put a scroll area or a panel
     /// around whatever this needs. The editing state says whether edit mode is
     /// on and takes the snapshot an edit records before it changes the tree.
-    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing);
+    fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing);
 
     /// Draw the panel beside the document — an outline, a sheet list, a slide
     /// list — and answer whether there is one to draw.
@@ -146,10 +146,9 @@ pub trait View {
         true
     }
 
-    /// The zoom at which the document fills a width, for a view that can be
-    /// fitted to its window.
-    fn fit_zoom(&self, _width: f32) -> Option<f32> {
-        None
+    /// Whether the view fits the document to the window until zoomed by hand.
+    fn fits(&self) -> bool {
+        false
     }
 
     /// Add the application's own items to the View menu.
@@ -228,21 +227,32 @@ const ZOOM_STEP: f32 = 1.1;
 const ZOOM_MIN: f32 = 0.4;
 const ZOOM_MAX: f32 = 4.0;
 
-struct Zoom {
+const PIXELS_PER_POINT: f32 = 96.0 / 72.0;
+
+/// How large the document is drawn: set by a person, or fitted to the window.
+pub struct Zoom {
     factor: f32,
     fit: bool,
 }
 
-impl Default for Zoom {
-    fn default() -> Self {
-        Self {
-            factor: 1.0,
-            fit: true,
+impl Zoom {
+    fn new(fit: bool) -> Self {
+        Self { factor: 1.0, fit }
+    }
+
+    /// Screen pixels per point of the document.
+    #[must_use]
+    pub fn scale(&self) -> f32 {
+        self.factor * PIXELS_PER_POINT
+    }
+
+    /// Offer the scale at which the document fills the window, taken while the zoom follows it.
+    pub fn fit(&mut self, scale: f32) {
+        if self.fit {
+            self.factor = (scale / PIXELS_PER_POINT).clamp(ZOOM_MIN, ZOOM_MAX);
         }
     }
-}
 
-impl Zoom {
     fn set(&mut self, factor: f32) {
         self.factor = factor.clamp(ZOOM_MIN, ZOOM_MAX);
         self.fit = false;
@@ -261,6 +271,7 @@ impl<V: View> Shell<V> {
     /// A window with nothing open.
     pub fn new(product: Product, view: V) -> Self {
         let show_side = view.side_at_start();
+        let zoom = Zoom::new(view.fits());
         Self {
             view,
             product,
@@ -268,7 +279,7 @@ impl<V: View> Shell<V> {
             error: None,
             notice: None,
             settling: false,
-            zoom: Zoom::default(),
+            zoom,
             show_side,
             editing: Editing::default(),
             settings: Settings::load(),
@@ -627,12 +638,7 @@ impl<V: View> eframe::App for Shell<V> {
                 // nothing-open message here instead would flash it between a
                 // double-click and the document.
             } else if self.view.is_open() {
-                if self.zoom.fit
-                    && let Some(factor) = self.view.fit_zoom(ui.available_width())
-                {
-                    self.zoom.factor = factor.clamp(ZOOM_MIN, ZOOM_MAX);
-                }
-                self.view.central(ui, self.zoom.factor, &mut self.editing);
+                self.view.central(ui, &mut self.zoom, &mut self.editing);
             } else {
                 self.nothing_open(ui);
             }
@@ -771,7 +777,7 @@ impl<V: View> Shell<V> {
                 if ui.button(t("Actual size")).clicked() {
                     self.zoom.set(1.0);
                 }
-                if self.view.fit_zoom(1.0).is_some() {
+                if self.view.fits() {
                     ui.checkbox(&mut self.zoom.fit, t("Fit to the window"));
                 }
                 ui.separator();

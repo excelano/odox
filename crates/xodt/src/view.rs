@@ -5,7 +5,8 @@
 
 use std::path::Path;
 
-use eframe::egui::{self, Ui};
+use eframe::egui::scroll_area::ScrollAreaOutput;
+use eframe::egui::{self, Pos2, Rect, Ui};
 use egui_richedit::{Model, Selection};
 use odox_core::Document;
 use odox_core::doc::TextDocument;
@@ -13,12 +14,93 @@ use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
-    Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, fonts,
-    page_editor,
+    Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
+    fonts, page_editor,
 };
 
 const MARGIN: f32 = 24.0;
-const PIXELS_PER_POINT: f32 = 96.0 / 72.0;
+
+#[derive(Default)]
+struct Scroll {
+    shown: Option<Shown>,
+    settle: Option<f32>,
+}
+
+#[derive(Clone, Copy)]
+struct Shown {
+    scale: f32,
+    offset: f32,
+    viewport: Rect,
+    height: f32,
+}
+
+#[derive(Clone, Copy)]
+struct Anchor {
+    fraction: f32,
+    at: f32,
+}
+
+impl Scroll {
+    fn area(&mut self, ui: &Ui, scale: f32) -> (egui::ScrollArea, Option<Anchor>) {
+        let area = egui::ScrollArea::vertical().auto_shrink([false, false]);
+        let rescaled = self
+            .shown
+            .filter(|shown| (shown.scale - scale).abs() > f32::EPSILON);
+        if let Some(shown) = rescaled {
+            self.settle = None;
+            let anchor = shown.anchor(ui.input(|input| input.pointer.hover_pos()));
+            let estimate = shown.height * scale / shown.scale;
+            return (
+                area.vertical_scroll_offset(anchor.offset(estimate)),
+                Some(anchor),
+            );
+        }
+        match self.settle.take() {
+            Some(offset) => (area.vertical_scroll_offset(offset), None),
+            None => (area, None),
+        }
+    }
+
+    fn record(
+        &mut self,
+        ui: &Ui,
+        output: &ScrollAreaOutput<()>,
+        scale: f32,
+        anchor: Option<Anchor>,
+    ) {
+        let drawn = output.state.clamped_offset().y;
+        let height = output.content_size.y;
+        let offset = anchor.map_or(drawn, |anchor| anchor.offset(height));
+        if (offset - drawn).abs() > 0.5 {
+            self.settle = Some(offset);
+            ui.ctx().request_repaint();
+        }
+        self.shown = Some(Shown {
+            scale,
+            offset,
+            viewport: output.inner_rect,
+            height,
+        });
+    }
+}
+
+impl Shown {
+    fn anchor(&self, pointer: Option<Pos2>) -> Anchor {
+        let at = pointer
+            .filter(|at| self.viewport.contains(*at))
+            .map_or(0.0, |at| at.y - self.viewport.top());
+        Anchor {
+            fraction: (self.offset + at) / self.height.max(1.0),
+            at,
+        }
+    }
+}
+
+impl Anchor {
+    fn offset(self, height: f32) -> f32 {
+        (self.fraction * height - self.at).max(0.0)
+    }
+}
 
 /// A text document, open or not.
 pub struct TextView {
@@ -41,6 +123,7 @@ pub struct TextView {
     /// paragraph when the page is next drawn.
     begin: bool,
     export: Export,
+    scroll: Scroll,
 }
 
 impl Default for TextView {
@@ -56,6 +139,7 @@ impl Default for TextView {
             command: None,
             begin: false,
             export: Export::default(),
+            scroll: Scroll::default(),
         }
     }
 }
@@ -98,6 +182,7 @@ impl View for TextView {
         self.pictures.clear();
         self.page.clear();
         self.found.clear();
+        self.scroll = Scroll::default();
     }
 
     fn is_open(&self) -> bool {
@@ -172,8 +257,7 @@ impl View for TextView {
         model.replace_matches(&matches.iter().collect::<Vec<_>>(), with, true)
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
-        let zoom = zoom * PIXELS_PER_POINT;
+    fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing) {
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -197,9 +281,11 @@ impl View for TextView {
         // written to. Narrower than the window, the flow is drawn on a page the
         // width the document asked for; wider, the page shrinks to fit rather
         // than being cut off.
-        let page = document.text_width() * zoom;
-        let page_height = document.text_height() * zoom;
-        let margin = MARGIN * zoom;
+        zoom.fit(ui.available_width() / (document.text_width() + MARGIN * 2.0));
+        let scale = zoom.scale();
+        let page = document.text_width() * scale;
+        let page_height = document.text_height() * scale;
+        let margin = MARGIN * scale;
 
         if edit_mode && let Some(root) = document.body_path() {
             let Document {
@@ -235,47 +321,49 @@ impl View for TextView {
             self.menu = MenuState::offering_blocks(true);
         }
 
-        egui::ScrollArea::both()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                // What was typed goes into the tree before it is laid out, so
-                // this frame already draws it.
-                if edit_mode && let Some(root) = document.body_path() {
-                    let Document {
-                        content, styles, ..
-                    } = &mut document.document;
-                    let mut model = FlowModel::new(content, styles, root, editing);
-                    self.page.input(ui, &mut model);
-                }
-                let Some(body) = document.body() else {
-                    return;
-                };
-                ui.vertical_centered(|ui| {
-                    let width = page.min(ui.available_width() - margin * 2.0).max(80.0);
-                    let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
-                    egui::Frame::new()
-                        .fill(palette.paper)
-                        .inner_margin(margin)
-                        .show(ui, |ui| {
-                            ui.set_width(width);
-                            // At least one page tall, however little is on
-                            // it, shrunk with the page when the window is
-                            // narrower.
-                            ui.set_min_height(page_height * width / page);
-                            let mut flow = Flow::new(&document.document, &mut self.pictures, zoom);
-                            flow.palette = palette;
-                            flow.scroll_to_heading = self.scroll_to.take();
-                            flow.scroll_to_place = self.place.take();
-                            flow.page = edit_mode.then_some(&mut self.page);
-                            flow.find = self.found.highlights(0);
-                            flow.blocks(ui, body, width);
-                            if flow.followed.is_some() {
-                                self.place = flow.followed.take();
-                                ui.ctx().request_repaint();
-                            }
-                        });
-                });
+        let (area, anchor) = self.scroll.area(ui, scale);
+        let output = area.show(ui, |ui| {
+            // What was typed goes into the tree before it is laid out, so
+            // this frame already draws it.
+            if edit_mode && let Some(root) = document.body_path() {
+                let Document {
+                    content, styles, ..
+                } = &mut document.document;
+                let mut model = FlowModel::new(content, styles, root, editing);
+                self.page.input(ui, &mut model);
+            }
+            let Some(body) = document.body() else {
+                return;
+            };
+            ui.vertical_centered(|ui| {
+                let width = page.min(ui.available_width() - margin * 2.0).max(80.0);
+                let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
+                egui::Frame::new()
+                    .fill(palette.paper)
+                    .inner_margin(margin)
+                    .show(ui, |ui| {
+                        ui.set_width(width);
+                        let gap = (ui.spacing().item_spacing.y * scale).round();
+                        ui.spacing_mut().item_spacing.y = gap;
+                        // At least one page tall, however little is on
+                        // it, shrunk with the page when the window is
+                        // narrower.
+                        ui.set_min_height(page_height * width / page);
+                        let mut flow = Flow::new(&document.document, &mut self.pictures, scale);
+                        flow.palette = palette;
+                        flow.scroll_to_heading = self.scroll_to.take();
+                        flow.scroll_to_place = self.place.take();
+                        flow.page = edit_mode.then_some(&mut self.page);
+                        flow.find = self.found.highlights(0);
+                        flow.blocks(ui, body, width);
+                        if flow.followed.is_some() {
+                            self.place = flow.followed.take();
+                            ui.ctx().request_repaint();
+                        }
+                    });
             });
+        });
+        self.scroll.record(ui, &output, scale, anchor);
         self.found.drawn();
     }
 
@@ -283,10 +371,8 @@ impl View for TextView {
         false
     }
 
-    fn fit_zoom(&self, width: f32) -> Option<f32> {
-        let document = self.document.as_ref()?;
-        let page = document.text_width() + MARGIN * 2.0;
-        Some(width / (page * PIXELS_PER_POINT))
+    fn fits(&self) -> bool {
+        true
     }
 
     fn side(&mut self, ui: &mut Ui) -> bool {

@@ -11,16 +11,16 @@
 
 use std::path::Path;
 
-use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2, pos2, vec2};
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
-use odox_core::{Document, Element, Length, Ns};
+use odox_core::{Document, Element, Length, Ns, PageLayout};
 use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
-    fonts, page_editor,
+    Zoom, fonts, page_editor,
 };
 
 /// A presentation, open or not.
@@ -335,11 +335,15 @@ impl View for SlideView {
             .select(Selection::caret(Caret::new(within.to_vec(), caret.offset)));
     }
 
+    fn fits(&self) -> bool {
+        true
+    }
+
     fn presenting(&self) -> bool {
         self.presenting
     }
 
-    fn central(&mut self, ui: &mut Ui, zoom: f32, editing: &mut Editing) {
+    fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing) {
         let count = self
             .document
             .as_ref()
@@ -394,20 +398,18 @@ impl View for SlideView {
                 &document.document,
                 pictures,
                 slide,
-                zoom,
+                zoom.scale(),
                 self.found.highlights(notes_at),
             );
         }
 
         let layout = document.page_layout(slide);
-        let available = ui.available_size();
-        // The page scaled to fit, keeping its shape, and then the window's own
-        // zoom on top of that.
-        let fit = (available.x / layout.width.points())
-            .min(available.y / layout.height.points())
-            .max(0.01)
-            * zoom;
-        let size = vec2(layout.width.points() * fit, layout.height.points() * fit);
+        zoom.fit(fit(ui.available_size(), &layout));
+        let scale = zoom.scale();
+        let size = vec2(
+            layout.width.points() * scale,
+            layout.height.points() * scale,
+        );
 
         // Both resolved before the closure, which borrows the document again.
         let background = document.background(slide);
@@ -428,7 +430,7 @@ impl View for SlideView {
                 // window's own colour. `odox_ui::format::Palette` says why.
                 ui.painter().rect_filled(page, 2.0, palette.paper);
 
-                let mut canvas = Canvas::new(&document.document, pictures, page, fit, palette);
+                let mut canvas = Canvas::new(&document.document, pictures, page, scale, palette);
                 canvas.page_editor = page_editor;
                 canvas.find = self.found.highlights(slide_index);
                 // Back to front: the ground, then what the master page draws on
@@ -452,7 +454,7 @@ impl View for SlideView {
                 );
 
                 if edit_mode {
-                    action = interact(ui, &response, page, fit, slide, picked, dragging);
+                    action = interact(ui, &response, page, scale, slide, picked, dragging);
                 }
             });
         });
@@ -462,7 +464,7 @@ impl View for SlideView {
             self.go_to_slide_named(&name);
         }
         if let Some(action) = action {
-            self.act(action, fit, editing);
+            self.act(action, scale, editing);
         }
     }
 
@@ -790,9 +792,11 @@ impl SlideView {
             return;
         };
         let layout = document.page_layout(slide);
-        let (width, height) = (layout.width.points(), layout.height.points());
-        let fit = (area.width() / width).min(area.height() / height).max(0.01);
-        let page = Rect::from_center_size(area.center(), vec2(width * fit, height * fit));
+        let fit = fit(area.size(), &layout);
+        let page = Rect::from_center_size(
+            area.center(),
+            vec2(layout.width.points() * fit, layout.height.points() * fit),
+        );
         let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
         ui.painter().rect_filled(page, 0.0, palette.paper);
         let mut canvas = Canvas::new(&document.document, &mut self.pictures, page, fit, palette);
@@ -960,6 +964,12 @@ fn interact(
         return Some(Action::Pick(under(at)));
     }
     None
+}
+
+fn fit(space: Vec2, layout: &PageLayout) -> f32 {
+    (space.x / layout.width.points())
+        .min(space.y / layout.height.points())
+        .max(0.01)
 }
 
 /// The speaker's notes under the slide.
