@@ -128,51 +128,53 @@ impl SheetDocument {
             Some(number) => Some(self.data_style_named(number)),
         };
         let mut made: HashMap<(Option<String>, [bool; 4]), String> = HashMap::new();
-        for row in block.top..=block.bottom {
-            for column in block.left..=block.right {
-                let index = &self.sheets[sheet];
-                let cell = self.cell(index, row, column);
-                if cell.as_ref().is_some_and(|c| c.covered) {
-                    continue;
-                }
-                let had = cell
-                    .as_ref()
-                    .and_then(|c| c.style_name())
-                    .or_else(|| {
-                        index
-                            .columns
-                            .get(column)
-                            .and_then(|c| c.default_cell_style.as_deref())
-                    })
-                    .map(ToOwned::to_owned);
-                let (across, down) = cell
-                    .as_ref()
-                    .map_or((1, 1), |c| (c.columns_spanned(), c.rows_spanned()));
-                let edges = [
-                    column == block.left,
-                    column + across > block.right,
-                    row == block.top,
-                    row + down > block.bottom,
-                ];
-                let name = if let Some(name) = made.get(&(had.clone(), edges)) {
-                    name.clone()
-                } else {
-                    let style =
-                        self.formatted(had.as_deref(), format, edges, data_style.as_deref());
-                    let name = self.cell_style_named(style);
-                    made.insert((had, edges), name.clone());
-                    name
-                };
-                let style_name = self.document.name(&Ns::Table, "style-name");
-                self.cell_element(sheet, row, column)?
-                    .set_attr(style_name, name);
-                self.reindex();
-                if format.number.is_some() {
-                    self.retype(sheet, row, column)?;
+        self.in_batch(sheet, block, |this| {
+            for row in block.top..=block.bottom {
+                for column in block.left..=block.right {
+                    let index = &this.sheets[sheet];
+                    let cell = this.cell(index, row, column);
+                    if cell.as_ref().is_some_and(|c| c.covered) {
+                        continue;
+                    }
+                    let had = cell
+                        .as_ref()
+                        .and_then(|c| c.style_name())
+                        .or_else(|| {
+                            index
+                                .columns
+                                .get(column)
+                                .and_then(|c| c.default_cell_style.as_deref())
+                        })
+                        .map(ToOwned::to_owned);
+                    let (across, down) = cell
+                        .as_ref()
+                        .map_or((1, 1), |c| (c.columns_spanned(), c.rows_spanned()));
+                    let edges = [
+                        column == block.left,
+                        column + across > block.right,
+                        row == block.top,
+                        row + down > block.bottom,
+                    ];
+                    let name = if let Some(name) = made.get(&(had.clone(), edges)) {
+                        name.clone()
+                    } else {
+                        let style =
+                            this.formatted(had.as_deref(), format, edges, data_style.as_deref());
+                        let name = this.cell_style_named(style);
+                        made.insert((had, edges), name.clone());
+                        name
+                    };
+                    let style_name = this.document.name(&Ns::Table, "style-name");
+                    this.cell_element(sheet, row, column)?
+                        .set_attr(style_name, name);
+                    this.touched();
+                    if format.number.is_some() {
+                        this.retype(sheet, row, column)?;
+                    }
                 }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     /// A cell style that says what `had` says, with the format written over
@@ -406,7 +408,7 @@ impl SheetDocument {
             Writing::Value
         };
         self.write_cell(sheet, row, column, &retyped, &text, writing)?;
-        self.reindex();
+        self.touched();
         Ok(())
     }
 }

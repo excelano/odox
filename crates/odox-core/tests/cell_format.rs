@@ -373,3 +373,49 @@ fn an_outline_reaches_a_merged_cell_on_the_blocks_edge() {
     let b = document.cell_style(sheet, cell.as_ref(), 1).cell.border;
     assert!(b.left.is_some() && b.right.is_some() && b.top.is_some());
 }
+
+#[test]
+fn a_block_inside_repeated_rows_is_split_and_the_rest_reads_the_same() {
+    let bytes = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/gaps.ods"),
+    )
+    .expect("the gaps fixture");
+    let mut document = SheetDocument::read(&bytes).expect("it reads");
+    let read = |document: &SheetDocument| {
+        let sheet = &document.sheets()[0];
+        (0..sheet.used_rows + 3)
+            .flat_map(|row| (0..4).map(move |column| (row, column)))
+            .map(|(row, column)| {
+                document
+                    .cell(sheet, row, column)
+                    .map_or(Value::Empty, |cell| cell.value())
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = read(&document);
+    let used = document.sheets()[0].used_rows;
+    let block = Block {
+        top: 2,
+        left: 1,
+        bottom: used + 1,
+        right: 2,
+    };
+    let bold = CellFormat {
+        bold: Some(true),
+        ..CellFormat::default()
+    };
+    document.format_cells(0, block, &bold).expect("formatted");
+    let document = saved(&mut document);
+    assert_eq!(read(&document), before);
+    let sheet = &document.sheets()[0];
+    for row in 2..=used + 1 {
+        let cell = document.cell(sheet, row, 1);
+        let style = document.cell_style(sheet, cell.as_ref(), 1);
+        assert_eq!(style.text.bold, Some(true), "row {row}");
+    }
+    let cell = document.cell(sheet, 1, 1);
+    assert_ne!(
+        document.cell_style(sheet, cell.as_ref(), 1).text.bold,
+        Some(true)
+    );
+}

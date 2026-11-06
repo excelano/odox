@@ -74,24 +74,30 @@ impl SheetDocument {
         if order.iter().enumerate().all(|(at, from)| at == *from) {
             return Ok(Vec::new());
         }
-        let mut written = Vec::new();
-        for (at, from) in order.into_iter().enumerate() {
-            let row = first + at;
-            for (source, note) in rows[from].iter().zip(&notes[from]) {
-                let c = source.column;
-                self.set_style_name(sheet, row, c, source.style.as_deref())?;
-                self.put_note(sheet, row, c, note.clone())?;
-                match &source.formula {
-                    Some(stored) => {
-                        let moved = formula::shifted(stored, offset(row, source.row), 0);
-                        self.set_formula(sheet, row, c, &moved)?;
+        let sorted = Block {
+            top: first,
+            ..block
+        };
+        self.in_batch(sheet, sorted, |this| {
+            let mut written = Vec::new();
+            for (at, from) in order.into_iter().enumerate() {
+                let row = first + at;
+                for (source, note) in rows[from].iter().zip(&notes[from]) {
+                    let c = source.column;
+                    this.set_style_name(sheet, row, c, source.style.as_deref())?;
+                    this.put_note(sheet, row, c, note.clone())?;
+                    match &source.formula {
+                        Some(stored) => {
+                            let moved = formula::shifted(stored, offset(row, source.row), 0);
+                            this.set_formula(sheet, row, c, &moved)?;
+                        }
+                        None => this.copy_value(sheet, row, c, source)?,
                     }
-                    None => self.copy_value(sheet, row, c, source)?,
+                    written.push((sheet, row, c));
                 }
-                written.push((sheet, row, c));
             }
-        }
-        Ok(written)
+            Ok(written)
+        })
     }
 
     /// Whether a block's first row reads as a header: every cell in it is

@@ -87,44 +87,57 @@ impl SheetDocument {
         } else {
             source.top..=source.bottom
         };
-        let mut written = Vec::new();
-        for line in lines {
-            let sources: Vec<Source> = if down {
-                (source.top..=source.bottom)
-                    .map(|row| self.source(sheet, row, line))
-                    .collect()
-            } else {
-                (source.left..=source.right)
-                    .map(|column| self.source(sheet, line, column))
-                    .collect()
-            };
-            let continued = if series { series_of(&sources) } else { None };
-            for step in 0..count {
-                let (row, column) = if down {
-                    (source.bottom + 1 + step, line)
-                } else {
-                    (line, source.right + 1 + step)
-                };
-                let from = &sources[step % sources.len()];
-                self.set_style_name(sheet, row, column, from.style.as_deref())?;
-                match (&continued, &from.formula) {
-                    (Some(next), _) => {
-                        self.set_cell(sheet, row, column, &next(sources.len() + step))?;
-                    }
-                    (None, Some(stored)) => {
-                        let moved = formula::shifted(
-                            stored,
-                            offset(row, from.row),
-                            offset(column, from.column),
-                        );
-                        self.set_formula(sheet, row, column, &moved)?;
-                    }
-                    (None, None) => self.copy_value(sheet, row, column, from)?,
-                }
-                written.push((sheet, row, column));
+        let whole = if down {
+            Block {
+                bottom: source.bottom + count,
+                ..source
             }
-        }
-        Ok(written)
+        } else {
+            Block {
+                right: source.right + count,
+                ..source
+            }
+        };
+        self.in_batch(sheet, whole, |this| {
+            let mut written = Vec::new();
+            for line in lines {
+                let sources: Vec<Source> = if down {
+                    (source.top..=source.bottom)
+                        .map(|row| this.source(sheet, row, line))
+                        .collect()
+                } else {
+                    (source.left..=source.right)
+                        .map(|column| this.source(sheet, line, column))
+                        .collect()
+                };
+                let continued = if series { series_of(&sources) } else { None };
+                for step in 0..count {
+                    let (row, column) = if down {
+                        (source.bottom + 1 + step, line)
+                    } else {
+                        (line, source.right + 1 + step)
+                    };
+                    let from = &sources[step % sources.len()];
+                    this.set_style_name(sheet, row, column, from.style.as_deref())?;
+                    match (&continued, &from.formula) {
+                        (Some(next), _) => {
+                            this.set_cell(sheet, row, column, &next(sources.len() + step))?;
+                        }
+                        (None, Some(stored)) => {
+                            let moved = formula::shifted(
+                                stored,
+                                offset(row, from.row),
+                                offset(column, from.column),
+                            );
+                            this.set_formula(sheet, row, column, &moved)?;
+                        }
+                        (None, None) => this.copy_value(sheet, row, column, from)?,
+                    }
+                    written.push((sheet, row, column));
+                }
+            }
+            Ok(written)
+        })
     }
 
     pub(super) fn source(&self, sheet: usize, row: usize, column: usize) -> Source {
@@ -182,7 +195,7 @@ impl SheetDocument {
         cell.children
             .splice(at..at, from.paragraphs.iter().cloned().map(Node::Element));
         cell.self_closing = false;
-        self.reindex();
+        self.touched();
         Ok(())
     }
 
@@ -202,7 +215,7 @@ impl SheetDocument {
                 cell.remove_attr(&Ns::Table, "style-name");
             }
         }
-        self.reindex();
+        self.touched();
         Ok(())
     }
 }
