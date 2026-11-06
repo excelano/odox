@@ -3,6 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use eframe::egui::{
@@ -10,6 +11,7 @@ use eframe::egui::{
 };
 use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
+use odox_core::formula;
 use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
@@ -57,10 +59,9 @@ pub struct SheetView {
     /// A column or row whose edge is being dragged, with the size it has so
     /// far, in points.
     resizing: Option<Resize>,
-    /// Whether a value in the document has been changed since it was opened,
-    /// which may have left a formula's result out of date. A width or a
-    /// height leaves every result as it was.
-    values_changed: bool,
+    /// The formula cells, by sheet, row and column, whose result a change
+    /// may have left out of date because it could not be worked out again.
+    stale: HashSet<(usize, usize, usize)>,
     export: Export,
 }
 
@@ -127,7 +128,8 @@ struct Paint<'a> {
     metrics: &'a Metrics,
     palette: format::Palette,
     zoom: f32,
-    values_changed: bool,
+    sheet_index: usize,
+    stale: &'a HashSet<(usize, usize, usize)>,
     highlights: Option<odox_ui::Highlights<'a>>,
 }
 
@@ -258,11 +260,9 @@ impl Paint<'_> {
                 }
             }
         }
-        // A formula's cached result may be out of date once a value has
-        // changed, and which ones are cannot be told without evaluating them;
-        // every one is drawn faint until the file is opened by something that
-        // recalculates. DESIGN.md §11.
-        if self.values_changed && cell.formula().is_some() {
+        // A formula whose result could not be worked out again after a
+        // change is drawn faint, because it may be out of date. DESIGN.md §11.
+        if self.stale.contains(&(self.sheet_index, row, column)) {
             format.color = format.color.gamma_multiply(0.45);
         }
         let align = match style.paragraph.align {
@@ -423,7 +423,7 @@ impl View for SheetView {
             .position(|s| s.visible)
             .unwrap_or(0);
         self.document = Some(document);
-        self.values_changed = false;
+        self.stale.clear();
         self.pick((0, 0));
         self.metrics = None;
         self.editor = None;
@@ -587,10 +587,14 @@ impl View for SheetView {
         }
         if !writes.is_empty() {
             editing.record(&document.document.content);
-            self.values_changed = true;
+            let mut changed = Vec::new();
             for (sheet, row, column, value) in &writes {
-                let _ = document.set_cell(*sheet, *row, *column, value);
+                if document.set_cell(*sheet, *row, *column, value).is_ok() {
+                    changed.push((*sheet, *row, *column));
+                }
             }
+            let done = document.recalculate(&changed);
+            self.recalculated(done);
             self.metrics = None;
         }
         done
@@ -711,7 +715,9 @@ impl SheetView {
             return;
         }
         editing.record_snapshot(before, None);
-        self.values_changed = true;
+        let done = document.recalculate_all();
+        self.stale.clear();
+        self.recalculated(done);
         self.metrics = None;
         self.editor = None;
         let new = match command {
@@ -1123,8 +1129,11 @@ impl SheetView {
             // A formula is what the cell says; the text is what it shows, and
             // both are worth seeing at once. A cell with no formula shows only
             // the text, which is all it has.
-            if let Some(formula) = cell.as_ref().and_then(odox_core::doc::Cell::formula) {
-                ui.monospace(format!("={formula}"));
+            let written = cell
+                .as_ref()
+                .and_then(|cell| cell.element.attr(&odox_core::Ns::Table, "formula"));
+            if let Some(written) = written {
+                ui.monospace(formula::to_typed(written));
                 ui.weak(text);
             } else {
                 ui.label(text);
@@ -1231,7 +1240,8 @@ impl SheetView {
             metrics,
             palette,
             zoom,
-            values_changed: self.values_changed,
+            sheet_index: self.sheet,
+            stale: &self.stale,
             highlights: self.found.highlights(self.sheet),
         };
         // No more frozen than the grid has.
@@ -1758,7 +1768,16 @@ impl SheetView {
             self.notice = Some(notice(&refused));
             return;
         }
-        let original = document.input_text(self.sheet, row, column);
+        let original = document
+            .sheets()
+            .get(self.sheet)
+            .and_then(|sheet| document.cell(sheet, row, column))
+            .and_then(|cell| {
+                cell.element
+                    .attr(&odox_core::Ns::Table, "formula")
+                    .map(formula::to_typed)
+            })
+            .unwrap_or_else(|| document.input_text(self.sheet, row, column));
         let text = typed.unwrap_or_else(|| original.clone());
         self.notice = None;
         self.editor = Some(CellEditor {
@@ -1779,15 +1798,14 @@ impl SheetView {
         let Outcome::Commit(step) = outcome else {
             return;
         };
-        if editor.text != editor.original {
-            self.write(
-                editor.row,
-                editor.column,
-                &self.document.as_ref().map_or(Value::Empty, |document| {
-                    document.read_input(self.sheet, editor.row, editor.column, &editor.text)
-                }),
-                editing,
-            );
+        if editor.text != editor.original
+            && !self.commit(editor.row, editor.column, &editor.text, editing)
+        {
+            self.editor = Some(CellEditor {
+                opened: true,
+                ..editor
+            });
+            return;
         }
         self.pick(match step {
             Step::Stay => (editor.row, editor.column),
@@ -1906,15 +1924,19 @@ impl SheetView {
             return false;
         }
         editing.record(&document.document.content);
-        self.values_changed = true;
+        let mut changed = Vec::new();
+        let mut refusal = None;
         for (r, c, value) in writes {
             if let Err(refused) = document.set_cell(sheet, r, c, value) {
-                self.notice = Some(notice(&refused));
+                refusal = Some(notice(&refused));
                 break;
             }
+            changed.push((sheet, r, c));
         }
+        let done = document.recalculate(&changed);
+        self.recalculated(done);
         self.metrics = None;
-        self.notice = None;
+        self.notice = refusal;
         true
     }
 
@@ -1929,11 +1951,59 @@ impl SheetView {
             return;
         }
         editing.record(&document.document.content);
-        self.values_changed = true;
         match document.set_cell(self.sheet, row, column, value) {
-            Ok(()) => self.metrics = None,
+            Ok(()) => {
+                let done = document.recalculate(&[(self.sheet, row, column)]);
+                self.recalculated(done);
+                self.metrics = None;
+            }
             Err(refused) => self.notice = Some(notice(&refused)),
         }
+    }
+
+    /// Write what was typed into a cell: a formula where it begins with `=`,
+    /// and otherwise a value read in the cell's format. Answers false for a
+    /// formula that cannot be read, which stays in the editor to be put right.
+    fn commit(&mut self, row: usize, column: usize, typed: &str, editing: &mut Editing) -> bool {
+        let Some(document) = &mut self.document else {
+            return true;
+        };
+        let typed_formula = typed.trim_start().starts_with('=') && typed.trim().len() > 1;
+        if !typed_formula {
+            let value = document.read_input(self.sheet, row, column, typed);
+            self.write(row, column, &value, editing);
+            return true;
+        }
+        let Ok(stored) = formula::to_stored(typed) else {
+            self.notice = Some(
+                t("This formula could not be read. Put it right, or press Escape to leave the cell as it was.")
+                    .to_owned(),
+            );
+            return false;
+        };
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
+            return true;
+        }
+        editing.record(&document.document.content);
+        match document.set_formula(self.sheet, row, column, &stored) {
+            Ok(()) => {
+                let done = document.recalculate(&[(self.sheet, row, column)]);
+                self.recalculated(done);
+                self.metrics = None;
+            }
+            Err(refused) => self.notice = Some(notice(&refused)),
+        }
+        true
+    }
+
+    /// Keep what a recalculation could not work out drawn faint, and draw what
+    /// it did work out as it is.
+    fn recalculated(&mut self, done: odox_core::doc::Recalculated) {
+        for place in done.updated {
+            self.stale.remove(&place);
+        }
+        self.stale.extend(done.stale);
     }
 
     /// Move the picked cell from the keyboard, which is how a person walks a
@@ -2217,7 +2287,6 @@ fn blocked_notice(blocked: &Blocked) -> String {
 /// What the cell bar says about a cell that cannot be edited.
 fn notice(refused: &Refused) -> String {
     match refused {
-        Refused::Formula => t("This cell holds a formula, which this version does not edit."),
         Refused::Covered => t("This cell is covered by the one that spans it."),
         // A cell is never a range and is not formatted here, so a refusal
         // over structure or a namespace is not one a cell hears.
@@ -2430,7 +2499,7 @@ mod tests {
     }
 
     #[test]
-    fn a_paste_over_a_formula_writes_nothing() {
+    fn a_paste_over_a_formula_puts_the_value_in_its_place() {
         let (mut view, mut editing) = opened();
         let (row, column) = (1..5)
             .flat_map(|r| (0..6).map(move |c| (r, c)))
@@ -2442,11 +2511,14 @@ mod tests {
             })
             .expect("the sheet has a formula");
         view.pick((row, column - 1));
-        let before = text_at(&view, row, column - 1);
         view.paste("changed\tchanged\n", &mut editing);
-        assert_eq!(text_at(&view, row, column - 1), before);
-        assert!(!editing.modified());
-        assert!(view.notice.is_some());
+        assert_eq!(text_at(&view, row, column), "changed");
+        let document = view.document.as_ref().expect("open");
+        let cell = document
+            .cell(&document.sheets()[0], row, column)
+            .expect("cell");
+        assert!(cell.formula().is_none());
+        assert!(editing.can_undo(), "the paste was one step");
     }
 
     #[test]

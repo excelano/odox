@@ -123,3 +123,4 @@ convert odp:impress8 export.odp "OpenDocument Presentation Flat XML" export.fodp
 # ranges or page styles.
 convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods
 convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
+convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods

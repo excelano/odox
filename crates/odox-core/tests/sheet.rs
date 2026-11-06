@@ -430,14 +430,17 @@ fn a_covered_cell_and_a_formula_are_refused_and_nothing_moves() {
         Err(odox_core::Refused::Covered)
     );
     assert_eq!(
-        document.set_cell(0, 0, 2, &Value::Number(1.0)),
-        Err(odox_core::Refused::Formula)
-    );
-    assert_eq!(
         document.set_cell(3, 0, 0, &Value::Number(1.0)),
         Err(odox_core::Refused::NotFound)
     );
     assert_eq!(document.document.content, before);
+    document
+        .set_cell(0, 0, 2, &Value::Number(1.0))
+        .expect("a value takes a formula's place");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 0, 2).expect("the cell");
+    assert_eq!(cell.formula(), None);
+    assert_eq!(cell.value(), Value::Number(1.0));
 }
 
 #[test]

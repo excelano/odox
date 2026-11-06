@@ -43,8 +43,6 @@ pub use table::{InTable, TableEdit, edit_table, insert_table, step_cell, table_a
 pub enum Refused {
     /// The cell is under a neighbour's span; the neighbour is the one to edit.
     Covered,
-    /// The cell holds a formula, which this version does not edit.
-    Formula,
     /// The document does not declare a namespace the edit would write in.
     Namespace,
     /// There is no such sheet, slide, shape or paragraph.
@@ -61,7 +59,6 @@ impl fmt::Display for Refused {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Covered => write!(f, "the cell is covered by a neighbour's span"),
-            Self::Formula => write!(f, "the cell holds a formula"),
             Self::Namespace => write!(f, "the document does not declare the namespace needed"),
             Self::NotFound => write!(f, "nothing is there to edit"),
             Self::Structure => write!(f, "the range crosses a table or a frame"),

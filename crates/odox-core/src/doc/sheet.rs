@@ -13,11 +13,13 @@
 mod freeze;
 mod hide;
 mod merge;
+mod recalc;
 mod restructure;
 mod sheets;
 mod size;
 pub use freeze::Frozen;
 pub use merge::Merged;
+pub use recalc::{Place, Recalculated};
 pub use restructure::{Blocked, Restructure};
 
 use std::ops::Range;
@@ -384,17 +386,14 @@ impl SheetDocument {
     ///
     /// # Errors
     ///
-    /// The cell is under a neighbour's span, holds a formula, or the sheet does
-    /// not exist.
+    /// The cell is under a neighbour's span, or the sheet does not exist.
     pub fn can_edit(&self, sheet: usize, row: usize, column: usize) -> Result<(), Refused> {
         let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
-        if let Some(cell) = self.cell(index, row, column) {
-            if cell.covered {
-                return Err(Refused::Covered);
-            }
-            if cell.formula().is_some() {
-                return Err(Refused::Formula);
-            }
+        if self
+            .cell(index, row, column)
+            .is_some_and(|cell| cell.covered)
+        {
+            return Err(Refused::Covered);
         }
         Ok(())
     }
@@ -410,8 +409,8 @@ impl SheetDocument {
     ///
     /// # Errors
     ///
-    /// The cell is under a neighbour's span, holds a formula, or the sheet does
-    /// not exist. Nothing is changed in any of those cases.
+    /// The cell is under a neighbour's span, or the sheet does not exist.
+    /// Nothing is changed in either case.
     pub fn set_cell(
         &mut self,
         sheet: usize,
@@ -442,6 +441,64 @@ impl SheetDocument {
         let text = format
             .and_then(|name| self.document.styles.data_styles().format(name, &value))
             .unwrap_or_else(|| value.cached_text());
+        self.write_cell(sheet, row, column, &value, &text, Writing::Value)?;
+        self.reindex();
+        Ok(())
+    }
+
+    /// Put a formula in a cell in place of what it held, as ODF stores it,
+    /// `of:=SUM([.A1:.A3])`, with no result until [`Self::recalculate`] is
+    /// given the cell.
+    ///
+    /// # Errors
+    ///
+    /// The cell is under a neighbour's span, or the sheet does not exist.
+    /// Nothing is changed in either case.
+    pub fn set_formula(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+        formula: &str,
+    ) -> Result<(), Refused> {
+        self.can_edit(sheet, row, column)?;
+        self.write_cell(sheet, row, column, &Value::Empty, "", Writing::Value)?;
+        let name = self.document.name(&Ns::Table, "formula");
+        self.cell_element(sheet, row, column)?
+            .set_attr(name, formula);
+        self.reindex();
+        Ok(())
+    }
+
+    /// Write a value and the text it shows into a cell, by sheet, row and
+    /// column, without asking whether the cell may be edited or indexing the
+    /// sheet again after.
+    fn write_cell(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+        value: &Value,
+        text: &str,
+        writing: Writing,
+    ) -> Result<(), Refused> {
+        let names = CellNames::of(&self.document);
+        let calcext = self.document.declares(&Ns::Calcext);
+        let cell = self.cell_element(sheet, row, column)?;
+        write_value(cell, value, text, &names, calcext, writing);
+        Ok(())
+    }
+
+    /// A cell's element, by sheet, row and column, written into the tree
+    /// where the document has none and split out of a repeated run where it is
+    /// one of several.
+    fn cell_element(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+    ) -> Result<&mut Element, Refused> {
+        let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
         let table_position = index.table;
         let range = index
             .row_range(row)
@@ -449,8 +506,6 @@ impl SheetDocument {
         let rows_written = index.rows.last().map_or(0, |r| r.first + r.count);
 
         let names = CellNames::of(&self.document);
-        let calcext = self.document.declares(&Ns::Calcext);
-
         let table = self
             .document
             .content
@@ -461,10 +516,7 @@ impl SheetDocument {
 
         let row_element = reach_row(table, range.as_ref(), row, rows_written, &names)?;
         let cell_index = reach_cell(row_element, column, &names);
-        let cell = row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)?;
-        write_value(cell, &value, &text, &names, calcext);
-        self.reindex();
-        Ok(())
+        row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)
     }
 
     /// The name of the data style a cell is shown in: its own cell style's, or
@@ -673,6 +725,7 @@ struct CellNames {
     date_value: Name,
     time_value: Name,
     currency: Name,
+    string_value: Name,
     calcext_value_type: Name,
     paragraph: Name,
 }
@@ -694,6 +747,7 @@ impl CellNames {
             date_value: document.name(&Ns::Office, "date-value"),
             time_value: document.name(&Ns::Office, "time-value"),
             currency: document.name(&Ns::Office, "currency"),
+            string_value: document.name(&Ns::Office, "string-value"),
             calcext_value_type: document.name(&Ns::Calcext, "value-type"),
             paragraph: document.name(&Ns::Text, "p"),
         }
@@ -833,7 +887,23 @@ fn with_count(mut element: Element, count: usize, repeated: &Name) -> Element {
 
 /// Put a value into a cell element: the typed attributes and the displayed
 /// paragraphs replaced, the style and everything else kept.
-fn write_value(cell: &mut Element, value: &Value, text: &str, names: &CellNames, calcext: bool) {
+/// What a cell is being given: a value in place of whatever it held, or the
+/// result of the formula it keeps, which may be an error.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Writing {
+    Value,
+    Result,
+    Error,
+}
+
+fn write_value(
+    cell: &mut Element,
+    value: &Value,
+    text: &str,
+    names: &CellNames,
+    calcext: bool,
+    writing: Writing,
+) {
     for local in [
         "value-type",
         "value",
@@ -846,7 +916,9 @@ fn write_value(cell: &mut Element, value: &Value, text: &str, names: &CellNames,
         cell.remove_attr(&Ns::Office, local);
     }
     cell.remove_attr(&Ns::Calcext, "value-type");
-    cell.remove_attr(&Ns::Table, "formula");
+    if writing == Writing::Value {
+        cell.remove_attr(&Ns::Table, "formula");
+    }
     cell.children
         .retain(|node| !matches!(node, Node::Element(e) if e.is(&Ns::Text, "p")));
 
@@ -866,8 +938,16 @@ fn write_value(cell: &mut Element, value: &Value, text: &str, names: &CellNames,
         // a cell without one fine; it is written where the document declares
         // the namespace, and a document that never heard of it is left alone.
         if calcext {
-            cell.set_attr(names.calcext_value_type.clone(), value_type);
+            let written = if writing == Writing::Error {
+                "error"
+            } else {
+                value_type
+            };
+            cell.set_attr(names.calcext_value_type.clone(), written);
         }
+    }
+    if writing == Writing::Error {
+        cell.set_attr(names.string_value.clone(), "");
     }
     match value {
         Value::Empty | Value::Text(_) => {}

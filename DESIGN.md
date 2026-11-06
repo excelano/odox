@@ -301,8 +301,8 @@ a formula with its cached value and a slide with a text frame. The tests walk th
 corpus directory rather than naming its documents.
 
 A formula cell carries `table:formula`, `office:value` and a `text:p` holding the
-value as last displayed, so a viewer needs neither a number-format engine nor a
-formula evaluator: it shows the string the producer formatted. Nothing gates on
+value as last displayed, so a document opens showing the string the producer
+formatted, and nothing is worked out until a value changes. Nothing gates on
 `office:version`; the reader accepts what it is given.
 
 ## §11 Editing
@@ -330,16 +330,44 @@ section a `style:map` condition chooses, and month and day names, so a typed
 value looks as LibreOffice would show it; `corpus/libreoffice/formats.ods` is
 the measure. What does not fit the format, and anything typed into a cell with
 none, is read the way a spreadsheet reads it: a number is a number, a number
-with `%` a percentage, `true` and `false` are booleans, anything else is text,
-and a formula is not recognised. A cell opens for editing with what reads back
-to its value: a percentage with its `%`, a date or a time as its format shows
-it. The colour a format gives a section, red for a negative amount, is not drawn.
-A cell that holds a formula is not
-opened, and once a value in the document has changed every formula's cached
-result is drawn faint, because which of them went stale cannot be told without
-evaluating them and a spreadsheet application recalculates on opening the
-file. Leaving a cell as it was is not an edit, so stepping through a currency
-does not retype it as a number.
+with `%` a percentage, `true` and `false` are booleans, and anything else is
+text. A cell opens for editing with what reads back to its value: a percentage
+with its `%`, a date or a time as its format shows it, a formula as it is typed.
+The colour a format gives a section, red for a negative amount, is not drawn.
+Leaving a cell as it was is not an edit, so stepping through a currency does
+not retype it as a number.
+
+**What begins with `=` is a formula** (`formula/typed.rs`). It is typed as a
+spreadsheet takes one, references bare, `A1`, `$A$1`, `A1:B3`, a sheet named
+with a dot or an exclamation mark, `Data.B2`, `Data!B2`, `'My sheet'.A1`, and
+arguments parted by `;` or `,`, and is stored as ODF writes it,
+`of:=SUM([.A1:.A3])`, and worked out at once. It reads back, in the editor and
+in the cell bar, as `LibreOffice` shows it, `=SUM(A1:A3)`, `=$Data.B2*3`. A
+formula that cannot be read stays in the editor with the cell bar saying so,
+until it is put right or Escape leaves the cell as it was; one that reads but
+calls a function outside the core is kept for the application that opens the
+file next, and drawn faint. A value typed or pasted over a formula takes its
+place.
+
+**A change works out again every formula that reads it** (`odox-core`'s
+`formula` module and `sheet/recalc.rs`). A document's own results are trusted
+when it opens; when a value changes, every formula that reads the cell, on any
+sheet and through any chain of other formulas, is worked out in the order they
+depend on each other, in the same undo step as the change, and a row or column
+put in or taken out works out every formula. The core is `OpenFormula` as ODF
+stores it: numbers, text, booleans, errors, references and ranges, the
+operators, and SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, PRODUCT, IF,
+IFERROR, AND, OR, NOT, TRUE, FALSE, ROUND, ROUNDUP, ROUNDDOWN, ABS, INT, MOD,
+POWER, SQRT, CONCATENATE, CONCAT, LEFT, RIGHT, MID, LEN, UPPER, LOWER, TRIM,
+DATE, YEAR, MONTH, DAY, VLOOKUP, SUMIF, COUNTIF and AVERAGEIF. What they answer
+is `LibreOffice`'s, measured on `corpus/libreoffice/formulas.ods`: a boolean is
+one or zero, `=` compares text with its case while a criterion ignores it, and a
+date is days from 30 December 1899. A result keeps the kind of value its cell
+held and is shown in the cell's number format; an error is written as
+`LibreOffice` writes one. A formula outside the core keeps its result and is
+drawn faint once something it reads changes, or once anything does where it
+cannot even be read, as is every formula that reads one; a formula that reads
+itself is `Err:522`.
 
 **A selection is a range, and the clipboard carries it as text and as a
 table.** A press picks the cell under it, Shift or a drag stretches the
@@ -348,8 +376,9 @@ Copy and cut hand over the cells as tab separated rows, each as it is
 displayed, which is what every other program can read, and as an HTML table of
 the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a value typed
 into the cell it lands in would be read, from the top left of the selection. A paste, a cut or a delete is
-one undo step and is all or nothing: if any cell it reaches holds a formula or
-lies under a merge, none is written and the cell bar says which. Emptying a
+one undo step and is all or nothing: if any cell it reaches lies under a merge,
+none is written and the cell bar says which. A value written over a formula
+takes its place, as it does when typed. Emptying a
 range leaves cells the document never wrote unwritten.
 
 **A cell's text is cut at the cell's edge.** It is drawn on one line from the
