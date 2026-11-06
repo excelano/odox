@@ -315,7 +315,7 @@ fn held(cell: &Cell<'_>) -> formula::Value {
 }
 
 /// `2026-11-05` or `2026-11-05T14:30:00` as days from 30 December 1899.
-fn date_serial(text: &str) -> Option<f64> {
+pub(super) fn date_serial(text: &str) -> Option<f64> {
     let (date, time) = text.split_once('T').unwrap_or((text, ""));
     let mut fields = date.splitn(3, '-').map(|f| f.parse::<i64>().ok());
     let (year, month, day) = (fields.next()??, fields.next()??, fields.next()??);
@@ -333,7 +333,7 @@ fn date_serial(text: &str) -> Option<f64> {
 }
 
 /// `PT14H05M09S` as a fraction of a day.
-fn duration_days(text: &str) -> Option<f64> {
+pub(super) fn duration_days(text: &str) -> Option<f64> {
     let rest = text.strip_prefix('P')?;
     let (days, time) = rest.split_once('T').unwrap_or((rest, ""));
     let days: f64 = days.strip_suffix('D').map_or(Ok(0.0), str::parse).ok()?;

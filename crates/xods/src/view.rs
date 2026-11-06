@@ -50,6 +50,8 @@ pub struct SheetView {
     book_command: Option<(BookCommand, usize)>,
     /// The sheet being renamed, while the question is up.
     renaming: Option<Renaming>,
+    /// How a block is to be sorted, while the question is up.
+    sorting: Option<Sorting>,
     /// How many rows the grid last showed, which is how far Page Up and Page
     /// Down go.
     page_rows: usize,
@@ -365,6 +367,7 @@ enum SheetCommand {
     Unmerge,
     FillDown,
     FillRight,
+    Sort,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -378,6 +381,14 @@ enum BookCommand {
 }
 
 /// A sheet's new name, as it is typed.
+/// The Sort question's answers so far.
+struct Sorting {
+    block: Block,
+    column: usize,
+    descending: bool,
+    header: bool,
+}
+
 struct Renaming {
     sheet: usize,
     name: String,
@@ -533,6 +544,7 @@ impl View for SheetView {
             let fills = [
                 (t("Fill down"), SheetCommand::FillDown),
                 (t("Fill right"), SheetCommand::FillRight),
+                (t("Sort…"), SheetCommand::Sort),
             ];
             for group in [&entries[..], &shown[..], &merged[..], &fills[..]] {
                 for &(name, command) in group {
@@ -627,6 +639,7 @@ impl View for SheetView {
             self.change_book(command, sheet, editing);
         }
         self.rename_question(ui.ctx(), editing);
+        self.sort_question(ui.ctx(), editing);
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -720,6 +733,10 @@ impl SheetView {
             }
             SheetCommand::FillDown | SheetCommand::FillRight => {
                 self.fill_selection(matches!(command, SheetCommand::FillDown), editing);
+                return;
+            }
+            SheetCommand::Sort => {
+                self.ask_sort();
                 return;
             }
         };
@@ -1066,6 +1083,142 @@ impl SheetView {
             }
             Some(false) => self.renaming = None,
             None => {}
+        }
+    }
+
+    /// Put the Sort question up for the selection, or for the block of filled
+    /// cells around the picked cell when it is the whole selection, by the
+    /// picked cell's column.
+    fn ask_sort(&mut self) {
+        let Some(document) = &self.document else {
+            return;
+        };
+        let ((top, left), (bottom, right)) = self.range();
+        let block = if (top, left) == (bottom, right) {
+            document.region(self.sheet, top, left)
+        } else {
+            Block {
+                top,
+                left,
+                bottom,
+                right,
+            }
+        };
+        if block.bottom == block.top {
+            self.notice = Some(t("There is only one row here to sort.").to_owned());
+            return;
+        }
+        self.sorting = Some(Sorting {
+            block,
+            column: self.selected.1.clamp(block.left, block.right),
+            descending: false,
+            header: document.has_header(self.sheet, block),
+        });
+    }
+
+    /// The Sort question: which column, which way, and whether the first row
+    /// is a header. Sorted, the block is selected.
+    fn sort_question(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let (Some(sorting), Some(document)) = (&mut self.sorting, &self.document) else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let headings: Vec<(usize, String)> = (sorting.block.left..=sorting.block.right)
+            .map(|column| {
+                let text = document
+                    .cell(sheet, sorting.block.top, column)
+                    .map(|cell| cell.text())
+                    .unwrap_or_default();
+                (column, text)
+            })
+            .collect();
+        let name = |column: usize, header: bool| {
+            let heading = headings
+                .iter()
+                .find(|(c, _)| *c == column)
+                .map(|(_, text)| text.as_str())
+                .filter(|text| header && !text.is_empty());
+            match heading {
+                Some(heading) => format!("{} \u{2014} {heading}", column_name(column)),
+                None => fill(t("Column {name}"), &[("name", &column_name(column))]),
+            }
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("sort")).show(ctx, |ui| {
+            ui.heading(t("Sort"));
+            ui.add_space(6.0);
+            let header = sorting.header;
+            egui::Grid::new(egui::Id::unique("sort-grid")).show(ui, |ui| {
+                ui.label(t("Sort by"));
+                egui::ComboBox::from_id_salt("sort-column")
+                    .selected_text(name(sorting.column, header))
+                    .show_ui(ui, |ui| {
+                        for column in sorting.block.left..=sorting.block.right {
+                            ui.selectable_value(&mut sorting.column, column, name(column, header));
+                        }
+                    });
+                ui.end_row();
+                ui.label("");
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut sorting.descending, false, t("Ascending"));
+                    ui.radio_value(&mut sorting.descending, true, t("Descending"));
+                });
+                ui.end_row();
+            });
+            ui.checkbox(&mut sorting.header, t("The first row is a header"));
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("Sort")).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                    answer = Some(true);
+                }
+                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                    answer = Some(false);
+                }
+            });
+        });
+        match answer {
+            Some(true) => {
+                if let Some(sorting) = self.sorting.take() {
+                    self.sort(&sorting, editing);
+                }
+            }
+            Some(false) => self.sorting = None,
+            None => {}
+        }
+    }
+
+    /// Sort a block as one step to undo, work out again what reads it, and
+    /// select it.
+    fn sort(&mut self, sorting: &Sorting, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let sorted = document.sort(
+            self.sheet,
+            sorting.block,
+            sorting.column,
+            sorting.descending,
+            sorting.header,
+        );
+        match sorted {
+            Ok(written) => {
+                if !written.is_empty() {
+                    editing.record_snapshot(before, None);
+                    let done = document.recalculate(&written);
+                    self.recalculated(done);
+                }
+                self.metrics = None;
+                self.pick((sorting.block.top, sorting.block.left));
+                self.extend((sorting.block.bottom, sorting.block.right));
+            }
+            Err(refused) => {
+                document.document.content = before;
+                document.reindex();
+                self.notice = Some(notice(&refused));
+            }
         }
     }
 
@@ -1789,7 +1942,11 @@ impl SheetView {
             Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
             _ => {}
         }
-        if self.editor.is_some() || editing.asking || self.renaming.is_some() {
+        if self.editor.is_some()
+            || editing.asking
+            || self.renaming.is_some()
+            || self.sorting.is_some()
+        {
             return;
         }
         if !was_editing {

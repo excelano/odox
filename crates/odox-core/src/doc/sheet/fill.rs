@@ -31,13 +31,13 @@ pub struct Block {
     pub right: usize,
 }
 
-/// One source cell, as a fill copies it.
-struct Source {
-    row: usize,
-    column: usize,
-    value: Value,
-    formula: Option<String>,
-    style: Option<String>,
+/// One source cell, as a fill or a sort copies it.
+pub(super) struct Source {
+    pub(super) row: usize,
+    pub(super) column: usize,
+    pub(super) value: Value,
+    pub(super) formula: Option<String>,
+    pub(super) style: Option<String>,
 }
 
 impl SheetDocument {
@@ -125,7 +125,7 @@ impl SheetDocument {
         Ok(written)
     }
 
-    fn source(&self, sheet: usize, row: usize, column: usize) -> Source {
+    pub(super) fn source(&self, sheet: usize, row: usize, column: usize) -> Source {
         let cell = self
             .sheets
             .get(sheet)
@@ -146,7 +146,7 @@ impl SheetDocument {
     }
 
     /// Give a cell a cell style, or take its own away.
-    fn set_style_name(
+    pub(super) fn set_style_name(
         &mut self,
         sheet: usize,
         row: usize,
@@ -166,7 +166,7 @@ impl SheetDocument {
     }
 }
 
-fn offset(to: usize, from: usize) -> isize {
+pub(super) fn offset(to: usize, from: usize) -> isize {
     isize::try_from(to).unwrap_or(isize::MAX) - isize::try_from(from).unwrap_or(isize::MAX)
 }
 
