@@ -330,13 +330,24 @@ section a `style:map` condition chooses, and month and day names, so a typed
 value looks as LibreOffice would show it; `corpus/libreoffice/formats.ods` is
 the measure. What does not fit the format, and anything typed into a cell with
 none, is read the way a spreadsheet reads it: a number is a number, a number
-with `%` a percentage, `true` and `false` are booleans, anything else is text,
-and a formula is not recognised. A cell opens for editing with what reads back
-to its value: a percentage with its `%`, a date or a time as its format shows
-it. The colour a format gives a section, red for a negative amount, is not drawn.
-A cell that holds a formula is not
-opened. Leaving a cell as it was is not an edit, so stepping through a currency
-does not retype it as a number.
+with `%` a percentage, `true` and `false` are booleans, and anything else is
+text. A cell opens for editing with what reads back to its value: a percentage
+with its `%`, a date or a time as its format shows it, a formula as it is typed.
+The colour a format gives a section, red for a negative amount, is not drawn.
+Leaving a cell as it was is not an edit, so stepping through a currency does
+not retype it as a number.
+
+**What begins with `=` is a formula** (`formula/typed.rs`). It is typed as a
+spreadsheet takes one, references bare, `A1`, `$A$1`, `A1:B3`, a sheet named
+with a dot or an exclamation mark, `Data.B2`, `Data!B2`, `'My sheet'.A1`, and
+arguments parted by `;` or `,`, and is stored as ODF writes it,
+`of:=SUM([.A1:.A3])`, and worked out at once. It reads back, in the editor and
+in the cell bar, as `LibreOffice` shows it, `=SUM(A1:A3)`, `=$Data.B2*3`. A
+formula that cannot be read stays in the editor with the cell bar saying so,
+until it is put right or Escape leaves the cell as it was; one that reads but
+calls a function outside the core is kept for the application that opens the
+file next, and drawn faint. A value typed or pasted over a formula takes its
+place.
 
 **A change works out again every formula that reads it** (`odox-core`'s
 `formula` module and `sheet/recalc.rs`). A document's own results are trusted
@@ -365,8 +376,9 @@ Copy and cut hand over the cells as tab separated rows, each as it is
 displayed, which is what every other program can read, and as an HTML table of
 the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a value typed
 into the cell it lands in would be read, from the top left of the selection. A paste, a cut or a delete is
-one undo step and is all or nothing: if any cell it reaches holds a formula or
-lies under a merge, none is written and the cell bar says which. Emptying a
+one undo step and is all or nothing: if any cell it reaches lies under a merge,
+none is written and the cell bar says which. A value written over a formula
+takes its place, as it does when typed. Emptying a
 range leaves cells the document never wrote unwritten.
 
 **A cell's text is cut at the cell's edge.** It is drawn on one line from the

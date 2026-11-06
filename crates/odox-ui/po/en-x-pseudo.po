@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-05 20:56-0600\n"
+"POT-Creation-Date: 2026-11-05 21:35-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: none\n"
@@ -122,7 +122,7 @@ msgid "Mark the rest as decoration"
 msgstr "[Märk thé réšt äš décörätíöñ ···········]"
 
 #: crates/odox-ui/src/export.rs:374 crates/odox-ui/src/shell.rs:531
-#: crates/xods/src/view.rs:1025 crates/xodt/src/view.rs:547
+#: crates/xods/src/view.rs:1031 crates/xodt/src/view.rs:547
 msgid "Cancel"
 msgstr "[Cäñcél ···]"
 
@@ -477,7 +477,7 @@ msgstr "[{cell}, émpty ······]"
 msgid "{cell}, {text}"
 msgstr "[{cell}, {text} ······]"
 
-#: crates/xods/src/view.rs:437 crates/xods/src/view.rs:2174
+#: crates/xods/src/view.rs:437 crates/xods/src/view.rs:2244
 msgid "Sheet{number}"
 msgstr "[Shéét{number} ······]"
 
@@ -509,152 +509,154 @@ msgstr "[Mérgé céllš ·····]"
 msgid "Unmerge cells"
 msgstr "[Üñmérgé céllš ······]"
 
-#: crates/xods/src/view.rs:644
+#: crates/xods/src/view.rs:648
 msgid "Freeze rows and columns"
 msgstr "[Fréézé röwš äñd cölümñš ··········]"
 
-#: crates/xods/src/view.rs:646
+#: crates/xods/src/view.rs:650
 msgid "Unfreeze rows and columns"
 msgstr "[Üñfréézé röwš äñd cölümñš ···········]"
 
-#: crates/xods/src/view.rs:653
+#: crates/xods/src/view.rs:657
 msgid "Copy the sheet as tab-separated text"
 msgstr "[Cöpy thé šhéét äš täb-šépärätéd téxt ···············]"
 
-#: crates/xods/src/view.rs:835
+#: crates/xods/src/view.rs:841
 msgid "A merged cell crosses the edge of the selection."
 msgstr ""
 "[Å mérgéd céll cröššéš thé édgé öf thé šéléctíöñ. ····················]"
 
-#: crates/xods/src/view.rs:915
+#: crates/xods/src/view.rs:921
 msgid "Add a sheet"
 msgstr "[Ådd ä šhéét ·····]"
 
-#: crates/xods/src/view.rs:916
+#: crates/xods/src/view.rs:922
 msgid "Rename the sheet…"
 msgstr "[Réñämé thé šhéét… ········]"
 
-#: crates/xods/src/view.rs:917
+#: crates/xods/src/view.rs:923
 msgid "Delete the sheet"
 msgstr "[Délété thé šhéét ·······]"
 
-#: crates/xods/src/view.rs:919
+#: crates/xods/src/view.rs:925
 msgid "Move the sheet left"
 msgstr "[Mövé thé šhéét léft ········]"
 
-#: crates/xods/src/view.rs:924
+#: crates/xods/src/view.rs:930
 msgid "Move the sheet right"
 msgstr "[Mövé thé šhéét ríght ·········]"
 
-#: crates/xods/src/view.rs:1006
+#: crates/xods/src/view.rs:1012
 msgid "Rename the sheet"
 msgstr "[Réñämé thé šhéét ·······]"
 
-#: crates/xods/src/view.rs:1022
+#: crates/xods/src/view.rs:1028
 msgid "Rename"
 msgstr "[Réñämé ···]"
 
-#: crates/xods/src/view.rs:1150
+#: crates/xods/src/view.rs:1159
 msgid "Sum: {sum}"
 msgstr "[Süm: {sum} ·····]"
 
-#: crates/xods/src/view.rs:1152
+#: crates/xods/src/view.rs:1161
 msgid "Average: {average}"
 msgstr "[Åvérägé: {average} ········]"
 
-#: crates/xods/src/view.rs:1157
+#: crates/xods/src/view.rs:1166
 msgid "Count: {count}"
 msgstr "[Cöüñt: {count} ······]"
 
-#: crates/xods/src/view.rs:2183
+#: crates/xods/src/view.rs:1979
+msgid ""
+"This formula could not be read. Put it right, or press Escape to leave the "
+"cell as it was."
+msgstr ""
+"[Thíš förmülä cöüld ñöt bé réäd. Püt ít ríght, ör préšš Éšcäpé tö léävé thé "
+"céll äš ít wäš. ·····································]"
+
+#: crates/xods/src/view.rs:2253
 msgid "There is nothing there to change."
 msgstr "[Théré íš ñöthíñg théré tö chäñgé. ··············]"
 
-#: crates/xods/src/view.rs:2184
+#: crates/xods/src/view.rs:2254
 msgid "A merged cell is in the way: this would cut through it."
 msgstr ""
 "[Å mérgéd céll íš íñ thé wäy: thíš wöüld cüt thröügh ít. "
 "·······················]"
 
-#: crates/xods/src/view.rs:2186
+#: crates/xods/src/view.rs:2256
 msgid "A formula holds [{reference}], which this version cannot read."
 msgstr ""
 "[Å förmülä höldš [{reference}], whích thíš véršíöñ cäññöt réäd. "
 "·························]"
 
-#: crates/xods/src/view.rs:2190
+#: crates/xods/src/view.rs:2260
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr ""
 "[Å förmülä pöíñtš ät [{reference}], whích wöüld bé délétéd. "
 "························]"
 
-#: crates/xods/src/view.rs:2193
+#: crates/xods/src/view.rs:2263
 msgid "Another sheet already has that name."
 msgstr "[Åñöthér šhéét älréädy häš thät ñämé. ···············]"
 
-#: crates/xods/src/view.rs:2195
+#: crates/xods/src/view.rs:2265
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
 msgstr ""
 "[Å šhéét'š ñämé cäññöt bé émpty ör höld [ ] * ? : / ör \\. "
 "·······················]"
 
-#: crates/xods/src/view.rs:2197
+#: crates/xods/src/view.rs:2267
 msgid "A workbook keeps at least one sheet to show."
 msgstr "[Å wörkböök kéépš ät léäšt öñé šhéét tö šhöw. ··················]"
 
-#: crates/xods/src/view.rs:2200
+#: crates/xods/src/view.rs:2270
 msgid "conditional formats"
 msgstr "[cöñdítíöñäl förmätš ········]"
 
-#: crates/xods/src/view.rs:2201
+#: crates/xods/src/view.rs:2271
 msgid "validations"
 msgstr "[välídätíöñš ·····]"
 
-#: crates/xods/src/view.rs:2202
+#: crates/xods/src/view.rs:2272
 msgid "database ranges"
 msgstr "[dätäbäšé räñgéš ·······]"
 
-#: crates/xods/src/view.rs:2203
+#: crates/xods/src/view.rs:2273
 msgid "pivot tables"
 msgstr "[pívöt täbléš ·····]"
 
-#: crates/xods/src/view.rs:2204
+#: crates/xods/src/view.rs:2274
 msgid "consolidations"
 msgstr "[cöñšölídätíöñš ······]"
 
-#: crates/xods/src/view.rs:2205
+#: crates/xods/src/view.rs:2275
 msgid "charts and objects"
 msgstr "[chärtš äñd öbjéctš ········]"
 
-#: crates/xods/src/view.rs:2206
+#: crates/xods/src/view.rs:2276
 msgid "print ranges"
 msgstr "[príñt räñgéš ·····]"
 
-#: crates/xods/src/view.rs:2207
+#: crates/xods/src/view.rs:2277
 msgid "shapes anchored to cells"
 msgstr "[šhäpéš äñchöréd tö céllš ··········]"
 
-#: crates/xods/src/view.rs:2210
+#: crates/xods/src/view.rs:2280
 msgid "This document has {what}, which this version cannot update to match."
 msgstr ""
 "[Thíš döcüméñt häš {what}, whích thíš véršíöñ cäññöt üpdäté tö mätch. "
 "····························]"
 
-#: crates/xods/src/view.rs:2220
-msgid "This cell holds a formula, which this version does not edit."
-msgstr ""
-"[Thíš céll höldš ä förmülä, whích thíš véršíöñ döéš ñöt édít. "
-"·························]"
-
-#: crates/xods/src/view.rs:2221
+#: crates/xods/src/view.rs:2290
 msgid "This cell is covered by the one that spans it."
 msgstr "[Thíš céll íš cövéréd by thé öñé thät špäñš ít. ···················]"
 
-#: crates/xods/src/view.rs:2225
+#: crates/xods/src/view.rs:2294
 msgid "There is no cell there."
 msgstr "[Théré íš ñö céll théré. ··········]"
 
-#: crates/xods/src/view.rs:2271
+#: crates/xods/src/view.rs:2340
 msgid "{whole}.{fraction}"
 msgstr "[{whole}.{fraction} ········]"
 

@@ -386,17 +386,14 @@ impl SheetDocument {
     ///
     /// # Errors
     ///
-    /// The cell is under a neighbour's span, holds a formula, or the sheet does
-    /// not exist.
+    /// The cell is under a neighbour's span, or the sheet does not exist.
     pub fn can_edit(&self, sheet: usize, row: usize, column: usize) -> Result<(), Refused> {
         let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
-        if let Some(cell) = self.cell(index, row, column) {
-            if cell.covered {
-                return Err(Refused::Covered);
-            }
-            if cell.formula().is_some() {
-                return Err(Refused::Formula);
-            }
+        if self
+            .cell(index, row, column)
+            .is_some_and(|cell| cell.covered)
+        {
+            return Err(Refused::Covered);
         }
         Ok(())
     }
@@ -412,8 +409,8 @@ impl SheetDocument {
     ///
     /// # Errors
     ///
-    /// The cell is under a neighbour's span, holds a formula, or the sheet does
-    /// not exist. Nothing is changed in any of those cases.
+    /// The cell is under a neighbour's span, or the sheet does not exist.
+    /// Nothing is changed in either case.
     pub fn set_cell(
         &mut self,
         sheet: usize,
@@ -449,6 +446,30 @@ impl SheetDocument {
         Ok(())
     }
 
+    /// Put a formula in a cell in place of what it held, as ODF stores it,
+    /// `of:=SUM([.A1:.A3])`, with no result until [`Self::recalculate`] is
+    /// given the cell.
+    ///
+    /// # Errors
+    ///
+    /// The cell is under a neighbour's span, or the sheet does not exist.
+    /// Nothing is changed in either case.
+    pub fn set_formula(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+        formula: &str,
+    ) -> Result<(), Refused> {
+        self.can_edit(sheet, row, column)?;
+        self.write_cell(sheet, row, column, &Value::Empty, "", Writing::Value)?;
+        let name = self.document.name(&Ns::Table, "formula");
+        self.cell_element(sheet, row, column)?
+            .set_attr(name, formula);
+        self.reindex();
+        Ok(())
+    }
+
     /// Write a value and the text it shows into a cell, by sheet, row and
     /// column, without asking whether the cell may be edited or indexing the
     /// sheet again after.
@@ -461,6 +482,22 @@ impl SheetDocument {
         text: &str,
         writing: Writing,
     ) -> Result<(), Refused> {
+        let names = CellNames::of(&self.document);
+        let calcext = self.document.declares(&Ns::Calcext);
+        let cell = self.cell_element(sheet, row, column)?;
+        write_value(cell, value, text, &names, calcext, writing);
+        Ok(())
+    }
+
+    /// A cell's element, by sheet, row and column, written into the tree
+    /// where the document has none and split out of a repeated run where it is
+    /// one of several.
+    fn cell_element(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+    ) -> Result<&mut Element, Refused> {
         let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
         let table_position = index.table;
         let range = index
@@ -469,8 +506,6 @@ impl SheetDocument {
         let rows_written = index.rows.last().map_or(0, |r| r.first + r.count);
 
         let names = CellNames::of(&self.document);
-        let calcext = self.document.declares(&Ns::Calcext);
-
         let table = self
             .document
             .content
@@ -481,9 +516,7 @@ impl SheetDocument {
 
         let row_element = reach_row(table, range.as_ref(), row, rows_written, &names)?;
         let cell_index = reach_cell(row_element, column, &names);
-        let cell = row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)?;
-        write_value(cell, value, text, &names, calcext, writing);
-        Ok(())
+        row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)
     }
 
     /// The name of the data style a cell is shown in: its own cell style's, or

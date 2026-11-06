@@ -11,6 +11,7 @@ use eframe::egui::{
 };
 use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
+use odox_core::formula;
 use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
@@ -1128,8 +1129,11 @@ impl SheetView {
             // A formula is what the cell says; the text is what it shows, and
             // both are worth seeing at once. A cell with no formula shows only
             // the text, which is all it has.
-            if let Some(formula) = cell.as_ref().and_then(odox_core::doc::Cell::formula) {
-                ui.monospace(format!("={formula}"));
+            let written = cell
+                .as_ref()
+                .and_then(|cell| cell.element.attr(&odox_core::Ns::Table, "formula"));
+            if let Some(written) = written {
+                ui.monospace(formula::to_typed(written));
                 ui.weak(text);
             } else {
                 ui.label(text);
@@ -1764,7 +1768,16 @@ impl SheetView {
             self.notice = Some(notice(&refused));
             return;
         }
-        let original = document.input_text(self.sheet, row, column);
+        let original = document
+            .sheets()
+            .get(self.sheet)
+            .and_then(|sheet| document.cell(sheet, row, column))
+            .and_then(|cell| {
+                cell.element
+                    .attr(&odox_core::Ns::Table, "formula")
+                    .map(formula::to_typed)
+            })
+            .unwrap_or_else(|| document.input_text(self.sheet, row, column));
         let text = typed.unwrap_or_else(|| original.clone());
         self.notice = None;
         self.editor = Some(CellEditor {
@@ -1785,15 +1798,14 @@ impl SheetView {
         let Outcome::Commit(step) = outcome else {
             return;
         };
-        if editor.text != editor.original {
-            self.write(
-                editor.row,
-                editor.column,
-                &self.document.as_ref().map_or(Value::Empty, |document| {
-                    document.read_input(self.sheet, editor.row, editor.column, &editor.text)
-                }),
-                editing,
-            );
+        if editor.text != editor.original
+            && !self.commit(editor.row, editor.column, &editor.text, editing)
+        {
+            self.editor = Some(CellEditor {
+                opened: true,
+                ..editor
+            });
+            return;
         }
         self.pick(match step {
             Step::Stay => (editor.row, editor.column),
@@ -1947,6 +1959,42 @@ impl SheetView {
             }
             Err(refused) => self.notice = Some(notice(&refused)),
         }
+    }
+
+    /// Write what was typed into a cell: a formula where it begins with `=`,
+    /// and otherwise a value read in the cell's format. Answers false for a
+    /// formula that cannot be read, which stays in the editor to be put right.
+    fn commit(&mut self, row: usize, column: usize, typed: &str, editing: &mut Editing) -> bool {
+        let Some(document) = &mut self.document else {
+            return true;
+        };
+        let typed_formula = typed.trim_start().starts_with('=') && typed.trim().len() > 1;
+        if !typed_formula {
+            let value = document.read_input(self.sheet, row, column, typed);
+            self.write(row, column, &value, editing);
+            return true;
+        }
+        let Ok(stored) = formula::to_stored(typed) else {
+            self.notice = Some(
+                t("This formula could not be read. Put it right, or press Escape to leave the cell as it was.")
+                    .to_owned(),
+            );
+            return false;
+        };
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
+            return true;
+        }
+        editing.record(&document.document.content);
+        match document.set_formula(self.sheet, row, column, &stored) {
+            Ok(()) => {
+                let done = document.recalculate(&[(self.sheet, row, column)]);
+                self.recalculated(done);
+                self.metrics = None;
+            }
+            Err(refused) => self.notice = Some(notice(&refused)),
+        }
+        true
     }
 
     /// Keep what a recalculation could not work out drawn faint, and draw what
@@ -2239,7 +2287,6 @@ fn blocked_notice(blocked: &Blocked) -> String {
 /// What the cell bar says about a cell that cannot be edited.
 fn notice(refused: &Refused) -> String {
     match refused {
-        Refused::Formula => t("This cell holds a formula, which this version does not edit."),
         Refused::Covered => t("This cell is covered by the one that spans it."),
         // A cell is never a range and is not formatted here, so a refusal
         // over structure or a namespace is not one a cell hears.
@@ -2452,7 +2499,7 @@ mod tests {
     }
 
     #[test]
-    fn a_paste_over_a_formula_writes_nothing() {
+    fn a_paste_over_a_formula_puts_the_value_in_its_place() {
         let (mut view, mut editing) = opened();
         let (row, column) = (1..5)
             .flat_map(|r| (0..6).map(move |c| (r, c)))
@@ -2464,11 +2511,14 @@ mod tests {
             })
             .expect("the sheet has a formula");
         view.pick((row, column - 1));
-        let before = text_at(&view, row, column - 1);
         view.paste("changed\tchanged\n", &mut editing);
-        assert_eq!(text_at(&view, row, column - 1), before);
-        assert!(!editing.modified());
-        assert!(view.notice.is_some());
+        assert_eq!(text_at(&view, row, column), "changed");
+        let document = view.document.as_ref().expect("open");
+        let cell = document
+            .cell(&document.sheets()[0], row, column)
+            .expect("cell");
+        assert!(cell.formula().is_none());
+        assert!(editing.can_undo(), "the paste was one step");
     }
 
     #[test]

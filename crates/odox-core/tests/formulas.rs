@@ -167,3 +167,51 @@ fn a_formula_that_reads_itself_is_circular() {
     let sheet = &document.sheets()[CALC];
     assert_eq!(document.cell(sheet, 0, 1).expect("cell").text(), "Err:522");
 }
+
+#[test]
+fn a_typed_formula_is_stored_and_worked_out_at_once() {
+    let mut document = fixture();
+    let stored = odox_core::formula::to_stored("=Data!B2+SUM(Data.C2:C3)").expect("readable");
+    document.set_formula(CALC, 0, 2, &stored).expect("set");
+    let done = document.recalculate(&[(CALC, 0, 2)]);
+    assert!(done.updated.contains(&(CALC, 0, 2)));
+    let sheet = &document.sheets()[CALC];
+    let cell = document.cell(sheet, 0, 2).expect("the cell");
+    assert_eq!(cell.value(), Value::Number(8.5));
+    assert_eq!(cell.text(), "8.5");
+    assert_eq!(
+        cell.element
+            .attr(&Ns::Table, "formula")
+            .map(odox_core::formula::to_typed)
+            .as_deref(),
+        Some("=$Data.B2+SUM($Data.C2:C3)")
+    );
+}
+
+#[test]
+fn a_typed_formula_outside_the_core_is_kept_and_stale() {
+    let mut document = fixture();
+    let stored = odox_core::formula::to_stored("=NPV(0.1;Data.B2:B4)").expect("readable");
+    document.set_formula(CALC, 0, 2, &stored).expect("set");
+    let done = document.recalculate(&[(CALC, 0, 2)]);
+    assert_eq!(done.stale, vec![(CALC, 0, 2)]);
+    let sheet = &document.sheets()[CALC];
+    assert_eq!(
+        document
+            .cell(sheet, 0, 2)
+            .expect("cell")
+            .element
+            .attr(&Ns::Table, "formula"),
+        Some("of:=NPV(0.1;[$Data.B2:.B4])")
+    );
+}
+
+#[test]
+fn a_value_typed_over_a_formula_reaches_what_read_it() {
+    let mut document = fixture();
+    document
+        .set_cell(CALC, 1, 1, &Value::Number(100.0))
+        .expect("set");
+    document.recalculate(&[(CALC, 1, 1)]);
+    assert_eq!(at(&document, "depends on a formula"), Value::Number(200.0));
+}

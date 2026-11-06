@@ -50,6 +50,7 @@ impl SheetDocument {
             .filter(|(_, formula)| formula.parsed.is_err())
             .map(|(place, _)| *place)
             .collect();
+        dirty.extend(changed.iter().filter(|place| formulas.contains_key(place)));
         let mut frontier: Vec<Place> = changed.to_vec();
         while let Some((sheet, row, column)) = frontier.pop() {
             for (place, formula) in &formulas {

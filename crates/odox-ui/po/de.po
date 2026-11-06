@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-05 20:56-0600\n"
+"POT-Creation-Date: 2026-11-05 21:35-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -114,7 +114,7 @@ msgid "Mark the rest as decoration"
 msgstr "Übrige als Schmuck markieren"
 
 #: crates/odox-ui/src/export.rs:374 crates/odox-ui/src/shell.rs:531
-#: crates/xods/src/view.rs:1025 crates/xodt/src/view.rs:547
+#: crates/xods/src/view.rs:1031 crates/xodt/src/view.rs:547
 msgid "Cancel"
 msgstr "Abbrechen"
 
@@ -469,7 +469,7 @@ msgstr "{cell}, leer"
 msgid "{cell}, {text}"
 msgstr "{cell}, {text}"
 
-#: crates/xods/src/view.rs:437 crates/xods/src/view.rs:2174
+#: crates/xods/src/view.rs:437 crates/xods/src/view.rs:2244
 msgid "Sheet{number}"
 msgstr "Tabelle{number}"
 
@@ -501,145 +501,148 @@ msgstr "Zellen verbinden"
 msgid "Unmerge cells"
 msgstr "Zellverbund aufheben"
 
-#: crates/xods/src/view.rs:644
+#: crates/xods/src/view.rs:648
 msgid "Freeze rows and columns"
 msgstr "Zeilen und Spalten fixieren"
 
-#: crates/xods/src/view.rs:646
+#: crates/xods/src/view.rs:650
 msgid "Unfreeze rows and columns"
 msgstr "Fixierung aufheben"
 
-#: crates/xods/src/view.rs:653
+#: crates/xods/src/view.rs:657
 msgid "Copy the sheet as tab-separated text"
 msgstr "Tabellenblatt als tabulatorgetrennten Text kopieren"
 
-#: crates/xods/src/view.rs:835
+#: crates/xods/src/view.rs:841
 msgid "A merged cell crosses the edge of the selection."
 msgstr "Eine verbundene Zelle reicht über den Rand der Auswahl hinaus."
 
-#: crates/xods/src/view.rs:915
+#: crates/xods/src/view.rs:921
 msgid "Add a sheet"
 msgstr "Blatt hinzufügen"
 
-#: crates/xods/src/view.rs:916
+#: crates/xods/src/view.rs:922
 msgid "Rename the sheet…"
 msgstr "Blatt umbenennen …"
 
-#: crates/xods/src/view.rs:917
+#: crates/xods/src/view.rs:923
 msgid "Delete the sheet"
 msgstr "Blatt löschen"
 
-#: crates/xods/src/view.rs:919
+#: crates/xods/src/view.rs:925
 msgid "Move the sheet left"
 msgstr "Blatt nach links verschieben"
 
-#: crates/xods/src/view.rs:924
+#: crates/xods/src/view.rs:930
 msgid "Move the sheet right"
 msgstr "Blatt nach rechts verschieben"
 
-#: crates/xods/src/view.rs:1006
+#: crates/xods/src/view.rs:1012
 msgid "Rename the sheet"
 msgstr "Blatt umbenennen"
 
-#: crates/xods/src/view.rs:1022
+#: crates/xods/src/view.rs:1028
 msgid "Rename"
 msgstr "Umbenennen"
 
-#: crates/xods/src/view.rs:1150
+#: crates/xods/src/view.rs:1159
 msgid "Sum: {sum}"
 msgstr "Summe: {sum}"
 
-#: crates/xods/src/view.rs:1152
+#: crates/xods/src/view.rs:1161
 msgid "Average: {average}"
 msgstr "Mittelwert: {average}"
 
-#: crates/xods/src/view.rs:1157
+#: crates/xods/src/view.rs:1166
 msgid "Count: {count}"
 msgstr "Anzahl: {count}"
 
-#: crates/xods/src/view.rs:2183
+#: crates/xods/src/view.rs:1979
+msgid ""
+"This formula could not be read. Put it right, or press Escape to leave the "
+"cell as it was."
+msgstr ""
+"Diese Formel konnte nicht gelesen werden. Berichtigen Sie sie, oder drücken "
+"Sie Esc, um die Zelle unverändert zu lassen."
+
+#: crates/xods/src/view.rs:2253
 msgid "There is nothing there to change."
 msgstr "Dort gibt es nichts zu ändern."
 
-#: crates/xods/src/view.rs:2184
+#: crates/xods/src/view.rs:2254
 msgid "A merged cell is in the way: this would cut through it."
 msgstr "Eine verbundene Zelle steht im Weg: Das würde sie zerschneiden."
 
-#: crates/xods/src/view.rs:2186
+#: crates/xods/src/view.rs:2256
 msgid "A formula holds [{reference}], which this version cannot read."
 msgstr ""
 "Eine Formel enthält [{reference}], und diese Version kann das nicht lesen."
 
-#: crates/xods/src/view.rs:2190
+#: crates/xods/src/view.rs:2260
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr "Eine Formel verweist auf [{reference}], das gelöscht würde."
 
-#: crates/xods/src/view.rs:2193
+#: crates/xods/src/view.rs:2263
 msgid "Another sheet already has that name."
 msgstr "Ein anderes Blatt hat bereits diesen Namen."
 
-#: crates/xods/src/view.rs:2195
+#: crates/xods/src/view.rs:2265
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
 msgstr ""
 "Der Name eines Blatts darf nicht leer sein und keines der Zeichen [ ] "
 "* ? : / oder \\ enthalten."
 
-#: crates/xods/src/view.rs:2197
+#: crates/xods/src/view.rs:2267
 msgid "A workbook keeps at least one sheet to show."
 msgstr "Ein Tabellendokument behält mindestens ein sichtbares Blatt."
 
-#: crates/xods/src/view.rs:2200
+#: crates/xods/src/view.rs:2270
 msgid "conditional formats"
 msgstr "bedingte Formatierungen"
 
-#: crates/xods/src/view.rs:2201
+#: crates/xods/src/view.rs:2271
 msgid "validations"
 msgstr "Gültigkeitsprüfungen"
 
-#: crates/xods/src/view.rs:2202
+#: crates/xods/src/view.rs:2272
 msgid "database ranges"
 msgstr "Datenbankbereiche"
 
-#: crates/xods/src/view.rs:2203
+#: crates/xods/src/view.rs:2273
 msgid "pivot tables"
 msgstr "Pivot-Tabellen"
 
-#: crates/xods/src/view.rs:2204
+#: crates/xods/src/view.rs:2274
 msgid "consolidations"
 msgstr "Konsolidierungen"
 
-#: crates/xods/src/view.rs:2205
+#: crates/xods/src/view.rs:2275
 msgid "charts and objects"
 msgstr "Diagramme und Objekte"
 
-#: crates/xods/src/view.rs:2206
+#: crates/xods/src/view.rs:2276
 msgid "print ranges"
 msgstr "Druckbereiche"
 
-#: crates/xods/src/view.rs:2207
+#: crates/xods/src/view.rs:2277
 msgid "shapes anchored to cells"
 msgstr "an Zellen verankerte Formen"
 
-#: crates/xods/src/view.rs:2210
+#: crates/xods/src/view.rs:2280
 msgid "This document has {what}, which this version cannot update to match."
 msgstr ""
 "Dieses Dokument enthält {what}, und diese Version kann das nicht "
 "entsprechend anpassen."
 
-#: crates/xods/src/view.rs:2220
-msgid "This cell holds a formula, which this version does not edit."
-msgstr ""
-"Diese Zelle enthält eine Formel; diese Version bearbeitet keine Formeln."
-
-#: crates/xods/src/view.rs:2221
+#: crates/xods/src/view.rs:2290
 msgid "This cell is covered by the one that spans it."
 msgstr "Diese Zelle wird von der Zelle verdeckt, die sich über sie erstreckt."
 
-#: crates/xods/src/view.rs:2225
+#: crates/xods/src/view.rs:2294
 msgid "There is no cell there."
 msgstr "Dort ist keine Zelle."
 
-#: crates/xods/src/view.rs:2271
+#: crates/xods/src/view.rs:2340
 msgid "{whole}.{fraction}"
 msgstr "{whole},{fraction}"
 
@@ -694,6 +697,10 @@ msgstr ""
 #: crates/xodt/src/view.rs:588
 msgid "The table could not be changed here."
 msgstr "Die Tabelle konnte hier nicht geändert werden."
+
+#~ msgid "This cell holds a formula, which this version does not edit."
+#~ msgstr ""
+#~ "Diese Zelle enthält eine Formel; diese Version bearbeitet keine Formeln."
 
 #~ msgid "or drop one on this window"
 #~ msgstr "oder eines auf dieses Fenster ziehen"
