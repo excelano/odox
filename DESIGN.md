@@ -377,6 +377,17 @@ cell styles, and a formula moves as a copy does, its relative references going
 with it, as `LibreOffice` and Excel sort unless asked otherwise. A sort across a
 merged cell is refused. Each sort is one step to undo.
 
+**A cell's comment is shown and written** (`sheet/comment.rs`). A commented
+cell has a small red corner; its comment, with who wrote it and on what day, is
+shown beside it while the pointer is over the cell, and beside the picked cell
+otherwise, and not while a cell is being typed in. Sheet > Comment… writes,
+changes or deletes the picked cell's comment, as one step to undo. A comment
+written here carries its text, its date in UTC, and as its author the full name
+the system keeps for the user, or their login; it says nothing of the box it is
+drawn in, which `LibreOffice` places itself, and a comment changed here keeps the
+box and the display setting it had. A value typed into a commented cell keeps
+the comment, and a sort moves each comment with its row.
+
 **A change works out again every formula that reads it** (`odox-core`'s
 `formula` module and `sheet/recalc.rs`). A document's own results are trusted
 when it opens; when a value changes, every formula that reads the cell, on any

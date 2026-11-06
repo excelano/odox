@@ -103,3 +103,22 @@ fn the_block_around_a_cell_is_found() {
     let document = table();
     assert_eq!(document.region(0, 2, 1), block());
 }
+
+#[test]
+fn a_comment_moves_with_its_row() {
+    let mut document = table();
+    document
+        .set_comment(0, 2, 0, Some("ripe"), None, "2026-11-06T01:00:00")
+        .expect("comment");
+    document.sort(0, block(), 0, false, true).expect("sorted");
+    let sheet = &document.sheets()[0];
+    let noted: Vec<String> = (1..5)
+        .filter(|&row| {
+            document
+                .cell(sheet, row, 0)
+                .is_some_and(|c| c.comment().is_some())
+        })
+        .map(|row| document.cell(sheet, row, 0).expect("cell").text())
+        .collect();
+    assert_eq!(noted, ["apple"]);
+}

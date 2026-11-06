@@ -52,6 +52,8 @@ pub struct SheetView {
     renaming: Option<Renaming>,
     /// How a block is to be sorted, while the question is up.
     sorting: Option<Sorting>,
+    /// The comment being written, while the question is up.
+    commenting: Option<Commenting>,
     /// How many rows the grid last showed, which is how far Page Up and Page
     /// Down go.
     page_rows: usize,
@@ -228,6 +230,21 @@ impl Paint<'_> {
 
         if let Some(cell) = cell.filter(|cell| !cell.covered) {
             self.text(ui, painter, rect, &cell, &style, (row, column));
+            // A comment is marked by a small red corner, as every
+            // spreadsheet marks one.
+            if cell
+                .element
+                .child(&odox_core::Ns::Office, "annotation")
+                .is_some()
+            {
+                let size = (6.0 * zoom).max(4.0);
+                let corner = rect.right_top();
+                painter.add(egui::Shape::convex_polygon(
+                    vec![corner, corner - vec2(size, 0.0), corner + vec2(0.0, size)],
+                    egui::Color32::from_rgb(0xd0, 0x20, 0x20),
+                    Stroke::NONE,
+                ));
+            }
         }
     }
 
@@ -368,6 +385,7 @@ enum SheetCommand {
     FillDown,
     FillRight,
     Sort,
+    Comment,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -381,6 +399,22 @@ enum BookCommand {
 }
 
 /// A sheet's new name, as it is typed.
+/// What the Comment question was answered with.
+enum Said {
+    Save(String),
+    Delete,
+    Cancel,
+}
+
+/// A comment being written on a cell, and whether the cell had one.
+struct Commenting {
+    row: usize,
+    column: usize,
+    text: String,
+    had: bool,
+    opened: bool,
+}
+
 /// The Sort question's answers so far.
 struct Sorting {
     block: Block,
@@ -545,6 +579,7 @@ impl View for SheetView {
                 (t("Fill down"), SheetCommand::FillDown),
                 (t("Fill right"), SheetCommand::FillRight),
                 (t("Sort…"), SheetCommand::Sort),
+                (t("Comment…"), SheetCommand::Comment),
             ];
             for group in [&entries[..], &shown[..], &merged[..], &fills[..]] {
                 for &(name, command) in group {
@@ -640,6 +675,7 @@ impl View for SheetView {
         }
         self.rename_question(ui.ctx(), editing);
         self.sort_question(ui.ctx(), editing);
+        self.comment_question(ui.ctx(), editing);
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -737,6 +773,10 @@ impl SheetView {
             }
             SheetCommand::Sort => {
                 self.ask_sort();
+                return;
+            }
+            SheetCommand::Comment => {
+                self.ask_comment();
                 return;
             }
         };
@@ -1083,6 +1123,103 @@ impl SheetView {
             }
             Some(false) => self.renaming = None,
             None => {}
+        }
+    }
+
+    /// Put the Comment question up for the picked cell, with its comment.
+    fn ask_comment(&mut self) {
+        let Some(document) = &self.document else {
+            return;
+        };
+        let (row, column) = self.selected;
+        if let Err(refused) = document.can_edit(self.sheet, row, column) {
+            self.notice = Some(notice(&refused));
+            return;
+        }
+        let comment = document
+            .sheets()
+            .get(self.sheet)
+            .and_then(|sheet| document.cell(sheet, row, column))
+            .and_then(|cell| cell.comment());
+        self.commenting = Some(Commenting {
+            row,
+            column,
+            had: comment.is_some(),
+            text: comment.map(|c| c.text).unwrap_or_default(),
+            opened: true,
+        });
+    }
+
+    /// The Comment question: the comment's text, to save or to delete.
+    fn comment_question(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let Some(commenting) = &mut self.commenting else {
+            return;
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("comment")).show(ctx, |ui| {
+            ui.heading(fill(
+                t("Comment on {cell}"),
+                &[("cell", &address(commenting.row, commenting.column))],
+            ));
+            let response = ui.add(
+                egui::TextEdit::multiline(&mut commenting.text)
+                    .id(egui::Id::unique("comment-text"))
+                    .desired_rows(4)
+                    .desired_width(320.0),
+            );
+            if std::mem::take(&mut commenting.opened) {
+                response.request_focus();
+            }
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                let written = !commenting.text.trim().is_empty();
+                if ui
+                    .add_enabled(written, egui::Button::new(t("Save")))
+                    .clicked()
+                {
+                    answer = Some(Said::Save(commenting.text.trim_end().to_owned()));
+                }
+                if commenting.had && ui.button(t("Delete")).clicked() {
+                    answer = Some(Said::Delete);
+                }
+                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                    answer = Some(Said::Cancel);
+                }
+            });
+        });
+        let Some(answer) = answer else {
+            return;
+        };
+        let Some(Commenting { row, column, .. }) = self.commenting.take() else {
+            return;
+        };
+        let text = match answer {
+            Said::Save(text) => Some(text),
+            Said::Delete => None,
+            Said::Cancel => return,
+        };
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        let date = odox_core::doc::Comment::date_of(now);
+        match document.set_comment(
+            self.sheet,
+            row,
+            column,
+            text.as_deref(),
+            author().as_deref(),
+            &date,
+        ) {
+            Ok(()) => editing.record_snapshot(before, None),
+            Err(refused) => {
+                document.document.content = before;
+                document.reindex();
+                self.notice = Some(notice(&refused));
+            }
         }
     }
 
@@ -1878,6 +2015,50 @@ impl SheetView {
                         }
                     }
                 }
+
+                // A comment beside its cell: the one under the pointer, or
+                // else the picked cell's, while no cell is being typed in.
+                let hovered = ui
+                    .input(|input| input.pointer.hover_pos())
+                    .filter(|at| visible.contains(*at))
+                    .and_then(cell_at);
+                let commented = |(row, column): (usize, usize)| {
+                    document
+                        .cell(sheet, row, column)
+                        .and_then(|cell| cell.comment())
+                        .map(|comment| ((row, column), comment))
+                };
+                let shown = hovered.and_then(commented).or_else(|| commented(selected));
+                if editor.is_none()
+                    && let Some(((row, column), comment)) = shown
+                {
+                    let corner =
+                        place.at(metrics, row, column) + vec2(metrics.column(column).1 + 4.0, 0.0);
+                    egui::Area::new(egui::Id::unique("cell-comment"))
+                        .order(egui::Order::Tooltip)
+                        .fixed_pos(corner)
+                        .interactable(false)
+                        .show(ui.ctx(), |ui| {
+                            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                                ui.set_max_width(260.0);
+                                let said = match (&comment.author, &comment.date) {
+                                    (Some(author), Some(date)) => Some(format!(
+                                        "{author}, {}",
+                                        date.get(..10).unwrap_or(date)
+                                    )),
+                                    (Some(author), None) => Some(author.clone()),
+                                    (None, Some(date)) => {
+                                        Some(date.get(..10).unwrap_or(date).to_owned())
+                                    }
+                                    (None, None) => None,
+                                };
+                                if let Some(said) = said {
+                                    ui.weak(said);
+                                }
+                                ui.label(&comment.text);
+                            });
+                        });
+                }
             });
 
         self.page_rows = page_rows;
@@ -1946,6 +2127,7 @@ impl SheetView {
             || editing.asking
             || self.renaming.is_some()
             || self.sorting.is_some()
+            || self.commenting.is_some()
         {
             return;
         }
@@ -2758,6 +2940,34 @@ fn matches_in(document: &SheetDocument, query: &str) -> Vec<Match> {
         }
     }
     found
+}
+
+/// The name a new comment is signed with: the user's full name where the
+/// system keeps one, and otherwise their login.
+fn author() -> Option<String> {
+    let login = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .ok()
+        .filter(|login| !login.is_empty())?;
+    let full = std::fs::read_to_string("/etc/passwd")
+        .ok()
+        .and_then(|passwd| {
+            passwd.lines().find_map(|line| {
+                let fields: Vec<&str> = line.split(':').collect();
+                (fields.first() == Some(&login.as_str()))
+                    .then(|| {
+                        fields
+                            .get(4)?
+                            .split(',')
+                            .next()
+                            .map(str::trim)
+                            .map(ToOwned::to_owned)
+                    })
+                    .flatten()
+                    .filter(|name| !name.is_empty())
+            })
+        });
+    Some(full.unwrap_or(login))
 }
 
 #[cfg(test)]

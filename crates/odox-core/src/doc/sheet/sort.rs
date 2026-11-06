@@ -3,7 +3,7 @@
 //! The order is a spreadsheet's: numbers, dates and times first, then text by
 //! its letters whatever their case, the whole reversed for a descending sort,
 //! and empty cells last whichever way it goes; rows that tie keep their order. A row's cells move
-//! together, each with its cell style, and a formula moves as a copy does, its
+//! together, each with its cell style and its comment, and a formula moves as a copy does, its
 //! relative references going with it, which is what `LibreOffice` and Excel do
 //! unless asked otherwise. Formulas elsewhere that read the sorted cells go on
 //! reading the same cells.
@@ -61,6 +61,13 @@ impl SheetDocument {
                     .collect()
             })
             .collect();
+        let notes: Vec<Vec<_>> = (first..=block.bottom)
+            .map(|row| {
+                (block.left..=block.right)
+                    .map(|c| self.note(sheet, row, c))
+                    .collect()
+            })
+            .collect();
         let key = column - block.left;
         let mut order: Vec<usize> = (0..rows.len()).collect();
         order.sort_by(|&a, &b| ordered(&rows[a][key].value, &rows[b][key].value, descending));
@@ -70,9 +77,10 @@ impl SheetDocument {
         let mut written = Vec::new();
         for (at, from) in order.into_iter().enumerate() {
             let row = first + at;
-            for source in &rows[from] {
+            for (source, note) in rows[from].iter().zip(&notes[from]) {
                 let c = source.column;
                 self.set_style_name(sheet, row, c, source.style.as_deref())?;
+                self.put_note(sheet, row, c, note.clone())?;
                 match &source.formula {
                     Some(stored) => {
                         let moved = formula::shifted(stored, offset(row, source.row), 0);
