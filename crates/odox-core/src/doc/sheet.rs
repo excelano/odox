@@ -18,6 +18,7 @@ mod recalc;
 mod restructure;
 mod sheets;
 mod size;
+mod sort;
 pub use fill::Block;
 pub use freeze::Frozen;
 pub use merge::Merged;

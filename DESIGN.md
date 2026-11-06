@@ -365,6 +365,18 @@ absolute ones kept, one moved off the sheet's edge becoming `#REF!`, and every
 cell takes its source's cell style. A fill over a merged cell is refused. Each
 fill is one step to undo, and what reads the cells it wrote is worked out again.
 
+**A block's rows are sorted by one of its columns** (`sheet/sort.rs`). Sheet >
+Sort… asks which column, ascending or descending, and whether the first row is
+a header, guessed where it is all text above a row holding a number or a date.
+The block is the selection, or, where the selection is one cell, the filled
+cells around it as far as no wholly empty row or column parts them. Numbers,
+dates and times come before text, which goes by its letters whatever their
+case, the order reversed for a descending sort, and empty cells go last either
+way; rows that tie keep their order. A row's cells move together with their
+cell styles, and a formula moves as a copy does, its relative references going
+with it, as `LibreOffice` and Excel sort unless asked otherwise. A sort across a
+merged cell is refused. Each sort is one step to undo.
+
 **A change works out again every formula that reads it** (`odox-core`'s
 `formula` module and `sheet/recalc.rs`). A document's own results are trusted
 when it opens; when a value changes, every formula that reads the cell, on any
