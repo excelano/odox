@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.10.1"
+version = "0.11.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Security release: the ZIP library Odox Text opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
+whats-new = "Documents open fitted to the width of the window, and 100% now shows a page at its printed size. Ctrl with the mouse wheel zooms and keeps your place in the document. The outline starts hidden; View > Show the side panel brings it back."
 
 [products.xodt.locales.de-de]
-whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Text Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
+whats-new = "Dokumente öffnen sich an die Fensterbreite angepasst, und 100 % zeigt eine Seite jetzt in Druckgröße. Strg mit dem Mausrad zoomt und behält dabei die Stelle im Dokument bei. Die Gliederung ist anfangs ausgeblendet; Ansicht > Seitenleiste anzeigen blendet sie wieder ein."
 
 [products.xods.locales.en-us]
-whats-new = "Security release: the ZIP library Odox Grid opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
+whats-new = "100% now shows a sheet at its printed size, and Ctrl with the mouse wheel zooms."
 
 [products.xods.locales.de-de]
-whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Grid Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
+whats-new = "100 % zeigt eine Tabelle jetzt in Druckgröße, und Strg mit dem Mausrad zoomt."
 
 [products.xodp.locales.en-us]
-whats-new = "Security release: the ZIP library Odox Deck opens and saves documents with moves to 9.1, closing a critical and several high-severity flaws in archive reading."
+whats-new = "Presentations open fitted to the window, and 100% now shows a slide at its printed size. Ctrl with the mouse wheel zooms; View > Fit to the window fits it again."
 
 [products.xodp.locales.de-de]
-whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Odox Deck Dokumente öffnet und speichert, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven."
+whats-new = "Präsentationen öffnen sich an das Fenster angepasst, und 100 % zeigt eine Folie jetzt in Druckgröße. Strg mit dem Mausrad zoomt; Ansicht > An das Fenster anpassen passt sie wieder an."
