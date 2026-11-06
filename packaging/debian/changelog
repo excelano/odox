@@ -1,3 +1,17 @@
+odox (0.13.0) unstable; urgency=low
+
+  * Release notes: plain apostrophe
+  * Release notes for 0.13.0
+  * xodt lays a tab out to the paragraph's tab stops, left, right, centre and decimal, with leaders, and to the default stops past them (closes #75)
+  * xods shows a cell's comment beside it and writes, changes and deletes one from Sheet > Comment…, and a sort moves comments with their rows (closes #62)
+  * xods sorts a block's rows by one column from Sheet > Sort…, a header kept in place and formulas moving with their rows (closes #59)
+  * Table cells drawn with their side padding, a number format's colour drawn in xods and its PDF, and booleans against the right edge (closes #85, closes #86, closes #87)
+  * xods fills down and across from the selection, with Ctrl+D, the Sheet menu and a handle that continues a series, and a formula typed past the written rows lands in its own row (closes #61)
+  * xods takes formulas typed with = and shows a formula as it is typed, and a value takes a formula's place (closes #56)
+  * xods works out again every formula a changed cell reaches, with a core of OpenFormula measured against LibreOffice (#56, phase one)
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 06 Nov 2026 07:14:39 -0600
+
 odox (0.12.0) unstable; urgency=low
 
   * Release notes for 0.12.0: Page up and down, tables in xodt, number formats and sheet keys in xods, export off the window's thread, File > New on macOS
