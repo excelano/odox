@@ -446,7 +446,7 @@ impl DataStyle {
                 _ => {}
             }
         }
-        if !shown_number {
+        if !shown_number && !self.parts.iter().any(|part| matches!(part, Part::Text(_))) {
             out.push_str(&number(
                 magnitude,
                 &Digits {
@@ -459,7 +459,7 @@ impl DataStyle {
                 group,
             ));
         }
-        if signed && magnitude != 0.0 {
+        if signed && out.chars().any(|c| c.is_ascii_digit() && c != '0') {
             out.insert(0, '-');
         }
         out
@@ -820,6 +820,7 @@ fn separators(language: Option<&str>) -> (char, Option<&'static str>) {
 
 fn number(x: f64, digits: &Digits, decimal: char, group: Option<&str>) -> String {
     let written = if let Some(places) = digits.decimals {
+        let x = half_away(x, places);
         let fixed = format!("{x:.places$}");
         match fixed.split_once('.') {
             Some((whole, fraction)) => {
@@ -861,6 +862,18 @@ fn number(x: f64, digits: &Digits, decimal: char, group: Option<&str>) -> String
     } else {
         format!("{whole}{decimal}{fraction}")
     }
+}
+
+/// A number rounded to `places` decimals with a half going away from zero,
+/// as a spreadsheet shows it, after it is taken to the fifteen significant
+/// digits it is written with: `1.005` to two places is `1.01`.
+fn half_away(x: f64, places: usize) -> f64 {
+    let factor = 10f64.powi(i32::try_from(places).unwrap_or(i32::MAX));
+    let scaled = x * factor;
+    if !scaled.is_finite() {
+        return x;
+    }
+    crate::formula::approx(scaled).round() / factor
 }
 
 fn grouped(whole: &str, separator: &str) -> String {

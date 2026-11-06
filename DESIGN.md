@@ -449,8 +449,8 @@ takes its place, as it does when typed. Emptying a
 range leaves cells the document never wrote unwritten.
 
 **A cell's text is cut at the cell's edge.** It is drawn on one line, at the
-top, middle or bottom of the cell as its style says and at the top where it
-says nothing, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
+top, middle or bottom of the cell as its style says and at the bottom where it
+says nothing, as `LibreOffice` puts it, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
 inside the cell's width with each line aligned as the cell is. Either way what
 does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one

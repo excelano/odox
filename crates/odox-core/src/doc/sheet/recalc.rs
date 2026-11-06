@@ -206,6 +206,14 @@ impl SheetDocument {
         let held = self
             .cell(index, row, column)
             .map_or(Value::Empty, |cell| cell.value());
+        let unsigned;
+        let result = match result {
+            formula::Value::Number(n) => {
+                unsigned = formula::Value::Number(*n + 0.0);
+                &unsigned
+            }
+            other => other,
+        };
         let (value, writing) = match result {
             formula::Value::Empty => (Value::Number(0.0), Writing::Result),
             formula::Value::Number(n) => (
@@ -247,9 +255,29 @@ struct Book<'a> {
     visiting: RefCell<HashSet<Place>>,
 }
 
+impl SheetDocument {
+    /// One of the workbook's calculation settings, as written.
+    fn calculation_setting(&self, local: &str) -> Option<&str> {
+        self.document
+            .content
+            .child(&crate::Ns::Office, "body")
+            .and_then(|body| body.child(&crate::Ns::Office, "spreadsheet"))
+            .and_then(|sheet| sheet.child(&crate::Ns::Table, "calculation-settings"))
+            .and_then(|settings| settings.attr(&crate::Ns::Table, local))
+    }
+}
+
 impl Cells for Book<'_> {
     fn sheet(&self, name: &str) -> Option<usize> {
         self.document.sheet_index(name)
+    }
+
+    fn wildcards(&self) -> bool {
+        self.document.calculation_setting("use-wildcards") == Some("true")
+    }
+
+    fn case_sensitive(&self) -> bool {
+        self.document.calculation_setting("case-sensitive") != Some("false")
     }
 
     fn value(

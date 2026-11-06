@@ -68,23 +68,46 @@ fn moved_cell(cell: &str, rows: isize, columns: isize) -> Option<String> {
     let rest = cell.trim_start_matches('$');
     let letters: String = rest.chars().take_while(char::is_ascii_alphabetic).collect();
     let rest = &rest[letters.len()..];
-    let fixed_row = rest.starts_with('$');
-    let number: isize = rest.trim_start_matches('$').parse().ok()?;
-    let index = letters.bytes().try_fold(0isize, |n, b| {
-        Some(n * 26 + isize::from(b.to_ascii_uppercase() - b'A') + 1)
-    })?;
-    let column = if fixed_column { index } else { index + columns };
-    let row = if fixed_row { number } else { number + rows };
-    if column < 1 || row < 1 {
+    let (fixed_column, fixed_row) = if letters.is_empty() {
+        (false, fixed_column)
+    } else {
+        (fixed_column, rest.starts_with('$'))
+    };
+    let digits = rest.trim_start_matches('$');
+    let number: Option<isize> = if digits.is_empty() {
+        None
+    } else {
+        Some(digits.parse().ok()?)
+    };
+    let index = if letters.is_empty() {
+        None
+    } else {
+        Some(letters.bytes().try_fold(0isize, |n, b| {
+            Some(n * 26 + isize::from(b.to_ascii_uppercase() - b'A') + 1)
+        })?)
+    };
+    if index.is_none() && number.is_none() {
         return None;
     }
-    Some(format!(
-        "{}{}{}{}",
-        if fixed_column { "$" } else { "" },
-        letters_of(column),
-        if fixed_row { "$" } else { "" },
-        row
-    ))
+    let column = index.map(|index| if fixed_column { index } else { index + columns });
+    let row = number.map(|number| if fixed_row { number } else { number + rows });
+    if column.is_some_and(|c| c < 1) || row.is_some_and(|r| r < 1) {
+        return None;
+    }
+    let mut out = String::new();
+    if let Some(column) = column {
+        if fixed_column {
+            out.push('$');
+        }
+        out.push_str(&letters_of(column));
+    }
+    if let Some(row) = row {
+        if fixed_row {
+            out.push('$');
+        }
+        out.push_str(&row.to_string());
+    }
+    Some(out)
 }
 
 fn letters_of(mut column: isize) -> String {
@@ -103,6 +126,9 @@ mod tests {
 
     #[test]
     fn relative_references_move_and_absolute_ones_stay() {
+        assert_eq!(shifted("of:=SUM([.B:.B])", 3, 0), "of:=SUM([.B:.B])");
+        assert_eq!(shifted("of:=SUM([.B:.$C])", 0, 1), "of:=SUM([.C:.$C])");
+        assert_eq!(shifted("of:=SUM([.2:.$4])", 1, 0), "of:=SUM([.3:.$4])");
         assert_eq!(shifted("of:=[.A1]*[.$B$1]", 1, 0), "of:=[.A2]*[.$B$1]");
         assert_eq!(shifted("of:=SUM([.A1:.B2])", 0, 2), "of:=SUM([.C1:.D2])");
         assert_eq!(

@@ -145,11 +145,14 @@ impl SheetDocument {
                             .and_then(|c| c.default_cell_style.as_deref())
                     })
                     .map(ToOwned::to_owned);
+                let (across, down) = cell
+                    .as_ref()
+                    .map_or((1, 1), |c| (c.columns_spanned(), c.rows_spanned()));
                 let edges = [
                     column == block.left,
-                    column == block.right,
+                    column + across > block.right,
                     row == block.top,
-                    row == block.bottom,
+                    row + down > block.bottom,
                 ];
                 let name = if let Some(name) = made.get(&(had.clone(), edges)) {
                     name.clone()
