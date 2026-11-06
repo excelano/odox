@@ -47,6 +47,15 @@ pub fn to_stored(typed: &str) -> Result<String, Unsupported> {
         } else if c == ',' || c == ';' {
             out.push(';');
             i += 1;
+        } else if matches!(c, 'e' | 'E')
+            && i > 0
+            && (chars[i - 1].is_ascii_digit() || chars[i - 1] == '.')
+            && chars
+                .get(i + 1)
+                .is_some_and(|n| n.is_ascii_digit() || *n == '+' || *n == '-')
+        {
+            out.push('E');
+            i += 1;
         } else if let Some((reference, length)) = reference_at(&chars[i..]) {
             out.push_str(&reference);
             i += length;
@@ -63,6 +72,10 @@ pub fn to_stored(typed: &str) -> Result<String, Unsupported> {
                 "TRUE" | "FALSE" if !called => {
                     out.push_str(&name);
                     out.push_str("()");
+                }
+                "CONCAT" if called => {
+                    out.push_str(super::eval::MICROSOFT);
+                    out.push_str(&name);
                 }
                 _ if called => out.push_str(&name),
                 _ => return Err(Unsupported),
@@ -111,7 +124,7 @@ pub fn to_typed(stored: &str) -> String {
             _ => out.push(c),
         }
     }
-    out
+    out.replace(super::eval::MICROSOFT, "")
 }
 
 /// The inside of a stored reference as a person reads it: the dot before a
@@ -262,6 +275,8 @@ mod tests {
             ("='My sheet'.A1&\"x, y\"", "of:=[$'My sheet'.A1]&\"x, y\""),
             ("=IF(A1>2;TRUE;FALSE)", "of:=IF([.A1]>2;TRUE();FALSE())"),
             ("=LOG10(100)", "of:=LOG10(100)"),
+            ("=1E5+2.5e-3", "of:=1E5+2.5E-3"),
+            ("=concat(A1;\"x\")", "of:=COM.MICROSOFT.CONCAT([.A1];\"x\")"),
         ] {
             assert_eq!(to_stored(typed).as_deref(), Ok(expected), "{typed}");
         }
@@ -281,6 +296,7 @@ mod tests {
             ("of:=[$Data.B2:.B6]", "=$Data.B2:B6"),
             ("of:=[.C2]/SUM([.$C$2:.$C$4])", "=C2/SUM($C$2:$C$4)"),
             ("of:=\"[.A1]\"&[.A1]", "=\"[.A1]\"&A1"),
+            ("of:=COM.MICROSOFT.CONCAT([.A1];\"x\")", "=CONCAT(A1;\"x\")"),
         ] {
             assert_eq!(to_typed(written), expected);
             assert_eq!(

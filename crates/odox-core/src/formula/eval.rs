@@ -7,6 +7,10 @@ use std::cmp::Ordering;
 
 use super::{Error, Expr, Op, Reference, Unsupported, Value};
 
+/// The prefix ODF writes before a function Excel added and `OpenFormula`
+/// names no other way, `COM.MICROSOFT.CONCAT`.
+pub(crate) const MICROSOFT: &str = "COM.MICROSOFT.";
+
 /// Where a formula reads the cells it refers to.
 pub trait Cells {
     /// A sheet's index by its name.
@@ -119,6 +123,7 @@ impl Context<'_> {
 
     #[allow(clippy::too_many_lines)]
     fn call(&self, name: &str, args: &[Expr]) -> Result<Value, Unsupported> {
+        let name = name.strip_prefix(MICROSOFT).unwrap_or(name);
         let count = |low: usize, high: usize| {
             if (low..=high).contains(&args.len()) {
                 Ok(())
@@ -748,7 +753,8 @@ pub(crate) fn serial(year: i64, month: i64, day: i64) -> f64 {
 /// The date a count of days from 30 December 1899 falls on.
 #[allow(clippy::cast_possible_truncation)]
 pub(crate) fn civil(serial: f64) -> (i64, i64, i64) {
-    civil_from_days(serial.floor() as i64 + days_from_civil(1899, 12, 30))
+    let serial = if serial.is_finite() { serial } else { 0.0 };
+    civil_from_days(serial.clamp(-1e9, 1e9).floor() as i64 + days_from_civil(1899, 12, 30))
 }
 
 /// Days since 1 January 1970, by Howard Hinnant's method.

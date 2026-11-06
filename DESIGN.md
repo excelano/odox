@@ -389,7 +389,7 @@ cell has a small red corner; its comment, with who wrote it and on what day, is
 shown beside it while the pointer is over the cell, and beside the picked cell
 otherwise, and not while a cell is being typed in. Sheet > Comment… writes,
 changes or deletes the picked cell's comment, as one step to undo. A comment
-written here carries its text, its date in UTC, and as its author the full name
+written here carries its text, its date in the computer's local time, which is how `LibreOffice` reads it, and as its author the full name
 the system keeps for the user, or their login; it says nothing of the box it is
 drawn in, which `LibreOffice` places itself, and a comment changed here keeps the
 box and the display setting it had. A value typed into a commented cell keeps

@@ -874,7 +874,13 @@ impl<V: View> Shell<V> {
                     self.view.show_match(0);
                 }
             } else {
+                if self.find.moved && self.find.current >= self.find.count {
+                    self.find.current = 0;
+                }
                 self.find.current = self.find.current.min(self.find.count.saturating_sub(1));
+                if std::mem::take(&mut self.find.moved) && self.find.count > 0 {
+                    self.view.show_match(self.find.current);
+                }
             }
         }
         if let Some(step) = pressed.step {
@@ -890,13 +896,9 @@ impl<V: View> Shell<V> {
         let done = self
             .view
             .replace(&with, which == Replace::All, &mut self.editing);
-        // A replacement that still matches the query is the match it replaced,
-        // so the next one is the one after.
-        if which == Replace::One
-            && done.replaced > 0
-            && !crate::find::ranges(&with, self.find.query()).is_empty()
-        {
-            self.find.current += 1;
+        if which == Replace::One && done.replaced > 0 {
+            self.find.current += crate::find::ranges(&with, self.find.query()).len();
+            self.find.moved = true;
         }
         let replaced = done.replaced.to_string();
         self.find.say(if done.skipped == 0 {

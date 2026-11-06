@@ -65,6 +65,9 @@ pub struct FindBar {
     pub(crate) current: usize,
     /// The view holds a search it has not been told to forget.
     pub(crate) searching: bool,
+    /// A replace moved the current match, and the view is to be shown it once
+    /// the matches are counted again.
+    pub(crate) moved: bool,
 }
 
 impl FindBar {

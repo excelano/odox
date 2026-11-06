@@ -86,7 +86,7 @@ impl SheetDocument {
                         let moved = formula::shifted(stored, offset(row, source.row), 0);
                         self.set_formula(sheet, row, c, &moved)?;
                     }
-                    None => self.set_cell(sheet, row, c, &source.value)?,
+                    None => self.copy_value(sheet, row, c, source)?,
                 }
                 written.push((sheet, row, c));
             }

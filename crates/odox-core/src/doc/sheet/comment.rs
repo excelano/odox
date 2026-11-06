@@ -24,24 +24,6 @@ pub struct Comment {
     pub text: String,
 }
 
-impl Comment {
-    /// A moment, in seconds since 1970 began in UTC, as a comment's date is
-    /// written: `2026-11-06T01:00:00`.
-    pub fn date_of(seconds: u64) -> String {
-        let days = i64::try_from(seconds / 86_400).unwrap_or(0);
-        let (year, month, day) = crate::formula::eval_civil(
-            crate::formula::eval_serial(1970, 1, 1) + f64::from(u32::try_from(days).unwrap_or(0)),
-        );
-        let rest = seconds % 86_400;
-        format!(
-            "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}",
-            rest / 3600,
-            rest / 60 % 60,
-            rest % 60
-        )
-    }
-}
-
 impl Cell<'_> {
     /// The cell's comment, if it has one.
     pub fn comment(&self) -> Option<Comment> {

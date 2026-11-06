@@ -497,6 +497,18 @@ impl Sheets<'_, '_, '_> {
             .map(|line| text::width(text, &glyphs, line))
             .fold(0.0_f32, f32::max);
         let padding = PADDING * share;
+        let room = width - padding * 2.0;
+        if right && style.cell.wrap != Some(true) && natural > room && !text.starts_with('#') {
+            let hash = Paragraph::plain("#", &run);
+            let hash: f32 = text::shape(&hash, self.layout.faces)?
+                .iter()
+                .map(|g| g.advance)
+                .sum();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let count = (room / hash.max(0.1)).floor().max(1.0) as usize;
+            let place = (x, y, width, height);
+            return self.text(&"#".repeat(count), style, right, place, share, parent);
+        }
         if style.cell.wrap == Some(true) {
             // Wrapped inside the column, each line aligned the way the cell is.
             let mut paragraph = paragraph;

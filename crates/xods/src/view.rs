@@ -299,14 +299,25 @@ impl Paint<'_> {
         };
         let padding = 3.0 * zoom;
         let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
-        let mut job = egui::text::LayoutJob::single_section(text, format.clone());
-        if style.cell.wrap == Some(true) {
-            job.wrap.max_width = (rect.width() - padding * 2.0).max(1.0);
-            job.halign = align;
-        }
-        let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
-        let size = galley.rect.size();
         let wrapped = style.cell.wrap == Some(true);
+        let room = (rect.width() - padding * 2.0).max(1.0);
+        let lay = |text: String| {
+            let mut job = egui::text::LayoutJob::single_section(text, format.clone());
+            if wrapped {
+                job.wrap.max_width = room;
+                job.halign = align;
+            }
+            ui.fonts_mut(|fonts| fonts.layout_job(job))
+        };
+        let mut galley = lay(text);
+        let figure = !matches!(cell.value(), Value::Text(_) | Value::Empty);
+        if figure && !wrapped && galley.rect.width() > room {
+            let hash = lay("#".to_owned()).rect.width().max(1.0);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let count = (room / hash).floor().max(1.0) as usize;
+            galley = lay("#".repeat(count));
+        }
+        let size = galley.rect.size();
         let x = match align {
             Align::Min => rect.left() + padding,
             Align::Center if wrapped => rect.center().x,
@@ -549,7 +560,7 @@ impl View for SheetView {
     }
 
     fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
-        let can = !editing.asking && self.editor.is_none();
+        let can = !editing.asking && self.editor.is_none() && !self.asking();
         ui.menu_button(t("Sheet"), |ui| {
             let entries = [
                 (t("Insert row above"), SheetCommand::RowAbove),
@@ -678,7 +689,7 @@ impl View for SheetView {
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
-        let can = !editing.asking && self.editor.is_none();
+        let can = !editing.asking && self.editor.is_none() && !self.asking();
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
         if can {
             self.sheet_keys(ui);
@@ -934,6 +945,13 @@ impl SheetView {
     /// Ctrl+Page Up and Ctrl+Shift+Tab the one before, round from the last to
     /// the first and back. Ctrl on a Mac too, where Command+Tab is the
     /// system's.
+    fn asking(&self) -> bool {
+        self.renaming.is_some()
+            || self.sorting.is_some()
+            || self.commenting.is_some()
+            || self.formatting.is_some()
+    }
+
     fn sheet_keys(&mut self, ui: &Ui) {
         let step = ui.input_mut(|input| {
             let shifted = Modifiers::CTRL | Modifiers::SHIFT;
@@ -1205,10 +1223,7 @@ impl SheetView {
             return;
         };
         let before = document.document.content.clone();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |since| since.as_secs());
-        let date = odox_core::doc::Comment::date_of(now);
+        let date = jiff::Zoned::now().strftime("%Y-%m-%dT%H:%M:%S").to_string();
         match document.set_comment(
             self.sheet,
             row,
@@ -2216,13 +2231,7 @@ impl SheetView {
             Some((cell, false)) if cell != self.selected || cell != self.anchor => self.pick(cell),
             _ => {}
         }
-        if self.editor.is_some()
-            || editing.asking
-            || self.renaming.is_some()
-            || self.sorting.is_some()
-            || self.commenting.is_some()
-            || self.formatting.is_some()
-        {
+        if self.editor.is_some() || editing.asking || self.asking() {
             return;
         }
         if !was_editing {

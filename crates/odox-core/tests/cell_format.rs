@@ -268,3 +268,87 @@ fn a_formula_keeps_its_formula_when_its_format_changes() {
     assert_eq!(cell.value(), Value::Percentage(1.5));
     assert_eq!(cell.text(), "150.0%");
 }
+
+fn one(row: usize, column: usize) -> Block {
+    Block {
+        top: row,
+        left: column,
+        bottom: row,
+        right: column,
+    }
+}
+
+fn shown_as(number: NumberFormat) -> CellFormat {
+    CellFormat {
+        number: Some(number),
+        ..CellFormat::default()
+    }
+}
+
+#[test]
+fn a_negative_number_keeps_its_sign_as_a_time() {
+    let mut document = blank("en-US");
+    document
+        .set_cell(0, 5, 0, &Value::Number(-2.5))
+        .expect("set");
+    document
+        .format_cells(0, one(5, 0), &shown_as(NumberFormat::Time))
+        .expect("time");
+    let mut document = saved(&mut document);
+    let cell = |document: &SheetDocument| {
+        let sheet = &document.sheets()[0];
+        let cell = document.cell(sheet, 5, 0).expect("a cell");
+        (cell.value(), cell.text())
+    };
+    assert_eq!(
+        cell(&document),
+        (Value::Time("-PT60H00M00S".to_owned()), "12:00".to_owned())
+    );
+    document
+        .format_cells(0, one(5, 0), &shown_as(NumberFormat::General))
+        .expect("general");
+    assert_eq!(cell(&document).0, Value::Number(-2.5));
+}
+
+#[test]
+fn a_moment_just_short_of_midnight_is_the_next_day() {
+    let mut document = blank("en-US");
+    document
+        .set_cell(0, 5, 0, &Value::Number(45_000.999_999_9))
+        .expect("set");
+    document
+        .format_cells(0, one(5, 0), &shown_as(NumberFormat::Date))
+        .expect("date");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 5, 0).expect("a cell");
+    assert_eq!(cell.value(), Value::Date("2023-03-16".to_owned()));
+}
+
+#[test]
+fn a_number_no_calendar_reaches_stays_a_number() {
+    let mut document = blank("en-US");
+    document
+        .set_cell(0, 5, 0, &Value::Number(1e20))
+        .expect("set");
+    document
+        .format_cells(0, one(5, 0), &shown_as(NumberFormat::Date))
+        .expect("date");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 5, 0).expect("a cell");
+    assert_eq!(cell.value(), Value::Number(1e20));
+}
+
+#[test]
+fn a_number_in_a_date_cell_is_shown_as_its_day() {
+    let mut document = blank("en-US");
+    document
+        .format_cells(0, one(5, 0), &shown_as(NumberFormat::Date))
+        .expect("date");
+    document
+        .set_formula(0, 5, 0, "of:=45000+1")
+        .expect("formula");
+    document.recalculate(&[(0, 5, 0)]);
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 5, 0).expect("a cell");
+    assert_eq!(cell.text(), "03/16/2023");
+}
