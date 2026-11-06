@@ -686,8 +686,7 @@ impl<V: View> Shell<V> {
         if let Some(message) = self.error.clone() {
             egui::Panel::bottom("error").show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.colored_label(ui.visuals().error_fg_color, "\u{26a0}");
-                    ui.label(message);
+                    ui.colored_label(ui.visuals().error_fg_color, message);
                     if ui.button(t("Dismiss")).clicked() {
                         self.error = None;
                     }

@@ -1265,8 +1265,8 @@ fn place_tabs(
         if let Some(fill) = leader.filter(|_| room > 0.0) {
             leaders.push(Leader {
                 fill,
-                from: x,
-                to: x + room,
+                from: after,
+                to: after + room,
                 top,
             });
         }

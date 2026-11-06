@@ -157,16 +157,20 @@ impl Presentation {
             .ok_or(Refused::NotFound)?;
         let layout = self.page_layout(slide);
         let master = self.master(slide);
-        let frames: Vec<Element> = PLACEHOLDERS
+        let mut runs = Vec::new();
+        let mut frames: Vec<Element> = PLACEHOLDERS
             .iter()
             .map(|class| {
                 let mut frame = match master.and_then(|m| placeholder(m, class)) {
                     Some(placeholder) => self.frame_from(placeholder),
                     None => self.frame_across(class, layout.width.points(), layout.height.points()),
                 };
+                let mut run = None;
                 if let Some(alike) = placeholder(slide.element, class) {
                     self.style_like(&mut frame, alike);
+                    run = first_run_style(alike).map(ToOwned::to_owned);
                 }
+                runs.push(run);
                 frame
             })
             .collect();
@@ -183,6 +187,23 @@ impl Presentation {
                 self.document.name(&Ns::Draw, "master-page-name"),
                 master.to_owned(),
             );
+        }
+        for (frame, run) in frames.iter_mut().zip(runs) {
+            let Some(run) = run else {
+                continue;
+            };
+            let paragraph = frame
+                .child_mut(&Ns::Draw, "text-box")
+                .and_then(|text_box| text_box.child_mut(&Ns::Text, "p"));
+            let Some(paragraph) = paragraph else {
+                continue;
+            };
+            let had = paragraph
+                .attr(&Ns::Text, "style-name")
+                .map(ToOwned::to_owned);
+            if let Some(style) = self.paragraph_with_run(had.as_deref(), &run) {
+                paragraph.set_attr(self.document.name(&Ns::Text, "style-name"), style);
+            }
         }
         page.children = frames.into_iter().map(Node::Element).collect();
         page.self_closing = false;
@@ -282,6 +303,88 @@ impl Presentation {
                 style.to_owned(),
             );
         }
+    }
+
+    /// An automatic paragraph style that says what `paragraph` does with the
+    /// text properties of the automatic text style `run` written over it, so
+    /// that an empty paragraph types in the look the run had; one that says
+    /// the same thing is used again. `None` where `run` is not an automatic
+    /// text style.
+    fn paragraph_with_run(&mut self, paragraph: Option<&str>, run: &str) -> Option<String> {
+        let automatic = |content: &Element, family: &str, name: &str| {
+            content
+                .child(&Ns::Office, "automatic-styles")?
+                .elements()
+                .find(|e| {
+                    e.is(&Ns::Style, "style")
+                        && e.attr(&Ns::Style, "family") == Some(family)
+                        && e.attr(&Ns::Style, "name") == Some(name)
+                })
+                .cloned()
+        };
+        let content = &self.document.content;
+        let text = automatic(content, "text", run)?
+            .child(&Ns::Style, "text-properties")?
+            .clone();
+        let mut style =
+            if let Some(own) = paragraph.and_then(|p| automatic(content, "paragraph", p)) {
+                own
+            } else {
+                let mut style = crate::edit::format::element(content.name_for(&Ns::Style, "style"));
+                style.set_attr(content.name_for(&Ns::Style, "family"), "paragraph");
+                if let Some(parent) = paragraph {
+                    style.set_attr(content.name_for(&Ns::Style, "parent-style-name"), parent);
+                }
+                style
+            };
+        style.remove_attr(&Ns::Style, "name");
+        match style.children.iter_mut().find_map(|n| match n {
+            Node::Element(e) if e.is(&Ns::Style, "text-properties") => Some(e),
+            _ => None,
+        }) {
+            Some(own) => {
+                for attribute in &text.attrs {
+                    own.remove_attr(&attribute.name.ns, &attribute.name.local);
+                    own.attrs.push(attribute.clone());
+                }
+            }
+            None => style.children.push(Node::Element(text)),
+        }
+        style.self_closing = false;
+        let container = crate::edit::format::automatic_styles(&mut self.document.content);
+        let wanted = crate::edit::format::unnamed(&style);
+        if let Some(name) = container
+            .elements()
+            .filter(|e| e.attr(&Ns::Style, "family") == Some("paragraph"))
+            .find(|e| crate::edit::format::unnamed(e) == wanted)
+            .and_then(|e| e.attr(&Ns::Style, "name"))
+        {
+            return Some(name.to_owned());
+        }
+        let taken: HashSet<String> = container
+            .elements()
+            .filter_map(|e| e.attr(&Ns::Style, "name").map(ToOwned::to_owned))
+            .collect();
+        let name = (1..=taken.len() + 1).map(|n| format!("P{n}")).find(|n| {
+            !taken.contains(n)
+                && self
+                    .document
+                    .styles
+                    .style(&crate::Family::Paragraph, n)
+                    .is_none()
+        })?;
+        style.attrs.insert(
+            0,
+            Attribute {
+                name: self.document.content.name_for(&Ns::Style, "name"),
+                value: name.clone(),
+            },
+        );
+        let container = crate::edit::format::automatic_styles(&mut self.document.content);
+        container.children.push(Node::Element(style.clone()));
+        container.self_closing = false;
+        self.document.styles.add(&style);
+        Some(name)
     }
 
     fn empty_text_box(&self) -> Element {
@@ -400,4 +503,21 @@ fn forget_name(presentation: &mut Element, name: &str) {
     presentation.children.retain(|node| {
         !matches!(node, Node::Element(e) if e.is(&Ns::Presentation, "show") && e.attr(&Ns::Presentation, "pages") == Some(""))
     });
+}
+
+/// The text style of a frame's first run of text, where its first paragraph
+/// begins with a span.
+fn first_run_style(frame: &Element) -> Option<&str> {
+    let paragraph = frame.descendant(&Ns::Text, "p")?;
+    let first = paragraph
+        .children
+        .iter()
+        .find(|n| !matches!(n, Node::Text(t) if t.is_empty()))?;
+    let Node::Element(first) = first else {
+        return None;
+    };
+    first
+        .is(&Ns::Text, "span")
+        .then(|| first.attr(&Ns::Text, "style-name"))
+        .flatten()
 }
