@@ -277,6 +277,10 @@ impl DataStyle {
         find: impl Fn(&str) -> Option<&'a DataStyle>,
     ) -> Option<String> {
         if let Some(x) = amount(value) {
+            if matches!(value, Value::Number(_)) && matches!(self.kind, Kind::Date | Kind::Time) {
+                return Moment::of_serial(x, self.kind == Kind::Time && self.elapsed)
+                    .map(|moment| self.format_moment(&moment));
+            }
             if matches!(value, Value::Percentage(_)) && self.kind != Kind::Percentage {
                 return None;
             }
@@ -296,7 +300,8 @@ impl DataStyle {
                 Some(self.format_moment(&Moment::of_date(text)?))
             }
             (Kind::Time, Value::Time(text)) => {
-                Some(self.format_moment(&Moment::of_duration(text)?))
+                let days = duration_days(text)?;
+                Some(self.format_moment(&Moment::of_serial(days, self.elapsed)?))
             }
             (Kind::Boolean, Value::Boolean(truth)) => Some(self.substitute(&self.truth(*truth))),
             (Kind::Text, Value::Text(text)) => Some(self.substitute(text)),
@@ -509,9 +514,12 @@ impl DataStyle {
                 }
                 Part::Minutes { long } => out.push_str(&pad(moment.minutes, *long)),
                 Part::Seconds { long } => out.push_str(&pad(moment.seconds, *long)),
-                Part::AmPm => out.push_str(if moment.hours < 12 { "AM" } else { "PM" }),
+                Part::AmPm => out.push_str(if moment.hours % 24 < 12 { "AM" } else { "PM" }),
                 _ => {}
             }
+        }
+        if moment.negative {
+            out.insert(0, '-');
         }
         out
     }
@@ -621,6 +629,8 @@ struct Moment {
     hours: u32,
     minutes: u32,
     seconds: u32,
+    /// A duration below zero.
+    negative: bool,
 }
 
 impl Moment {
@@ -649,47 +659,74 @@ impl Moment {
             hours: next(),
             minutes: next(),
             seconds: next(),
+            negative: false,
         })
     }
 
-    /// `PT14H05M09S`, the duration a time cell holds.
-    fn of_duration(text: &str) -> Option<Self> {
-        let rest = text.trim().strip_prefix("PT").or_else(|| {
-            text.trim()
-                .strip_prefix('P')
-                .and_then(|rest| rest.split_once('T').map(|(_, time)| time))
-        })?;
-        let mut moment = Self {
-            year: 1899,
-            month: 12,
-            day: 30,
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-        };
-        let mut digits = String::new();
-        for c in rest.chars() {
-            if c.is_ascii_digit() || c == '.' {
-                digits.push(c);
-                continue;
-            }
-            let whole: f64 = digits.parse().ok()?;
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let whole = whole.trunc() as u32;
-            match c {
-                'H' => moment.hours = whole,
-                'M' => moment.minutes = whole,
-                'S' => moment.seconds = whole,
-                _ => return None,
-            }
-            digits.clear();
+    /// A count of days from 30 December 1899 as a date and time of day, or,
+    /// as a `duration`, as the hours, minutes and seconds it comes to; `None`
+    /// for a date no calendar here reaches.
+    fn of_serial(serial: f64, duration: bool) -> Option<Self> {
+        if !serial.is_finite() || !(-693_594.0..=2_958_466.0).contains(&serial) {
+            return None;
         }
-        Some(moment)
+        #[allow(clippy::cast_possible_truncation)]
+        let total = (serial * 86_400.0).round() as i64;
+        let (days, of_day) = (total.div_euclid(86_400), total.rem_euclid(86_400));
+        #[allow(clippy::cast_precision_loss)]
+        let (year, month, day) = crate::formula::eval_civil(days as f64);
+        let clock = if duration {
+            total.unsigned_abs()
+        } else {
+            of_day.unsigned_abs()
+        };
+        Some(Self {
+            year: i32::try_from(year).ok()?,
+            month: u32::try_from(month).ok()?,
+            day: u32::try_from(day).ok()?,
+            hours: u32::try_from(clock / 3600).ok()?,
+            minutes: u32::try_from(clock / 60 % 60).ok()?,
+            seconds: u32::try_from(clock % 60).ok()?,
+            negative: duration && total < 0,
+        })
     }
 
     fn iso_date(&self) -> String {
         format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
+}
+
+/// `PT14H05M09S`, `P1DT02H` or `-PT01H`, the duration a time cell holds, in
+/// days.
+pub(crate) fn duration_days(text: &str) -> Option<f64> {
+    let text = text.trim();
+    if let Some(positive) = text.strip_prefix('-') {
+        return duration_days(positive).map(|days| -days);
+    }
+    let rest = text.strip_prefix('P')?;
+    let (days, time) = rest.split_once('T').unwrap_or((rest, ""));
+    let days: f64 = if days.is_empty() {
+        0.0
+    } else {
+        days.strip_suffix('D')?.parse().ok()?
+    };
+    let mut seconds = 0.0;
+    let mut digits = String::new();
+    for c in time.chars() {
+        if c.is_ascii_digit() || c == '.' {
+            digits.push(c);
+            continue;
+        }
+        let n: f64 = digits.parse().ok()?;
+        seconds += n * match c {
+            'H' => 3600.0,
+            'M' => 60.0,
+            'S' => 1.0,
+            _ => return None,
+        };
+        digits.clear();
+    }
+    Some(days + seconds / 86_400.0)
 }
 
 /// `14:05`, `14:05:09`, `2:05 PM` or `2:05pm`, as the duration a time cell

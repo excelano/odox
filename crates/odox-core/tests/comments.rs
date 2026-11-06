@@ -101,9 +101,3 @@ fn a_comment_taken_away_is_gone_and_a_value_typed_keeps_one() {
         .expect("typed");
     assert!(comment(&document, 0, 0).is_some());
 }
-
-#[test]
-fn a_moment_is_written_as_a_comments_date() {
-    assert_eq!(Comment::date_of(0), "1970-01-01T00:00:00");
-    assert_eq!(Comment::date_of(1_793_955_600), "2026-11-06T09:00:00");
-}

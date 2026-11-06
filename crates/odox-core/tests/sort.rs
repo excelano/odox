@@ -122,3 +122,52 @@ fn a_comment_moves_with_its_row() {
         .collect();
     assert_eq!(noted, ["apple"]);
 }
+
+#[test]
+fn a_link_in_a_cell_moves_with_its_row() {
+    use odox_core::{Element, Node, Ns};
+    let mut document = table();
+    let found = |e: &Element, local: &str| e.is(&Ns::Table, local);
+    {
+        let table = document
+            .document
+            .content
+            .child_mut(&Ns::Office, "body")
+            .and_then(|b| b.child_mut(&Ns::Office, "spreadsheet"))
+            .and_then(|s| s.child_mut(&Ns::Table, "table"))
+            .expect("a table");
+        let row = table
+            .children
+            .iter_mut()
+            .filter_map(|n| match n {
+                Node::Element(e) if found(e, "table-row") => Some(e),
+                _ => None,
+            })
+            .nth(2)
+            .expect("apple's row");
+        let Some(Node::Element(cell)) = row.children.first_mut() else {
+            panic!("a cell");
+        };
+        let Some(Node::Element(paragraph)) = cell.children.first_mut() else {
+            panic!("a paragraph");
+        };
+        let mut link = Element::new("text", "a", Ns::Text);
+        link.set_attr(
+            odox_core::Name::new("xlink", "href", Ns::Xlink),
+            "https://example.com/",
+        );
+        link.children = std::mem::take(&mut paragraph.children);
+        link.self_closing = false;
+        paragraph.children.push(Node::Element(link));
+    }
+    document.reindex();
+    document.sort(0, block(), 0, false, true).expect("sorted");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 1, 0).expect("apple, first");
+    assert_eq!(cell.text(), "apple");
+    let paragraph = cell.element.child(&Ns::Text, "p").expect("a paragraph");
+    assert!(
+        paragraph.child(&Ns::Text, "a").is_some(),
+        "the link went with it"
+    );
+}

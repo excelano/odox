@@ -373,7 +373,9 @@ impl SheetDocument {
         let retyped = match kind {
             Some(Kind::Percentage) => Value::Percentage(number),
             Some(Kind::Currency) => Value::Currency(number, None),
-            Some(Kind::Date) => Value::Date(iso_date(number)),
+            Some(Kind::Date) if (-693_594.0..=2_958_466.0).contains(&number) => {
+                Value::Date(iso_date(number))
+            }
             Some(Kind::Time) => Value::Time(duration(number)),
             _ => match value {
                 Value::Date(_) | Value::Time(_) | Value::Percentage(_) | Value::Currency(..) => {

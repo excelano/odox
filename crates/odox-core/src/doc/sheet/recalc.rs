@@ -334,33 +334,21 @@ pub(super) fn date_serial(text: &str) -> Option<f64> {
 
 /// `PT14H05M09S` as a fraction of a day.
 pub(super) fn duration_days(text: &str) -> Option<f64> {
-    let rest = text.strip_prefix('P')?;
-    let (days, time) = rest.split_once('T').unwrap_or((rest, ""));
-    let days: f64 = days.strip_suffix('D').map_or(Ok(0.0), str::parse).ok()?;
-    let mut seconds = 0.0;
-    let mut digits = String::new();
-    for c in time.chars() {
-        if c.is_ascii_digit() || c == '.' {
-            digits.push(c);
-            continue;
-        }
-        let n: f64 = digits.parse().ok()?;
-        seconds += n * match c {
-            'H' => 3600.0,
-            'M' => 60.0,
-            'S' => 1.0,
-            _ => return None,
-        };
-        digits.clear();
-    }
-    Some(days + seconds / 86_400.0)
+    crate::data_style::duration_days(text)
 }
 
 /// Days from 30 December 1899 as a date cell holds them, with the time of
 /// day where there is one.
 pub(super) fn iso_date(serial: f64) -> String {
-    let (year, month, day) = formula::eval_civil(serial);
-    let seconds = ((serial - serial.floor()) * 86_400.0).round();
+    let whole = serial.floor();
+    let mut seconds = ((serial - whole) * 86_400.0).round();
+    let day = if seconds >= 86_400.0 {
+        seconds = 0.0;
+        whole + 1.0
+    } else {
+        whole
+    };
+    let (year, month, day) = formula::eval_civil(day);
     if seconds == 0.0 {
         format!("{year:04}-{month:02}-{day:02}")
     } else {
@@ -379,8 +367,9 @@ pub(super) fn iso_date(serial: f64) -> String {
 pub(super) fn duration(days: f64) -> String {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let seconds = (days.abs() * 86_400.0).round() as u64;
+    let sign = if days < 0.0 && seconds > 0 { "-" } else { "" };
     format!(
-        "PT{:02}H{:02}M{:02}S",
+        "{sign}PT{:02}H{:02}M{:02}S",
         seconds / 3600,
         seconds / 60 % 60,
         seconds % 60

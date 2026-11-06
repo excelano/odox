@@ -15,7 +15,7 @@
 use super::{Place, SheetDocument, Value};
 use crate::edit::Refused;
 use crate::formula;
-use crate::xml::Ns;
+use crate::xml::{Element, Node, Ns};
 
 /// A rectangle of cells, by its top left and bottom right corners, counting
 /// rows and columns from zero.
@@ -38,6 +38,8 @@ pub(super) struct Source {
     pub(super) value: Value,
     pub(super) formula: Option<String>,
     pub(super) style: Option<String>,
+    /// Its paragraphs as the document has them, with their spans and links.
+    pub(super) paragraphs: Vec<Element>,
 }
 
 impl SheetDocument {
@@ -117,7 +119,7 @@ impl SheetDocument {
                         );
                         self.set_formula(sheet, row, column, &moved)?;
                     }
-                    (None, None) => self.set_cell(sheet, row, column, &from.value)?,
+                    (None, None) => self.copy_value(sheet, row, column, from)?,
                 }
                 written.push((sheet, row, column));
             }
@@ -142,7 +144,46 @@ impl SheetDocument {
                 .as_ref()
                 .and_then(|cell| cell.style_name())
                 .map(ToOwned::to_owned),
+            paragraphs: cell
+                .as_ref()
+                .map(|cell| {
+                    cell.element
+                        .elements()
+                        .filter(|e| e.is(&Ns::Text, "p"))
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default(),
         }
+    }
+
+    /// Write a cell's value as a copy of another's, its paragraphs taken as
+    /// they stand so that a link or a bold word goes with it.
+    pub(super) fn copy_value(
+        &mut self,
+        sheet: usize,
+        row: usize,
+        column: usize,
+        from: &Source,
+    ) -> Result<(), Refused> {
+        self.set_cell(sheet, row, column, &from.value)?;
+        if from.paragraphs.is_empty() {
+            return Ok(());
+        }
+        let cell = self.cell_element(sheet, row, column)?;
+        let at = cell
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::Element(e) if e.is(&Ns::Text, "p")))
+            .unwrap_or(cell.children.len());
+        cell.children
+            .retain(|n| !matches!(n, Node::Element(e) if e.is(&Ns::Text, "p")));
+        let at = at.min(cell.children.len());
+        cell.children
+            .splice(at..at, from.paragraphs.iter().cloned().map(Node::Element));
+        cell.self_closing = false;
+        self.reindex();
+        Ok(())
     }
 
     /// Give a cell a cell style, or take its own away.
