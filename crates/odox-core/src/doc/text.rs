@@ -20,6 +20,12 @@ pub struct TextDocument {
     pub document: Document,
 }
 
+impl From<Document> for TextDocument {
+    fn from(document: Document) -> Self {
+        Self { document }
+    }
+}
+
 impl TextDocument {
     /// Read a `.odt` package.
     ///
@@ -27,8 +33,7 @@ impl TextDocument {
     ///
     /// The bytes are not a text document, or its `content.xml` cannot be read.
     pub fn read(bytes: &[u8]) -> Result<Self, Error> {
-        let document = Document::read(bytes, media_type::TEXT_ANY)?;
-        Ok(Self { document })
+        Ok(Document::read(bytes, media_type::TEXT_ANY)?.into())
     }
 
     /// The `office:text` element: the flow.

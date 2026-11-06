@@ -6,7 +6,7 @@
 // This exists for CI. `.github/workflows/apple-silicon.yml` runs the suite
 // natively on arm64, and the one thing no runner reaches otherwise is the
 // window, which is exactly where the code that has never run lives:
-// `odox-ui`'s `opened_document` is the only `unsafe` in the workspace, and
+// `odox-ui`'s `opened_document` is one of two `unsafe` modules in the workspace, and
 // macOS delivers a double-clicked document through an Apple Event rather than
 // through argv.
 //

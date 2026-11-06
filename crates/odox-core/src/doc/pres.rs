@@ -67,6 +67,12 @@ impl Slide<'_> {
     }
 }
 
+impl From<Document> for Presentation {
+    fn from(document: Document) -> Self {
+        Self { document }
+    }
+}
+
 impl Presentation {
     /// Read a `.odp` package.
     ///
@@ -74,8 +80,7 @@ impl Presentation {
     ///
     /// The bytes are not a presentation, or its `content.xml` cannot be read.
     pub fn read(bytes: &[u8]) -> Result<Self, Error> {
-        let document = Document::read(bytes, media_type::PRESENTATION_ANY)?;
-        Ok(Self { document })
+        Ok(Document::read(bytes, media_type::PRESENTATION_ANY)?.into())
     }
 
     /// The slides, in the order they are presented.

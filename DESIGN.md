@@ -211,6 +211,16 @@ never a path. The desktop's light and dark setting is read through the XDG porta
 on Linux (`src/system_theme.rs`), because `winit` returns `None` from
 `system_theme()` there.
 
+The side panel is an outline in a text document and a slide list in a deck. A
+view says whether it has one for the document open, and the View menu offers
+the panel only then, so a spreadsheet, whose sheets are tabs along the bottom,
+or a text document with no headings, has no checkbox that does nothing.
+
+**A text document pages with buttons under it.** Page up and Page down move the
+view nine tenths of the window, so the line read last is still in sight, and
+grey out at the top and the bottom. The Page Up and Page Down keys do the same
+while no caret is taking them; with a caret they move it, as §11 says.
+
 A view can take the whole window. `View::presenting` is the slideshow's flag:
 while it is true the shell draws no menu, no panel and no bar, takes none of
 its keys, puts the window full screen and fills the central panel with black,
@@ -220,6 +230,11 @@ It is the view's own mode, so the keys that move through a show are the view's.
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
 one in a window of its own: a window holds one document, as it does for Open.
+On macOS the copy is not a child process, because the sandbox kills a child
+signed with the full sandbox entitlement before it reaches `main`: a bundle asks
+`NSWorkspace` for a new instance of itself, and since Launch Services drops the
+arguments a sandboxed application passes, the request travels as a marker file
+in the temporary directory the instances share (`odox-ui/src/instance.rs`).
 `odox_core::blank` writes each kind as a whole package that is then read like
 any other: a text document with one empty paragraph, a spreadsheet with one
 sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
@@ -402,6 +417,9 @@ column, Ctrl+Home and Ctrl+End to the first and the last used cell, and Ctrl+A
 selects the used cells. Shift with any of them stretches the selection. Each
 key is read with the modifiers it came with, because a press and the release of
 Ctrl can arrive in one frame.
+Ctrl+Page Down and Ctrl+Tab look at the next sheet, Ctrl+Page Up and
+Ctrl+Shift+Tab the one before, round from the last to the first and passing
+over hidden sheets. It is Ctrl on a Mac too, where Command+Tab is the system's.
 
 **A selection says what it holds.** With more than one cell selected, the cell
 bar gives the sum and the average of the numbers in it, percentages and
@@ -698,6 +716,14 @@ build dependency, so the test says it skipped the check where it is not
 installed; `packaging/verapdf.sh` runs the same check over any documents by
 hand. The export is one flow in `odox-ui` for all three windows, over one trait
 in `odox-pdf` that each kind of document implements with a layout of its own.
+
+**An export is made off the window's thread.** Once a file is chosen, the
+document's parts are copied (`Document::snapshot`) and the PDF is laid out and
+written on a thread of its own, from the copy, while a corner of the window says
+which file is being exported; the menu item waits until it is done. The window
+stays live and editable meanwhile, and what is typed then is not in that PDF.
+The styles index caches what it resolves and cannot cross threads, so the copy
+carries the parts and the thread indexes them again, as a read does.
 
 **The PDF holds what the window shows, in the same order.** `odox-pdf` reads
 text into blocks with the same decisions the window's flow makes, which live in
