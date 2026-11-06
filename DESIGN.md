@@ -500,6 +500,24 @@ not wholly contain takes the selected text out of each paragraph it covers
 and leaves every paragraph and cell standing, so Backspace at the start of a
 cell does nothing.
 
+**A table is put in and reshaped from the Format menu's Table submenu, and the
+toolbar's Table button.** The button and Insert a table ask how many rows and
+columns, two by three to begin with, and the table goes after the caret's
+paragraph, or before it where the paragraph is empty, with an empty paragraph
+after it where nothing follows, and the caret in its first cell. It is written
+as `LibreOffice` writes one (`odox-core/src/edit/table.rs`): an automatic table
+style as wide as the text, a column style per width, thin-bordered cells with
+the document's table-contents paragraph style where it has one. Rows and columns
+go in above, below, left and right of the caret's cell and come out with it;
+the last row or column out takes the table, and Delete table takes it at once.
+The window draws columns at the widths their styles give, so a column put in
+shares the width of the one it goes beside and a column taken out gives its
+width to its neighbour, keeping the table as wide as it was. A table with merged
+or repeated cells keeps its rows and columns, and the window says why. Tab in a
+table selects what the next cell holds and Shift+Tab the one before, row by
+row, and Tab in the last cell puts in a row and goes to its first. Each change
+is one step to undo.
+
 The caret stands in the paragraph's flat text, and what is drawn is not that
 text character for character: a tab is drawn as spaces, a note as its
 citation, a field as its value. The renderer records each such piece as it

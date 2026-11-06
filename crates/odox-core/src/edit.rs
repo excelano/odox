@@ -21,6 +21,7 @@ mod block;
 mod figure;
 mod format;
 pub mod html;
+mod table;
 
 use std::fmt;
 use std::ops::Range;
@@ -34,6 +35,7 @@ pub use figure::{
 };
 pub use format::{Mark, format, marked};
 pub(crate) use format::{automatic_styles, element};
+pub use table::{InTable, TableEdit, edit_table, insert_table, step_cell, table_at};
 
 /// Why an edit was not made. Each is a state of the document rather than a
 /// failure, and the window says which.

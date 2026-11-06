@@ -167,6 +167,11 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.selection.as_ref()
     }
 
+    /// Whether the editor has the keyboard, which is when its keys are its own.
+    pub fn has_focus(&self, ctx: &egui::Context) -> bool {
+        ctx.memory(|memory| memory.has_focus(self.id))
+    }
+
     /// Put the caret or the selection somewhere. The next frame scrolls it
     /// into view and gives the editor the keyboard.
     pub fn select(&mut self, selection: Selection<P>) {
