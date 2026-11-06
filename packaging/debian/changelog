@@ -1,3 +1,15 @@
+odox (0.14.0) unstable; urgency=low
+
+  * Release notes for 0.14.0
+  * QA fixes: the caret before a tab stands before it, Tab past a table's last cell says why it cannot add a row, the error line has no glyph the window's fonts lack, File > New reaps the copy it starts, and a new slide's empty title types in the size of the title before it
+  * Sort, fill and Format cells split their block out of its runs in one pass and index the sheet once, not after every cell, so 16,000 rows take a tenth of a second instead of up to a minute
+  * QA fixes: formulas round, compare and cancel as LibreOffice does, text orders alphabetically and equals with the document's case setting, criteria take wildcards where the document allows them, whole-column references survive a fill and a sort, number formats round a half away from zero and show no -0, a text-only section shows only its text, an outline reaches a merged cell on the block's edge, and a cell with no vertical alignment sits at the bottom
+  * QA fixes: dialogs in xods keep their sheet, a negative time keeps its sign, a moment just short of midnight is the next day, a date past any calendar stays a number, a number in a date or time cell shows as one, sort and fill carry a cell's links and spans, CONCAT is written as LibreOffice reads it and 1E5 is typed as a number, a comment's date is local time, a number too wide for its cell shows ### in the window and the PDF, and Replace moves to the next match
+  * The PDF export lays a tab out to the paragraph's tab stops, left, right, centre and decimal, with its leader written as text, and to the default stops past them, as the window does (closes #92)
+  * xods formats cells from Sheet > Format cells… and Ctrl+1, with Ctrl+B, Ctrl+I and Ctrl+U on the selection, draws italic, underline and a cell's vertical alignment in the window and its PDF, declares the formula namespace a new sheet's first formula needs, and keeps Enter in the Sort and Format questions from opening the cell (closes #58)
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 06 Nov 2026 11:15:41 -0600
+
 odox (0.13.0) unstable; urgency=low
 
   * Release notes: plain apostrophe
