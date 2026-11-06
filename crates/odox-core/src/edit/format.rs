@@ -639,7 +639,7 @@ impl Formatter<'_> {
 }
 
 /// A style with its name taken off, to compare with another by what it says.
-pub(super) fn unnamed(style: &Element) -> Element {
+pub(crate) fn unnamed(style: &Element) -> Element {
     let mut style = style.clone();
     style.remove_attr(&Ns::Style, "name");
     style

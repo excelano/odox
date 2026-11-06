@@ -23,7 +23,7 @@ use std::ops::Range;
 
 use krilla::tagging::{TableHeaderScope, Tag, TagKind};
 use odox_core::doc::{DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT, Sheet, SheetDocument};
-use odox_core::{Fit, Length, Properties, TextAlign};
+use odox_core::{Fit, Length, Properties, TextAlign, VerticalAlign};
 
 use crate::fonts::Faces;
 use crate::layout::{Item, Layout};
@@ -459,7 +459,8 @@ impl Sheets<'_, '_, '_> {
             let right = cell
                 .as_ref()
                 .is_some_and(|cell| cell.value().aligns_right());
-            for item in self.text(&text, &style, right, (x, y, width), grid.share, parent)? {
+            let place = (x, y, width, height);
+            for item in self.text(&text, &style, right, place, grid.share, parent)? {
                 items.push(Item::Clipped {
                     rect: cut,
                     item: Box::new(item),
@@ -478,16 +479,12 @@ impl Sheets<'_, '_, '_> {
             .collect())
     }
 
-    /// A cell's text from its top, a line to each of its paragraphs, or
-    /// wrapped inside the column where the cell says so: text against the
-    /// left edge and numbers against the right, unless its paragraph style
-    /// says otherwise, as ODF and the window have it.
     fn text(
         &mut self,
         text: &str,
         style: &Properties,
         right: bool,
-        (x, y, width): (f32, f32, f32),
+        (x, y, width, height): (f32, f32, f32, f32),
         share: f32,
         parent: NodeId,
     ) -> Result<Vec<Item>, Refusal> {
@@ -508,7 +505,8 @@ impl Sheets<'_, '_, '_> {
                 Some(align) => align,
                 None => TextAlign::Start,
             };
-            return self.stack(paragraph, x + padding, width - padding * 2.0, y, parent);
+            let room = (y, height, style.cell.vertical_align);
+            return self.stack(paragraph, x + padding, width - padding * 2.0, room, parent);
         }
         let start = match style.paragraph.align {
             Some(TextAlign::Center) => x + (width - natural) / 2.0,
@@ -516,16 +514,16 @@ impl Sheets<'_, '_, '_> {
             None if right => x + width - padding - natural,
             _ => x + padding,
         };
-        self.stack(paragraph, start, natural + 1.0, y, parent)
+        let room = (y, height, style.cell.vertical_align);
+        self.stack(paragraph, start, natural + 1.0, room, parent)
     }
 
-    /// Lay a paragraph out at a width, its first line at the top `y`.
     fn stack(
         &mut self,
         paragraph: Paragraph,
         x: f32,
         width: f32,
-        y: f32,
+        (y, height, vertical): (f32, f32, Option<VerticalAlign>),
         parent: NodeId,
     ) -> Result<Vec<Item>, Refusal> {
         let mut pieces = Vec::new();
@@ -536,8 +534,13 @@ impl Sheets<'_, '_, '_> {
             Some(parent),
             &mut pieces,
         )?;
+        let total: f32 = pieces.iter().map(|piece| piece.height).sum();
+        let mut below = y + match vertical {
+            Some(VerticalAlign::Middle) => ((height - total) / 2.0).max(0.0),
+            Some(VerticalAlign::Bottom) => (height - total).max(0.0),
+            _ => 0.0,
+        };
         let mut items = Vec::new();
-        let mut below = y;
         for piece in pieces {
             items.extend(piece.items.into_iter().map(|item| item.shifted(0.0, below)));
             below += piece.height;

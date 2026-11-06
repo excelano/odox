@@ -358,7 +358,7 @@ pub(super) fn duration_days(text: &str) -> Option<f64> {
 
 /// Days from 30 December 1899 as a date cell holds them, with the time of
 /// day where there is one.
-fn iso_date(serial: f64) -> String {
+pub(super) fn iso_date(serial: f64) -> String {
     let (year, month, day) = formula::eval_civil(serial);
     let seconds = ((serial - serial.floor()) * 86_400.0).round();
     if seconds == 0.0 {
@@ -376,7 +376,7 @@ fn iso_date(serial: f64) -> String {
 }
 
 /// A fraction of a day as the duration a time cell holds.
-fn duration(days: f64) -> String {
+pub(super) fn duration(days: f64) -> String {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let seconds = (days.abs() * 86_400.0).round() as u64;
     format!(
