@@ -52,6 +52,9 @@ pub struct SheetDocument {
     /// The package and everything shared with the other two formats.
     pub document: Document,
     sheets: Vec<Sheet>,
+    /// A bulk edit is under way over a block split ahead of it, and the index
+    /// is rebuilt once at its end instead of after every cell.
+    batch: bool,
 }
 
 /// One sheet, indexed for lookup by row and column.
@@ -356,7 +359,11 @@ impl Cell<'_> {
 impl From<Document> for SheetDocument {
     fn from(document: Document) -> Self {
         let sheets = index_sheets(&document);
-        Self { document, sheets }
+        Self {
+            document,
+            sheets,
+            batch: false,
+        }
     }
 }
 
@@ -379,6 +386,68 @@ impl SheetDocument {
     /// which is what undo does.
     pub fn reindex(&mut self) {
         self.sheets = index_sheets(&self.document);
+    }
+
+    /// Rebuild the index after a cell changed, unless a bulk edit is under
+    /// way, which rebuilds it once when it is done.
+    fn touched(&mut self) {
+        if !self.batch {
+            self.reindex();
+        }
+    }
+
+    /// Run a bulk edit over a block: its rows and cells are split out of
+    /// their runs in one pass first, so that no cell written inside it moves
+    /// another, and the index is rebuilt once at the end however it ends.
+    pub(super) fn in_batch<T>(
+        &mut self,
+        sheet: usize,
+        block: fill::Block,
+        edit: impl FnOnce(&mut Self) -> Result<T, Refused>,
+    ) -> Result<T, Refused> {
+        self.split_block(sheet, block)?;
+        self.batch = true;
+        let result = edit(self);
+        self.batch = false;
+        self.reindex();
+        result
+    }
+
+    /// Split the rows and cells of a block out of the runs they are written
+    /// in, and write in the ones the table does not reach, each standing
+    /// alone.
+    fn split_block(&mut self, sheet: usize, block: fill::Block) -> Result<(), Refused> {
+        let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
+        let table_position = index.table;
+        let names = CellNames::of(&self.document);
+        let table = self
+            .document
+            .content
+            .child_mut(&Ns::Office, "body")
+            .and_then(|body| body.child_mut(&Ns::Office, "spreadsheet"))
+            .and_then(|sheet| sheet.at_mut(&[table_position]))
+            .ok_or(Refused::NotFound)?;
+        let rows = (block.top, block.bottom);
+        let columns = (block.left, block.right);
+        let mut at = 0;
+        split_rows(table, &mut at, rows, columns, &names);
+        if at <= block.bottom {
+            if block.top > at {
+                table.children.push(Node::Element(with_count(
+                    empty_row(&names),
+                    block.top - at,
+                    &names.rows_repeated,
+                )));
+            }
+            for _ in at.max(block.top)..=block.bottom {
+                let mut row = empty_row(&names);
+                split_cells(&mut row, columns, &names);
+                table.children.push(Node::Element(row));
+            }
+            table.self_closing = false;
+        }
+        self.reindex();
+        Ok(())
     }
 
     /// Whether a cell may be written, which is what [`Self::set_cell`] asks
@@ -442,7 +511,7 @@ impl SheetDocument {
             .and_then(|name| self.document.styles.data_styles().format(name, &value))
             .unwrap_or_else(|| value.cached_text());
         self.write_cell(sheet, row, column, &value, &text, Writing::Value)?;
-        self.reindex();
+        self.touched();
         Ok(())
     }
 
@@ -467,11 +536,11 @@ impl SheetDocument {
             return Err(Refused::Namespace);
         }
         self.write_cell(sheet, row, column, &Value::Empty, "", Writing::Value)?;
-        self.reindex();
+        self.touched();
         let name = self.document.name(&Ns::Table, "formula");
         self.cell_element(sheet, row, column)?
             .set_attr(name, formula);
-        self.reindex();
+        self.touched();
         Ok(())
     }
 
@@ -845,6 +914,127 @@ fn empty_row(names: &CellNames) -> Element {
     row.children.push(Node::Element(empty_cell(names)));
     row.self_closing = false;
     row
+}
+
+/// Split the rows of a container from `top` to `bottom` out of their runs,
+/// and each of their cells from `left` to `right`, counting rows from `at`.
+fn split_rows(
+    parent: &mut Element,
+    at: &mut usize,
+    (top, bottom): (usize, usize),
+    columns: (usize, usize),
+    names: &CellNames,
+) {
+    let mut index = 0;
+    while index < parent.children.len() {
+        let Node::Element(child) = &mut parent.children[index] else {
+            index += 1;
+            continue;
+        };
+        if child.is(&Ns::Table, "table-row") {
+            let repeat = child
+                .attr_usize(&Ns::Table, "number-rows-repeated")
+                .unwrap_or(1)
+                .max(1);
+            let (first, last) = (*at, *at + repeat - 1);
+            *at = last + 1;
+            if last < top || first > bottom {
+                index += 1;
+                continue;
+            }
+            let (low, high) = (top.max(first), bottom.min(last));
+            let original = child.clone();
+            let mut pieces = Vec::new();
+            if low > first {
+                pieces.push(with_count(
+                    original.clone(),
+                    low - first,
+                    &names.rows_repeated,
+                ));
+            }
+            for _ in low..=high {
+                let mut one = with_count(original.clone(), 1, &names.rows_repeated);
+                split_cells(&mut one, columns, names);
+                pieces.push(one);
+            }
+            if last > high {
+                pieces.push(with_count(original, last - high, &names.rows_repeated));
+            }
+            let count = pieces.len();
+            parent
+                .children
+                .splice(index..=index, pieces.into_iter().map(Node::Element));
+            index += count;
+            continue;
+        }
+        if child.is(&Ns::Table, "table-header-rows")
+            || child.is(&Ns::Table, "table-row-group")
+            || child.is(&Ns::Table, "table-rows")
+        {
+            split_rows(child, at, (top, bottom), columns, names);
+        }
+        index += 1;
+    }
+}
+
+/// Split a row's cells from `left` to `right` out of their runs, and write in
+/// the ones it does not reach.
+fn split_cells(row: &mut Element, (left, right): (usize, usize), names: &CellNames) {
+    let mut at = 0;
+    let mut index = 0;
+    while index < row.children.len() {
+        let Node::Element(child) = &row.children[index] else {
+            index += 1;
+            continue;
+        };
+        if !child.is(&Ns::Table, "table-cell") && !child.is(&Ns::Table, "covered-table-cell") {
+            index += 1;
+            continue;
+        }
+        let repeat = child
+            .attr_usize(&Ns::Table, "number-columns-repeated")
+            .unwrap_or(1)
+            .max(1);
+        let (first, last) = (at, at + repeat - 1);
+        at = last + 1;
+        if last < left || first > right || repeat == 1 {
+            index += 1;
+            continue;
+        }
+        let (low, high) = (left.max(first), right.min(last));
+        let original = child.clone();
+        let mut pieces = Vec::new();
+        if low > first {
+            pieces.push(with_count(
+                original.clone(),
+                low - first,
+                &names.columns_repeated,
+            ));
+        }
+        for _ in low..=high {
+            pieces.push(with_count(original.clone(), 1, &names.columns_repeated));
+        }
+        if last > high {
+            pieces.push(with_count(original, last - high, &names.columns_repeated));
+        }
+        let count = pieces.len();
+        row.children
+            .splice(index..=index, pieces.into_iter().map(Node::Element));
+        index += count;
+    }
+    if at <= right {
+        if left > at {
+            row.children.push(Node::Element(with_count(
+                empty_cell(names),
+                left - at,
+                &names.columns_repeated,
+            )));
+        }
+        for _ in at.max(left)..=right {
+            row.children.push(Node::Element(empty_cell(names)));
+        }
+        row.self_closing = false;
+    }
 }
 
 /// Split the repeated element at `index` in `parent` so that the `offset`th of

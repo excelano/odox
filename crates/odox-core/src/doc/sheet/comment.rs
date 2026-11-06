@@ -163,7 +163,7 @@ impl SheetDocument {
             cell.children.insert(0, Node::Element(note));
         }
         cell.self_closing = cell.children.is_empty();
-        self.reindex();
+        self.touched();
         Ok(())
     }
 }
