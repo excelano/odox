@@ -35,6 +35,7 @@ pub mod doc;
 pub mod draw;
 pub mod edit;
 mod error;
+pub mod formula;
 mod meta;
 mod package;
 pub mod place;

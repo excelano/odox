@@ -3,6 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use eframe::egui::{
@@ -57,10 +58,9 @@ pub struct SheetView {
     /// A column or row whose edge is being dragged, with the size it has so
     /// far, in points.
     resizing: Option<Resize>,
-    /// Whether a value in the document has been changed since it was opened,
-    /// which may have left a formula's result out of date. A width or a
-    /// height leaves every result as it was.
-    values_changed: bool,
+    /// The formula cells, by sheet, row and column, whose result a change
+    /// may have left out of date because it could not be worked out again.
+    stale: HashSet<(usize, usize, usize)>,
     export: Export,
 }
 
@@ -127,7 +127,8 @@ struct Paint<'a> {
     metrics: &'a Metrics,
     palette: format::Palette,
     zoom: f32,
-    values_changed: bool,
+    sheet_index: usize,
+    stale: &'a HashSet<(usize, usize, usize)>,
     highlights: Option<odox_ui::Highlights<'a>>,
 }
 
@@ -258,11 +259,9 @@ impl Paint<'_> {
                 }
             }
         }
-        // A formula's cached result may be out of date once a value has
-        // changed, and which ones are cannot be told without evaluating them;
-        // every one is drawn faint until the file is opened by something that
-        // recalculates. DESIGN.md §11.
-        if self.values_changed && cell.formula().is_some() {
+        // A formula whose result could not be worked out again after a
+        // change is drawn faint, because it may be out of date. DESIGN.md §11.
+        if self.stale.contains(&(self.sheet_index, row, column)) {
             format.color = format.color.gamma_multiply(0.45);
         }
         let align = match style.paragraph.align {
@@ -423,7 +422,7 @@ impl View for SheetView {
             .position(|s| s.visible)
             .unwrap_or(0);
         self.document = Some(document);
-        self.values_changed = false;
+        self.stale.clear();
         self.pick((0, 0));
         self.metrics = None;
         self.editor = None;
@@ -587,10 +586,14 @@ impl View for SheetView {
         }
         if !writes.is_empty() {
             editing.record(&document.document.content);
-            self.values_changed = true;
+            let mut changed = Vec::new();
             for (sheet, row, column, value) in &writes {
-                let _ = document.set_cell(*sheet, *row, *column, value);
+                if document.set_cell(*sheet, *row, *column, value).is_ok() {
+                    changed.push((*sheet, *row, *column));
+                }
             }
+            let done = document.recalculate(&changed);
+            self.recalculated(done);
             self.metrics = None;
         }
         done
@@ -711,7 +714,9 @@ impl SheetView {
             return;
         }
         editing.record_snapshot(before, None);
-        self.values_changed = true;
+        let done = document.recalculate_all();
+        self.stale.clear();
+        self.recalculated(done);
         self.metrics = None;
         self.editor = None;
         let new = match command {
@@ -1231,7 +1236,8 @@ impl SheetView {
             metrics,
             palette,
             zoom,
-            values_changed: self.values_changed,
+            sheet_index: self.sheet,
+            stale: &self.stale,
             highlights: self.found.highlights(self.sheet),
         };
         // No more frozen than the grid has.
@@ -1906,15 +1912,19 @@ impl SheetView {
             return false;
         }
         editing.record(&document.document.content);
-        self.values_changed = true;
+        let mut changed = Vec::new();
+        let mut refusal = None;
         for (r, c, value) in writes {
             if let Err(refused) = document.set_cell(sheet, r, c, value) {
-                self.notice = Some(notice(&refused));
+                refusal = Some(notice(&refused));
                 break;
             }
+            changed.push((sheet, r, c));
         }
+        let done = document.recalculate(&changed);
+        self.recalculated(done);
         self.metrics = None;
-        self.notice = None;
+        self.notice = refusal;
         true
     }
 
@@ -1929,11 +1939,23 @@ impl SheetView {
             return;
         }
         editing.record(&document.document.content);
-        self.values_changed = true;
         match document.set_cell(self.sheet, row, column, value) {
-            Ok(()) => self.metrics = None,
+            Ok(()) => {
+                let done = document.recalculate(&[(self.sheet, row, column)]);
+                self.recalculated(done);
+                self.metrics = None;
+            }
             Err(refused) => self.notice = Some(notice(&refused)),
         }
+    }
+
+    /// Keep what a recalculation could not work out drawn faint, and draw what
+    /// it did work out as it is.
+    fn recalculated(&mut self, done: odox_core::doc::Recalculated) {
+        for place in done.updated {
+            self.stale.remove(&place);
+        }
+        self.stale.extend(done.stale);
     }
 
     /// Move the picked cell from the keyboard, which is how a person walks a
