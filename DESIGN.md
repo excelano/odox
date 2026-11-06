@@ -172,7 +172,13 @@ senses drag, which a bare allocation does not.
 **What is not drawn.** The window does not paginate: a page layout gives a
 width, and page boxes, widows, floats and multiple columns are typesetting rather
 than reading. An export is where pages are made (§12).
-Tab stops advance by a fixed amount. Right-to-left text is drawn left to right.
+A tab goes to the paragraph's next stop (`flow.rs`'s `place_tabs`): the stops
+its style sets, left, right, centre or on a decimal character, with a leader
+of dots or a line where the stop has one, and past them the default stops the
+default style spaces evenly, 1.25 cm apart where it says nothing; stops count
+from the paragraph's left margin, as `LibreOffice` counts them, and
+`corpus/libreoffice/tabs.odt` is the measure. The PDF export still draws a tab
+as four spaces. Right-to-left text is drawn left to right.
 A `draw:measure` is undrawn. A radial, ellipsoidal, square or rectangular gradient
 is filled with the flat average of its two colours, and a tiled picture with
 nothing. A turned shape's label is undrawn, because an upright paragraph inside a

@@ -275,6 +275,34 @@ pub struct ParagraphProperties {
     pub border: Edges<Border>,
     /// Space between the border and the text, per edge.
     pub padding: Edges<Length>,
+    /// The tab stops the paragraph sets, in the order of their positions.
+    pub tab_stops: Option<Vec<TabStop>>,
+    /// How far apart the stops are that nothing sets, from the default style.
+    pub tab_distance: Option<Length>,
+}
+
+/// A tab stop: where a tab takes the text after it, and how.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TabStop {
+    /// From the paragraph's left margin.
+    pub position: Length,
+    /// How the text after the tab stands at the stop.
+    pub kind: TabKind,
+    /// The character the gap is filled with, as the dots of a contents line.
+    pub leader: Option<char>,
+}
+
+/// How the text after a tab stands at its stop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabKind {
+    /// Starting at it.
+    Left,
+    /// Ending at it.
+    Right,
+    /// Centred on it.
+    Center,
+    /// With this character, a decimal point, at it.
+    Char(char),
 }
 
 /// Cell formatting, which a spreadsheet reads for every visible cell.
@@ -1168,6 +1196,48 @@ impl ParagraphProperties {
         }
         if let Some(after) = p.attr(&Ns::Fo, "break-after") {
             self.break_after = Some(parse_break(after));
+        }
+        if let Some(distance) = p
+            .attr(&Ns::Style, "tab-stop-distance")
+            .and_then(Length::parse)
+        {
+            self.tab_distance = Some(distance);
+        }
+        if let Some(stops) = p.child(&Ns::Style, "tab-stops") {
+            let mut read: Vec<TabStop> = stops
+                .elements()
+                .filter(|stop| stop.is(&Ns::Style, "tab-stop"))
+                .filter_map(|stop| {
+                    let position = stop.attr(&Ns::Style, "position").and_then(Length::parse)?;
+                    let kind = match stop.attr(&Ns::Style, "type") {
+                        Some("right") => TabKind::Right,
+                        Some("center") => TabKind::Center,
+                        Some("char") => TabKind::Char(
+                            stop.attr(&Ns::Style, "char")
+                                .and_then(|c| c.chars().next())
+                                .unwrap_or('.'),
+                        ),
+                        _ => TabKind::Left,
+                    };
+                    let leader = stop
+                        .attr(&Ns::Style, "leader-text")
+                        .and_then(|text| text.chars().next())
+                        .or_else(|| match stop.attr(&Ns::Style, "leader-style") {
+                            Some("dotted") => Some('.'),
+                            Some("solid") => Some('_'),
+                            Some("dash" | "long-dash") => Some('-'),
+                            _ => None,
+                        })
+                        .filter(|c| !c.is_whitespace());
+                    Some(TabStop {
+                        position,
+                        kind,
+                        leader,
+                    })
+                })
+                .collect();
+            read.sort_by(|a, b| a.position.points().total_cmp(&b.position.points()));
+            self.tab_stops = Some(read);
         }
     }
 }
