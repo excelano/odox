@@ -328,9 +328,7 @@ impl<V: View> Shell<V> {
     /// in a window of its own, which is another of this application.
     fn new_document(&mut self, ctx: &egui::Context) {
         if self.view.is_open() {
-            let started = std::env::current_exe()
-                .and_then(|program| std::process::Command::new(program).arg(NEW).spawn());
-            if let Err(e) = started {
+            if let Err(e) = crate::instance::start(ctx, NEW) {
                 self.error = Some(fill(
                     t("A new window could not be opened: {reason}"),
                     &[("reason", &e.to_string())],
@@ -658,6 +656,12 @@ impl<V: View> Shell<V> {
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, ctx));
         self.search(ui);
 
+        if let Some(reason) = crate::instance::failure() {
+            self.error = Some(fill(
+                t("A new window could not be opened: {reason}"),
+                &[("reason", &reason)],
+            ));
+        }
         match self.view.take_notice() {
             Some(Notice::Done(message)) => {
                 self.notice = Some(message);
@@ -1147,6 +1151,10 @@ pub fn run<V: View + 'static>(
     crate::opened_document::watch();
 
     let first = std::env::args_os().nth(1).map(PathBuf::from);
+    let asked_for_new = match &first {
+        Some(argument) => argument.as_os_str() == NEW,
+        None => crate::instance::asked_for(),
+    };
     eframe::run_native(
         id,
         options,
@@ -1159,12 +1167,10 @@ pub fn run<V: View + 'static>(
             #[cfg(target_os = "macos")]
             crate::opened_document::wake_with(&cc.egui_ctx);
             let mut shell = Shell::new(product, build(&cc.egui_ctx));
-            match first {
-                Some(argument) if argument.as_os_str() == NEW => {
-                    shell.new_document(&cc.egui_ctx);
-                }
-                Some(path) => shell.open(&cc.egui_ctx, &path),
-                None => {}
+            if asked_for_new {
+                shell.new_document(&cc.egui_ctx);
+            } else if let Some(path) = first {
+                shell.open(&cc.egui_ctx, &path);
             }
             Ok(Box::new(shell))
         }),

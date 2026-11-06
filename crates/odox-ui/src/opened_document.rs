@@ -7,7 +7,7 @@
 //! and Finder blames the application, reporting that it cannot open files in a
 //! format whose association is in fact correct.
 //!
-//! **This is the one place in the whole workspace that writes `unsafe`.** It is
+//! **This and `instance`'s macOS module are the only `unsafe` in the workspace.** It is
 //! here rather than in the three application crates because all three windows
 //! come through [`run`](crate::run), so a copy in each would be three
 //! byte-identical copies of two hundred lines of Objective-C glue. `lib.rs` is

@@ -230,6 +230,11 @@ It is the view's own mode, so the keys that move through a show are the view's.
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
 one in a window of its own: a window holds one document, as it does for Open.
+On macOS the copy is not a child process, because the sandbox kills a child
+signed with the full sandbox entitlement before it reaches `main`: a bundle asks
+`NSWorkspace` for a new instance of itself, and since Launch Services drops the
+arguments a sandboxed application passes, the request travels as a marker file
+in the temporary directory the instances share (`odox-ui/src/instance.rs`).
 `odox_core::blank` writes each kind as a whole package that is then read like
 any other: a text document with one empty paragraph, a spreadsheet with one
 sheet named "Sheet1" in the reader's language, a deck with one 16:9 slide and
