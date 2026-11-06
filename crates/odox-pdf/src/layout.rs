@@ -365,11 +365,19 @@ impl<'a> Layout<'a> {
             None => Tag::P.into(),
         };
         let node = self.tree.group(parent, kind);
-        let glyphs = text::shape(paragraph, self.faces)?;
+        let mut glyphs = text::shape(paragraph, self.faces)?;
 
         let body = (width - paragraph.left - paragraph.right).max(1.0);
         let first_width = (body - paragraph.indent).max(1.0);
-        let lines = text::lines(&paragraph.text, &glyphs, first_width, body);
+        let (lines, leaders) = if paragraph.text.contains('\t') {
+            text::tabbed_lines(paragraph, &mut glyphs, first_width, body)
+        } else {
+            (
+                text::lines(&paragraph.text, &glyphs, first_width, body),
+                HashMap::new(),
+            )
+        };
+        let glyphs = glyphs;
         let count = lines.len();
         let mut link_nodes: HashMap<usize, NodeId> = HashMap::new();
 
@@ -431,6 +439,7 @@ impl<'a> Layout<'a> {
             }
 
             let mut decorations = Vec::new();
+            let mut gaps = Vec::new();
             let mut pen = start;
             for fragment in fragments(&in_line) {
                 let style = &paragraph.runs[fragment[0].run].style;
@@ -458,6 +467,14 @@ impl<'a> Layout<'a> {
                     } else {
                         glyph.advance
                     };
+                    if let Some(&fill) = leaders.get(&glyph.cluster) {
+                        gaps.push((
+                            pen + advance,
+                            pen + advance + stretched,
+                            fill,
+                            fragment[0].run,
+                        ));
+                    }
                     advance += stretched;
                     krilla.push(KrillaGlyph::new(
                         krilla::text::GlyphId::new(u32::from(glyph.id)),
@@ -536,6 +553,14 @@ impl<'a> Layout<'a> {
                     });
                 }
                 pen += advance;
+            }
+            for (from, to, fill, run) in gaps {
+                let style = &paragraph.runs[run].style;
+                let color = style.color.unwrap_or(INK);
+                let line_y = baseline - style.rise;
+                if let Some(item) = self.leader(fill, style, (from, to), line_y, color, node)? {
+                    piece.items.push(item);
+                }
             }
             decorations.append(&mut piece.items);
             piece.items = decorations;
@@ -633,6 +658,55 @@ impl<'a> Layout<'a> {
             leaf: Some(leaf),
         });
         Ok(())
+    }
+
+    fn leader(
+        &mut self,
+        fill: char,
+        style: &Style,
+        (from, to): (f32, f32),
+        baseline: f32,
+        color: Color,
+        node: NodeId,
+    ) -> Result<Option<Item>, Refusal> {
+        let one = fill.to_string();
+        let glyphs = text::shape(&Paragraph::plain(&one, style), self.faces)?;
+        let [glyph] = &glyphs[..] else {
+            return Ok(None);
+        };
+        if glyph.advance <= 0.0 {
+            return Ok(None);
+        }
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let count = ((to - from) / glyph.advance).floor().max(0.0) as usize;
+        if count == 0 {
+            return Ok(None);
+        }
+        let width = one.len();
+        #[allow(clippy::cast_precision_loss)]
+        let used = glyph.advance * count as f32;
+        Ok(Some(Item::Text {
+            x: to - used,
+            baseline,
+            face: glyph.face,
+            size: style.size,
+            color,
+            glyphs: (0..count)
+                .map(|at| {
+                    KrillaGlyph::new(
+                        krilla::text::GlyphId::new(u32::from(glyph.id)),
+                        glyph.advance / style.size,
+                        glyph.dx / style.size,
+                        glyph.dy / style.size,
+                        0.0,
+                        at * width..(at + 1) * width,
+                        None,
+                    )
+                })
+                .collect(),
+            text: one.repeat(count),
+            leaf: Some(self.tree.leaf(node)),
+        }))
     }
 
     fn list(

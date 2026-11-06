@@ -177,8 +177,9 @@ its style sets, left, right, centre or on a decimal character, with a leader
 of dots or a line where the stop has one, and past them the default stops the
 default style spaces evenly, 1.25 cm apart where it says nothing; stops count
 from the paragraph's left margin, as `LibreOffice` counts them, and
-`corpus/libreoffice/tabs.odt` is the measure. The PDF export still draws a tab
-as four spaces. Right-to-left text is drawn left to right.
+`corpus/libreoffice/tabs.odt` is the measure. The PDF export places a tab the
+same way (`odox-pdf`'s `text.rs`), its leader written as text a reader hears.
+Right-to-left text is drawn left to right.
 A `draw:measure` is undrawn. A radial, ellipsoidal, square or rectangular gradient
 is filled with the flat average of its two colours, and a tiled picture with
 nothing. A turned shape's label is undrawn, because an upright paragraph inside a
@@ -856,7 +857,7 @@ carries the parts and the thread indexes them again, as a read does.
 **The PDF holds what the window shows, in the same order.** `odox-pdf` reads
 text into blocks with the same decisions the window's flow makes, which live in
 `odox-core` for both to call: which elements are blocks and which pass their
-text through, how a list level writes its numbers, a tab as four spaces, a
+text through, how a list level writes its numbers, a tab to its stop, a
 picture anchored in a paragraph after it. An object with no picture of its own,
 which the window shows as an empty box, is left out. A note in a text document
 is the one thing the PDF holds that the window does not show: its citation stays
