@@ -333,6 +333,13 @@ impl Cell<'_> {
     }
 }
 
+impl From<Document> for SheetDocument {
+    fn from(document: Document) -> Self {
+        let sheets = index_sheets(&document);
+        Self { document, sheets }
+    }
+}
+
 impl SheetDocument {
     /// Read a `.ods` package.
     ///
@@ -340,9 +347,7 @@ impl SheetDocument {
     ///
     /// The bytes are not a spreadsheet, or its `content.xml` cannot be read.
     pub fn read(bytes: &[u8]) -> Result<Self, Error> {
-        let document = Document::read(bytes, media_type::SPREADSHEET_ANY)?;
-        let sheets = index_sheets(&document);
-        Ok(Self { document, sheets })
+        Ok(Document::read(bytes, media_type::SPREADSHEET_ANY)?.into())
     }
 
     /// The sheets, in the order the document holds them.

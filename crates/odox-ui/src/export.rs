@@ -6,16 +6,19 @@
 //! about first: each such picture is shown with a place for its alternative
 //! text and a box to mark it decorative. What is answered goes into the
 //! document, as one step to undo, so the next export does not ask again and
-//! the document says it too. DESIGN.md §12.
+//! the document says it too. The PDF is made and written on a thread of its
+//! own, from a copy of the document, so the window stays live while it is.
+//! DESIGN.md §12.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
 use std::path::{Path, PathBuf};
+use std::thread::{self, JoinHandle};
 
 use eframe::egui::{self, Key, Ui};
-use odox_core::{Element, Ns, edit};
-use odox_pdf::{Exportable, Refusal};
+use odox_core::{Document, Element, Ns, edit};
+use odox_pdf::{Exportable, Refusal, Substitution};
 
 use crate::i18n::{fill, reading_language, t};
 use crate::{Editing, Notice, Pictures, replace_file};
@@ -29,7 +32,21 @@ pub struct Export {
     asking: Option<Question>,
     /// The pictures shown beside the question.
     pictures: Pictures,
+    /// The export being made, once a file has been chosen for it.
+    running: Option<Running>,
     notice: Option<Notice>,
+}
+
+/// An export on its own thread, and the file it is writing.
+struct Running {
+    file: String,
+    worker: JoinHandle<Result<Vec<Substitution>, Failure>>,
+}
+
+/// Why an export that was started did not end in a file.
+enum Failure {
+    Refused(Refusal),
+    Unwritten(std::io::Error),
 }
 
 /// An export asked for, with the file the document was read from, which is
@@ -64,7 +81,13 @@ impl Answer {
 impl Export {
     /// The File menu's item.
     pub fn menu(&mut self, ui: &mut Ui, source: Option<&Path>) {
-        if ui.button(t("Export as PDF/UA…")).clicked() {
+        if ui
+            .add_enabled(
+                self.running.is_none(),
+                egui::Button::new(t("Export as PDF/UA…")),
+            )
+            .clicked()
+        {
             ui.close();
             self.requested = Some(Request {
                 source: source.map(Path::to_path_buf),
@@ -83,13 +106,14 @@ impl Export {
     }
 
     /// Carry the export on, on each frame: start it once it has been asked
-    /// for, and draw the question while it is up.
-    pub fn show(
+    /// for, draw the question while it is up, and say how it ended.
+    pub fn show<D: Exportable + From<Document> + 'static>(
         &mut self,
         ctx: &egui::Context,
-        document: &mut impl Exportable,
+        document: &mut D,
         editing: &mut Editing,
     ) {
+        self.follow(ctx);
         if let Some(Request { source }) = self.requested.take() {
             let content = &document.document().content;
             let body = body_index(content);
@@ -143,8 +167,61 @@ impl Export {
         }
     }
 
-    /// Ask where to write the PDF, and write it there.
-    fn write(&mut self, document: &impl Exportable, source: Option<&Path>) {
+    /// While the export is being made, say so in a corner of the window; once
+    /// it is done, what came of it.
+    fn follow(&mut self, ctx: &egui::Context) {
+        let Some(running) = &self.running else {
+            return;
+        };
+        if !running.worker.is_finished() {
+            egui::Area::new(egui::Id::unique("exporting"))
+                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -12.0))
+                .show(ctx, |ui| {
+                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(fill(t("Exporting {file}…"), &[("file", &running.file)]));
+                        });
+                    });
+                });
+            return;
+        }
+        let Some(Running { file, worker }) = self.running.take() else {
+            return;
+        };
+        self.notice = Some(match worker.join() {
+            Ok(Ok(substituted)) => {
+                let mut said = fill(t("Exported {file} as PDF/UA."), &[("file", &file)]);
+                for substitution in &substituted {
+                    said.push(' ');
+                    said.push_str(&fill(
+                        t("{family} may not be embedded, so {used} was used instead."),
+                        &[
+                            ("family", &substitution.family),
+                            ("used", &substitution.used),
+                        ],
+                    ));
+                }
+                Notice::Done(said)
+            }
+            Ok(Err(Failure::Unwritten(e))) => Notice::Problem(fill(
+                t("{file} could not be saved: {reason}"),
+                &[("file", &file), ("reason", &e.to_string())],
+            )),
+            Ok(Err(Failure::Refused(refusal))) => Notice::Problem(refused(&refusal)),
+            Err(_) => Notice::Problem(fill(
+                t("The export of {file} stopped before it was finished."),
+                &[("file", &file)],
+            )),
+        });
+    }
+
+    /// Ask where to write the PDF, and start writing it there.
+    fn write<D: Exportable + From<Document> + 'static>(
+        &mut self,
+        document: &D,
+        source: Option<&Path>,
+    ) {
         let stem = source.and_then(Path::file_stem).map_or_else(
             || t("Untitled").to_owned(),
             |stem| stem.to_string_lossy().into_owned(),
@@ -161,6 +238,17 @@ impl Export {
         if target.extension().is_none() {
             target.set_extension("pdf");
         }
+        self.start(document, target, stem);
+    }
+
+    /// Make the PDF from a copy of the document and write it, on a thread of
+    /// its own, and answer at once.
+    fn start<D: Exportable + From<Document> + 'static>(
+        &mut self,
+        document: &D,
+        target: PathBuf,
+        stem: String,
+    ) {
         let options = odox_pdf::Options {
             title: stem,
             language: reading_language(),
@@ -170,29 +258,14 @@ impl Export {
             || target.display().to_string(),
             |name| name.to_string_lossy().into_owned(),
         );
-        self.notice = Some(match document.export(&options) {
-            Ok(exported) => match replace_file(&target, &exported.pdf) {
-                Ok(()) => {
-                    let mut said = fill(t("Exported {file} as PDF/UA."), &[("file", &file)]);
-                    for substitution in &exported.substituted {
-                        said.push(' ');
-                        said.push_str(&fill(
-                            t("{family} may not be embedded, so {used} was used instead."),
-                            &[
-                                ("family", &substitution.family),
-                                ("used", &substitution.used),
-                            ],
-                        ));
-                    }
-                    Notice::Done(said)
-                }
-                Err(e) => Notice::Problem(fill(
-                    t("{file} could not be saved: {reason}"),
-                    &[("file", &file), ("reason", &e.to_string())],
-                )),
-            },
-            Err(refusal) => Notice::Problem(refused(&refusal)),
+        let snapshot = document.document().snapshot();
+        let worker = thread::spawn(move || {
+            let document = D::from(snapshot.into_document());
+            let exported = document.export(&options).map_err(Failure::Refused)?;
+            replace_file(&target, &exported.pdf).map_err(Failure::Unwritten)?;
+            Ok(exported.substituted)
         });
+        self.running = Some(Running { file, worker });
     }
 }
 
@@ -361,6 +434,44 @@ mod tests {
             text: text.to_owned(),
             decorative,
         }
+    }
+
+    #[test]
+    fn an_export_is_made_on_its_own_thread_and_ends_in_a_notice() {
+        let mut document = fixture();
+        let target = std::env::temp_dir().join(format!("odox-export-{}.pdf", std::process::id()));
+        let _ = std::fs::remove_file(&target);
+        let mut export = Export::default();
+        // Every picture in the fixture is described, or the export would be
+        // refused rather than written.
+        let mut editing = Editing::default();
+        let answers: Vec<Answer> = (0..edit::figures(&document.document.content).len())
+            .map(|index| answer(&document, index, "", true))
+            .collect();
+        describe(&mut document, &answers, &mut editing).expect("described");
+
+        export.start(&document, target.clone(), "export".to_owned());
+        assert!(
+            export.running.is_some(),
+            "start answers before the export is made"
+        );
+
+        let ctx = egui::Context::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        while export.notice.is_none() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the export never finished"
+            );
+            ctx.run_ui(egui::RawInput::default(), |ui| export.follow(ui.ctx()))
+                .textures_delta
+                .clear();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(matches!(export.take_notice(), Some(Notice::Done(_))));
+        let written = std::fs::read(&target).expect("the PDF was written");
+        assert!(written.starts_with(b"%PDF-"));
+        std::fs::remove_file(&target).expect("removed");
     }
 
     #[test]

@@ -712,6 +712,14 @@ installed; `packaging/verapdf.sh` runs the same check over any documents by
 hand. The export is one flow in `odox-ui` for all three windows, over one trait
 in `odox-pdf` that each kind of document implements with a layout of its own.
 
+**An export is made off the window's thread.** Once a file is chosen, the
+document's parts are copied (`Document::snapshot`) and the PDF is laid out and
+written on a thread of its own, from the copy, while a corner of the window says
+which file is being exported; the menu item waits until it is done. The window
+stays live and editable meanwhile, and what is typed then is not in that PDF.
+The styles index caches what it resolves and cannot cross threads, so the copy
+carries the parts and the thread indexes them again, as a read does.
+
 **The PDF holds what the window shows, in the same order.** `odox-pdf` reads
 text into blocks with the same decisions the window's flow makes, which live in
 `odox-core` for both to call: which elements are blocks and which pass their

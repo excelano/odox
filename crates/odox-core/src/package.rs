@@ -13,6 +13,7 @@ use crate::Error;
 use crate::xml::{self, Element, Ns};
 
 /// One entry of a package.
+#[derive(Clone)]
 pub struct Part {
     /// The entry's path inside the package, such as `content.xml` or
     /// `Pictures/100002010000...png`.
@@ -39,6 +40,7 @@ pub struct Part {
 /// Entries are kept in the order they were read, and every entry is kept
 /// whether or not anything here understands it — a digital signature, a
 /// thumbnail, an embedded object, a part from a future version of the format.
+#[derive(Clone)]
 pub struct Package {
     parts: Vec<Part>,
     media_type: Option<String>,

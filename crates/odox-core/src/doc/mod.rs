@@ -25,6 +25,30 @@ pub use text::TextDocument;
 use crate::xml::{Element, Name, Ns};
 use crate::{Error, Meta, Package, Styles};
 
+/// A document's own parts, without the styles index made from them: what can be
+/// handed to another thread, which a [`Document`] cannot be because its index
+/// caches what it resolves.
+pub struct Snapshot {
+    package: Package,
+    content: Element,
+    styles_part: Option<Element>,
+    meta: Meta,
+}
+
+impl Snapshot {
+    /// The document again, its styles indexed from its parts as a read does.
+    pub fn into_document(self) -> Document {
+        let styles = Styles::collect(Some(&self.content), self.styles_part.as_ref());
+        Document {
+            package: self.package,
+            content: self.content,
+            styles_part: self.styles_part,
+            styles,
+            meta: self.meta,
+        }
+    }
+}
+
 /// A document read from a package: everything the three formats share.
 pub struct Document {
     /// The package itself, which keeps every entry whether or not it was read
@@ -64,6 +88,16 @@ impl Document {
             styles,
             meta,
         })
+    }
+
+    /// A copy of the document's parts, for another thread.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            package: self.package.clone(),
+            content: self.content.clone(),
+            styles_part: self.styles_part.clone(),
+            meta: self.meta.clone(),
+        }
     }
 
     /// The `office:body` element, which every format has exactly one of.

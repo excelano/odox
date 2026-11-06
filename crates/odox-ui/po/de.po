@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-05 19:52-0600\n"
+"POT-Creation-Date: 2026-11-05 20:03-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -17,69 +17,77 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: crates/odox-ui/src/export.rs:67
+#: crates/odox-ui/src/export.rs:87
 msgid "Export as PDF/UA…"
 msgstr "Als PDF/UA exportieren…"
 
-#: crates/odox-ui/src/export.rs:131
+#: crates/odox-ui/src/export.rs:155
 msgid "The pictures could not be described: {reason}"
 msgstr "Die Bilder konnten nicht beschrieben werden: {reason}"
 
-#: crates/odox-ui/src/export.rs:149 crates/odox-ui/src/shell.rs:342
-#: crates/odox-ui/src/shell.rs:423 crates/odox-ui/src/shell.rs:503
-#: crates/odox-ui/src/shell.rs:519
-msgid "Untitled"
-msgstr "Ohne Titel"
+#: crates/odox-ui/src/export.rs:183
+msgid "Exporting {file}…"
+msgstr "{file} wird exportiert…"
 
-#: crates/odox-ui/src/export.rs:153
-msgid "PDF/UA document"
-msgstr "PDF/UA-Dokument"
-
-#: crates/odox-ui/src/export.rs:167
-msgid "Slide {number}"
-msgstr "Folie {number}"
-
-#: crates/odox-ui/src/export.rs:176
+#: crates/odox-ui/src/export.rs:194
 msgid "Exported {file} as PDF/UA."
 msgstr "{file} wurde als PDF/UA exportiert."
 
-#: crates/odox-ui/src/export.rs:180
+#: crates/odox-ui/src/export.rs:198
 msgid "{family} may not be embedded, so {used} was used instead."
 msgstr ""
 "{family} darf nicht eingebettet werden, daher wurde stattdessen {used} "
 "verwendet."
 
-#: crates/odox-ui/src/export.rs:190 crates/odox-ui/src/shell.rs:460
+#: crates/odox-ui/src/export.rs:208 crates/odox-ui/src/shell.rs:460
 msgid "{file} could not be saved: {reason}"
 msgstr "{file} konnte nicht gespeichert werden: {reason}"
 
-#: crates/odox-ui/src/export.rs:211
+#: crates/odox-ui/src/export.rs:213
+msgid "The export of {file} stopped before it was finished."
+msgstr "Der Export von {file} wurde abgebrochen, bevor er fertig war."
+
+#: crates/odox-ui/src/export.rs:226 crates/odox-ui/src/shell.rs:342
+#: crates/odox-ui/src/shell.rs:423 crates/odox-ui/src/shell.rs:503
+#: crates/odox-ui/src/shell.rs:519
+msgid "Untitled"
+msgstr "Ohne Titel"
+
+#: crates/odox-ui/src/export.rs:230
+msgid "PDF/UA document"
+msgstr "PDF/UA-Dokument"
+
+#: crates/odox-ui/src/export.rs:244
+msgid "Slide {number}"
+msgstr "Folie {number}"
+
+#: crates/odox-ui/src/export.rs:273
 msgid "{count} pictures still say nothing in place of what they show."
 msgstr "{count} Bilder haben noch keine Beschreibung dessen, was sie zeigen."
 
-#: crates/odox-ui/src/export.rs:215
+#: crates/odox-ui/src/export.rs:277
 msgid "No font for {family} on this computer may be embedded in a PDF."
 msgstr ""
 "Keine Schrift für {family} auf diesem Computer darf in ein PDF eingebettet "
 "werden."
 
-#: crates/odox-ui/src/export.rs:219
+#: crates/odox-ui/src/export.rs:281
 msgid "No font on this computer has the character {character}."
 msgstr "Keine Schrift auf diesem Computer enthält das Zeichen {character}."
 
-#: crates/odox-ui/src/export.rs:223
+#: crates/odox-ui/src/export.rs:285
 msgid "There is nothing to export: nothing in the document is shown."
 msgstr "Es gibt nichts zu exportieren: Im Dokument wird nichts angezeigt."
 
-#: crates/odox-ui/src/export.rs:226
+#: crates/odox-ui/src/export.rs:288
 msgid "The PDF could not be written: {reason}"
 msgstr "Das PDF konnte nicht geschrieben werden: {reason}"
 
-#: crates/odox-ui/src/export.rs:242
+#: crates/odox-ui/src/export.rs:304
 msgid "Describe the pictures"
 msgstr "Bilder beschreiben"
 
-#: crates/odox-ui/src/export.rs:244
+#: crates/odox-ui/src/export.rs:306
 msgid ""
 "A PDF/UA file says what each picture shows to someone who cannot see it, or "
 "that it is decoration and shows nothing they need. These pictures say "
@@ -89,23 +97,23 @@ msgstr ""
 "zeigt, oder dass es nur Schmuck ist und nichts Nötiges zeigt. Diese Bilder "
 "sagen noch keines von beiden."
 
-#: crates/odox-ui/src/export.rs:275
+#: crates/odox-ui/src/export.rs:337
 msgid "What the picture shows"
 msgstr "Was das Bild zeigt"
 
-#: crates/odox-ui/src/export.rs:278
+#: crates/odox-ui/src/export.rs:340
 msgid "Decoration only"
 msgstr "Nur Schmuck"
 
-#: crates/odox-ui/src/export.rs:289
+#: crates/odox-ui/src/export.rs:351
 msgid "Export"
 msgstr "Exportieren"
 
-#: crates/odox-ui/src/export.rs:294
+#: crates/odox-ui/src/export.rs:356
 msgid "Mark the rest as decoration"
 msgstr "Übrige als Schmuck markieren"
 
-#: crates/odox-ui/src/export.rs:301 crates/odox-ui/src/shell.rs:533
+#: crates/odox-ui/src/export.rs:363 crates/odox-ui/src/shell.rs:533
 #: crates/xods/src/view.rs:1025
 msgid "Cancel"
 msgstr "Abbrechen"
