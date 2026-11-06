@@ -573,9 +573,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "375989decec1a0fa424442bed520fa12ede43a48475ce8c7417d2c69b32b5f6b"
+checksum = "4ff2a8126fff0f8c839080d619675a585e61720bb12d2baceae45769fd66f155"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -920,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "egui_richedit"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "eframe",
  "egui",
@@ -1092,9 +1092,9 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+checksum = "626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4"
 dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
@@ -2395,14 +2395,14 @@ dependencies = [
 
 [[package]]
 name = "odox"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "odox-core",
 ]
 
 [[package]]
 name = "odox-core"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "quick-xml 0.42.0",
  "zip",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "odox-fonts"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "fontdb",
  "ttf-parser",
@@ -2418,7 +2418,7 @@ dependencies = [
 
 [[package]]
 name = "odox-pdf"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "krilla",
  "odox-core",
@@ -2429,7 +2429,7 @@ dependencies = [
 
 [[package]]
 name = "odox-ui"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "arboard",
  "block2 0.6.2",
@@ -4538,7 +4538,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xodp"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "eframe",
  "egui_richedit",
@@ -4548,7 +4548,7 @@ dependencies = [
 
 [[package]]
 name = "xods"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "eframe",
  "odox-core",
@@ -4557,7 +4557,7 @@ dependencies = [
 
 [[package]]
 name = "xodt"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "eframe",
  "egui_richedit",
@@ -4770,9 +4770,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.4.0"
+version = "9.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cec733c9820347a592f6375c3c0089b479ba0a0b1cbf3dd1958b02959b7c033"
+checksum = "23f17fbc870bfac28c6228aed7d6e6df352e26bf7015c4313727e16a7a01ce5e"
 dependencies = [
  "crc32fast",
  "flate2",
