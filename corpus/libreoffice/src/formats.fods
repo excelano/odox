@@ -8,6 +8,7 @@
  <office:automatic-styles>
   <style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="4cm"/></style:style>
   <number:number-style style:name="grouped"><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/></number:number-style>
+  <number:number-style style:name="yes"><number:text>Yes</number:text></number:number-style>
   <number:number-style style:name="whole"><number:number number:decimal-places="0" number:min-decimal-places="0" number:min-integer-digits="1"/></number:number-style>
   <number:currency-style style:name="dollars-positive" style:volatile="true" number:language="en" number:country="US"><number:currency-symbol number:language="en" number:country="US">$</number:currency-symbol><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/></number:currency-style>
   <number:currency-style style:name="dollars" number:language="en" number:country="US"><style:text-properties fo:color="#ff0000"/><number:text>-</number:text><number:currency-symbol number:language="en" number:country="US">$</number:currency-symbol><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><style:map style:condition="value()&gt;=0" style:apply-style-name="dollars-positive"/></number:currency-style>
@@ -23,6 +24,7 @@
   <number:number-style style:name="fraction"><number:fraction number:min-integer-digits="0" number:min-numerator-digits="1" number:min-denominator-digits="1"/></number:number-style>
   <number:boolean-style style:name="truth"><number:boolean/></number:boolean-style>
   <style:style style:name="c-grouped" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="grouped"/>
+  <style:style style:name="c-yes" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="yes"/>
   <style:style style:name="c-whole" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="whole"/>
   <style:style style:name="c-dollars" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="dollars"/>
   <style:style style:name="c-euros" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="euros"/>
@@ -59,6 +61,15 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>Scientific</text:p></table:table-cell><table:table-cell table:style-name="c-science" office:value-type="float" office:value="123456"><text:p>1.23E+05</text:p></table:table-cell><table:table-cell/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>Fraction</text:p></table:table-cell><table:table-cell table:style-name="c-fraction" office:value-type="float" office:value="2.5"><text:p>2 1/2</text:p></table:table-cell><table:table-cell/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>Boolean</text:p></table:table-cell><table:table-cell table:style-name="c-truth" office:value-type="boolean" office:boolean-value="true"><text:p>TRUE</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Whole, a half</text:p></table:table-cell><table:table-cell table:style-name="c-whole" office:value-type="float" office:value="2.5"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Whole, minus a half</text:p></table:table-cell><table:table-cell table:style-name="c-whole" office:value-type="float" office:value="-2.5"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Grouped, a written half</text:p></table:table-cell><table:table-cell table:style-name="c-grouped" office:value-type="float" office:value="1.005"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Grouped, near zero below</text:p></table:table-cell><table:table-cell table:style-name="c-grouped" office:value-type="float" office:value="-0.001"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Whole, small negative</text:p></table:table-cell><table:table-cell table:style-name="c-whole" office:value-type="float" office:value="-0.4"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Text only</text:p></table:table-cell><table:table-cell table:style-name="c-yes" office:value-type="float" office:value="5"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>US date, a number</text:p></table:table-cell><table:table-cell table:style-name="c-us-date" office:value-type="float" office:value="45000"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Clock, a number</text:p></table:table-cell><table:table-cell table:style-name="c-clock" office:value-type="float" office:value="45000.75"><text:p>?</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Clock, a negative number</text:p></table:table-cell><table:table-cell table:style-name="c-clock" office:value-type="float" office:value="-2.5"><text:p>?</text:p></table:table-cell></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

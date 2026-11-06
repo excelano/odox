@@ -102,7 +102,7 @@ pub fn spreadsheet(language: &str, sheet: &str) -> Vec<u8> {
     );
     let content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content {NS}><office:automatic-styles/><office:body><office:spreadsheet><table:table table:name="{sheet}"><table:table-column table:default-cell-style-name="Default"/><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+<office:document-content {NS}><office:automatic-styles/><office:body><office:spreadsheet><table:calculation-settings table:automatic-find-labels="false" table:use-regular-expressions="false" table:use-wildcards="true"/><table:table table:name="{sheet}"><table:table-column table:default-cell-style-name="Default"/><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
     );
     assemble(media_type::SPREADSHEET, &content, &styles)
 }

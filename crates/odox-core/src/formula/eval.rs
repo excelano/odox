@@ -24,6 +24,18 @@ pub trait Cells {
     ///
     /// The cell holds a formula this crate cannot work out.
     fn value(&self, sheet: usize, row: usize, column: usize) -> Result<Value, Unsupported>;
+
+    /// Whether a criterion's text may hold the wildcards `*` and `?`, as the
+    /// document's calculation settings say.
+    fn wildcards(&self) -> bool {
+        false
+    }
+
+    /// Whether text compares with its case, as the document's calculation
+    /// settings say; ODF's default is that it does.
+    fn case_sensitive(&self) -> bool {
+        true
+    }
 }
 
 /// Work out a formula standing on a sheet.
@@ -115,7 +127,7 @@ impl Context<'_> {
             Expr::Percent(inner) => Value::Number(tryv!(number(&self.scalar(inner)?)) / 100.0),
             Expr::Binary(op, left, right) => {
                 let (left, right) = (self.scalar(left)?, self.scalar(right)?);
-                binary(*op, &left, &right)
+                binary(*op, &left, &right, self.cells.case_sensitive())
             }
             Expr::Call(name, arguments) => self.call(name, arguments)?,
         })
@@ -148,7 +160,7 @@ impl Context<'_> {
                 count(0, 0)?;
                 Value::Boolean(false)
             }
-            "SUM" => Value::Number(tryv!(numbers(&all()?)).iter().sum()),
+            "SUM" => Value::Number(tryv!(numbers(&all()?)).iter().fold(0.0, |a, b| a + b)),
             "PRODUCT" => {
                 let found = tryv!(numbers(&all()?));
                 Value::Number(if found.is_empty() {
@@ -278,7 +290,7 @@ impl Context<'_> {
             }
             "INT" => {
                 count(1, 1)?;
-                Value::Number(tryv!(num(0)?).floor())
+                Value::Number(approx(tryv!(num(0)?)).floor())
             }
             "MOD" => {
                 count(2, 2)?;
@@ -295,6 +307,7 @@ impl Context<'_> {
                     Op::Power,
                     &Value::Number(tryv!(num(0)?)),
                     &Value::Number(tryv!(num(1)?)),
+                    false,
                 )
             }
             "SQRT" => {
@@ -432,9 +445,13 @@ impl Context<'_> {
                     }
                     last
                 } else {
+                    let exact = Criterion::of(&wanted, self.cells.wildcards());
                     rows.iter().find(|row| {
                         same_kind(&row[0], &wanted)
-                            && compare(&row[0], &wanted, false) == Ok(Ordering::Equal)
+                            && match &wanted {
+                                Value::Text(_) => exact.matches(&row[0]),
+                                _ => compare(&row[0], &wanted, false) == Ok(Ordering::Equal),
+                            }
                     })
                 };
                 match found {
@@ -447,7 +464,7 @@ impl Context<'_> {
                 let Arg::Range(range) = self.arg(&args[0])? else {
                     return Ok(Value::Error(Error::Value));
                 };
-                let criterion = Criterion::of(&self.scalar(&args[1])?);
+                let criterion = Criterion::of(&self.scalar(&args[1])?, self.cells.wildcards());
                 let values = match args.get(2) {
                     Some(expr) => match self.arg(expr)? {
                         Arg::Range(values) => values,
@@ -506,7 +523,12 @@ fn number(value: &Value) -> Result<f64, Error> {
         Value::Empty => Ok(0.0),
         Value::Number(n) | Value::Date(n) => Ok(*n),
         Value::Boolean(b) => Ok(if *b { 1.0 } else { 0.0 }),
-        Value::Text(t) => t.trim().parse().map_err(|_| Error::Value),
+        Value::Text(t) => t
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite())
+            .ok_or(Error::Value),
         Value::Error(error) => Err(*error),
     }
 }
@@ -525,6 +547,7 @@ fn text(value: &Value) -> Result<String, Error> {
 /// A number written with up to fifteen significant digits, as a spreadsheet
 /// writes one into text.
 pub(crate) fn spelled(n: f64) -> String {
+    let n = n + 0.0;
     if n.fract().abs() < f64::EPSILON && n.abs() < 1e15 {
         return format!("{n:.0}");
     }
@@ -580,14 +603,14 @@ fn numbers(args: &[Arg]) -> Result<Vec<f64>, Error> {
     Ok(out)
 }
 
-fn binary(op: Op, left: &Value, right: &Value) -> Value {
+fn binary(op: Op, left: &Value, right: &Value, case: bool) -> Value {
     let arithmetic = |f: fn(f64, f64) -> Value| match (number(left), number(right)) {
         (Ok(a), Ok(b)) => f(a, b),
         (Err(error), _) | (_, Err(error)) => Value::Error(error),
     };
     match op {
-        Op::Add => arithmetic(|a, b| Value::Number(a + b)),
-        Op::Subtract => arithmetic(|a, b| Value::Number(a - b)),
+        Op::Add => arithmetic(|a, b| Value::Number(sum(a, b))),
+        Op::Subtract => arithmetic(|a, b| Value::Number(sum(a, -b))),
         Op::Multiply => arithmetic(|a, b| Value::Number(a * b)),
         Op::Divide => arithmetic(|a, b| {
             if b == 0.0 {
@@ -608,7 +631,7 @@ fn binary(op: Op, left: &Value, right: &Value) -> Value {
             (Ok(a), Ok(b)) => Value::Text(a + &b),
             (Err(error), _) | (_, Err(error)) => Value::Error(error),
         },
-        _ => match compare(left, right, true) {
+        _ => match compare(left, right, case) {
             Ok(ordering) => Value::Boolean(match op {
                 Op::Equal => ordering == Ordering::Equal,
                 Op::NotEqual => ordering != Ordering::Equal,
@@ -631,8 +654,11 @@ fn same_kind(a: &Value, b: &Value) -> bool {
 }
 
 /// Two values in order: numbers before text, an empty cell as zero beside a
-/// number and as empty text beside text, and text with its case or without.
-fn compare(left: &Value, right: &Value, with_case: bool) -> Result<Ordering, Error> {
+/// number and as empty text beside text, text in alphabetical order with its
+/// case deciding only between the same letters and only where `case` asks,
+/// and numbers that differ only past the fifteenth significant digit the
+/// same, as a spreadsheet compares them.
+fn compare(left: &Value, right: &Value, case: bool) -> Result<Ordering, Error> {
     if let Value::Error(error) = left {
         return Err(*error);
     }
@@ -650,34 +676,43 @@ fn compare(left: &Value, right: &Value, with_case: bool) -> Result<Ordering, Err
                 as_text(left).unwrap_or_default(),
                 as_text(right).unwrap_or_default(),
             );
-            Ok(if with_case {
-                a.cmp(&b)
+            let order = a.to_lowercase().cmp(&b.to_lowercase());
+            Ok(if order == Ordering::Equal && case {
+                b.cmp(&a)
             } else {
-                a.to_lowercase().cmp(&b.to_lowercase())
+                order
             })
         }
         (Value::Text(_), _) => Ok(Ordering::Greater),
         (_, Value::Text(_)) => Ok(Ordering::Less),
         _ => {
             let (a, b) = (number(left)?, number(right)?);
+            if near(a, b) {
+                return Ok(Ordering::Equal);
+            }
             Ok(a.partial_cmp(&b).unwrap_or(Ordering::Equal))
         }
     }
 }
 
 /// A criterion of `SUMIF` and `COUNTIF`: a value, or a comparison written as
-/// text, `">2"`, `"<>apple"`.
+/// text, `">2"`, `"<>apple"`, `"ap*"` where the document allows wildcards.
 struct Criterion {
     op: Op,
     against: Value,
+    /// The text after the comparison, which a text cell is compared with.
+    written: String,
+    wildcards: bool,
 }
 
 impl Criterion {
-    fn of(value: &Value) -> Self {
+    fn of(value: &Value, wildcards: bool) -> Self {
         let Value::Text(written) = value else {
             return Self {
                 op: Op::Equal,
                 against: value.clone(),
+                written: text(value).unwrap_or_default(),
+                wildcards: false,
             };
         };
         let (op, rest) = [
@@ -692,10 +727,15 @@ impl Criterion {
         .find_map(|(prefix, op)| written.strip_prefix(prefix).map(|rest| (op, rest)))
         .unwrap_or((Op::Equal, written.as_str()));
         let against = match rest.trim().parse::<f64>() {
-            Ok(n) => Value::Number(n),
-            Err(_) => Value::Text(rest.to_owned()),
+            Ok(n) if n.is_finite() => Value::Number(n),
+            _ => Value::Text(rest.to_owned()),
         };
-        Self { op, against }
+        Self {
+            op,
+            against,
+            written: rest.to_owned(),
+            wildcards,
+        }
     }
 
     fn matches(&self, cell: &Value) -> bool {
@@ -711,6 +751,17 @@ impl Criterion {
                 },
                 _ => self.op == Op::NotEqual,
             };
+        }
+        if let Value::Text(t) = cell
+            && matches!(self.op, Op::Equal | Op::NotEqual)
+        {
+            let fold = str::to_lowercase;
+            let same = if self.wildcards {
+                glob(&fold(&self.written), &fold(t))
+            } else {
+                fold(t) == fold(&self.written)
+            };
+            return same == (self.op == Op::Equal);
         }
         if is_text(cell) != is_text(&self.against) {
             return self.op == Op::NotEqual;
@@ -730,18 +781,108 @@ impl Criterion {
 }
 
 /// Round half away from zero, up away from zero, or down toward it, to a
-/// number of decimal places, which may be negative. The product is first
-/// rounded to nine places, so that `1.005` rounds as it is written and not as
-/// binary holds it.
+/// number of decimal places, which may be negative. The scaled number is
+/// first taken to fifteen significant digits, so that `1.005` rounds as it is
+/// written and not as binary holds it, and `0.4999999999` still rounds down.
 fn round(x: f64, places: f64, how: &str) -> f64 {
-    let factor = 10f64.powf(places);
-    let scaled = (x * factor * 1e9).round() / 1e9;
+    if !x.is_finite() || places > 308.0 {
+        return x;
+    }
+    if places < -308.0 {
+        return 0.0;
+    }
+    let factor = 10f64.powf(places.abs());
+    let scaled = if places >= 0.0 {
+        x * factor
+    } else {
+        x / factor
+    };
+    if !scaled.is_finite() {
+        return x;
+    }
+    let scaled = approx(scaled);
     let rounded = match how {
         "ROUNDUP" => scaled.abs().ceil().copysign(scaled),
         "ROUNDDOWN" => scaled.trunc(),
         _ => scaled.round(),
     };
-    rounded / factor
+    let back = if places >= 0.0 {
+        rounded / factor
+    } else {
+        rounded * factor
+    };
+    back + 0.0
+}
+
+/// A number taken to fifteen significant digits, the most a spreadsheet
+/// shows, which is how it rounds and compares.
+pub(crate) fn approx(x: f64) -> f64 {
+    if x == 0.0 || !x.is_finite() {
+        return x;
+    }
+    format!("{x:.14e}").parse().unwrap_or(x)
+}
+
+/// Whether two numbers are the same but for the last bits of binary.
+fn near(a: f64, b: f64) -> bool {
+    let difference = (a - b).abs();
+    if difference == 0.0 {
+        return true;
+    }
+    let tolerance = 2f64.powi(-48);
+    difference < a.abs() * tolerance && difference < b.abs() * tolerance
+}
+
+/// A sum that is zero where its two terms cancel but for the last bits of
+/// binary, as `0.3 - 0.1 - 0.2` is.
+fn sum(a: f64, b: f64) -> f64 {
+    if ((a < 0.0 && b > 0.0) || (a > 0.0 && b < 0.0)) && near(a, -b) {
+        return 0.0;
+    }
+    a + b
+}
+
+/// Whether text matches a pattern in which `*` stands for any run of
+/// characters, `?` for any one, and `~` makes the next one plain.
+fn glob(pattern: &str, text: &str) -> bool {
+    let pattern: Vec<char> = pattern.chars().collect();
+    let text: Vec<char> = text.chars().collect();
+    let (mut p, mut t) = (0, 0);
+    let mut star: Option<(usize, usize)> = None;
+    while t < text.len() {
+        match pattern.get(p) {
+            Some('*') => {
+                star = Some((p, t));
+                p += 1;
+                continue;
+            }
+            Some('?') => {
+                p += 1;
+                t += 1;
+                continue;
+            }
+            Some('~') if pattern.get(p + 1) == Some(&text[t]) => {
+                p += 2;
+                t += 1;
+                continue;
+            }
+            Some(&c) if c == text[t] => {
+                p += 1;
+                t += 1;
+                continue;
+            }
+            _ => {}
+        }
+        match star {
+            Some((at, from)) => {
+                p = at + 1;
+                t = from + 1;
+                star = Some((at, from + 1));
+            }
+            None => return false,
+        }
+    }
+    pattern[p..].iter().all(|c| *c == '*')
 }
 
 /// The days from 30 December 1899 to a date.

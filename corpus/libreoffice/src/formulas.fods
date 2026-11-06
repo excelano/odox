@@ -6,6 +6,7 @@
  </office:styles>
  <office:body>
   <office:spreadsheet>
+   <table:calculation-settings table:use-regular-expressions="false" table:use-wildcards="true"/>
    <table:table table:name="Data">
     <table:table-row><table:table-cell office:value-type="string"><text:p>Item</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Qty</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Price</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Date</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Flag</text:p></table:table-cell></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>apple</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="4"><text:p>4</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="1.5"><text:p>1.5</text:p></table:table-cell><table:table-cell office:value-type="date" office:date-value="2026-01-15"><text:p>2026-01-15</text:p></table:table-cell><table:table-cell office:value-type="boolean" office:boolean-value="true"><text:p>TRUE</text:p></table:table-cell></table:table-row>
@@ -79,6 +80,23 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>countif</text:p></table:table-cell><table:table-cell table:formula='of:=COUNTIF([$Data.B2:.B6];"&gt;=2")'/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>depends on a formula</text:p></table:table-cell><table:table-cell table:formula="of:=[.B2]*2"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>absolute reference</text:p></table:table-cell><table:table-cell table:formula="of:=[$Data.$B$2]*[$Data.$C$3]"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>round just below a half</text:p></table:table-cell><table:table-cell table:formula='of:=ROUND(0.4999999999;0)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>rounddown just below one</text:p></table:table-cell><table:table-cell table:formula='of:=ROUNDDOWN(0.9999999999;0)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>roundup just past one</text:p></table:table-cell><table:table-cell table:formula='of:=ROUNDUP(1.0000000001;0)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>round a huge number</text:p></table:table-cell><table:table-cell table:formula='of:=ROUND(1E300;0)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>round to many places</text:p></table:table-cell><table:table-cell table:formula='of:=ROUND(1;400)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>round a written half</text:p></table:table-cell><table:table-cell table:formula='of:=ROUND(1.005;2)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sum near equal</text:p></table:table-cell><table:table-cell table:formula='of:=0.1+0.2=0.3'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>int of a product</text:p></table:table-cell><table:table-cell table:formula='of:=INT(4.35*100)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>cancelling terms</text:p></table:table-cell><table:table-cell table:formula='of:=0.3-0.1-0.2'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text order across case</text:p></table:table-cell><table:table-cell table:formula='of:="a"&lt;"B"'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text order after case</text:p></table:table-cell><table:table-cell table:formula='of:="Z"&lt;"a"'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>concat</text:p></table:table-cell><table:table-cell table:formula='of:=COM.MICROSOFT.CONCAT("a";[$Data.A3])'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>countif wildcard</text:p></table:table-cell><table:table-cell table:formula='of:=COUNTIF([$Data.A2:.A6];"ap*")'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sumif wildcard</text:p></table:table-cell><table:table-cell table:formula='of:=SUMIF([$Data.A2:.A6];"?pple";[$Data.B2:.B6])'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>vlookup wildcard</text:p></table:table-cell><table:table-cell table:formula='of:=VLOOKUP("pe*";[$Data.A2:.C6];2;0)'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sum of nothing</text:p></table:table-cell><table:table-cell table:formula='of:=SUM([$Data.Z90:.Z91])'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text inf</text:p></table:table-cell><table:table-cell table:formula='of:="inf"+1'/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

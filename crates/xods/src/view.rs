@@ -326,9 +326,9 @@ impl Paint<'_> {
             Align::Max => rect.right() - padding - size.x,
         };
         let y = match style.cell.vertical_align {
+            Some(odox_core::VerticalAlign::Top) => rect.top(),
             Some(odox_core::VerticalAlign::Middle) => rect.center().y - size.y / 2.0,
-            Some(odox_core::VerticalAlign::Bottom) => rect.bottom() - size.y,
-            _ => rect.top(),
+            _ => rect.bottom() - size.y,
         };
         painter.galley(pos2(x, y.max(rect.top())), galley, format.color);
     }

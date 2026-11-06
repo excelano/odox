@@ -352,3 +352,24 @@ fn a_number_in_a_date_cell_is_shown_as_its_day() {
     let cell = document.cell(sheet, 5, 0).expect("a cell");
     assert_eq!(cell.text(), "03/16/2023");
 }
+
+#[test]
+fn an_outline_reaches_a_merged_cell_on_the_blocks_edge() {
+    let mut document = blank("en-US");
+    document.merge(0, 1..=1, 1..=2).expect("merged");
+    let format = CellFormat {
+        borders: Some(Borders::Outline),
+        ..CellFormat::default()
+    };
+    let block = Block {
+        top: 1,
+        left: 1,
+        bottom: 2,
+        right: 2,
+    };
+    document.format_cells(0, block, &format).expect("formatted");
+    let sheet = &document.sheets()[0];
+    let cell = document.cell(sheet, 1, 1);
+    let b = document.cell_style(sheet, cell.as_ref(), 1).cell.border;
+    assert!(b.left.is_some() && b.right.is_some() && b.top.is_some());
+}

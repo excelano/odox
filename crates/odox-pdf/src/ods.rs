@@ -548,9 +548,9 @@ impl Sheets<'_, '_, '_> {
         )?;
         let total: f32 = pieces.iter().map(|piece| piece.height).sum();
         let mut below = y + match vertical {
+            Some(VerticalAlign::Top) => 0.0,
             Some(VerticalAlign::Middle) => ((height - total) / 2.0).max(0.0),
-            Some(VerticalAlign::Bottom) => (height - total).max(0.0),
-            _ => 0.0,
+            _ => (height - total).max(0.0),
         };
         let mut items = Vec::new();
         for piece in pieces {
