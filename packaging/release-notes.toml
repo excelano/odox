@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.12.0"
+version = "0.13.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Page up and Page down buttons sit under the page, and the keys now scroll while reading. Insert a table from the toolbar or Format > Table, add and remove its rows and columns, and move between cells with Tab. Exporting a PDF no longer stops the window while it works."
+whats-new = "Tabs now go to the paragraph's tab stops, left, right, centred or on the decimal point, with dot leaders as LibreOffice draws them. Text in table cells is inset from the cell borders."
 
 [products.xodt.locales.de-de]
-whats-new = "Unter der Seite gibt es die Schaltflächen „Seite nach oben“ und „Seite nach unten“, und die Tasten Bild auf und Bild ab blättern jetzt auch beim Lesen. Fügen Sie über die Symbolleiste oder Format > Tabelle eine Tabelle ein, fügen Sie Zeilen und Spalten hinzu oder entfernen Sie sie, und wechseln Sie mit der Tabulatortaste zwischen den Zellen. Der PDF-Export hält das Fenster nicht mehr an, während er läuft."
+whats-new = "Tabulatoren springen jetzt zu den Tabstopps des Absatzes, links, rechts, zentriert oder am Dezimalzeichen, mit Füllzeichen wie in LibreOffice. Text in Tabellenzellen hat Abstand zum Zellrahmen."
 
 [products.xods.locales.en-us]
-whats-new = "Values you type take the cell's number format: currencies, percentages, dates and times appear as the cell says. Ctrl+Tab and Ctrl+Page Down move between sheets. Typing quickly into a cell no longer drops keys, and exporting a PDF no longer stops the window."
+whats-new = "Formulas are calculated: type one starting with =, and every cell that depends on a change updates. Fill down and across with Ctrl+D, the Sheet menu or the fill handle, which continues a series. Sheet > Sort sorts a block of rows by a column, and Sheet > Comment adds, changes or deletes a cell's comment. Number format colours, such as red for negatives, now show on screen and in PDFs."
 
 [products.xods.locales.de-de]
-whats-new = "Eingegebene Werte übernehmen das Zahlenformat der Zelle: Währungen, Prozente, Datum und Uhrzeit erscheinen so, wie die Zelle es vorgibt. Strg+Tab und Strg+Bild ab wechseln zwischen den Blättern. Schnelles Tippen in eine Zelle verliert keine Tasten mehr, und der PDF-Export hält das Fenster nicht mehr an."
+whats-new = "Formeln werden berechnet: Geben Sie eine Formel mit = ein, und jede davon abhängige Zelle wird aktualisiert. Füllen Sie nach unten und rechts mit Strg+D, über das Menü Blatt oder mit dem Ausfüllkästchen, das eine Reihe fortsetzt. Blatt > Sortieren sortiert einen Zeilenblock nach einer Spalte, und Blatt > Kommentar fügt einen Zellkommentar hinzu, ändert oder löscht ihn. Farben aus Zahlenformaten, etwa Rot für negative Werte, erscheinen jetzt auf dem Bildschirm und im PDF."
 
 [products.xodp.locales.en-us]
-whats-new = "Exporting a PDF no longer stops the window while it works, and File > New opens its own window on every system."
+whats-new = "Tabs in slide text now go to the paragraph\'s tab stops, left, right, centred or on the decimal point, with dot leaders."
 
 [products.xodp.locales.de-de]
-whats-new = "Der PDF-Export hält das Fenster nicht mehr an, während er läuft, und Datei > Neu öffnet auf jedem System ein eigenes Fenster."
+whats-new = "Tabulatoren in Folientext springen jetzt zu den Tabstopps des Absatzes, links, rechts, zentriert oder am Dezimalzeichen, mit Füllzeichen."
