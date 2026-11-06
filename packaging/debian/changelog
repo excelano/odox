@@ -1,3 +1,14 @@
+odox (0.12.0) unstable; urgency=low
+
+  * Release notes for 0.12.0: Page up and down, tables in xodt, number formats and sheet keys in xods, export off the window's thread, File > New on macOS
+  * xodt inserts tables and adds and removes their rows and columns, and Tab walks the cells (closes #81)
+  * xods reads typed values in the cell's number format and shows them as the format writes them, and takes every key typed into a cell (closes #57)
+  * File > New on macOS asks Launch Services for a new instance, since the sandbox kills a child copy before main (closes #71)
+  * Export makes the PDF on a thread of its own, from a copy of the document, so the window stays live (closes #70)
+  * Page up and down buttons in xodt, Ctrl+Tab and Ctrl+Page Down through sheets, and a side panel offered only where there is one
+
+ -- David M. Anderson <david.anderson@excelano.com>  Thu, 05 Nov 2026 21:03:25 -0600
+
 odox (0.11.0) unstable; urgency=low
 
   * Release notes for 0.11.0: fit to the window, printed size at 100%, Ctrl+wheel zoom, outline hidden at start
