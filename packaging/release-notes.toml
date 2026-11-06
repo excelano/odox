@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.13.0"
+version = "0.14.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Tabs now go to the paragraph's tab stops, left, right, centred or on the decimal point, with dot leaders as LibreOffice draws them. Text in table cells is inset from the cell borders."
+whats-new = "Exported PDFs now place tabs at the paragraph's tab stops, with dot leaders, as the window does. The caret before a tab sits where it belongs, Replace moves on to the next match, and Tab in a table that cannot grow says why."
 
 [products.xodt.locales.de-de]
-whats-new = "Tabulatoren springen jetzt zu den Tabstopps des Absatzes, links, rechts, zentriert oder am Dezimalzeichen, mit Füllzeichen wie in LibreOffice. Text in Tabellenzellen hat Abstand zum Zellrahmen."
+whats-new = "Exportierte PDFs setzen Tabulatoren jetzt an die Tabstopps des Absatzes, mit Füllzeichen, wie das Fenster. Die Schreibmarke vor einem Tabulator steht an der richtigen Stelle, Ersetzen geht zum nächsten Treffer weiter, und die Tabulatortaste in einer Tabelle, die nicht wachsen kann, sagt, warum."
 
 [products.xods.locales.en-us]
-whats-new = "Formulas are calculated: type one starting with =, and every cell that depends on a change updates. Fill down and across with Ctrl+D, the Sheet menu or the fill handle, which continues a series. Sheet > Sort sorts a block of rows by a column, and Sheet > Comment adds, changes or deletes a cell's comment. Number format colours, such as red for negatives, now show on screen and in PDFs."
+whats-new = "Format cells with Sheet > Format cells or Ctrl+1: number format, bold, italic, underline, colours, alignment, wrapping and borders, and Ctrl+B, Ctrl+I and Ctrl+U on a selection. Formulas, rounding and number formats now agree with LibreOffice, sort and fill keep links and bold, and large sorts and fills are much faster."
 
 [products.xods.locales.de-de]
-whats-new = "Formeln werden berechnet: Geben Sie eine Formel mit = ein, und jede davon abhängige Zelle wird aktualisiert. Füllen Sie nach unten und rechts mit Strg+D, über das Menü Blatt oder mit dem Ausfüllkästchen, das eine Reihe fortsetzt. Blatt > Sortieren sortiert einen Zeilenblock nach einer Spalte, und Blatt > Kommentar fügt einen Zellkommentar hinzu, ändert oder löscht ihn. Farben aus Zahlenformaten, etwa Rot für negative Werte, erscheinen jetzt auf dem Bildschirm und im PDF."
+whats-new = "Zellen formatieren mit Blatt > Zellen formatieren oder Strg+1: Zahlenformat, fett, kursiv, unterstrichen, Farben, Ausrichtung, Zeilenumbruch und Rahmen, dazu Strg+B, Strg+I und Strg+U auf einer Auswahl. Formeln, Rundung und Zahlenformate stimmen jetzt mit LibreOffice überein, Sortieren und Ausfüllen behalten Links und Fettdruck, und große Bereiche sind deutlich schneller."
 
 [products.xodp.locales.en-us]
-whats-new = "Tabs in slide text now go to the paragraph's tab stops, left, right, centred or on the decimal point, with dot leaders."
+whats-new = "A new slide's title now types in the same size as the title before it. Tabs in exported PDFs go to the paragraph's tab stops, and Replace moves on to the next match."
 
 [products.xodp.locales.de-de]
-whats-new = "Tabulatoren in Folientext springen jetzt zu den Tabstopps des Absatzes, links, rechts, zentriert oder am Dezimalzeichen, mit Füllzeichen."
+whats-new = "Der Titel einer neuen Folie hat jetzt dieselbe Größe wie der Titel davor. Tabulatoren in exportierten PDFs gehen zu den Tabstopps des Absatzes, und Ersetzen geht zum nächsten Treffer weiter."
