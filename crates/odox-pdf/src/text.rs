@@ -9,7 +9,10 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+use std::collections::HashMap;
 use std::ops::Range;
+
+use odox_core::TabKind;
 
 use unicode_linebreak::{BreakOpportunity, linebreaks};
 
@@ -52,6 +55,7 @@ pub(crate) fn shape(paragraph: &Paragraph, faces: &mut Faces) -> Result<Vec<Glyp
             if character == '\n' {
                 continue;
             }
+            let character = if character == '\t' { ' ' } else { character };
             let face = match segments.last() {
                 Some((range, face)) if range.end == at && faces.covers(*face, character) => *face,
                 _ if faces.covers(primary, character) => primary,
@@ -83,7 +87,7 @@ fn shape_segment(
     let shaper = rustybuzz::Face::from_slice(&loaded.data, loaded.index)
         .ok_or_else(|| Refusal::Writer("a face could not be read for shaping".to_owned()))?;
     let mut buffer = rustybuzz::UnicodeBuffer::new();
-    buffer.push_str(&paragraph.text[range.clone()]);
+    buffer.push_str(&paragraph.text[range.clone()].replace('\t', " "));
     buffer.guess_segment_properties();
     buffer.set_direction(rustybuzz::Direction::LeftToRight);
     let output = rustybuzz::shape(&shaper, &[], buffer);
@@ -116,25 +120,12 @@ fn shape_segment(
 /// Where a paragraph's lines break, as byte ranges of its text: the first
 /// line `first` points wide and the rest `rest`.
 pub(crate) fn lines(text: &str, glyphs: &[Glyph], first: f32, rest: f32) -> Vec<Range<usize>> {
-    let breaks: Vec<(usize, bool)> = linebreaks(text)
-        .map(|(at, kind)| (at, kind == BreakOpportunity::Mandatory))
-        .collect();
+    let breaks = opportunities(text);
     let mut lines = Vec::new();
     let mut start = 0;
     loop {
         let available = if lines.is_empty() { first } else { rest };
-        let mut chosen = None;
-        for &(at, mandatory) in breaks.iter().filter(|(at, _)| *at > start) {
-            if width(text, glyphs, start..at) <= available {
-                chosen = Some(at);
-                if mandatory {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        let end = chosen.unwrap_or_else(|| cut(text, glyphs, start, &breaks, available));
+        let end = line_end(text, glyphs, &breaks, start, available);
         lines.push(start..end);
         start = end;
         if start >= text.len() {
@@ -142,6 +133,121 @@ pub(crate) fn lines(text: &str, glyphs: &[Glyph], first: f32, rest: f32) -> Vec<
         }
     }
     lines
+}
+
+pub(crate) fn tabbed_lines(
+    paragraph: &Paragraph,
+    glyphs: &mut [Glyph],
+    first: f32,
+    rest: f32,
+) -> (Vec<Range<usize>>, HashMap<usize, char>) {
+    let text = &paragraph.text;
+    let breaks = opportunities(text);
+    let mut leaders = HashMap::new();
+    let mut lines = Vec::new();
+    let mut start = 0;
+    loop {
+        let (available, offset) = if lines.is_empty() {
+            (first, paragraph.indent)
+        } else {
+            (rest, 0.0)
+        };
+        leaders.extend(place_tabs(paragraph, glyphs, start, offset));
+        let end = line_end(text, glyphs, &breaks, start, available);
+        lines.push(start..end);
+        start = end;
+        if start >= text.len() {
+            break;
+        }
+    }
+    (lines, leaders)
+}
+
+fn place_tabs(
+    paragraph: &Paragraph,
+    glyphs: &mut [Glyph],
+    start: usize,
+    offset: f32,
+) -> Vec<(usize, char)> {
+    let text = &paragraph.text;
+    let stop_at = text[start..].find('\n').map_or(text.len(), |at| start + at);
+    let on_line: Vec<usize> = (0..glyphs.len())
+        .filter(|&i| (start..stop_at).contains(&glyphs[i].cluster))
+        .collect();
+    let is_tab = |glyph: &Glyph| text[glyph.cluster..].starts_with('\t');
+    let mut leaders = Vec::new();
+    let mut x = 0.0;
+    for (at, &index) in on_line.iter().enumerate() {
+        if !is_tab(&glyphs[index]) {
+            x += glyphs[index].advance;
+            continue;
+        }
+        let segment: Vec<usize> = on_line[at + 1..]
+            .iter()
+            .copied()
+            .take_while(|&i| !is_tab(&glyphs[i]))
+            .collect();
+        let width: f32 = segment.iter().map(|&i| glyphs[i].advance).sum();
+        let from_margin = x + offset;
+        let stop = paragraph
+            .tabs
+            .iter()
+            .find(|stop| stop.position.points() > from_margin + 0.5);
+        let (target, kind, leader) = match stop {
+            Some(stop) => (stop.position.points() - offset, stop.kind, stop.leader),
+            None => {
+                let next =
+                    ((from_margin / paragraph.tab_distance).floor() + 1.0) * paragraph.tab_distance;
+                (next - offset, TabKind::Left, None)
+            }
+        };
+        let reach = match kind {
+            TabKind::Left => 0.0,
+            TabKind::Right => width,
+            TabKind::Center => width / 2.0,
+            TabKind::Char(mark) => segment
+                .iter()
+                .position(|&i| text[glyphs[i].cluster..].starts_with(mark))
+                .map_or(width, |before| {
+                    segment[..before].iter().map(|&i| glyphs[i].advance).sum()
+                }),
+        };
+        let least = paragraph.runs[glyphs[index].run].style.size * 0.25;
+        let advance = (target - reach - x).max(least);
+        glyphs[index].advance = advance;
+        if let Some(fill) = leader.filter(|_| advance > least) {
+            leaders.push((glyphs[index].cluster, fill));
+        }
+        x += advance;
+    }
+    leaders
+}
+
+fn opportunities(text: &str) -> Vec<(usize, bool)> {
+    linebreaks(text)
+        .map(|(at, kind)| (at, kind == BreakOpportunity::Mandatory))
+        .collect()
+}
+
+fn line_end(
+    text: &str,
+    glyphs: &[Glyph],
+    breaks: &[(usize, bool)],
+    start: usize,
+    available: f32,
+) -> usize {
+    let mut chosen = None;
+    for &(at, mandatory) in breaks.iter().filter(|(at, _)| *at > start) {
+        if width(text, glyphs, start..at) <= available {
+            chosen = Some(at);
+            if mandatory {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    chosen.unwrap_or_else(|| cut(text, glyphs, start, breaks, available))
 }
 
 /// Where a line with no break that fits is cut: after as many whole clusters
@@ -238,5 +344,56 @@ mod tests {
     #[test]
     fn an_empty_paragraph_is_one_empty_line() {
         assert_eq!(broken("", 30.0, 30.0), [""]);
+    }
+
+    fn tabbed(text: &str, tabs: Vec<odox_core::TabStop>) -> (Vec<f32>, HashMap<usize, char>) {
+        let style = crate::model::Style {
+            family: String::new(),
+            variant: odox_fonts::Variant::default(),
+            size: 12.0,
+            color: None,
+            background: None,
+            underline: false,
+            strike: false,
+            rise: 0.0,
+            link: None,
+        };
+        let mut paragraph = Paragraph::plain(text, &style);
+        paragraph.tabs = tabs;
+        paragraph.tab_distance = 50.0;
+        let mut shaped = glyphs(text);
+        let (_, leaders) = tabbed_lines(&paragraph, &mut shaped, 1000.0, 1000.0);
+        let advances = shaped
+            .iter()
+            .filter(|g| text[g.cluster..].starts_with('\t'))
+            .map(|g| g.advance)
+            .collect();
+        (advances, leaders)
+    }
+
+    fn stop(at: f32, kind: TabKind, leader: Option<char>) -> odox_core::TabStop {
+        odox_core::TabStop {
+            position: odox_core::Length(at),
+            kind,
+            leader,
+        }
+    }
+
+    #[test]
+    fn a_tab_goes_to_its_stop_as_the_stop_says() {
+        let right = stop(200.0, TabKind::Right, Some('.'));
+        let (advances, leaders) = tabbed("ab\tcd", vec![right]);
+        assert_eq!(advances, [200.0 - 20.0 - 20.0]);
+        assert_eq!(leaders.get(&2), Some(&'.'));
+        let centre = stop(200.0, TabKind::Center, None);
+        assert_eq!(tabbed("ab\tcd", vec![centre]).0, [200.0 - 10.0 - 20.0]);
+        let decimal = stop(200.0, TabKind::Char('.'), None);
+        assert_eq!(tabbed("a\t12.5", vec![decimal]).0, [200.0 - 20.0 - 10.0]);
+    }
+
+    #[test]
+    fn past_the_stops_a_tab_goes_to_the_next_default_one() {
+        let left = stop(30.0, TabKind::Left, None);
+        assert_eq!(tabbed("a\tb\tc", vec![left]).0, [20.0, 10.0]);
     }
 }

@@ -1,8 +1,8 @@
 //! A text document read into the blocks an export lays out.
 //!
 //! The reading follows the window's (`odox-ui`'s flow): the same elements are
-//! blocks, the same ones pass their text through, a tab is the same four
-//! spaces, a footnote is its citation, and a picture anchored in a paragraph
+//! blocks, the same ones pass their text through, a tab goes to the same
+//! stop, a footnote is its citation, and a picture anchored in a paragraph
 //! comes after it. What the window draws is what the PDF holds, in the same
 //! order.
 //
@@ -15,7 +15,7 @@ use krilla::tagging::ListNumbering;
 use odox_core::edit::{self, Description};
 use odox_core::{
     Border, Break, Color, Document, Edges, Element, Family, Length, Measure, Node, Ns, Position,
-    Properties, TextAlign, TextProperties,
+    Properties, TabStop, TextAlign, TextProperties,
 };
 use odox_fonts::Variant;
 
@@ -25,6 +25,7 @@ pub(crate) const DEFAULT_SIZE: f32 = 12.0;
 pub(crate) const SCRIPT_SCALE: f32 = 0.58;
 /// How large a footnote's citation is, as a proportion of its run.
 const CITATION_SCALE: f32 = 0.7;
+const TAB_DISTANCE: f32 = 1.25 / 2.54 * 72.0;
 /// How far each list level is indented.
 const LIST_STEP: f32 = 18.0;
 /// The space a list label is drawn in, left of its item's text.
@@ -65,6 +66,8 @@ pub(crate) struct Paragraph {
     /// A new page before it, or after it.
     pub page_before: bool,
     pub page_after: bool,
+    pub tabs: Vec<TabStop>,
+    pub tab_distance: f32,
 }
 
 impl Paragraph {
@@ -90,6 +93,8 @@ impl Paragraph {
             border: Edges::default(),
             page_before: false,
             page_after: false,
+            tabs: Vec::new(),
+            tab_distance: TAB_DISTANCE,
         }
     }
 }
@@ -305,6 +310,8 @@ impl Reader<'_> {
             border: p.border,
             page_before: p.break_before == Some(Break::Page),
             page_after: p.break_after == Some(Break::Page),
+            tabs: p.tab_stops.clone().unwrap_or_default(),
+            tab_distance: p.tab_distance.map_or(TAB_DISTANCE, Length::points),
         }));
         for (element, path) in anchored {
             let outer = std::mem::replace(&mut self.path, path);
@@ -352,7 +359,9 @@ impl Reader<'_> {
         let current = style(inherited, size, link);
         for (index, child) in parent.children.iter().enumerate() {
             match child {
-                Node::Text(t) | Node::CData(t) => text.push(t, &current, inherited),
+                Node::Text(t) | Node::CData(t) => {
+                    text.push(&t.replace('\t', ""), &current, inherited);
+                }
                 Node::Comment(_) | Node::ProcessingInstruction(_) => {}
                 Node::Element(element) => {
                     path.push(index);
@@ -360,7 +369,7 @@ impl Reader<'_> {
                         let count = element.attr_usize(&Ns::Text, "c").unwrap_or(1);
                         text.push(&" ".repeat(count.min(256)), &current, inherited);
                     } else if element.is(&Ns::Text, "tab") {
-                        text.push("    ", &current, inherited);
+                        text.push("\t", &current, inherited);
                     } else if element.is(&Ns::Text, "line-break") {
                         text.push("\n", &current, inherited);
                     } else if element.is(&Ns::Text, "span") || element.is(&Ns::Text, "a") {
@@ -627,7 +636,7 @@ impl Text {
         // PDF/UA file may not hold as a glyph, is left out.
         let shown: String = shown
             .chars()
-            .filter(|&c| c == '\n' || !(c.is_control() || is_invisible(c)))
+            .filter(|&c| c == '\n' || c == '\t' || !(c.is_control() || is_invisible(c)))
             .collect();
         if shown.is_empty() {
             return;
