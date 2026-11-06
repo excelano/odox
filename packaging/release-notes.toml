@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.11.0"
+version = "0.12.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Documents open fitted to the width of the window, and 100% now shows a page at its printed size. Ctrl with the mouse wheel zooms and keeps your place in the document. The outline starts hidden; View > Show the side panel brings it back."
+whats-new = "Page up and Page down buttons sit under the page, and the keys now scroll while reading. Insert a table from the toolbar or Format > Table, add and remove its rows and columns, and move between cells with Tab. Exporting a PDF no longer stops the window while it works."
 
 [products.xodt.locales.de-de]
-whats-new = "Dokumente öffnen sich an die Fensterbreite angepasst, und 100 % zeigt eine Seite jetzt in Druckgröße. Strg mit dem Mausrad zoomt und behält dabei die Stelle im Dokument bei. Die Gliederung ist anfangs ausgeblendet; Ansicht > Seitenleiste anzeigen blendet sie wieder ein."
+whats-new = "Unter der Seite gibt es die Schaltflächen „Seite nach oben“ und „Seite nach unten“, und die Tasten Bild auf und Bild ab blättern jetzt auch beim Lesen. Fügen Sie über die Symbolleiste oder Format > Tabelle eine Tabelle ein, fügen Sie Zeilen und Spalten hinzu oder entfernen Sie sie, und wechseln Sie mit der Tabulatortaste zwischen den Zellen. Der PDF-Export hält das Fenster nicht mehr an, während er läuft."
 
 [products.xods.locales.en-us]
-whats-new = "100% now shows a sheet at its printed size, and Ctrl with the mouse wheel zooms."
+whats-new = "Values you type take the cell's number format: currencies, percentages, dates and times appear as the cell says. Ctrl+Tab and Ctrl+Page Down move between sheets. Typing quickly into a cell no longer drops keys, and exporting a PDF no longer stops the window."
 
 [products.xods.locales.de-de]
-whats-new = "100 % zeigt eine Tabelle jetzt in Druckgröße, und Strg mit dem Mausrad zoomt."
+whats-new = "Eingegebene Werte übernehmen das Zahlenformat der Zelle: Währungen, Prozente, Datum und Uhrzeit erscheinen so, wie die Zelle es vorgibt. Strg+Tab und Strg+Bild ab wechseln zwischen den Blättern. Schnelles Tippen in eine Zelle verliert keine Tasten mehr, und der PDF-Export hält das Fenster nicht mehr an."
 
 [products.xodp.locales.en-us]
-whats-new = "Presentations open fitted to the window, and 100% now shows a slide at its printed size. Ctrl with the mouse wheel zooms; View > Fit to the window fits it again."
+whats-new = "Exporting a PDF no longer stops the window while it works, and File > New opens its own window on every system."
 
 [products.xodp.locales.de-de]
-whats-new = "Präsentationen öffnen sich an das Fenster angepasst, und 100 % zeigt eine Folie jetzt in Druckgröße. Strg mit dem Mausrad zoomt; Ansicht > An das Fenster anpassen passt sie wieder an."
+whats-new = "Der PDF-Export hält das Fenster nicht mehr an, während er läuft, und Datei > Neu öffnet auf jedem System ein eigenes Fenster."
