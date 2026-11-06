@@ -10,6 +10,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod comment;
 mod fill;
 mod freeze;
 mod hide;
@@ -19,6 +20,7 @@ mod restructure;
 mod sheets;
 mod size;
 mod sort;
+pub use comment::Comment;
 pub use fill::Block;
 pub use freeze::Frozen;
 pub use merge::Merged;
