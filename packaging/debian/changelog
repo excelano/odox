@@ -1,3 +1,13 @@
+odox (0.11.0) unstable; urgency=low
+
+  * Release notes for 0.11.0: fit to the window, printed size at 100%, Ctrl+wheel zoom, outline hidden at start
+  * Zoom keeps its place, and 100% is printed size in all three applications
+  * xodt: open fitted to the window's width, at true size, with the outline hidden
+  * Store listing: the Microsoft Store's support info is the account's contact details
+  * Store listing: the support URL is excelano.com/support with the app and store filled in
+
+ -- David M. Anderson <david.anderson@excelano.com>  Thu, 05 Nov 2026 18:05:37 -0600
+
 odox (0.10.1) unstable; urgency=low
 
   * Release notes for 0.10.1: zip 9.1 fixes GHSA-m665-v7pm-7grj (critical) and four high/medium advisories in archive reading
