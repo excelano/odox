@@ -23,6 +23,7 @@ pub use restructure::{Blocked, Restructure};
 use std::ops::Range;
 
 use super::Document;
+use crate::data_style::DataStyle;
 use crate::edit::Refused;
 use crate::media_type;
 use crate::value::Length;
@@ -133,13 +134,15 @@ pub enum Value {
 }
 
 impl Value {
-    /// What a person typed into a cell, read the way a spreadsheet reads it: a
-    /// number is a number, `true` and `false` are booleans, nothing is empty,
-    /// and anything else is text.
+    /// What a person typed into a cell with no number format, read the way a
+    /// spreadsheet reads it: a number is a number, a number followed by `%` is a
+    /// percentage, `true` and `false` are booleans, nothing is empty, and
+    /// anything else is text.
     ///
     /// A formula is not recognised here, because nothing in this version
-    /// evaluates one; text beginning with `=` is text. Percentages, currencies
-    /// and dates need the document's number formats to read and are text too.
+    /// evaluates one; text beginning with `=` is text. A currency or a date
+    /// needs the cell's number format to read, which is
+    /// [`SheetDocument::read_input`].
     pub fn from_input(input: &str) -> Self {
         let trimmed = input.trim();
         if trimmed.is_empty() {
@@ -151,24 +154,27 @@ impl Value {
         if trimmed.eq_ignore_ascii_case("false") {
             return Self::Boolean(false);
         }
-        if let Ok(number) = trimmed.parse::<f64>()
-            && number.is_finite()
-            && !trimmed.contains(['i', 'n', 'I', 'N'])
-        {
+        let plain = |text: &str| {
+            text.parse::<f64>()
+                .ok()
+                .filter(|n| n.is_finite() && !text.contains(['i', 'n', 'I', 'N']))
+        };
+        if let Some(number) = plain(trimmed) {
             return Self::Number(number);
+        }
+        if let Some(number) = trimmed.strip_suffix('%').and_then(|n| plain(n.trim_end())) {
+            return Self::Percentage(number / 100.0);
         }
         Self::Text(input.to_owned())
     }
 
     /// The text a person edits for the value: a number's plain spelling, a
-    /// date's or a duration's ISO form, `TRUE` and `FALSE`, the text itself.
-    /// What [`Self::from_input`] reads back into the same value where it can,
-    /// which is not everywhere: a percentage, a currency or a date typed again
-    /// comes back as the number or the text it reads as, because reading it as
-    /// what it was needs the number format the cell carries.
+    /// percentage with its `%`, a date's or a duration's ISO form, `TRUE` and
+    /// `FALSE`, the text itself. What [`SheetDocument::read_input`] reads back
+    /// into the same value.
     pub fn input_text(&self) -> String {
         match self {
-            Self::Percentage(n) => n.to_string(),
+            Self::Percentage(n) => format!("{}%", shortest(n * 100.0)),
             _ => self.cached_text(),
         }
     }
@@ -181,7 +187,7 @@ impl Value {
         match self {
             Self::Empty => String::new(),
             Self::Number(n) | Self::Currency(n, _) => n.to_string(),
-            Self::Percentage(n) => format!("{}%", n * 100.0),
+            Self::Percentage(n) => format!("{}%", shortest(n * 100.0)),
             Self::Date(s) | Self::Time(s) | Self::Text(s) => s.clone(),
             Self::Boolean(true) => "TRUE".to_owned(),
             Self::Boolean(false) => "FALSE".to_owned(),
@@ -200,6 +206,18 @@ impl Value {
                 | Self::Date(_)
                 | Self::Time(_)
         )
+    }
+}
+
+/// A number spelled shortest once the noise of binary arithmetic is rounded
+/// off: `12.34` rather than `12.340000000000002`.
+fn shortest(n: f64) -> String {
+    let rounded = format!("{n:.10}");
+    let trimmed = rounded.trim_end_matches('0').trim_end_matches('.');
+    if trimmed == "-0" {
+        "0".to_owned()
+    } else {
+        trimmed.to_owned()
     }
 }
 
@@ -403,6 +421,27 @@ impl SheetDocument {
     ) -> Result<(), Refused> {
         self.can_edit(sheet, row, column)?;
         let index = self.sheets.get(sheet).ok_or(Refused::NotFound)?;
+        let format = self.data_style_name(index, row, column);
+        let value = match value {
+            Value::Currency(amount, None) => Value::Currency(
+                *amount,
+                self.cell(index, row, column)
+                    .and_then(|cell| {
+                        cell.element
+                            .attr(&Ns::Office, "currency")
+                            .map(ToOwned::to_owned)
+                    })
+                    .or_else(|| {
+                        format
+                            .and_then(|name| self.document.styles.data_styles().get(name))
+                            .and_then(DataStyle::currency_code)
+                    }),
+            ),
+            other => other.clone(),
+        };
+        let text = format
+            .and_then(|name| self.document.styles.data_styles().format(name, &value))
+            .unwrap_or_else(|| value.cached_text());
         let table_position = index.table;
         let range = index
             .row_range(row)
@@ -423,9 +462,58 @@ impl SheetDocument {
         let row_element = reach_row(table, range.as_ref(), row, rows_written, &names)?;
         let cell_index = reach_cell(row_element, column, &names);
         let cell = row_element.at_mut(&[cell_index]).ok_or(Refused::NotFound)?;
-        write_value(cell, value, &names, calcext);
+        write_value(cell, &value, &text, &names, calcext);
         self.reindex();
         Ok(())
+    }
+
+    /// The name of the data style a cell is shown in: its own cell style's, or
+    /// its column's default cell style's.
+    fn data_style_name(&self, sheet: &Sheet, row: usize, column: usize) -> Option<&str> {
+        let cell = self.cell(sheet, row, column);
+        let named = cell.as_ref().and_then(Cell::style_name);
+        let from_column = sheet
+            .columns
+            .get(column)
+            .and_then(|c| c.default_cell_style.as_deref());
+        self.document.styles.data_style_of(named.or(from_column)?)
+    }
+
+    /// The data style a cell is shown in, by sheet, row and column.
+    pub fn data_style(&self, sheet: usize, row: usize, column: usize) -> Option<&DataStyle> {
+        let name = self.data_style_name(self.sheets.get(sheet)?, row, column)?;
+        self.document.styles.data_styles().get(name)
+    }
+
+    /// What a person typed into a cell, read in the cell's own format where it
+    /// has one and fits, and otherwise as [`Value::from_input`] reads it.
+    pub fn read_input(&self, sheet: usize, row: usize, column: usize, input: &str) -> Value {
+        if input.trim().is_empty() {
+            return Value::Empty;
+        }
+        self.data_style(sheet, row, column)
+            .and_then(|style| style.read_input(input))
+            .unwrap_or_else(|| Value::from_input(input))
+    }
+
+    /// The text a cell is edited from: its value written so that
+    /// [`Self::read_input`] reads it back unchanged, which is the shown text for
+    /// a date or a time and the bare number otherwise.
+    pub fn input_text(&self, sheet: usize, row: usize, column: usize) -> String {
+        let Some(index) = self.sheets.get(sheet) else {
+            return String::new();
+        };
+        let Some(cell) = self.cell(index, row, column) else {
+            return String::new();
+        };
+        let value = cell.value();
+        match value {
+            Value::Date(_) | Value::Time(_) => self
+                .data_style_name(index, row, column)
+                .and_then(|name| self.document.styles.data_styles().format(name, &value))
+                .unwrap_or_else(|| value.input_text()),
+            _ => value.input_text(),
+        }
     }
 
     /// The `table:table` element of a sheet.
@@ -745,7 +833,7 @@ fn with_count(mut element: Element, count: usize, repeated: &Name) -> Element {
 
 /// Put a value into a cell element: the typed attributes and the displayed
 /// paragraphs replaced, the style and everything else kept.
-fn write_value(cell: &mut Element, value: &Value, names: &CellNames, calcext: bool) {
+fn write_value(cell: &mut Element, value: &Value, text: &str, names: &CellNames, calcext: bool) {
     for local in [
         "value-type",
         "value",
@@ -796,7 +884,6 @@ fn write_value(cell: &mut Element, value: &Value, names: &CellNames, calcext: bo
         Value::Time(s) => cell.set_attr(names.time_value.clone(), s.clone()),
         Value::Boolean(b) => cell.set_attr(names.boolean_value.clone(), b.to_string()),
     }
-    let text = value.cached_text();
     if !text.is_empty() {
         for line in text.split('\n') {
             let mut paragraph = Element::new("", "p", Ns::Text);

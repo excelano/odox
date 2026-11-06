@@ -190,6 +190,11 @@ pub struct TextView {
     begin: bool,
     export: Export,
     scroll: Scroll,
+    /// The size asked of a table to put in, while the question is up.
+    table_size: Option<(usize, usize)>,
+    /// The size the question was answered with, put in on the next frame.
+    table_wanted: Option<(usize, usize)>,
+    notice: Option<Notice>,
 }
 
 impl Default for TextView {
@@ -206,6 +211,9 @@ impl Default for TextView {
             begin: false,
             export: Export::default(),
             scroll: Scroll::default(),
+            table_size: None,
+            table_wanted: None,
+            notice: None,
         }
     }
 }
@@ -329,7 +337,9 @@ impl View for TextView {
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let edit_mode = editing.on && !editing.asking && !self.export.asking();
+        let asked = self.table_size.is_some();
+        self.ask_table_size(ui.ctx());
+        let edit_mode = editing.on && !editing.asking && !self.export.asking() && !asked;
         if !editing.on {
             self.page.clear();
         }
@@ -354,6 +364,7 @@ impl View for TextView {
         let margin = MARGIN * scale;
 
         if edit_mode && let Some(root) = document.body_path() {
+            let text_width = document.text_width();
             let Document {
                 content, styles, ..
             } = &mut document.document;
@@ -364,21 +375,19 @@ impl View for TextView {
                 self.page
                     .select(Selection::caret(egui_richedit::Position::new(first, 0)));
             }
-            let pressed = toolbar::text(ui, &self.page, &model);
-            let command = self.command.take();
-            let mark = pressed.mark.or(match command {
-                Some(Command::Mark(mark)) => Some(mark),
-                _ => None,
-            });
-            let block = pressed.block.or(match command {
-                Some(Command::Block(block)) => Some(block),
-                _ => None,
-            });
-            if let Some(mark) = mark {
-                self.page.toggle(&mut model, mark);
+            let asked = toolbar_commands(
+                ui,
+                &mut self.page,
+                &mut model,
+                self.command.take(),
+                self.table_wanted.take(),
+                text_width,
+            );
+            if asked.size {
+                self.table_size = Some((2, 3));
             }
-            if let Some(block) = block {
-                model.apply_block(&mut self.page, block);
+            if asked.notice.is_some() {
+                self.notice = asked.notice;
             }
             self.menu = MenuState::of(&self.page, &model, true);
             ui.separator();
@@ -402,6 +411,7 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
+                table_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -491,7 +501,7 @@ impl View for TextView {
     }
 
     fn take_notice(&mut self) -> Option<Notice> {
-        self.export.take_notice()
+        self.notice.take().or_else(|| self.export.take_notice())
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {
@@ -509,6 +519,49 @@ impl View for TextView {
 }
 
 impl TextView {
+    /// Ask how many rows and columns a table is to have, while the question
+    /// is up, and keep the answer for the page to put in.
+    fn ask_table_size(&mut self, ctx: &egui::Context) {
+        let Some((rows, columns)) = &mut self.table_size else {
+            return;
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("insert-table")).show(ctx, |ui| {
+            ui.heading(t("Insert a table"));
+            ui.add_space(6.0);
+            egui::Grid::new(egui::Id::unique("table-size")).show(ui, |ui| {
+                ui.label(t("Rows"));
+                ui.add(egui::DragValue::new(rows).range(1..=200));
+                ui.end_row();
+                ui.label(t("Columns"));
+                ui.add(egui::DragValue::new(columns).range(1..=20));
+                ui.end_row();
+            });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("Insert")).clicked()
+                    || ui.input(|input| input.key_pressed(egui::Key::Enter))
+                {
+                    answer = Some(true);
+                }
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input(|input| input.key_pressed(egui::Key::Escape))
+                {
+                    answer = Some(false);
+                }
+            });
+        });
+        match answer {
+            Some(true) => {
+                self.table_wanted = Some((*rows, *columns));
+                self.table_size = None;
+                ctx.request_repaint();
+            }
+            Some(false) => self.table_size = None,
+            None => {}
+        }
+    }
+
     /// Load the faces the document's styles name, once, when it opens.
     ///
     /// egui rebuilds its glyph atlas when the font definitions change, so this
@@ -522,5 +575,89 @@ impl TextView {
             parts.push(styles);
         }
         fonts::install(ctx, &parts);
+    }
+}
+
+/// What the window says when a change to a table is refused.
+fn table_refused(refused: &odox_core::Refused) -> String {
+    match refused {
+        odox_core::Refused::Structure => t(
+            "This table has merged or repeated cells, so its rows and columns are left as they are.",
+        )
+        .to_owned(),
+        _ => t("The table could not be changed here.").to_owned(),
+    }
+}
+
+/// Tab and Shift+Tab in a table move from cell to cell rather than typing a
+/// tab, while the page has the keyboard.
+fn table_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
+    if !page.has_focus(ui.ctx()) {
+        return;
+    }
+    let tab = ui.input(|input| {
+        input.events.iter().find_map(|event| match event {
+            egui::Event::Key {
+                key: egui::Key::Tab,
+                pressed: true,
+                modifiers,
+                ..
+            } if !modifiers.command => Some(!modifiers.shift),
+            _ => None,
+        })
+    });
+    if let Some(forward) = tab
+        && model.step_cell(page, forward)
+    {
+        ui.input_mut(|input| {
+            input.consume_key(egui::Modifiers::SHIFT, egui::Key::Tab);
+            input.consume_key(egui::Modifiers::NONE, egui::Key::Tab);
+        });
+    }
+}
+
+/// What the toolbar and the Format menu asked for that the view carries on
+/// with: the question of a table's size, and a refusal to tell.
+struct Asked {
+    size: bool,
+    notice: Option<Notice>,
+}
+
+/// The toolbar over the page, and what it or the Format menu asked for: a
+/// mark, a kind of paragraph, a table or a change to the one the caret is in.
+/// A table the size question was answered with goes in here too.
+fn toolbar_commands(
+    ui: &mut Ui,
+    page: &mut PageEditor,
+    model: &mut FlowModel<'_>,
+    command: Option<Command>,
+    wanted: Option<(usize, usize)>,
+    width: f32,
+) -> Asked {
+    let pressed = toolbar::text(ui, page, model);
+    let mark = pressed.mark.or(match command {
+        Some(Command::Mark(mark)) => Some(mark),
+        _ => None,
+    });
+    let block = pressed.block.or(match command {
+        Some(Command::Block(block)) => Some(block),
+        _ => None,
+    });
+    if let Some(mark) = mark {
+        page.toggle(model, mark);
+    }
+    if let Some(block) = block {
+        model.apply_block(page, block);
+    }
+    let changed = match (command, wanted) {
+        (Some(Command::Table(change)), _) => Some(model.edit_table(page, change)),
+        (_, Some((rows, columns))) => Some(model.insert_table(page, rows, columns, width)),
+        _ => None,
+    };
+    Asked {
+        size: pressed.table || command == Some(Command::InsertTable),
+        notice: changed
+            .and_then(Result::err)
+            .map(|refused| Notice::Problem(table_refused(&refused))),
     }
 }

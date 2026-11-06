@@ -318,9 +318,23 @@ so an installation nobody has configured has no file.
 **A cell is edited in place.** Typing on the picked cell replaces it, Enter or
 F2 opens it with what it holds, Enter commits and moves down, Tab commits and
 moves right, Escape puts it back, and Delete clears it; the text box sits in
-the cell in the cell's own font. What is typed is read the way a spreadsheet
-reads it: a number is a number, `true` and `false` are booleans, anything else
-is text, and a formula is not recognised. A cell that holds a formula is not
+the cell in the cell's own font, taking every key from the first, however fast
+they come. What is typed is read in the cell's number format, the data style its
+cell style or its column's default cell style names: `1234.5` or `$1,234.50` in
+a currency cell is the amount, with the cell's currency or the one its symbol
+names, `15` or `15%` in a percentage cell is fifteen percent, `3/9/26` in a
+date cell written month first is the ninth of March, `9:30 pm` in a time cell is
+that time, and the separators are those of the format's language. The cell then
+shows the value as the format writes it, grouping, decimals, symbol, the
+section a `style:map` condition chooses, and month and day names, so a typed
+value looks as LibreOffice would show it; `corpus/libreoffice/formats.ods` is
+the measure. What does not fit the format, and anything typed into a cell with
+none, is read the way a spreadsheet reads it: a number is a number, a number
+with `%` a percentage, `true` and `false` are booleans, anything else is text,
+and a formula is not recognised. A cell opens for editing with what reads back
+to its value: a percentage with its `%`, a date or a time as its format shows
+it. The colour a format gives a section, red for a negative amount, is not drawn.
+A cell that holds a formula is not
 opened, and once a value in the document has changed every formula's cached
 result is drawn faint, because which of them went stale cannot be told without
 evaluating them and a spreadsheet application recalculates on opening the
@@ -332,8 +346,8 @@ table.** A press picks the cell under it, Shift or a drag stretches the
 selection to another, and the range is the rectangle between the two corners.
 Copy and cut hand over the cells as tab separated rows, each as it is
 displayed, which is what every other program can read, and as an HTML table of
-the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a typed value
-would be read, from the top left of the selection. A paste, a cut or a delete is
+the same cells, which a word processor pastes as a table; paste reads the same shape back, each cell as a value typed
+into the cell it lands in would be read, from the top left of the selection. A paste, a cut or a delete is
 one undo step and is all or nothing: if any cell it reaches holds a formula or
 lies under a merge, none is written and the cell bar says which. Emptying a
 range leaves cells the document never wrote unwritten.
@@ -485,6 +499,24 @@ with the rest. A range with an end inside a table, a cell or a frame it does
 not wholly contain takes the selected text out of each paragraph it covers
 and leaves every paragraph and cell standing, so Backspace at the start of a
 cell does nothing.
+
+**A table is put in and reshaped from the Format menu's Table submenu, and the
+toolbar's Table button.** The button and Insert a table ask how many rows and
+columns, two by three to begin with, and the table goes after the caret's
+paragraph, or before it where the paragraph is empty, with an empty paragraph
+after it where nothing follows, and the caret in its first cell. It is written
+as `LibreOffice` writes one (`odox-core/src/edit/table.rs`): an automatic table
+style as wide as the text, a column style per width, thin-bordered cells with
+the document's table-contents paragraph style where it has one. Rows and columns
+go in above, below, left and right of the caret's cell and come out with it;
+the last row or column out takes the table, and Delete table takes it at once.
+The window draws columns at the widths their styles give, so a column put in
+shares the width of the one it goes beside and a column taken out gives its
+width to its neighbour, keeping the table as wide as it was. A table with merged
+or repeated cells keeps its rows and columns, and the window says why. Tab in a
+table selects what the next cell holds and Shift+Tab the one before, row by
+row, and Tab in the last cell puts in a row and goes to its first. Each change
+is one step to undo.
 
 The caret stands in the paragraph's flat text, and what is drawn is not that
 text character for character: a tab is drawn as spaces, a note as its

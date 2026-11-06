@@ -5,6 +5,7 @@
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText, Ui};
 use egui_richedit::{Mark, Model};
+use odox_core::edit::TableEdit;
 
 use crate::i18n::t;
 use crate::{Block, FlowModel, PageEditor};
@@ -31,6 +32,8 @@ pub struct Pressed {
     pub mark: Option<Mark>,
     /// A kind of paragraph's button, for the model to apply.
     pub block: Option<Block>,
+    /// The table button, which asks how many rows and columns.
+    pub table: bool,
 }
 
 /// The marks, and after them the kinds of paragraph: body text, three
@@ -62,6 +65,11 @@ pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed 
                     pressed.block = Some(block);
                 }
             }
+            ui.separator();
+            pressed.table = ui
+                .button(t("Table"))
+                .on_hover_text(t("Insert a table"))
+                .clicked();
         });
     });
     pressed
@@ -119,6 +127,10 @@ pub enum Command {
     Mark(Mark),
     /// A kind of paragraph.
     Block(Block),
+    /// Ask how large a table to put in.
+    InsertTable,
+    /// Change the table the caret is in.
+    Table(TableEdit),
 }
 
 /// The kinds of paragraph, in the order the toolbar and the menu offer them.
@@ -148,6 +160,7 @@ fn block_name(block: Block) -> &'static str {
 pub struct MenuState {
     enabled: bool,
     blocks: bool,
+    in_table: bool,
     marks: Vec<Mark>,
     kinds: Vec<Block>,
 }
@@ -165,6 +178,7 @@ impl MenuState {
         Self {
             enabled: true,
             blocks,
+            in_table: blocks && model.in_table(selection),
             marks: Mark::ALL
                 .into_iter()
                 .filter(|mark| editor.marked(model, *mark) == Some(true))
@@ -219,6 +233,36 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
                 ui.close();
             }
         }
+        ui.separator();
+        ui.add_enabled_ui(state.enabled, |ui| {
+            ui.menu_button(t("Table"), |ui| {
+                if ui.button(t("Insert a table…")).clicked() {
+                    chosen = Some(Command::InsertTable);
+                    ui.close();
+                }
+                ui.separator();
+                for (edit, name) in [
+                    (TableEdit::RowAbove, t("Insert row above")),
+                    (TableEdit::RowBelow, t("Insert row below")),
+                    (TableEdit::ColumnLeft, t("Insert column left")),
+                    (TableEdit::ColumnRight, t("Insert column right")),
+                    (TableEdit::DeleteRow, t("Delete row")),
+                    (TableEdit::DeleteColumn, t("Delete column")),
+                    (TableEdit::DeleteTable, t("Delete table")),
+                ] {
+                    if matches!(edit, TableEdit::DeleteRow) {
+                        ui.separator();
+                    }
+                    if ui
+                        .add_enabled(state.in_table, egui::Button::new(name))
+                        .clicked()
+                    {
+                        chosen = Some(Command::Table(edit));
+                        ui.close();
+                    }
+                }
+            });
+        });
     }
     chosen
 }

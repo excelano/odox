@@ -15,7 +15,7 @@ use std::ops::Range;
 
 use eframe::egui::Id;
 use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
-use odox_core::edit::{self, html, is_paragraph};
+use odox_core::edit::{self, TableEdit, html, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles};
 
 use crate::Editing;
@@ -314,6 +314,125 @@ impl<'a> FlowModel<'a> {
             });
         }
         true
+    }
+
+    /// Whether the paragraph a selection ends in is in a table.
+    pub fn in_table(&self, selection: &Selection<Vec<usize>>) -> bool {
+        let path = [self.root.as_slice(), &selection.focus.paragraph].concat();
+        edit::table_at(self.content, &path).is_some()
+    }
+
+    /// Put a table of `rows` by `columns` beside the paragraph the caret is
+    /// in, as wide as `width` points, as one step to undo, with the caret in
+    /// its first cell.
+    ///
+    /// # Errors
+    ///
+    /// What the edit refused, with the document left as it was.
+    pub fn insert_table(
+        &mut self,
+        editor: &mut PageEditor,
+        rows: usize,
+        columns: usize,
+        width: f32,
+    ) -> Result<(), Refused> {
+        self.structural(editor, |content, paragraph, styles| {
+            edit::insert_table(content, paragraph, rows, columns, width, styles)
+        })
+    }
+
+    /// Change the table the caret is in, as one step to undo.
+    ///
+    /// # Errors
+    ///
+    /// What the edit refused, with the document left as it was.
+    pub fn edit_table(
+        &mut self,
+        editor: &mut PageEditor,
+        change: TableEdit,
+    ) -> Result<(), Refused> {
+        self.structural(editor, |content, paragraph, styles| {
+            edit::edit_table(content, paragraph, change, styles)
+        })
+    }
+
+    /// Tab and Shift+Tab in a table: select what the next cell or the one
+    /// before holds, and past the last cell put in a row and go to its first.
+    /// Answers whether the caret was in a table, and so whether the key was
+    /// this one's.
+    pub fn step_cell(&mut self, editor: &mut PageEditor, forward: bool) -> bool {
+        let Some(selection) = editor.selection().cloned() else {
+            return false;
+        };
+        let path = [self.root.as_slice(), &selection.focus.paragraph].concat();
+        if edit::table_at(self.content, &path).is_none() {
+            return false;
+        }
+        if let Some(next) = edit::step_cell(self.content, &path, forward) {
+            if let Some(paragraph) = next
+                .strip_prefix(self.root.as_slice())
+                .map(<[usize]>::to_vec)
+            {
+                let length = self.text(&paragraph).map_or(0, |t| t.chars().count());
+                editor.select(Selection {
+                    anchor: Position::new(paragraph.clone(), 0),
+                    focus: Position::new(paragraph, length),
+                });
+            }
+            return true;
+        }
+        if forward {
+            let _ = self.structural(editor, |content, paragraph, styles| {
+                let mut caret = edit::edit_table(content, paragraph, TableEdit::RowBelow, styles)?;
+                while let Some(previous) = edit::table_at(content, &caret)
+                    .filter(|place| place.column > 0)
+                    .and_then(|_| edit::step_cell(content, &caret, false))
+                {
+                    caret = previous;
+                }
+                Ok(caret)
+            });
+        }
+        true
+    }
+
+    /// An edit to the tree around the caret's paragraph that answers where the
+    /// caret goes: tried on the tree, put back if refused, and otherwise
+    /// recorded as one step to undo with the caret where it said.
+    fn structural(
+        &mut self,
+        editor: &mut PageEditor,
+        change: impl FnOnce(&mut Element, &[usize], &mut Styles) -> Result<Vec<usize>, Refused>,
+    ) -> Result<(), Refused> {
+        let selection = editor.selection().cloned().ok_or(Refused::NotFound)?;
+        let before = self.content.clone();
+        let had = self
+            .content
+            .child(&Ns::Office, "automatic-styles")
+            .is_some();
+        let root = self.root.clone();
+        let path = [root.as_slice(), &selection.focus.paragraph].concat();
+        let caret = match change(self.content, &path, self.styles) {
+            Ok(caret) => caret,
+            Err(refused) => {
+                *self.content = before;
+                return Err(refused);
+            }
+        };
+        let paragraph = caret
+            .strip_prefix(root.as_slice())
+            .map(<[usize]>::to_vec)
+            .ok_or(Refused::NotFound)?;
+        self.follow_styles(had);
+        self.order = OnceCell::new();
+        let begins = Position::new(
+            [self.tag.as_slice(), &selection.focus.paragraph].concat(),
+            selection.focus.offset,
+        );
+        self.editing.touch();
+        self.editing.record_snapshot(before, Some(begins));
+        editor.select(Selection::caret(Position::new(paragraph, 0)));
+        Ok(())
     }
 
     /// What a paragraph is, as HTML says it.

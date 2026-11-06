@@ -1430,6 +1430,17 @@ impl SheetView {
                         let style = document.cell_style(sheet, cell.as_ref(), editor.column);
                         let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
                         let id = egui::Id::unique("cell-editor");
+                        let opened = std::mem::take(&mut editor.opened);
+                        if opened {
+                            ui.memory_mut(|memory| memory.request_focus(id));
+                            let mut state =
+                                egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
+                            let end = egui::text::CCursor::new(editor.text.chars().count());
+                            state
+                                .cursor
+                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
+                            egui::TextEdit::store_state(ui.ctx(), id, state);
+                        }
                         let response = ui.put(
                             rect,
                             egui::TextEdit::singleline(&mut editor.text)
@@ -1444,19 +1455,7 @@ impl SheetView {
                         ui.ctx().accesskit_node_builder(response.id, |node| {
                             node.set_label(address(editor.row, editor.column));
                         });
-                        if editor.opened {
-                            editor.opened = false;
-                            response.request_focus();
-                            // The caret at the end of what is there, rather
-                            // than egui's choice of the start.
-                            let mut state =
-                                egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
-                            let end = egui::text::CCursor::new(editor.text.chars().count());
-                            state
-                                .cursor
-                                .set_char_range(Some(egui::text::CCursorRange::one(end)));
-                            egui::TextEdit::store_state(ui.ctx(), id, state);
-                        } else if response.lost_focus() {
+                        if !opened && response.lost_focus() {
                             outcome = Some(ui.input(|input| {
                                 if input.key_pressed(Key::Escape) {
                                     Outcome::Cancel
@@ -1729,10 +1728,15 @@ impl SheetView {
             return;
         }
         let (typed, open, delete) = ui.input(|input| {
-            let typed = input.events.iter().find_map(|event| match event {
-                Event::Text(text) => Some(text.clone()),
-                _ => None,
-            });
+            let typed: String = input
+                .events
+                .iter()
+                .filter_map(|event| match event {
+                    Event::Text(text) => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect();
+            let typed = (!typed.is_empty()).then_some(typed);
             (
                 typed,
                 input.key_pressed(Key::Enter) || input.key_pressed(Key::F2),
@@ -1754,12 +1758,7 @@ impl SheetView {
             self.notice = Some(notice(&refused));
             return;
         }
-        let original = document
-            .sheets()
-            .get(self.sheet)
-            .and_then(|sheet| document.cell(sheet, row, column))
-            .map(|cell| cell.value().input_text())
-            .unwrap_or_default();
+        let original = document.input_text(self.sheet, row, column);
         let text = typed.unwrap_or_else(|| original.clone());
         self.notice = None;
         self.editor = Some(CellEditor {
@@ -1784,7 +1783,9 @@ impl SheetView {
             self.write(
                 editor.row,
                 editor.column,
-                &Value::from_input(&editor.text),
+                &self.document.as_ref().map_or(Value::Empty, |document| {
+                    document.read_input(self.sheet, editor.row, editor.column, &editor.text)
+                }),
                 editing,
             );
         }
@@ -1849,8 +1850,13 @@ impl SheetView {
     /// Put copied cells down with their top left corner at the selection's,
     /// and select them.
     fn paste(&mut self, text: &str, editing: &mut Editing) {
-        let block = cells_of(text);
         let ((top, left), _) = self.range();
+        let Some(document) = &self.document else {
+            return;
+        };
+        let block = cells_of(text, |down, across, input| {
+            document.read_input(self.sheet, top + down, left + across, input)
+        });
         if self.write_block((top, left), &block, false, editing) {
             let width = block.iter().map(Vec::len).max().unwrap_or(1);
             self.pick((top, left));
@@ -2322,12 +2328,20 @@ fn tab_separated(cells: &[Vec<String>]) -> String {
 }
 
 /// What the clipboard held, as rows of cells: a line is a row and a tab ends a
-/// cell. A final newline ends the last row and does not begin another.
-fn cells_of(text: &str) -> Vec<Vec<Value>> {
+/// cell. A final newline ends the last row and does not begin another. `read`
+/// is given each cell's place in the block, rows then columns down from its
+/// top left, and its text.
+fn cells_of(text: &str, read: impl Fn(usize, usize, &str) -> Value) -> Vec<Vec<Value>> {
     let text = text.replace("\r\n", "\n");
     let text = text.strip_suffix('\n').unwrap_or(&text);
     text.split('\n')
-        .map(|line| line.split('\t').map(Value::from_input).collect())
+        .enumerate()
+        .map(|(down, line)| {
+            line.split('\t')
+                .enumerate()
+                .map(|(across, cell)| read(down, across, cell))
+                .collect()
+        })
         .collect()
 }
 
@@ -2389,7 +2403,7 @@ mod tests {
 
     #[test]
     fn clipboard_text_is_rows_of_cells() {
-        let block = cells_of("a\t1\r\nTRUE\t\n");
+        let block = cells_of("a\t1\r\nTRUE\t\n", |_, _, cell| Value::from_input(cell));
         assert_eq!(block.len(), 2);
         assert!(matches!(&block[0][0], Value::Text(t) if t == "a"));
         assert!(matches!(block[0][1], Value::Number(n) if (n - 1.0).abs() < f64::EPSILON));

@@ -122,3 +122,4 @@ convert odp:impress8 export.odp "OpenDocument Presentation Flat XML" export.fodp
 # by hand, because no text format Calc imports carries header rows, print
 # ranges or page styles.
 convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods
+convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
