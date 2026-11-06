@@ -150,3 +150,21 @@ fn a_cell_with_no_format_reads_a_percentage() {
     };
     assert!((read - 0.1234).abs() < 1e-12);
 }
+
+#[test]
+fn a_negative_amount_takes_the_colour_its_format_gives_it() {
+    let document = formats();
+    let sheet = &document.sheets()[0];
+    let red = odox_core::Color { r: 255, g: 0, b: 0 };
+    assert_eq!(
+        document.value_colour(sheet, 4, 1),
+        Some(red),
+        "dollars negative"
+    );
+    assert_eq!(document.value_colour(sheet, 3, 1), None, "dollars positive");
+    assert_eq!(
+        document.value_colour(sheet, 0, 1),
+        None,
+        "text in no format"
+    );
+}

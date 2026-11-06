@@ -215,7 +215,7 @@ fn a_formula_loses_its_language_prefix_and_keeps_its_cached_value() {
     // The formatted text the producer cached is what a viewer shows, which is
     // why no number format is resolved and no formula is evaluated.
     assert_eq!(cell.text(), "42.50 \u{20ac}");
-    assert!(cell.value().is_numeric());
+    assert!(cell.value().aligns_right());
 }
 
 #[test]
@@ -243,9 +243,10 @@ fn typed_values_read_as_their_types() {
     assert_eq!(value(4), Value::Boolean(true));
     assert_eq!(value(5), Value::Text("plain".to_owned()));
     assert!(
-        !value(5).is_numeric(),
+        !value(5).aligns_right(),
         "text is the one type that is not right-aligned"
     );
+    assert!(value(4).aligns_right(), "a boolean is, as a number is");
 }
 
 #[test]

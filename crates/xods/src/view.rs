@@ -249,6 +249,9 @@ impl Paint<'_> {
             .background
             .map_or(palette, |fill| palette.on(format::color32(fill)));
         let mut format = format::text_format(&style.text, DEFAULT_SIZE, zoom, ground);
+        if let Some(colour) = self.document.value_colour(self.sheet, row, column) {
+            format.color = format::color32(colour);
+        }
         if let Some(highlights) = &self.highlights {
             let hits = highlights.within(&[row, column]);
             if !hits.is_empty() {
@@ -270,7 +273,7 @@ impl Paint<'_> {
             Some(odox_core::TextAlign::End) => Align::Max,
             // Text against the left edge and every other type against the
             // right, which is ODF's own rule.
-            None if cell.value().is_numeric() => Align::Max,
+            None if cell.value().aligns_right() => Align::Max,
             _ => Align::Min,
         };
         let padding = 3.0 * zoom;

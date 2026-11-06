@@ -333,7 +333,8 @@ none, is read the way a spreadsheet reads it: a number is a number, a number
 with `%` a percentage, `true` and `false` are booleans, and anything else is
 text. A cell opens for editing with what reads back to its value: a percentage
 with its `%`, a date or a time as its format shows it, a formula as it is typed.
-The colour a format gives a section, red for a negative amount, is not drawn.
+The colour a format gives a section, red for a negative amount, is the colour
+the value is drawn in, in the window and in the PDF.
 Leaving a cell as it was is not an edit, so stepping through a currency does
 not retype it as a number.
 
