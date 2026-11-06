@@ -360,13 +360,18 @@ impl<'a> FlowModel<'a> {
     /// before holds, and past the last cell put in a row and go to its first.
     /// Answers whether the caret was in a table, and so whether the key was
     /// this one's.
-    pub fn step_cell(&mut self, editor: &mut PageEditor, forward: bool) -> bool {
+    ///
+    /// # Errors
+    ///
+    /// Past the last cell, a row could not be put in, as a table with merged
+    /// or repeated cells refuses one; the key was still this one's.
+    pub fn step_cell(&mut self, editor: &mut PageEditor, forward: bool) -> Result<bool, Refused> {
         let Some(selection) = editor.selection().cloned() else {
-            return false;
+            return Ok(false);
         };
         let path = [self.root.as_slice(), &selection.focus.paragraph].concat();
         if edit::table_at(self.content, &path).is_none() {
-            return false;
+            return Ok(false);
         }
         if let Some(next) = edit::step_cell(self.content, &path, forward) {
             if let Some(paragraph) = next
@@ -379,10 +384,10 @@ impl<'a> FlowModel<'a> {
                     focus: Position::new(paragraph, length),
                 });
             }
-            return true;
+            return Ok(true);
         }
         if forward {
-            let _ = self.structural(editor, |content, paragraph, styles| {
+            self.structural(editor, |content, paragraph, styles| {
                 let mut caret = edit::edit_table(content, paragraph, TableEdit::RowBelow, styles)?;
                 while let Some(previous) = edit::table_at(content, &caret)
                     .filter(|place| place.column > 0)
@@ -391,9 +396,9 @@ impl<'a> FlowModel<'a> {
                     caret = previous;
                 }
                 Ok(caret)
-            });
+            })?;
         }
-        true
+        Ok(true)
     }
 
     /// An edit to the tree around the caret's paragraph that answers where the

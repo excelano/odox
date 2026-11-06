@@ -411,7 +411,7 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
-                table_keys(ui, &mut self.page, &mut model);
+                table_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -590,8 +590,14 @@ fn table_refused(refused: &odox_core::Refused) -> String {
 }
 
 /// Tab and Shift+Tab in a table move from cell to cell rather than typing a
-/// tab, while the page has the keyboard.
-fn table_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
+/// tab, while the page has the keyboard. Why a row could not be put in past
+/// the last cell goes to `notice`.
+fn table_keys(
+    ui: &Ui,
+    page: &mut PageEditor,
+    model: &mut FlowModel<'_>,
+    notice: &mut Option<Notice>,
+) {
     if !page.has_focus(ui.ctx()) {
         return;
     }
@@ -606,13 +612,18 @@ fn table_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
             _ => None,
         })
     });
-    if let Some(forward) = tab
-        && model.step_cell(page, forward)
-    {
+    let Some(forward) = tab else {
+        return;
+    };
+    let stepped = model.step_cell(page, forward);
+    if stepped != Ok(false) {
         ui.input_mut(|input| {
             input.consume_key(egui::Modifiers::SHIFT, egui::Key::Tab);
             input.consume_key(egui::Modifiers::NONE, egui::Key::Tab);
         });
+    }
+    if let Err(refused) = stepped {
+        *notice = Some(Notice::Problem(table_refused(&refused)));
     }
 }
 

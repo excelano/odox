@@ -66,12 +66,13 @@ impl ParagraphJob {
     }
 
     /// A tab the model counts as one character, drawn as one space with room
-    /// before it: about four spaces' worth until [`Self::set_tab_advance`]
+    /// after it: about four spaces' worth until [`Self::set_tab_advance`]
     /// sets how far it reaches.
     pub fn tab(&mut self, format: TextFormat) {
         let start = self.job.text.chars().count();
         let room = format.font_id.size * 0.75;
-        self.job.append(" ", room, format);
+        self.job.append(" ", 0.0, format.clone());
+        self.job.append("", room, format);
         self.tabs.push((self.job.sections.len() - 1, start));
         self.map.push(1, 1, true);
     }
@@ -86,7 +87,7 @@ impl ParagraphJob {
         self.tabs.get(tab).map(|(_, at)| *at)
     }
 
-    /// Set the room before a tab's space, which is how far it reaches.
+    /// Set the room after a tab's space, which is how far it reaches.
     pub fn set_tab_advance(&mut self, tab: usize, room: f32) {
         if let Some(&(section, _)) = self.tabs.get(tab)
             && let Some(section) = self.job.sections.get_mut(section)

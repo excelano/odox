@@ -35,10 +35,9 @@ pub fn start(ctx: &egui::Context, argument: &str) -> std::io::Result<()> {
     }
     let _ = ctx;
     let program = std::env::current_exe()?;
-    std::process::Command::new(program)
-        .arg(argument)
-        .spawn()
-        .map(drop)
+    let mut child = std::process::Command::new(program).arg(argument).spawn()?;
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// Whether this process is a copy started for a new document where the

@@ -271,8 +271,18 @@ fn an_added_slide_follows_its_master_and_names_only_what_it_can_see() {
         "the title before it, not the master's own automatic style"
     );
     let paragraph = title.descendant(&Ns::Text, "p").expect("a paragraph");
-    assert_eq!(paragraph.attr(&Ns::Text, "style-name"), Some("P1"));
     assert!(paragraph.plain_text().is_empty());
+    let looks = paragraph.attr(&Ns::Text, "style-name").expect("a style");
+    let before = frame_of(slides[0].element, "title")
+        .descendant(&Ns::Text, "span")
+        .and_then(|span| span.attr(&Ns::Text, "style-name"))
+        .expect("the title before it has a run");
+    let size = |family, name| deck.document.styles.resolve(&family, name).text.size;
+    assert_eq!(
+        size(odox_core::Family::Paragraph, looks),
+        size(odox_core::Family::Text, before),
+        "the new title types in the size of the one before it"
+    );
     let outline = frame_of(added.element, "outline");
     assert_eq!(
         outline.attr(&Ns::Presentation, "style-name"),
