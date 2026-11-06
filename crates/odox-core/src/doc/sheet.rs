@@ -10,6 +10,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod fill;
 mod freeze;
 mod hide;
 mod merge;
@@ -17,6 +18,7 @@ mod recalc;
 mod restructure;
 mod sheets;
 mod size;
+pub use fill::Block;
 pub use freeze::Frozen;
 pub use merge::Merged;
 pub use recalc::{Place, Recalculated};
@@ -463,6 +465,7 @@ impl SheetDocument {
     ) -> Result<(), Refused> {
         self.can_edit(sheet, row, column)?;
         self.write_cell(sheet, row, column, &Value::Empty, "", Writing::Value)?;
+        self.reindex();
         let name = self.document.name(&Ns::Table, "formula");
         self.cell_element(sheet, row, column)?
             .set_attr(name, formula);

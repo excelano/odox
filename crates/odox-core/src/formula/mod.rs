@@ -15,11 +15,13 @@
 
 mod eval;
 mod parse;
+mod shift;
 mod typed;
 
 pub use eval::{Cells, evaluate};
 pub(crate) use eval::{civil as eval_civil, serial as eval_serial, spelled};
 pub use parse::parse;
+pub use shift::shifted;
 pub use typed::{to_stored, to_typed};
 
 /// A formula, or part of one.

@@ -349,6 +349,21 @@ calls a function outside the core is kept for the application that opens the
 file next, and drawn faint. A value typed or pasted over a formula takes its
 place.
 
+**Cells are filled down and across from the ones beside them**
+(`sheet/fill.rs`). Sheet > Fill down, or Ctrl+D, fills the selection from its
+first row, and Fill right from its first column; a selection one row deep or
+one column wide is filled from the row above or the column to its left. Fill
+right has no key, because Ctrl+R is Reload. The small square at the
+selection's far corner is dragged down or right to fill past it, and a drag
+also goes on with a series the selection starts: numbers or dates a steady
+step apart, text ending in a number (`Item 1`, `Q03`), and day and month
+names in English and German, kept in their case. One cell starts a series of
+names or numbered text, and a lone number or date is copied, as in every
+spreadsheet. A formula is copied with its relative references moved and its
+absolute ones kept, one moved off the sheet's edge becoming `#REF!`, and every
+cell takes its source's cell style. A fill over a merged cell is refused. Each
+fill is one step to undo, and what reads the cells it wrote is worked out again.
+
 **A change works out again every formula that reads it** (`odox-core`'s
 `formula` module and `sheet/recalc.rs`). A document's own results are trusted
 when it opens; when a value changes, every formula that reads the cell, on any
