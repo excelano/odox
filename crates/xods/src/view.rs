@@ -9,7 +9,7 @@ use std::path::Path;
 use eframe::egui::{
     self, Align, Event, FontId, Key, Modifiers, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
+use odox_core::doc::{Block, Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
 use odox_core::formula;
 use odox_core::{Document, Refused};
@@ -360,6 +360,8 @@ enum SheetCommand {
     ShowColumns,
     Merge,
     Unmerge,
+    FillDown,
+    FillRight,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -525,9 +527,17 @@ impl View for SheetView {
                 (t("Merge cells"), SheetCommand::Merge),
                 (t("Unmerge cells"), SheetCommand::Unmerge),
             ];
-            for group in [&entries[..], &shown[..], &merged[..]] {
+            let fills = [
+                (t("Fill down"), SheetCommand::FillDown),
+                (t("Fill right"), SheetCommand::FillRight),
+            ];
+            for group in [&entries[..], &shown[..], &merged[..], &fills[..]] {
                 for &(name, command) in group {
-                    if ui.add_enabled(can, egui::Button::new(name)).clicked() {
+                    let mut button = egui::Button::new(name);
+                    if matches!(command, SheetCommand::FillDown) {
+                        button = button.shortcut_text(ui.ctx().format_shortcut(&FILL_DOWN));
+                    }
+                    if ui.add_enabled(can, button).clicked() {
                         self.sheet_command = Some(command);
                         ui.close();
                     }
@@ -703,6 +713,10 @@ impl SheetView {
             }
             SheetCommand::Merge | SheetCommand::Unmerge => {
                 self.change_merged(command, editing);
+                return;
+            }
+            SheetCommand::FillDown | SheetCommand::FillRight => {
+                self.fill_selection(matches!(command, SheetCommand::FillDown), editing);
                 return;
             }
         };
@@ -1260,6 +1274,7 @@ impl SheetView {
         let mut page_rows = self.page_rows;
         let resizing = self.resizing;
         let mut edge = None;
+        let mut filled = None;
 
         egui::ScrollArea::both()
             .auto_shrink([false, false])
@@ -1651,9 +1666,82 @@ impl SheetView {
                 {
                     pointed = Some((cell, true));
                 }
+
+                // The fill handle at the selection's far corner: dragged down
+                // or right, it shows how far the selection will be filled, and
+                // let go, fills it.
+                let (last_row, last_column) = range_end;
+                let corner = place.at(metrics, last_row, last_column)
+                    + vec2(metrics.column(last_column).1, metrics.row(last_row).1);
+                let clip = pane_of(last_row, last_column).intersect(visible);
+                if clip.contains(corner - vec2(1.0, 1.0)) {
+                    let handle = Rect::from_center_size(corner, vec2(7.0, 7.0));
+                    let colour = ui.visuals().selection.stroke.color;
+                    painter.rect_filled(handle, 0.0, colour);
+                    let grip = ui
+                        .interact(
+                            handle.expand(3.0),
+                            ui.scope_id().with("fill-handle"),
+                            Sense::drag(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::Crosshair);
+                    let reach =
+                        grip.interact_pointer_pos()
+                            .and_then(cell_at)
+                            .and_then(|(row, column)| {
+                                let below = row.saturating_sub(last_row);
+                                let beside = column.saturating_sub(last_column);
+                                if below >= beside && below > 0 {
+                                    Some((true, below))
+                                } else if beside > 0 {
+                                    Some((false, beside))
+                                } else {
+                                    None
+                                }
+                            });
+                    if let Some((down, count)) =
+                        reach.filter(|_| grip.dragged() || grip.drag_stopped())
+                    {
+                        let (to_row, to_column) = if down {
+                            (last_row + count, last_column)
+                        } else {
+                            (last_row, last_column + count)
+                        };
+                        painter.with_clip_rect(visible).rect_stroke(
+                            Rect::from_min_max(
+                                place.at(metrics, range_start.0, range_start.1),
+                                place.at(metrics, to_row, to_column)
+                                    + vec2(metrics.column(to_column).1, metrics.row(to_row).1),
+                            ),
+                            0.0,
+                            Stroke::new(1.5, colour),
+                            StrokeKind::Inside,
+                        );
+                        if grip.drag_stopped() {
+                            filled = Some((down, count));
+                        }
+                    }
+                }
             });
 
         self.page_rows = page_rows;
+        if let Some((down, count)) = filled {
+            let ((top, left), (bottom, right)) = (range_start, range_end);
+            let source = Block {
+                top,
+                left,
+                bottom,
+                right,
+            };
+            if self.fill_from(source, down, count, true, editing) {
+                let end = if down {
+                    (bottom + count, right)
+                } else {
+                    (bottom, right + count)
+                };
+                self.extend(end);
+            }
+        }
         match edge {
             Some(Edge::Dragging(resize)) => {
                 if let Some(metrics) = &mut self.metrics {
@@ -1703,10 +1791,75 @@ impl SheetView {
         }
         if !was_editing {
             self.clipboard(ui, editing);
+            if ui.input_mut(|input| input.consume_shortcut(&FILL_DOWN)) {
+                self.fill_selection(true, editing);
+            }
             self.begin_editing(ui, editing);
         }
         if self.editor.is_none() {
             self.arrow_keys(ui, grid, used);
+        }
+    }
+
+    /// Fill the selection from its first row down, or its first column
+    /// across, with copies; a selection one row deep, or one column wide, is
+    /// filled from the row above it or the column to its left.
+    fn fill_selection(&mut self, down: bool, editing: &mut Editing) {
+        let ((top, left), (bottom, right)) = self.range();
+        let (first, last) = if down { (top, bottom) } else { (left, right) };
+        let (from, count) = if last > first {
+            (first, last - first)
+        } else if first > 0 {
+            (first - 1, 1)
+        } else {
+            return;
+        };
+        let source = if down {
+            Block {
+                top: from,
+                left,
+                bottom: from,
+                right,
+            }
+        } else {
+            Block {
+                top,
+                left: from,
+                bottom,
+                right: from,
+            }
+        };
+        self.fill_from(source, down, count, false, editing);
+    }
+
+    /// Fill `count` rows below a block or columns to its right from it, as one
+    /// step to undo, and work out again what reads the cells written.
+    fn fill_from(
+        &mut self,
+        source: Block,
+        down: bool,
+        count: usize,
+        series: bool,
+        editing: &mut Editing,
+    ) -> bool {
+        let Some(document) = &mut self.document else {
+            return false;
+        };
+        let before = document.document.content.clone();
+        match document.fill(self.sheet, source, down, count, series) {
+            Ok(written) => {
+                editing.record_snapshot(before, None);
+                let done = document.recalculate(&written);
+                self.recalculated(done);
+                self.metrics = None;
+                true
+            }
+            Err(refused) => {
+                document.document.content = before;
+                document.reindex();
+                self.notice = Some(notice(&refused));
+                false
+            }
         }
     }
 
@@ -2106,6 +2259,11 @@ impl SheetView {
         }
     }
 }
+
+/// Fill down, as every spreadsheet has it. Fill right has no key, because
+/// Ctrl+R is Reload in all three windows.
+const FILL_DOWN: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, Key::D);
 
 /// The keys that move the picked cell, with Ctrl and Shift or without.
 const MOVES: [Key; 9] = [
