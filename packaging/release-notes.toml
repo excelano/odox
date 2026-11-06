@@ -30,7 +30,7 @@ whats-new = "Formulas are calculated: type one starting with =, and every cell t
 whats-new = "Formeln werden berechnet: Geben Sie eine Formel mit = ein, und jede davon abhängige Zelle wird aktualisiert. Füllen Sie nach unten und rechts mit Strg+D, über das Menü Blatt oder mit dem Ausfüllkästchen, das eine Reihe fortsetzt. Blatt > Sortieren sortiert einen Zeilenblock nach einer Spalte, und Blatt > Kommentar fügt einen Zellkommentar hinzu, ändert oder löscht ihn. Farben aus Zahlenformaten, etwa Rot für negative Werte, erscheinen jetzt auf dem Bildschirm und im PDF."
 
 [products.xodp.locales.en-us]
-whats-new = "Tabs in slide text now go to the paragraph\'s tab stops, left, right, centred or on the decimal point, with dot leaders."
+whats-new = "Tabs in slide text now go to the paragraph's tab stops, left, right, centred or on the decimal point, with dot leaders."
 
 [products.xodp.locales.de-de]
 whats-new = "Tabulatoren in Folientext springen jetzt zu den Tabstopps des Absatzes, links, rechts, zentriert oder am Dezimalzeichen, mit Füllzeichen."
