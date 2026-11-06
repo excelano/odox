@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:meta><dc:title>Number formats</dc:title><dc:language>en-US</dc:language></office:meta>
+ <office:styles>
+  <style:default-style style:family="table-cell"><style:text-properties fo:font-size="10pt" fo:language="en" fo:country="US"/></style:default-style>
+  <style:style style:name="Default" style:family="table-cell"/>
+ </office:styles>
+ <office:automatic-styles>
+  <style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="4cm"/></style:style>
+  <number:number-style style:name="grouped"><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/></number:number-style>
+  <number:number-style style:name="whole"><number:number number:decimal-places="0" number:min-decimal-places="0" number:min-integer-digits="1"/></number:number-style>
+  <number:currency-style style:name="dollars-positive" style:volatile="true" number:language="en" number:country="US"><number:currency-symbol number:language="en" number:country="US">$</number:currency-symbol><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/></number:currency-style>
+  <number:currency-style style:name="dollars" number:language="en" number:country="US"><style:text-properties fo:color="#ff0000"/><number:text>-</number:text><number:currency-symbol number:language="en" number:country="US">$</number:currency-symbol><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><style:map style:condition="value()&gt;=0" style:apply-style-name="dollars-positive"/></number:currency-style>
+  <number:currency-style style:name="euros" number:language="de" number:country="DE"><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><number:text> </number:text><number:currency-symbol number:language="de" number:country="DE">€</number:currency-symbol></number:currency-style>
+  <number:percentage-style style:name="percent"><number:number number:decimal-places="0" number:min-decimal-places="0" number:min-integer-digits="1"/><number:text>%</number:text></number:percentage-style>
+  <number:percentage-style style:name="percent2"><number:number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1"/><number:text>%</number:text></number:percentage-style>
+  <number:date-style style:name="us-date" number:automatic-order="true"><number:month/><number:text>/</number:text><number:day/><number:text>/</number:text><number:year number:style="long"/></number:date-style>
+  <number:date-style style:name="iso-date"><number:year number:style="long"/><number:text>-</number:text><number:month number:style="long"/><number:text>-</number:text><number:day number:style="long"/></number:date-style>
+  <number:date-style style:name="long-date"><number:day-of-week number:style="long"/><number:text>, </number:text><number:month number:style="long" number:textual="true"/><number:text> </number:text><number:day/><number:text>, </number:text><number:year number:style="long"/></number:date-style>
+  <number:time-style style:name="clock"><number:hours number:style="long"/><number:text>:</number:text><number:minutes number:style="long"/><number:text>:</number:text><number:seconds number:style="long"/></number:time-style>
+  <number:time-style style:name="ampm"><number:hours/><number:text>:</number:text><number:minutes number:style="long"/><number:text> </number:text><number:am-pm/></number:time-style>
+  <number:number-style style:name="science"><number:scientific-number number:decimal-places="2" number:min-decimal-places="2" number:min-integer-digits="1" number:min-exponent-digits="2" number:forced-exponent-sign="true"/></number:number-style>
+  <number:number-style style:name="fraction"><number:fraction number:min-integer-digits="0" number:min-numerator-digits="1" number:min-denominator-digits="1"/></number:number-style>
+  <number:boolean-style style:name="truth"><number:boolean/></number:boolean-style>
+  <style:style style:name="c-grouped" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="grouped"/>
+  <style:style style:name="c-whole" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="whole"/>
+  <style:style style:name="c-dollars" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="dollars"/>
+  <style:style style:name="c-euros" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="euros"/>
+  <style:style style:name="c-percent" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="percent"/>
+  <style:style style:name="c-percent2" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="percent2"/>
+  <style:style style:name="c-us-date" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="us-date"/>
+  <style:style style:name="c-iso-date" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="iso-date"/>
+  <style:style style:name="c-long-date" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="long-date"/>
+  <style:style style:name="c-clock" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="clock"/>
+  <style:style style:name="c-ampm" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="ampm"/>
+  <style:style style:name="c-science" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="science"/>
+  <style:style style:name="c-fraction" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="fraction"/>
+  <style:style style:name="c-truth" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="truth"/>
+ </office:automatic-styles>
+ <office:body>
+  <office:spreadsheet>
+   <table:table table:name="Formats">
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+    <table:table-column table:style-name="co1" table:default-cell-style-name="c-dollars"/>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Format</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Value</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Column default</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Grouped</text:p></table:table-cell><table:table-cell table:style-name="c-grouped" office:value-type="float" office:value="1234567.891"><text:p>1,234,567.89</text:p></table:table-cell><table:table-cell office:value-type="currency" office:currency="USD" office:value="1234.5"><text:p>$1,234.50</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Whole</text:p></table:table-cell><table:table-cell table:style-name="c-whole" office:value-type="float" office:value="41.6"><text:p>42</text:p></table:table-cell><table:table-cell office:value-type="currency" office:currency="USD" office:value="-12"><text:p>-$12.00</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Dollars</text:p></table:table-cell><table:table-cell table:style-name="c-dollars" office:value-type="currency" office:currency="USD" office:value="1234.5"><text:p>$1,234.50</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Dollars negative</text:p></table:table-cell><table:table-cell table:style-name="c-dollars" office:value-type="currency" office:currency="USD" office:value="-1234.5"><text:p>-$1,234.50</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Euros</text:p></table:table-cell><table:table-cell table:style-name="c-euros" office:value-type="currency" office:currency="EUR" office:value="1234.5"><text:p>1.234,50 €</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Percent</text:p></table:table-cell><table:table-cell table:style-name="c-percent" office:value-type="percentage" office:value="0.15"><text:p>15%</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Percent, two places</text:p></table:table-cell><table:table-cell table:style-name="c-percent2" office:value-type="percentage" office:value="0.1234"><text:p>12.34%</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>US date</text:p></table:table-cell><table:table-cell table:style-name="c-us-date" office:value-type="date" office:date-value="2026-11-05"><text:p>11/5/2026</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>ISO date</text:p></table:table-cell><table:table-cell table:style-name="c-iso-date" office:value-type="date" office:date-value="2026-03-09"><text:p>2026-03-09</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Long date</text:p></table:table-cell><table:table-cell table:style-name="c-long-date" office:value-type="date" office:date-value="2026-11-05"><text:p>Thursday, November 5, 2026</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Clock</text:p></table:table-cell><table:table-cell table:style-name="c-clock" office:value-type="time" office:time-value="PT14H05M09S"><text:p>14:05:09</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>AM/PM</text:p></table:table-cell><table:table-cell table:style-name="c-ampm" office:value-type="time" office:time-value="PT14H05M00S"><text:p>2:05 PM</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Scientific</text:p></table:table-cell><table:table-cell table:style-name="c-science" office:value-type="float" office:value="123456"><text:p>1.23E+05</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Fraction</text:p></table:table-cell><table:table-cell table:style-name="c-fraction" office:value-type="float" office:value="2.5"><text:p>2 1/2</text:p></table:table-cell><table:table-cell/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>Boolean</text:p></table:table-cell><table:table-cell table:style-name="c-truth" office:value-type="boolean" office:boolean-value="true"><text:p>TRUE</text:p></table:table-cell><table:table-cell/></table:table-row>
+   </table:table>
+  </office:spreadsheet>
+ </office:body>
+</office:document>

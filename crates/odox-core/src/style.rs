@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::data_style::DataStyles;
 use crate::value::{Color, Length, Measure, Percent};
 use crate::xml::{Element, Ns};
 
@@ -560,6 +561,7 @@ pub struct Styles {
     gradients: HashMap<String, Gradient>,
     fill_images: HashMap<String, String>,
     font_faces: HashMap<String, String>,
+    formats: DataStyles,
     cache: RefCell<HashMap<(Family, String), Rc<Properties>>>,
 }
 
@@ -579,6 +581,7 @@ impl Styles {
             gradients: HashMap::new(),
             fill_images: HashMap::new(),
             font_faces: HashMap::new(),
+            formats: DataStyles::default(),
             cache: RefCell::new(HashMap::new()),
         };
         // styles.xml first, so that an automatic style in content.xml with the
@@ -630,7 +633,9 @@ impl Styles {
     }
 
     fn collect_style(&mut self, element: &Element) {
-        if element.is(&Ns::Style, "style") {
+        if element.name.ns == Ns::Number {
+            self.formats.collect(element);
+        } else if element.is(&Ns::Style, "style") {
             let Some(name) = element.attr(&Ns::Style, "name") else {
                 return;
             };
@@ -688,6 +693,25 @@ impl Styles {
             self.cache.borrow_mut().remove(&key);
         }
         self.collect_style(element);
+    }
+
+    /// The data styles, by name.
+    pub fn data_styles(&self) -> &DataStyles {
+        &self.formats
+    }
+
+    /// The data style a cell style names, from itself or the nearest style it
+    /// inherits from that names one.
+    pub fn data_style_of(&self, cell_style: &str) -> Option<&str> {
+        let mut name = cell_style;
+        for _ in 0..32 {
+            let style = self.style(&Family::TableCell, name)?;
+            if let Some(data) = style.element.attr(&Ns::Style, "data-style-name") {
+                return Some(data);
+            }
+            name = style.parent.as_deref()?;
+        }
+        None
     }
 
     /// A style by family and name.
