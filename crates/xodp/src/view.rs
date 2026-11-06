@@ -468,14 +468,17 @@ impl View for SlideView {
         }
     }
 
-    fn side(&mut self, ui: &mut Ui) -> bool {
+    fn has_side(&self) -> bool {
+        self.document
+            .as_ref()
+            .is_some_and(|document| !document.slides().is_empty())
+    }
+
+    fn side(&mut self, ui: &mut Ui) {
         let Some(document) = &self.document else {
-            return false;
+            return;
         };
         let slides = document.slides();
-        if slides.is_empty() {
-            return false;
-        }
         ui.heading(t("Slides"));
         ui.separator();
         let mut chosen = None;
@@ -495,7 +498,6 @@ impl View for SlideView {
         if let Some(index) = chosen {
             self.show_slide(index);
         }
-        true
     }
 
     fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {

@@ -20,6 +20,10 @@ use odox_ui::{
 
 const MARGIN: f32 = 24.0;
 
+/// How much of the window a page up or down moves, keeping the rest in sight
+/// so the line last read is still there after the move.
+const PAGE: f32 = 0.9;
+
 #[derive(Default)]
 struct Scroll {
     shown: Option<Shown>,
@@ -82,9 +86,71 @@ impl Scroll {
             height,
         });
     }
+
+    /// The Page up and Page down buttons under the page, and the keys when
+    /// `keys` says the caret is not the one taking them.
+    fn paging(&mut self, ui: &mut Ui, keys: bool) {
+        let (up, down) = self.room();
+        let mut moved = None;
+        if keys {
+            ui.input_mut(|input| {
+                if input.consume_key(egui::Modifiers::NONE, egui::Key::PageUp) {
+                    moved = Some(false);
+                }
+                if input.consume_key(egui::Modifiers::NONE, egui::Key::PageDown) {
+                    moved = Some(true);
+                }
+            });
+        }
+        egui::Panel::bottom("pages").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(up, egui::Button::new(t("Page up")))
+                    .clicked()
+                {
+                    moved = Some(false);
+                }
+                if ui
+                    .add_enabled(down, egui::Button::new(t("Page down")))
+                    .clicked()
+                {
+                    moved = Some(true);
+                }
+            });
+        });
+        if let Some(down) = moved {
+            self.page(ui.ctx(), down);
+        }
+    }
+
+    /// Whether the view can move up, and whether it can move down.
+    fn room(&self) -> (bool, bool) {
+        self.shown.map_or((false, false), |shown| {
+            (shown.offset > 0.5, shown.offset < shown.bottom() - 0.5)
+        })
+    }
+
+    /// Move the view most of a window up or down, settled on the next frame.
+    fn page(&mut self, ctx: &egui::Context, down: bool) {
+        let Some(shown) = self.shown else {
+            return;
+        };
+        let step = shown.viewport.height() * PAGE;
+        let offset = if down {
+            shown.offset + step
+        } else {
+            shown.offset - step
+        };
+        self.settle = Some(offset.clamp(0.0, shown.bottom()));
+        ctx.request_repaint();
+    }
 }
 
 impl Shown {
+    fn bottom(&self) -> f32 {
+        (self.height - self.viewport.height()).max(0.0)
+    }
+
     fn anchor(&self, pointer: Option<Pos2>) -> Anchor {
         let at = pointer
             .filter(|at| self.viewport.contains(*at))
@@ -321,6 +387,12 @@ impl View for TextView {
             self.menu = MenuState::offering_blocks(true);
         }
 
+        // The caret's own Page Up and Page Down move it, and the view with it.
+        let keys = !editing.asking
+            && !self.export.asking()
+            && (!edit_mode || self.page.selection().is_none());
+        self.scroll.paging(ui, keys);
+
         let (area, anchor) = self.scroll.area(ui, scale);
         let output = area.show(ui, |ui| {
             // What was typed goes into the tree before it is laid out, so
@@ -375,14 +447,17 @@ impl View for TextView {
         true
     }
 
-    fn side(&mut self, ui: &mut Ui) -> bool {
+    fn has_side(&self) -> bool {
+        self.document
+            .as_ref()
+            .is_some_and(|document| !document.outline().is_empty())
+    }
+
+    fn side(&mut self, ui: &mut Ui) {
         let Some(document) = &self.document else {
-            return false;
+            return;
         };
         let outline = document.outline();
-        if outline.is_empty() {
-            return false;
-        }
         ui.heading(t("Outline"));
         ui.separator();
         for (index, heading) in outline.iter().enumerate() {
@@ -408,7 +483,6 @@ impl View for TextView {
                 }
             });
         }
-        true
     }
 
     fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {

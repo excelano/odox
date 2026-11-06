@@ -135,11 +135,14 @@ pub trait View {
     /// on and takes the snapshot an edit records before it changes the tree.
     fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing);
 
-    /// Draw the panel beside the document — an outline, a sheet list, a slide
-    /// list — and answer whether there is one to draw.
-    fn side(&mut self, _ui: &mut Ui) -> bool {
+    /// Whether the document has anything to put beside it: an outline, a
+    /// slide list. Only then does the View menu offer the side panel.
+    fn has_side(&self) -> bool {
         false
     }
+
+    /// Draw the panel beside the document, when `has_side` says there is one.
+    fn side(&mut self, _ui: &mut Ui) {}
 
     /// Whether a window opens with the side panel showing.
     fn side_at_start(&self) -> bool {
@@ -688,23 +691,14 @@ impl<V: View> Shell<V> {
             });
         }
 
-        if self.show_side && self.view.is_open() {
-            // The view answers whether it has anything to put beside the
-            // document, so that a format with nothing there gets no empty panel
-            // rather than a blank one a person has to close.
-            let mut drew = false;
+        if self.show_side && self.view.has_side() {
             egui::Panel::left("side")
                 .resizable(true)
                 .default_size(220.0)
                 .min_size(120.0)
                 .show(ui, |ui| {
-                    egui::ScrollArea::both().show(ui, |ui| {
-                        drew = self.view.side(ui);
-                    });
+                    egui::ScrollArea::both().show(ui, |ui| self.view.side(ui));
                 });
-            if !drew {
-                self.show_side = false;
-            }
         }
     }
 
@@ -780,8 +774,10 @@ impl<V: View> Shell<V> {
                 if self.view.fits() {
                     ui.checkbox(&mut self.zoom.fit, t("Fit to the window"));
                 }
-                ui.separator();
-                ui.checkbox(&mut self.show_side, t("Show the side panel"));
+                if self.view.has_side() {
+                    ui.separator();
+                    ui.checkbox(&mut self.show_side, t("Show the side panel"));
+                }
                 self.view.view_menu(ui);
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

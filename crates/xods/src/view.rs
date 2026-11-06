@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use eframe::egui::{
-    self, Align, Event, FontId, Key, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
+    self, Align, Event, FontId, Key, Modifiers, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
 use odox_core::doc::{Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
@@ -615,15 +615,12 @@ impl View for SheetView {
         }
         let can = !editing.asking && self.editor.is_none();
         egui::Panel::top("cell").show(ui, |ui| self.cell_bar(ui));
+        if can {
+            self.sheet_keys(ui);
+        }
         egui::Panel::bottom("sheets").show(ui, |ui| self.sheet_tabs(ui, can));
         self.grid(ui, zoom.scale(), editing);
         self.found.drawn();
-    }
-
-    fn side(&mut self, _ui: &mut Ui) -> bool {
-        // A workbook's sheets are its tabs along the bottom, where a person
-        // reaches for them, so there is nothing to put beside the grid.
-        false
     }
 
     fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {
@@ -847,6 +844,48 @@ impl SheetView {
         self.editor = None;
         if merge {
             self.pick((top, left));
+        }
+    }
+
+    /// Ctrl+Page Down and Ctrl+Tab look at the next sheet a person can see,
+    /// Ctrl+Page Up and Ctrl+Shift+Tab the one before, round from the last to
+    /// the first and back. Ctrl on a Mac too, where Command+Tab is the
+    /// system's.
+    fn sheet_keys(&mut self, ui: &Ui) {
+        let step = ui.input_mut(|input| {
+            let shifted = Modifiers::CTRL | Modifiers::SHIFT;
+            if input.consume_key(shifted, Key::Tab)
+                || input.consume_key(Modifiers::CTRL, Key::PageUp)
+            {
+                Some(false)
+            } else if input.consume_key(Modifiers::CTRL, Key::Tab)
+                || input.consume_key(Modifiers::CTRL, Key::PageDown)
+            {
+                Some(true)
+            } else {
+                None
+            }
+        });
+        let (Some(forward), Some(document)) = (step, &self.document) else {
+            return;
+        };
+        let shown: Vec<usize> = document
+            .sheets()
+            .iter()
+            .enumerate()
+            .filter(|(_, sheet)| sheet.visible)
+            .map(|(index, _)| index)
+            .collect();
+        let Some(at) = shown.iter().position(|&index| index == self.sheet) else {
+            return;
+        };
+        let to = if forward {
+            (at + 1) % shown.len()
+        } else {
+            (at + shown.len() - 1) % shown.len()
+        };
+        if shown[to] != self.sheet {
+            self.show_sheet(shown[to]);
         }
     }
 
