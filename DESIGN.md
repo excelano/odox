@@ -394,6 +394,27 @@ drawn in, which `LibreOffice` places itself, and a comment changed here keeps th
 box and the display setting it had. A value typed into a commented cell keeps
 the comment, and a sort moves each comment with its row.
 
+**Cells are formatted from Sheet > Format cells…** (`sheet/format.rs`), or
+Ctrl+1: a number format (general, a number with its decimals and thousands
+grouped or not, a percentage, an amount in the currency of the document's
+country, a date in the order that country writes one, a time), bold, italic
+and underline, a font colour, a fill, the text's alignment across and down the
+cell and whether it wraps, and borders, none, around the selection or around
+every cell in it. The question opens with what the picked cell shows and
+changes only what is changed in it, so cells that differ keep what nobody
+touched. Ctrl+B, Ctrl+I and Ctrl+U make the selection bold, italic or
+underlined, or take it off where the picked cell has it. A cell's formatting is
+its cell style: a formatted cell takes an automatic style in `content.xml`
+holding what its old style held with the change written over it, a copy of its
+own automatic style or one inheriting from its named style, and a style that
+says the same thing is used again rather than written twice. A number format is
+a data style written in the shape `LibreOffice` writes it, in the document's
+language. A value takes the kind its new format shows, an amount given a
+percentage format becoming a percentage and a number given a date format that
+day, and its text is written again in the format; a formula keeps its formula.
+A selection larger than a hundred thousand cells is cut to the cells the sheet
+uses. Each is one step to undo.
+
 **A change works out again every formula that reads it** (`odox-core`'s
 `formula` module and `sheet/recalc.rs`). A document's own results are trusted
 when it opens; when a value changes, every formula that reads the cell, on any
@@ -426,8 +447,9 @@ none is written and the cell bar says which. A value written over a formula
 takes its place, as it does when typed. Emptying a
 range leaves cells the document never wrote unwritten.
 
-**A cell's text is cut at the cell's edge.** It is drawn on one line from the
-top, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
+**A cell's text is cut at the cell's edge.** It is drawn on one line, at the
+top, middle or bottom of the cell as its style says and at the top where it
+says nothing, or, where the cell's style says to wrap (`fo:wrap-option="wrap"`), wrapped
 inside the cell's width with each line aligned as the cell is. Either way what
 does not fit the cell's height or width is not drawn: a row keeps the height the
 document gives it, and does not grow while a person types. A merged cell is one
@@ -615,7 +637,7 @@ caret and nothing selected, the mark goes to what is typed next at the caret,
 and moving the caret forgets it. A button is lit where the whole selection has
 its mark, and for a caret where the text typed there would. Each is one undo
 step, and a mark put on with typing is the same step as the typing. A
-spreadsheet cell is not formatted.
+spreadsheet cell is formatted whole, as its own paragraph says below.
 
 **A mark changes spans and automatic styles and nothing else.** The range's
 ends are cut into the nodes they fall inside. A span the range holds whole has
@@ -874,7 +896,7 @@ order says across first, and the rows the sheet marks as its header
 first. The page style's scale, or the number of pages it asks the sheet to fit,
 across, down or in all, decides how large the cells are drawn, down to a tenth.
 A cell is drawn as the window draws it: its fill and borders, and its text
-from the top, on one line or, where the cell says to wrap
+at the top, middle or bottom, on one line or, where the cell says to wrap
 (`fo:wrap-option="wrap"`), wrapped inside its width, and cut at the cell's
 edge; there are no grid lines. The
 window draws none of the pictures or charts a sheet can hold, and neither does

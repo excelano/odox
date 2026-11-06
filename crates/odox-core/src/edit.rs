@@ -19,7 +19,7 @@
 
 mod block;
 mod figure;
-mod format;
+pub(crate) mod format;
 pub mod html;
 mod table;
 

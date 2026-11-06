@@ -19,6 +19,7 @@ use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Export, Found, Notice, View, Zoom, fonts};
 
 use crate::access;
+use crate::format::Formatting;
 use crate::grid::{Metrics, address, column_name};
 
 /// A spreadsheet, open or not.
@@ -54,6 +55,7 @@ pub struct SheetView {
     sorting: Option<Sorting>,
     /// The comment being written, while the question is up.
     commenting: Option<Commenting>,
+    formatting: Option<Formatting>,
     /// How many rows the grid last showed, which is how far Page Up and Page
     /// Down go.
     page_rows: usize,
@@ -296,37 +298,28 @@ impl Paint<'_> {
             _ => Align::Min,
         };
         let padding = 3.0 * zoom;
-        let anchor = match align {
-            Align::Min => pos2(rect.left() + padding, rect.top()),
-            Align::Center => pos2(rect.center().x, rect.top()),
-            Align::Max => pos2(rect.right() - padding, rect.top()),
-        };
         let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
+        let mut job = egui::text::LayoutJob::single_section(text, format.clone());
         if style.cell.wrap == Some(true) {
-            // Wrapped inside the column, each line aligned the way the cell
-            // is, and cut off at the row's height.
-            let mut job = egui::text::LayoutJob::simple(
-                text,
-                format.font_id.clone(),
-                format.color,
-                (rect.width() - padding * 2.0).max(1.0),
-            );
+            job.wrap.max_width = (rect.width() - padding * 2.0).max(1.0);
             job.halign = align;
-            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
-            painter.galley(anchor, galley, format.color);
-        } else {
-            painter.text(
-                anchor,
-                match align {
-                    Align::Min => egui::Align2::LEFT_TOP,
-                    Align::Center => egui::Align2::CENTER_TOP,
-                    Align::Max => egui::Align2::RIGHT_TOP,
-                },
-                text,
-                format.font_id.clone(),
-                format.color,
-            );
         }
+        let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+        let size = galley.rect.size();
+        let wrapped = style.cell.wrap == Some(true);
+        let x = match align {
+            Align::Min => rect.left() + padding,
+            Align::Center if wrapped => rect.center().x,
+            Align::Center => rect.center().x - size.x / 2.0,
+            Align::Max if wrapped => rect.right() - padding,
+            Align::Max => rect.right() - padding - size.x,
+        };
+        let y = match style.cell.vertical_align {
+            Some(odox_core::VerticalAlign::Middle) => rect.center().y - size.y / 2.0,
+            Some(odox_core::VerticalAlign::Bottom) => rect.bottom() - size.y,
+            _ => rect.top(),
+        };
+        painter.galley(pos2(x, y.max(rect.top())), galley, format.color);
     }
 }
 
@@ -386,6 +379,7 @@ enum SheetCommand {
     FillRight,
     Sort,
     Comment,
+    Format,
 }
 
 /// What is asked of one of the workbook's sheets.
@@ -578,6 +572,7 @@ impl View for SheetView {
             let fills = [
                 (t("Fill down"), SheetCommand::FillDown),
                 (t("Fill right"), SheetCommand::FillRight),
+                (t("Format cells…"), SheetCommand::Format),
                 (t("Sort…"), SheetCommand::Sort),
                 (t("Comment…"), SheetCommand::Comment),
             ];
@@ -586,6 +581,9 @@ impl View for SheetView {
                     let mut button = egui::Button::new(name);
                     if matches!(command, SheetCommand::FillDown) {
                         button = button.shortcut_text(ui.ctx().format_shortcut(&FILL_DOWN));
+                    }
+                    if matches!(command, SheetCommand::Format) {
+                        button = button.shortcut_text(ui.ctx().format_shortcut(&FORMAT));
                     }
                     if ui.add_enabled(can, button).clicked() {
                         self.sheet_command = Some(command);
@@ -676,6 +674,7 @@ impl View for SheetView {
         self.rename_question(ui.ctx(), editing);
         self.sort_question(ui.ctx(), editing);
         self.comment_question(ui.ctx(), editing);
+        self.format_question(ui.ctx(), editing);
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
         }
@@ -777,6 +776,10 @@ impl SheetView {
             }
             SheetCommand::Comment => {
                 self.ask_comment();
+                return;
+            }
+            SheetCommand::Format => {
+                self.ask_format();
                 return;
             }
         };
@@ -1223,6 +1226,94 @@ impl SheetView {
         }
     }
 
+    fn ask_format(&mut self) {
+        let Some(document) = &self.document else {
+            return;
+        };
+        let ((top, left), (bottom, right)) = self.range();
+        let block = Block {
+            top,
+            left,
+            bottom,
+            right,
+        };
+        self.formatting = Formatting::of(document, self.sheet, block, self.selected);
+    }
+
+    fn format_question(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let Some(formatting) = &mut self.formatting else {
+            return;
+        };
+        match formatting.show(ctx) {
+            Some(true) => {
+                let format = formatting.changes();
+                let block = formatting.block;
+                self.formatting = None;
+                self.format(block, &format, editing);
+            }
+            Some(false) => self.formatting = None,
+            None => {}
+        }
+    }
+
+    fn mark_keys(&mut self, ui: &Ui, editing: &mut Editing) {
+        let pressed = |key| {
+            ui.input_mut(|input| {
+                input.consume_shortcut(&egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, key))
+            })
+        };
+        let key = [Key::B, Key::I, Key::U]
+            .into_iter()
+            .find(|&key| pressed(key));
+        let (Some(key), Some(document)) = (key, &self.document) else {
+            return;
+        };
+        let Some(sheet) = document.sheets().get(self.sheet) else {
+            return;
+        };
+        let (row, column) = self.selected;
+        let cell = document.cell(sheet, row, column);
+        let text = document
+            .cell_style(sheet, cell.as_ref(), column)
+            .text
+            .clone();
+        let mut format = odox_core::doc::CellFormat::default();
+        match key {
+            Key::B => format.bold = Some(text.bold != Some(true)),
+            Key::I => format.italic = Some(text.italic != Some(true)),
+            _ => format.underline = Some(text.underline != Some(true)),
+        }
+        let ((top, left), (bottom, right)) = self.range();
+        let block = Block {
+            top,
+            left,
+            bottom,
+            right,
+        };
+        self.format(block, &format, editing);
+    }
+
+    fn format(&mut self, block: Block, format: &odox_core::doc::CellFormat, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        if *format == odox_core::doc::CellFormat::default() {
+            return;
+        }
+        let before = document.document.content.clone();
+        match document.format_cells(self.sheet, block, format) {
+            Ok(()) => {
+                editing.record_snapshot(before, None);
+                self.summary = None;
+            }
+            Err(refused) => {
+                document.document.content = before;
+                document.reindex();
+                self.notice = Some(notice(&refused));
+            }
+        }
+    }
+
     /// Put the Sort question up for the selection, or for the block of filled
     /// cells around the picked cell when it is the whole selection, by the
     /// picked cell's column.
@@ -1307,7 +1398,9 @@ impl SheetView {
             ui.checkbox(&mut sorting.header, t("The first row is a header"));
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                if ui.button(t("Sort")).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                if ui.button(t("Sort")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Enter))
+                {
                     answer = Some(true);
                 }
                 if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
@@ -2128,6 +2221,7 @@ impl SheetView {
             || self.renaming.is_some()
             || self.sorting.is_some()
             || self.commenting.is_some()
+            || self.formatting.is_some()
         {
             return;
         }
@@ -2136,6 +2230,10 @@ impl SheetView {
             if ui.input_mut(|input| input.consume_shortcut(&FILL_DOWN)) {
                 self.fill_selection(true, editing);
             }
+            if ui.input_mut(|input| input.consume_shortcut(&FORMAT)) {
+                self.ask_format();
+            }
+            self.mark_keys(ui, editing);
             self.begin_editing(ui, editing);
         }
         if self.editor.is_none() {
@@ -2606,6 +2704,9 @@ impl SheetView {
 /// Ctrl+R is Reload in all three windows.
 const FILL_DOWN: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, Key::D);
+
+const FORMAT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, Key::Num1);
 
 /// The keys that move the picked cell, with Ctrl and Shift or without.
 const MOVES: [Key; 9] = [

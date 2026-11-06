@@ -17,8 +17,9 @@ mod text;
 
 pub use pres::{Presentation, Slide};
 pub use sheet::{
-    Block, Blocked, Cell, Column, Comment, DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT, Frozen,
-    Merged, Place, Recalculated, Restructure, Sheet, SheetDocument, Value,
+    Block, Blocked, Borders, Cell, CellFormat, Column, Comment, DEFAULT_COLUMN_WIDTH,
+    DEFAULT_ROW_HEIGHT, Frozen, Merged, NumberFormat, Place, Recalculated, Restructure, Sheet,
+    SheetDocument, Value,
 };
 pub use text::TextDocument;
 

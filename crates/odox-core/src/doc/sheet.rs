@@ -12,6 +12,7 @@
 
 mod comment;
 mod fill;
+mod format;
 mod freeze;
 mod hide;
 mod merge;
@@ -22,6 +23,7 @@ mod size;
 mod sort;
 pub use comment::Comment;
 pub use fill::Block;
+pub use format::{Borders, CellFormat, NumberFormat};
 pub use freeze::Frozen;
 pub use merge::Merged;
 pub use recalc::{Place, Recalculated};
@@ -450,8 +452,9 @@ impl SheetDocument {
     ///
     /// # Errors
     ///
-    /// The cell is under a neighbour's span, or the sheet does not exist.
-    /// Nothing is changed in either case.
+    /// The cell is under a neighbour's span, the sheet does not exist, or the
+    /// document cannot declare the formula namespace. Nothing is changed in
+    /// any case.
     pub fn set_formula(
         &mut self,
         sheet: usize,
@@ -460,6 +463,9 @@ impl SheetDocument {
         formula: &str,
     ) -> Result<(), Refused> {
         self.can_edit(sheet, row, column)?;
+        if formula.starts_with("of:") && !self.document.content.declare(&Ns::Of) {
+            return Err(Refused::Namespace);
+        }
         self.write_cell(sheet, row, column, &Value::Empty, "", Writing::Value)?;
         self.reindex();
         let name = self.document.name(&Ns::Table, "formula");

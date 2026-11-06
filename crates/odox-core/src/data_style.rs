@@ -151,6 +151,9 @@ pub struct DataStyle {
     language: Option<String>,
     country: Option<String>,
     colour: Option<Color>,
+    /// Whether hours past a day are shown as they are, `[HH]`, rather than
+    /// as the time of day they come to.
+    elapsed: bool,
 }
 
 impl DataStyle {
@@ -236,6 +239,7 @@ impl DataStyle {
             language,
             country,
             colour,
+            elapsed: element.attr(&Ns::Number, "truncate-on-overflow") == Some("false"),
         })
     }
 
@@ -349,6 +353,15 @@ impl DataStyle {
             }
             Kind::Text => Some(Value::Text(input.to_owned())),
         }
+    }
+
+    /// How many decimals a number is shown with, and whether its thousands
+    /// are grouped, where the style shows a number.
+    pub fn digits(&self) -> Option<(usize, bool)> {
+        self.parts.iter().find_map(|part| match part {
+            Part::Number(digits) => Some((digits.decimals.unwrap_or(0), digits.grouping)),
+            _ => None,
+        })
     }
 
     /// The ISO 4217 code of the currency this style shows, where its symbol
@@ -487,8 +500,10 @@ impl DataStyle {
                             0 => 12,
                             h => h,
                         }
-                    } else {
+                    } else if self.elapsed {
                         moment.hours
+                    } else {
+                        moment.hours % 24
                     };
                     out.push_str(&pad(hours, *long));
                 }
