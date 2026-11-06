@@ -19,6 +19,8 @@ use egui::text::LayoutJob;
 pub struct ParagraphJob {
     job: LayoutJob,
     map: OffsetMap,
+    /// Each tab: its section in the job and its character in what is drawn.
+    tabs: Vec<(usize, usize)>,
 }
 
 impl ParagraphJob {
@@ -30,7 +32,11 @@ impl ParagraphJob {
         if len > 0 {
             map.push(len, len, false);
         }
-        Self { job, map }
+        Self {
+            job,
+            map,
+            tabs: Vec::new(),
+        }
     }
 
     /// Text drawn as the model holds it: one drawn character for each of the
@@ -44,8 +50,8 @@ impl ParagraphJob {
         self.map.push(len, len, false);
     }
 
-    /// Something drawn differently from what the model holds: a tab the model
-    /// counts as one character drawn as four spaces is `atom("    ", 1, ..)`,
+    /// Something drawn differently from what the model holds: a run of spaces
+    /// the model counts as one element drawn as three is `atom("   ", 1, ..)`,
     /// and a citation the model does not count is `atom("1", 0, ..)`. The
     /// caret stands on either side of an atom and never inside it.
     pub fn atom(&mut self, shown: &str, model_len: usize, format: TextFormat) {
@@ -57,6 +63,41 @@ impl ParagraphJob {
             self.job.append(shown, 0.0, format);
         }
         self.map.push(shown_len, model_len, true);
+    }
+
+    /// A tab the model counts as one character, drawn as one space with room
+    /// before it: about four spaces' worth until [`Self::set_tab_advance`]
+    /// sets how far it reaches.
+    pub fn tab(&mut self, format: TextFormat) {
+        let start = self.job.text.chars().count();
+        let room = format.font_id.size * 0.75;
+        self.job.append(" ", room, format);
+        self.tabs.push((self.job.sections.len() - 1, start));
+        self.map.push(1, 1, true);
+    }
+
+    /// How many tabs the paragraph holds.
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    /// The character a tab is drawn as, counting what is drawn.
+    pub fn tab_char(&self, tab: usize) -> Option<usize> {
+        self.tabs.get(tab).map(|(_, at)| *at)
+    }
+
+    /// Set the room before a tab's space, which is how far it reaches.
+    pub fn set_tab_advance(&mut self, tab: usize, room: f32) {
+        if let Some(&(section, _)) = self.tabs.get(tab)
+            && let Some(section) = self.job.sections.get_mut(section)
+        {
+            section.leading_space = room.max(0.0);
+        }
+    }
+
+    /// The layout job as it stands, to measure.
+    pub fn layout_job(&self) -> &LayoutJob {
+        &self.job
     }
 
     /// Whether nothing has been drawn yet.

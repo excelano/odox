@@ -125,3 +125,4 @@ convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods
 convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods
 convert ods:calc8 comments.ods "OpenDocument Spreadsheet Flat XML" comments.fods
+convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt

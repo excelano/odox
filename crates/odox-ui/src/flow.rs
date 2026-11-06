@@ -19,15 +19,16 @@ use std::sync::Arc;
 use eframe::egui::emath::TSTransform;
 use eframe::egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use eframe::egui::{
-    Align, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Role, Sense,
-    Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, WidgetInfo, pos2,
+    Align, Align2, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Role,
+    Sense, Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, WidgetInfo, pos2,
     text::{CCursor, CCursorRange, LayoutJob},
     text_selection::{LabelSelectionState, visuals::paint_text_selection},
     vec2,
 };
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
-    Border, Document, Element, Family, Node, Ns, Properties, TextAlign, TextProperties, edit,
+    Border, Document, Element, Family, Node, Ns, Properties, TabKind, TextAlign, TextProperties,
+    edit,
 };
 
 use crate::find::Highlights;
@@ -402,8 +403,9 @@ impl Flow<'_> {
         }
         let base = format::text_format(&properties.text, DEFAULT_SIZE, zoom, self.palette);
 
-        let (job, frames) = self.layout_job(element, &properties, &base, size, wrap);
+        let (mut job, frames) = self.layout_job(element, &properties, &base, size, wrap);
         self.palette = palette;
+        let leaders = place_tabs(ui, &mut job, &properties.paragraph, indent.max(0.0), zoom);
         let (job, map) = job.into_parts();
 
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
@@ -458,6 +460,7 @@ impl Flow<'_> {
         // not see this frame, and the editor moves Up and Down through where
         // each paragraph was drawn.
         let origin = pos2(anchor, rect.top());
+        paint_leaders(ui, &leaders, origin, &base);
         let mut galley = galley;
         self.show_matches(ui, &mut galley, &map, origin);
         let readable = Arc::clone(&galley);
@@ -606,11 +609,11 @@ impl Flow<'_> {
                         let count = element.attr_usize(&Ns::Text, "c").unwrap_or(1);
                         put(job, &" ".repeat(count.min(256)), count);
                     } else if element.is(&Ns::Text, "tab") {
-                        // egui lays out a tab as a glyph rather than advancing to
-                        // a stop, so the paragraph's tab stops are approximated
-                        // by a fixed advance. A document whose layout depends on
-                        // tab stops is one §6 of DESIGN.md names.
-                        put(job, "    ", 1);
+                        if counted {
+                            job.tab(format.clone());
+                        } else {
+                            job.atom("    ", 0, format.clone());
+                        }
                     } else if element.is(&Ns::Text, "line-break") {
                         put(job, "\n", 1);
                     } else if element.is(&Ns::Text, "span") {
@@ -1177,6 +1180,129 @@ fn holds_place(element: &Element, place: &str) -> bool {
         let marks = e.is(&Ns::Text, "bookmark") || e.is(&Ns::Text, "bookmark-start");
         (marks && e.attr(&Ns::Text, "name") == Some(place)) || holds_place(e, place)
     })
+}
+
+/// The gap a tab with a leader leaves, from where the tab begins to where the
+/// text after it does, on the row whose top is `top`, in galley coordinates.
+struct Leader {
+    fill: char,
+    from: f32,
+    to: f32,
+    top: f32,
+}
+
+/// The default tab distance where no style gives one: 1.25 cm.
+const TAB_DISTANCE: f32 = 1.25 / 2.54 * 72.0;
+
+/// Give each tab in a paragraph the room that takes the text after it to its
+/// stop: the next stop the paragraph sets past where the tab stands, or the
+/// next of the evenly spaced default ones. A left stop starts the text there,
+/// a right one ends it there, a centre one centres it and a decimal one puts
+/// its decimal character there. Each tab is measured on the paragraph laid out
+/// with the tabs before it already placed. Stops count from the left margin,
+/// and the galley starts `offset` right of it. Answers the gaps to fill with
+/// leaders.
+fn place_tabs(
+    ui: &Ui,
+    job: &mut ParagraphJob,
+    paragraph: &odox_core::ParagraphProperties,
+    offset: f32,
+    zoom: f32,
+) -> Vec<Leader> {
+    let mut leaders = Vec::new();
+    let stops = paragraph.tab_stops.clone().unwrap_or_default();
+    let distance = paragraph
+        .tab_distance
+        .map_or(TAB_DISTANCE, odox_core::Length::points)
+        * zoom;
+    for tab in 0..job.tab_count() {
+        let Some(start) = job.tab_char(tab) else {
+            continue;
+        };
+        job.set_tab_advance(tab, 0.0);
+        let galley = ui
+            .ctx()
+            .fonts_mut(|fonts| fonts.layout_job(job.layout_job().clone()));
+        let at = |index: usize| galley.pos_from_cursor(CCursor::new(index));
+        let here = at(start);
+        let (x, top) = (here.min.x, here.min.y);
+        let space = at(start + 1).min.x - x;
+        let text: Vec<char> = galley.text().chars().collect();
+        let end = job
+            .tab_char(tab + 1)
+            .filter(|&next| (at(next).min.y - top).abs() < 0.5)
+            .unwrap_or_else(|| {
+                (start + 1..text.len())
+                    .find(|&i| text[i] == '\n' || (at(i).min.y - top).abs() > 0.5)
+                    .unwrap_or(text.len())
+            });
+        let after = x + space;
+        let segment = at(end).min.x.max(after) - after;
+        let from_margin = x + space + offset;
+        let stop = stops
+            .iter()
+            .find(|stop| stop.position.points() * zoom > from_margin + 0.5);
+        let (target, kind, leader) = if let Some(stop) = stop {
+            (
+                stop.position.points() * zoom - offset,
+                stop.kind,
+                stop.leader,
+            )
+        } else {
+            let next = ((from_margin / distance).floor() + 1.0) * distance;
+            (next - offset, TabKind::Left, None)
+        };
+        let reach = match kind {
+            TabKind::Left => 0.0,
+            TabKind::Right => segment,
+            TabKind::Center => segment / 2.0,
+            TabKind::Char(mark) => (start + 1..end)
+                .find(|&i| text[i] == mark)
+                .map_or(segment, |i| at(i).min.x - after),
+        };
+        let room = (target - reach - after).max(0.0);
+        job.set_tab_advance(tab, room);
+        if let Some(fill) = leader.filter(|_| room > 0.0) {
+            leaders.push(Leader {
+                fill,
+                from: x,
+                to: x + room,
+                top,
+            });
+        }
+    }
+    leaders
+}
+
+/// Fill the gaps tabs with leaders leave, in the paragraph's own font.
+fn paint_leaders(ui: &Ui, leaders: &[Leader], origin: Pos2, format: &TextFormat) {
+    for leader in leaders {
+        let one = leader.fill.to_string();
+        let width = ui.ctx().fonts_mut(|fonts| {
+            fonts
+                .layout_no_wrap(one.clone(), format.font_id.clone(), format.color)
+                .size()
+                .x
+        });
+        if width <= 0.0 {
+            continue;
+        }
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let count = ((leader.to - leader.from) / width).floor().max(0.0) as usize;
+        if count == 0 {
+            continue;
+        }
+        let filled = one.repeat(count);
+        #[allow(clippy::cast_precision_loss)]
+        let used = width * count as f32;
+        ui.painter().text(
+            origin + vec2(leader.to - used, leader.top),
+            Align2::LEFT_TOP,
+            filled,
+            format.font_id.clone(),
+            format.color,
+        );
+    }
 }
 
 #[cfg(test)]

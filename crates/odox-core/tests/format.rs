@@ -73,11 +73,14 @@ fn restored(edited: &Element, original: &Element, path: &[usize]) -> Element {
     *restored.at_mut(path).expect("the paragraph") =
         original.at(&original_path).expect("it").clone();
     match automatic_count(original) {
-        Some(count) => {
+        Some(_) => {
             let container = restored
                 .child_mut(&Ns::Office, "automatic-styles")
                 .expect("kept");
-            container.children.truncate(count);
+            *container = original
+                .child(&Ns::Office, "automatic-styles")
+                .expect("the original's")
+                .clone();
         }
         None => restored
             .children
