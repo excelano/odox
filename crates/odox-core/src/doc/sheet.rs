@@ -201,15 +201,8 @@ impl Value {
     /// Whether the value is one a spreadsheet puts against the right edge of its
     /// cell: every type but text, which is ODF's own rule and every
     /// application's default.
-    pub fn is_numeric(&self) -> bool {
-        matches!(
-            self,
-            Self::Number(_)
-                | Self::Percentage(_)
-                | Self::Currency(..)
-                | Self::Date(_)
-                | Self::Time(_)
-        )
+    pub fn aligns_right(&self) -> bool {
+        !matches!(self, Self::Text(_) | Self::Empty)
     }
 }
 
@@ -538,6 +531,14 @@ impl SheetDocument {
     pub fn data_style(&self, sheet: usize, row: usize, column: usize) -> Option<&DataStyle> {
         let name = self.data_style_name(self.sheets.get(sheet)?, row, column)?;
         self.document.styles.data_styles().get(name)
+    }
+
+    /// The colour a cell's number format gives the value it holds, as a
+    /// negative amount in red; `None` where the format gives none.
+    pub fn value_colour(&self, sheet: &Sheet, row: usize, column: usize) -> Option<crate::Color> {
+        let value = self.cell(sheet, row, column)?.value();
+        let name = self.data_style_name(sheet, row, column)?;
+        self.document.styles.data_styles().colour(name, &value)
     }
 
     /// What a person typed into a cell, read in the cell's own format where it

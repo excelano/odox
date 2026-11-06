@@ -884,7 +884,13 @@ impl Flow<'_> {
                                     if let Some(fill) = properties.cell.background {
                                         self.palette = palette.on(format::color32(fill));
                                     }
-                                    self.blocks(ui, cell, content);
+                                    ui.horizontal_top(|ui| {
+                                        ui.add_space(padding);
+                                        ui.vertical(|ui| {
+                                            ui.set_max_width(content);
+                                            self.blocks(ui, cell, content);
+                                        });
+                                    });
                                     self.palette = palette;
                                     self.detached = was_detached;
                                     self.path.pop();

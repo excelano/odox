@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::doc::Value;
+use crate::value::Color;
 use crate::xml::{Element, Ns};
 
 /// What kind of value a data style shows.
@@ -149,6 +150,7 @@ pub struct DataStyle {
     conditions: Vec<Condition>,
     language: Option<String>,
     country: Option<String>,
+    colour: Option<Color>,
 }
 
 impl DataStyle {
@@ -171,6 +173,7 @@ impl DataStyle {
         let mut country = element.attr(&Ns::Number, "country").map(ToOwned::to_owned);
         let mut parts = Vec::new();
         let mut conditions = Vec::new();
+        let mut colour = None;
         for child in element.elements() {
             if child.is(&Ns::Style, "map") {
                 if let (Some(condition), Some(style)) = (
@@ -180,6 +183,10 @@ impl DataStyle {
                 {
                     conditions.push(condition);
                 }
+                continue;
+            }
+            if child.is(&Ns::Style, "text-properties") {
+                colour = child.attr(&Ns::Fo, "color").and_then(Color::parse);
                 continue;
             }
             if child.name.ns != Ns::Number {
@@ -228,7 +235,33 @@ impl DataStyle {
             conditions,
             language,
             country,
+            colour,
         })
+    }
+
+    /// The colour this style gives a value's text, from the section its
+    /// conditions choose; `None` where the style gives none, or does not show
+    /// the value.
+    pub fn colour<'a>(
+        &'a self,
+        value: &Value,
+        find: impl Fn(&str) -> Option<&'a DataStyle> + Copy,
+    ) -> Option<Color> {
+        self.format(value, find)?;
+        match amount(value) {
+            Some(x) => self.section(x, find).colour,
+            None => self.colour,
+        }
+    }
+
+    /// The style a number is shown in: the one the first condition it meets
+    /// names, or this one.
+    fn section<'a>(&'a self, x: f64, find: impl Fn(&str) -> Option<&'a DataStyle>) -> &'a Self {
+        self.conditions
+            .iter()
+            .find(|condition| condition.holds(x))
+            .and_then(|condition| find(&condition.style))
+            .unwrap_or(self)
     }
 
     /// The text this style shows for a value, following its conditions to the
@@ -246,12 +279,7 @@ impl DataStyle {
             if !matches!(self.kind, Kind::Number | Kind::Currency | Kind::Percentage) {
                 return None;
             }
-            let chosen = self
-                .conditions
-                .iter()
-                .find(|condition| condition.holds(x))
-                .and_then(|condition| find(&condition.style))
-                .unwrap_or(self);
+            let chosen = self.section(x, find);
             let x = if self.conditions.is_empty() {
                 x
             } else {
@@ -985,5 +1013,10 @@ impl DataStyles {
     /// The text the named style shows for a value.
     pub fn format(&self, name: &str, value: &Value) -> Option<String> {
         self.get(name)?.format(value, |other| self.get(other))
+    }
+
+    /// The colour the named style gives a value's text, where it gives one.
+    pub fn colour(&self, name: &str, value: &Value) -> Option<Color> {
+        self.get(name)?.colour(value, |other| self.get(other))
     }
 }

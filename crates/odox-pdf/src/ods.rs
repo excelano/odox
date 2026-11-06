@@ -370,7 +370,10 @@ impl Sheets<'_, '_, '_> {
         if cell.as_ref().is_some_and(|cell| cell.covered) {
             return Ok(Vec::new());
         }
-        let style = document.cell_style(sheet, cell.as_ref(), column);
+        let mut style = document.cell_style(sheet, cell.as_ref(), column);
+        if let Some(colour) = document.value_colour(sheet, row, column) {
+            std::rc::Rc::make_mut(&mut style).text.color = Some(colour);
+        }
 
         // A merged cell covers the shown rows and columns its span reaches.
         let across = cell
@@ -453,8 +456,10 @@ impl Sheets<'_, '_, '_> {
                 items.push(Item::Empty { x, y, leaf });
             }
         } else {
-            let numeric = cell.as_ref().is_some_and(|cell| cell.value().is_numeric());
-            for item in self.text(&text, &style, numeric, (x, y, width), grid.share, parent)? {
+            let right = cell
+                .as_ref()
+                .is_some_and(|cell| cell.value().aligns_right());
+            for item in self.text(&text, &style, right, (x, y, width), grid.share, parent)? {
                 items.push(Item::Clipped {
                     rect: cut,
                     item: Box::new(item),
@@ -481,7 +486,7 @@ impl Sheets<'_, '_, '_> {
         &mut self,
         text: &str,
         style: &Properties,
-        numeric: bool,
+        right: bool,
         (x, y, width): (f32, f32, f32),
         share: f32,
         parent: NodeId,
@@ -499,7 +504,7 @@ impl Sheets<'_, '_, '_> {
             // Wrapped inside the column, each line aligned the way the cell is.
             let mut paragraph = paragraph;
             paragraph.align = match style.paragraph.align {
-                None if numeric => TextAlign::End,
+                None if right => TextAlign::End,
                 Some(align) => align,
                 None => TextAlign::Start,
             };
@@ -508,7 +513,7 @@ impl Sheets<'_, '_, '_> {
         let start = match style.paragraph.align {
             Some(TextAlign::Center) => x + (width - natural) / 2.0,
             Some(TextAlign::End) => x + width - padding - natural,
-            None if numeric => x + width - padding - natural,
+            None if right => x + width - padding - natural,
             _ => x + padding,
         };
         self.stack(paragraph, start, natural + 1.0, y, parent)
