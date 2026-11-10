@@ -214,25 +214,22 @@ impl SheetDocument {
             }
             other => other,
         };
-        let (value, writing) = match result {
-            formula::Value::Empty => (Value::Number(0.0), Writing::Result),
-            formula::Value::Number(n) => (
-                match held {
-                    Value::Date(_) => Value::Date(iso_date(*n)),
-                    Value::Time(_) => Value::Time(duration(*n)),
-                    Value::Percentage(_) => Value::Percentage(*n),
-                    Value::Currency(_, code) => Value::Currency(*n, code),
-                    _ => Value::Number(*n),
-                },
-                Writing::Result,
-            ),
-            formula::Value::Date(n) => (Value::Date(iso_date(*n)), Writing::Result),
-            formula::Value::Text(text) => (Value::Text(text.clone()), Writing::Result),
-            formula::Value::Boolean(b) => (Value::Boolean(*b), Writing::Result),
-            formula::Value::Error(error) => (Value::Text(error.code().to_owned()), Writing::Error),
+        let value = match result {
+            formula::Value::Empty => Value::Number(0.0),
+            formula::Value::Number(n) => match held {
+                Value::Date(_) => Value::Date(iso_date(*n)),
+                Value::Time(_) => Value::Time(duration(*n)),
+                Value::Percentage(_) => Value::Percentage(*n),
+                Value::Currency(_, code) => Value::Currency(*n, code),
+                _ => Value::Number(*n),
+            },
+            formula::Value::Date(n) => Value::Date(iso_date(*n)),
+            formula::Value::Text(text) => Value::Text(text.clone()),
+            formula::Value::Boolean(b) => Value::Boolean(*b),
+            formula::Value::Error(error) => Value::Error(error.code().to_owned()),
         };
-        let shown = match (&value, writing) {
-            (_, Writing::Error) | (Value::Text(_), _) => value.cached_text(),
+        let shown = match &value {
+            Value::Text(_) | Value::Error(_) => value.cached_text(),
             _ => self
                 .data_style_name(index, row, column)
                 .and_then(|name| self.document.styles.data_styles().format(name, &value))
@@ -241,7 +238,7 @@ impl SheetDocument {
                     other => other.cached_text(),
                 }),
         };
-        self.write_cell(sheet, row, column, &value, &shown, writing)
+        self.write_cell(sheet, row, column, &value, &shown, Writing::Result)
     }
 }
 
@@ -317,15 +314,6 @@ fn held(cell: &Cell<'_>) -> formula::Value {
     if cell.covered {
         return formula::Value::Empty;
     }
-    if cell.element.attr(&Ns::Calcext, "value-type") == Some("error") {
-        let shown = cell.text();
-        return formula::Value::Error(
-            Error::ALL
-                .into_iter()
-                .find(|error| error.code() == shown)
-                .unwrap_or(Error::Value),
-        );
-    }
     match cell.value() {
         Value::Empty => formula::Value::Empty,
         Value::Number(n) | Value::Percentage(n) | Value::Currency(n, _) => {
@@ -339,6 +327,12 @@ fn held(cell: &Cell<'_>) -> formula::Value {
         }
         Value::Boolean(b) => formula::Value::Boolean(b),
         Value::Text(text) => formula::Value::Text(text),
+        Value::Error(shown) => formula::Value::Error(
+            Error::ALL
+                .into_iter()
+                .find(|error| error.code() == shown)
+                .unwrap_or(Error::Value),
+        ),
     }
 }
 
