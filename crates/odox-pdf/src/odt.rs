@@ -10,6 +10,9 @@ use std::collections::VecDeque;
 use odox_core::Length;
 use odox_core::doc::TextDocument;
 
+use odox_core::doc::PageFields;
+
+use crate::bands::{Bands, Regions};
 use crate::fonts::Faces;
 use crate::layout::{self, Layout, Piece};
 use crate::model::{self, Block};
@@ -49,35 +52,54 @@ pub fn export(document: &TextDocument, options: &Options) -> Result<Exported, Re
 
     let page = document.page_layout();
     let margin = |length: Option<Length>| length.map_or(0.0, Length::points);
-    let (top, bottom) = (margin(page.margin.top), margin(page.margin.bottom));
     let (left, right) = (margin(page.margin.left), margin(page.margin.right));
     let (page_width, page_height) = (page.width.points(), page.height.points());
-    let body_height = (page_height - top - bottom).max(72.0);
     let body_width = (page_width - left - right).max(72.0);
+    let title = crate::title(&document.document, options);
+    let fields = |page: usize, pages: usize| PageFields {
+        page,
+        pages,
+        sheet: None,
+        title: &title,
+        today: options.today,
+    };
 
     let mut faces = Faces::new();
-    let mut layout = Layout::new(&mut faces, body_height);
+    let mut layout = Layout::new(&mut faces, 0.0);
+    let bands = Bands::new(
+        &mut layout,
+        &document.document,
+        document.master_page(),
+        &page,
+        Regions::Own,
+        &fields(1, 1),
+    )?;
+    let top = margin(page.margin.top) + bands.above();
+    let bottom = page_height - margin(page.margin.bottom) - bands.below();
+    let body_height = (bottom - top).max(72.0);
+    layout.page_height = body_height;
     let mut pieces = Vec::new();
     layout.blocks(&blocks, left, body_width, None, &mut pieces)?;
-    let tree = layout.tree;
 
     let mut headings = Vec::new();
-    let pages = paginate(pieces, body_height)
-        .into_iter()
-        .enumerate()
-        .map(|(index, placed)| {
-            let mut page = Page::new(page_width, page_height);
-            for (y, piece) in placed {
-                let y = top + y;
-                if let Some((level, title)) = piece.heading {
-                    headings.push((level, title, index, y));
-                }
-                page.items
-                    .extend(piece.items.into_iter().map(|item| (y, item)));
+    let placed = paginate(pieces, body_height);
+    let count = placed.len();
+    let mut pages = Vec::with_capacity(count);
+    for (index, placed) in placed.into_iter().enumerate() {
+        let mut page = Page::new(page_width, page_height);
+        for (y, piece) in placed {
+            let y = top + y;
+            if let Some((level, title)) = piece.heading {
+                headings.push((level, title, index, y));
             }
-            page
-        })
-        .collect();
+            page.items
+                .extend(piece.items.into_iter().map(|item| (y, item)));
+        }
+        page.items
+            .extend(bands.draw(&mut layout, &fields(index + 1, count), (top, bottom))?);
+        pages.push(page);
+    }
+    let tree = layout.tree;
 
     crate::write(
         crate::Laid {
@@ -87,7 +109,7 @@ pub fn export(document: &TextDocument, options: &Options) -> Result<Exported, Re
         },
         faces,
         &crate::About {
-            title: crate::title(&document.document, options),
+            title,
             language: crate::language(&document.document, "paragraph")
                 .unwrap_or_else(|| options.language.clone()),
             creator: "Odox Text",

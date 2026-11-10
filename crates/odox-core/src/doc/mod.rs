@@ -9,12 +9,14 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod band;
 mod pres;
 mod refs;
 mod sheet;
 mod slides;
 mod text;
 
+pub use band::{PageFields, page_band, with_page_fields};
 pub use pres::{Presentation, Slide};
 pub use sheet::{
     Block, Blocked, Borders, Cell, CellFormat, Column, Comment, DEFAULT_COLUMN_WIDTH,

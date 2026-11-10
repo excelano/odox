@@ -25,6 +25,9 @@ use krilla::tagging::{TableHeaderScope, Tag, TagKind};
 use odox_core::doc::{DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT, Sheet, SheetDocument};
 use odox_core::{Fit, Length, Properties, TextAlign, VerticalAlign};
 
+use odox_core::doc::PageFields;
+
+use crate::bands::{Bands, Regions};
 use crate::fonts::Faces;
 use crate::layout::{Item, Layout};
 use crate::model::{self, Block, Paragraph};
@@ -50,7 +53,7 @@ pub(crate) fn undescribed(_: &SheetDocument) -> Vec<Vec<usize>> {
 /// Export a spreadsheet as PDF/UA-1.
 pub(crate) fn export(document: &SheetDocument, options: &Options) -> Result<Exported, Refusal> {
     let mut faces = Faces::new();
-    let laid = lay_out(document, &mut faces)?;
+    let laid = lay_out(document, options, &mut faces)?;
     crate::write(
         laid,
         faces,
@@ -63,24 +66,78 @@ pub(crate) fn export(document: &SheetDocument, options: &Options) -> Result<Expo
     )
 }
 
-fn lay_out(document: &SheetDocument, faces: &mut Faces) -> Result<Laid, Refusal> {
+fn sheet_fields<'a>(
+    page: usize,
+    pages: usize,
+    sheet: &'a Sheet,
+    title: &'a str,
+    options: &Options,
+) -> PageFields<'a> {
+    PageFields {
+        page,
+        pages,
+        sheet: Some(&sheet.name),
+        title,
+        today: options.today,
+    }
+}
+
+fn lay_out<'d>(
+    document: &'d SheetDocument,
+    options: &Options,
+    faces: &mut Faces,
+) -> Result<Laid, Refusal> {
     let mut layout = Layout::new(faces, 0.0);
     let mut pages = Vec::new();
     let mut headings = Vec::new();
-    for sheet in document.sheets().iter().filter(|sheet| sheet.visible) {
+    let title = crate::title(&document.document, options);
+    let fields = |page: usize, pages: usize, sheet: &'d Sheet| {
+        sheet_fields(page, pages, sheet, &title, options)
+    };
+    let sheets = document.sheets();
+    let mut printed = Vec::new();
+    for sheet in sheets.iter().filter(|sheet| sheet.visible) {
+        let page = document.page_layout(sheet);
+        let bands = Bands::new(
+            &mut layout,
+            &document.document,
+            document.master_page(sheet),
+            &page,
+            Regions::Sheet,
+            &fields(1, 1, sheet),
+        )?;
         let mut sheets = Sheets {
             layout: &mut layout,
             document,
             sheet,
+            room: (bands.above(), bands.below()),
         };
         let Some(laid) = sheets.sheet()? else {
             continue;
         };
         headings.push((1, sheet.name.clone(), pages.len(), laid.top));
+        let margin = |length: Option<Length>| length.map_or(0.0, Length::points);
+        let body = (
+            margin(page.margin.top) + bands.above(),
+            page.height.points() - margin(page.margin.bottom) - bands.below(),
+        );
+        printed.push((
+            pages.len()..pages.len() + laid.pages.len(),
+            bands,
+            body,
+            sheet,
+        ));
         pages.extend(laid.pages);
     }
     if pages.is_empty() {
         return Err(Refusal::Empty);
+    }
+    let count = pages.len();
+    for (range, bands, body, sheet) in printed {
+        for index in range {
+            let drawn = bands.draw(&mut layout, &fields(index + 1, count, sheet), body)?;
+            pages[index].items.extend(drawn);
+        }
     }
     Ok(Laid {
         pages,
@@ -155,6 +212,7 @@ struct Sheets<'l, 'f, 'd> {
     layout: &'l mut Layout<'f>,
     document: &'d SheetDocument,
     sheet: &'d Sheet,
+    room: (f32, f32),
 }
 
 impl Sheets<'_, '_, '_> {
@@ -183,10 +241,13 @@ impl Sheets<'_, '_, '_> {
 
         let page = document.page_layout(sheet);
         let margin = |length: Option<Length>| length.map_or(0.0, Length::points);
-        let (top, left) = (margin(page.margin.top), margin(page.margin.left));
+        let (top, left) = (
+            margin(page.margin.top) + self.room.0,
+            margin(page.margin.left),
+        );
         let (width, height) = (page.width.points(), page.height.points());
         let across = (width - left - margin(page.margin.right)).max(72.0);
-        let down = (height - top - margin(page.margin.bottom)).max(72.0);
+        let down = (height - top - margin(page.margin.bottom) - self.room.1).max(72.0);
 
         let heights: Vec<f32> = rows
             .iter()
@@ -607,6 +668,15 @@ mod tests {
         corpus("export.ods")
     }
 
+    fn options() -> Options {
+        Options {
+            title: "Untitled".to_owned(),
+            language: "en-US".to_owned(),
+            untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
+        }
+    }
+
     fn corpus(name: &str) -> SheetDocument {
         let bytes = std::fs::read(
             Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -634,13 +704,26 @@ mod tests {
 
     fn laid() -> Laid {
         let mut faces = Faces::new();
-        lay_out(&fixture(), &mut faces).expect("laid out")
+        lay_out(&fixture(), &options(), &mut faces).expect("laid out")
+    }
+
+    #[test]
+    fn a_page_prints_its_header_and_footer_as_decoration() {
+        let mut faces = Faces::new();
+        let laid = lay_out(&corpus("sheet.ods"), &options(), &mut faces).expect("laid out");
+        let page = texts(&laid.pages[0]);
+        assert!(page.contains(&("Sheet1".to_owned(), false)), "{page:?}");
+        assert!(page.contains(&("Page 1".to_owned(), false)), "{page:?}");
+        assert!(
+            page.contains(&("Sheet1".to_owned(), true)),
+            "the heading is read"
+        );
     }
 
     #[test]
     fn a_page_no_cell_draws_on_is_left_out() {
         let mut faces = Faces::new();
-        let laid = lay_out(&corpus("gaps.ods"), &mut faces).expect("laid out");
+        let laid = lay_out(&corpus("gaps.ods"), &options(), &mut faces).expect("laid out");
         let pages: Vec<Vec<String>> = laid
             .pages
             .iter()

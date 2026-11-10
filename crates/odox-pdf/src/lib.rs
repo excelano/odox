@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+mod bands;
 mod fonts;
 mod layout;
 mod model;

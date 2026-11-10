@@ -562,6 +562,20 @@ pub struct PageLayout {
     /// Whether a spreadsheet's pages run down its columns first and then
     /// across, which is ODF's default, or across its rows first.
     pub down_first: bool,
+    /// The space a page header takes, where the layout gives it one.
+    pub header: Option<Band>,
+    /// The space a page footer takes.
+    pub footer: Option<Band>,
+}
+
+/// The space a page header or footer takes inside the page's margins: at
+/// least `min_height` for its text, and `spacing` between it and the body.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Band {
+    /// The least height of its text.
+    pub min_height: Length,
+    /// The gap between it and the body.
+    pub spacing: Length,
 }
 
 /// How a spreadsheet is fitted to its pages, from `style:scale-to`,
@@ -603,6 +617,8 @@ impl Default for PageLayout {
             },
             fit: Fit::Scale(1.0),
             down_first: true,
+            header: None,
+            footer: None,
         }
     }
 }
@@ -1028,6 +1044,23 @@ fn page_layout(element: &Element) -> PageLayout {
         }
         layout.down_first = properties.attr(&Ns::Style, "print-page-order") != Some("ltr");
     }
+    let band = |style: &str, spacing: &str| {
+        let properties = element
+            .child(&Ns::Style, style)?
+            .child(&Ns::Style, "header-footer-properties")?;
+        let length = |local: &str| {
+            properties
+                .attr(&Ns::Fo, local)
+                .and_then(Length::parse)
+                .map_or(0.0, Length::points)
+        };
+        Some(Band {
+            min_height: Length(length("min-height").max(length("height"))),
+            spacing: Length(length(spacing)),
+        })
+    };
+    layout.header = band("header-style", "margin-bottom");
+    layout.footer = band("footer-style", "margin-top");
     layout
 }
 
