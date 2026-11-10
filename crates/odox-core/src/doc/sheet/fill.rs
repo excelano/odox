@@ -282,15 +282,11 @@ fn dates(values: &[&Value]) -> Option<Series> {
     let fields: Vec<(i64, i64, i64)> = values
         .iter()
         .map(|value| match value {
-            Value::Date(text) if text.len() == 10 => {
-                let mut fields = text.splitn(3, '-').map(|f| f.parse::<i64>().ok());
-                Some((fields.next()??, fields.next()??, fields.next()??))
-            }
+            Value::Date(text) if !text.contains('T') => formula::read_iso_day(text),
             _ => None,
         })
         .collect::<Option<_>>()?;
-    let date =
-        |(year, month, day): (i64, i64, i64)| Value::Date(format!("{year:04}-{month:02}-{day:02}"));
+    let date = |fields: (i64, i64, i64)| Value::Date(formula::iso_day(fields));
 
     let (year, month, day) = fields[0];
     let months: Vec<f64> = fields
