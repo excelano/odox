@@ -955,6 +955,9 @@ impl<V: View> Shell<V> {
         let pressed = |modifiers, key| {
             ctx.input_mut(|input| input.consume_shortcut(&KeyboardShortcut::new(modifiers, key)))
         };
+        if self.find.is_engaged() && pressed(Modifiers::NONE, Key::Escape) {
+            self.find.close();
+        }
         if pressed(Modifiers::COMMAND, Key::F) {
             self.find.open();
         }

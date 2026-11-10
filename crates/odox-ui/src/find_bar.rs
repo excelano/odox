@@ -45,10 +45,22 @@ enum Focus {
     Replacement,
 }
 
+/// Whether the bar is showing, and whether Escape is its.
+#[derive(Default, PartialEq, Eq)]
+enum Shown {
+    #[default]
+    Hidden,
+    /// Showing, with the person last at something else.
+    Aside,
+    /// Showing, and what the person last used, by opening it or pressing on
+    /// it.
+    InUse,
+}
+
 /// The state of the search bar.
 #[derive(Default)]
 pub struct FindBar {
-    open: bool,
+    shown: Shown,
     query: String,
     /// The field that is to take the keyboard on the next frame it is drawn,
     /// with what it holds selected.
@@ -73,7 +85,7 @@ pub struct FindBar {
 impl FindBar {
     /// Show the bar and put the keyboard in it.
     pub fn open(&mut self) {
-        self.open = true;
+        self.shown = Shown::InUse;
         self.focus = Focus::Query;
     }
 
@@ -98,13 +110,18 @@ impl FindBar {
 
     /// Hide the bar. The query stays for the next time.
     pub fn close(&mut self) {
-        self.open = false;
+        self.shown = Shown::Hidden;
         self.asked = None;
     }
 
     /// Whether the bar is showing.
     pub fn is_open(&self) -> bool {
-        self.open
+        self.shown != Shown::Hidden
+    }
+
+    /// Whether the bar is showing and Escape is to close it.
+    pub fn is_engaged(&self) -> bool {
+        self.shown == Shown::InUse
     }
 
     /// What was typed.
@@ -156,10 +173,6 @@ impl FindBar {
                 });
                 output.response.request_focus();
             }
-            if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Escape)) {
-                self.close();
-                return;
-            }
             if ui.button(t("Previous")).clicked() {
                 *step = Some(Step::Previous);
             }
@@ -184,8 +197,24 @@ impl FindBar {
                 }
             });
         });
-        if can_replace && self.open {
+        if can_replace && self.is_open() {
             ui.horizontal(|ui| self.replace_row(ui, count, &mut pressed));
+        }
+        let bar = ui.min_rect();
+        if self.is_open()
+            && let Some(at) = ui.input(|input| {
+                input
+                    .pointer
+                    .any_pressed()
+                    .then(|| input.pointer.interact_pos())
+                    .flatten()
+            })
+        {
+            self.shown = if bar.contains(at) {
+                Shown::InUse
+            } else {
+                Shown::Aside
+            };
         }
         pressed
     }
@@ -204,10 +233,6 @@ impl FindBar {
         if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Enter)) {
             pressed.replace = Some(Replace::One);
             output.response.request_focus();
-        }
-        if output.response.lost_focus() && ui.input(|input| input.key_pressed(Key::Escape)) {
-            self.close();
-            return;
         }
         if ui
             .add_enabled(count > 0, egui::Button::new(t("Replace")))
