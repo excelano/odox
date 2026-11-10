@@ -57,7 +57,12 @@ dependencies come from a running process rather than from the linker.
 
 The renderer is wgpu, which is eframe's default and the rest of the fleet's:
 Direct3D on Windows, Metal on macOS, Vulkan here. It reaches Vulkan through
-`dlopen`, so it adds nothing to the `NEEDED` list above.
+`dlopen`, so it adds nothing to the `NEEDED` list above. On Windows it is
+Direct3D 12 alone, unless `WGPU_BACKEND` names another backend: wgpu's
+default set includes Vulkan and OpenGL, and creating a Vulkan instance loads
+every installed Vulkan driver into the process, where a faulty one ends it
+before a window opens. A machine with no usable graphics card still draws,
+through the Microsoft Basic Render Driver.
 
 One `unsafe` module, on one platform. macOS delivers a double-clicked document as
 an Apple Event, and receiving one needs a single Objective-C method: `odox-ui`'s
@@ -239,7 +244,9 @@ or a text document with no headings, has no checkbox that does nothing.
 **A text document pages with buttons under it.** Page up and Page down move the
 view nine tenths of the window, so the line read last is still in sight, and
 grey out at the top and the bottom. The Page Up and Page Down keys do the same
-while no caret is taking them; with a caret they move it, as §11 says.
+while no caret is taking them, and Home and End, with or without Ctrl, go to
+the top and the bottom of the document; with a caret they move it, as §11
+says.
 
 A view can take the whole window. `View::presenting` is the slideshow's flag:
 while it is true the shell draws no menu, no panel and no bar, takes none of
