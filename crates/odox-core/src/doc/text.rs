@@ -64,17 +64,21 @@ impl TextDocument {
     /// one the body starts on. Where there is none, or no `styles.xml` at all,
     /// the default of [`PageLayout`] applies.
     pub fn page_layout(&self) -> PageLayout {
-        let master = self
-            .document
-            .styles_part
-            .as_ref()
-            .and_then(|styles| styles.child(&Ns::Office, "master-styles"))
-            .and_then(|masters| masters.child(&Ns::Style, "master-page"))
-            .and_then(|master| master.attr(&Ns::Style, "name"));
-        master
+        self.master_page()
+            .and_then(|master| master.attr(&Ns::Style, "name"))
             .and_then(|name| self.document.styles.page_layout_of(name))
             .cloned()
             .unwrap_or_default()
+    }
+
+    /// The document's first master page, which holds the body's page header
+    /// and footer.
+    pub fn master_page(&self) -> Option<&Element> {
+        self.document
+            .styles_part
+            .as_ref()?
+            .child(&Ns::Office, "master-styles")?
+            .child(&Ns::Style, "master-page")
     }
 
     /// The width a line of body text may be: the page less its side margins.

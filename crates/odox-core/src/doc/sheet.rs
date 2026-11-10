@@ -704,24 +704,30 @@ impl SheetDocument {
     /// The page a sheet is printed on: the page layout of the master page
     /// its table style names, or of the document's first master page.
     pub fn page_layout(&self, sheet: &Sheet) -> PageLayout {
+        self.master_page(sheet)
+            .and_then(|master| master.attr(&Ns::Style, "name"))
+            .and_then(|name| self.document.styles.page_layout_of(name))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The master page a sheet is printed on, which holds its page header and
+    /// footer: the one its table style names, or the document's first.
+    pub fn master_page(&self, sheet: &Sheet) -> Option<&Element> {
         let styles = &self.document.styles;
         let named = self
             .table(sheet)
             .and_then(|table| table.attr(&Ns::Table, "style-name"))
             .and_then(|name| styles.style(&Family::Table, name))
-            .and_then(|style| style.element.attr(&Ns::Style, "master-page-name"));
-        let first = self
-            .document
-            .styles_part
-            .as_ref()
-            .and_then(|part| part.child(&Ns::Office, "master-styles"))
-            .and_then(|masters| masters.child(&Ns::Style, "master-page"))
-            .and_then(|master| master.attr(&Ns::Style, "name"));
-        named
-            .or(first)
-            .and_then(|name| styles.page_layout_of(name))
-            .cloned()
-            .unwrap_or_default()
+            .and_then(|style| style.element.attr(&Ns::Style, "master-page-name"))
+            .and_then(|name| styles.master_page(name));
+        named.or_else(|| {
+            self.document
+                .styles_part
+                .as_ref()?
+                .child(&Ns::Office, "master-styles")?
+                .child(&Ns::Style, "master-page")
+        })
     }
 
     /// The part of a sheet it prints, from `table:print-ranges`, as rows and

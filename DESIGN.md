@@ -912,8 +912,22 @@ proportional line height is a share of the face's own line height, which is
 what ODF means by it. A page is filled with whole pieces: a line, a table row, a
 picture. A heading stays on the page with the line after it, a page break the
 document asks for is taken, a table's header rows are drawn again above the rest
-of it on a new page, and only a piece taller than a page is cut. There are no
-headers, footers, widow control, floats or columns.
+of it on a new page, and only a piece taller than a page is cut. There is no
+widow control, and there are no floats or columns.
+
+**A page prints its header and footer** (`odox-pdf`'s `bands.rs`, from
+`odox-core`'s `doc/band.rs`): the ones the master page gives it, the first
+page's own and an even page's left one where the master gives them, the
+master's own otherwise, and none where the master turns them off. Their fields
+are filled in for the page: its number and the count, the title, the sheet's
+name, and today for a date that is not fixed. The body is shortened by the
+room they take, their height and the spacing their page layout asks between
+them and the body, and they are drawn inside the margins above and below it.
+A text document's keep their paragraphs' own alignment; a spreadsheet's left,
+centre and right regions each run across the page, and one with no regions is
+centred, as Calc prints it. Page numbers run on across a spreadsheet's sheets.
+`corpus/libreoffice/pages.odt` is the measure. The windows have no pages and
+show neither.
 
 A spreadsheet prints each sheet that is shown on the page its table style's
 master page gives, beginning a new page with the sheet's name. What it prints is
@@ -951,7 +965,8 @@ for the header rows and TD, with column and row spans, and an empty cell is
 still a cell. A picture is a Figure with its alternative text. A link to an
 address outside the document is a Link with its annotation, whose text is the
 address; a link to a place inside it is read as its text. Backgrounds, borders,
-underlines, a repeated table header and a decorative picture are artifacts.
+underlines, a repeated table header, a page's header and footer and a
+decorative picture are artifacts.
 
 Each sheet is a section: its name as an H1, then one table however many pages
 it takes, read row by row across all of them. The marked header rows are its TH
