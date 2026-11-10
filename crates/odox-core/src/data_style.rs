@@ -44,16 +44,18 @@ pub enum Kind {
 #[derive(Debug, Clone, PartialEq)]
 enum Part {
     Text(String),
-    Number(Digits),
+    /// A number, and the literal text `number:embedded-text` puts among its
+    /// integer digits, each with how many digits stand to its right.
+    Number(Digits, Vec<(usize, String)>),
     Scientific {
         digits: Digits,
         exponent_digits: usize,
         forced_sign: bool,
+        /// What the exponent is a multiple of: three for engineering
+        /// notation.
+        interval: i32,
     },
-    Fraction {
-        integer: bool,
-        denominator: u32,
-    },
+    Fraction(Fraction),
     CurrencySymbol(String),
     Year {
         long: bool,
@@ -68,6 +70,10 @@ enum Part {
     DayOfWeek {
         long: bool,
     },
+    Quarter {
+        long: bool,
+    },
+    WeekOfYear,
     Hours {
         long: bool,
     },
@@ -76,10 +82,23 @@ enum Part {
     },
     Seconds {
         long: bool,
+        decimals: u32,
     },
     AmPm,
     Boolean,
     TextContent,
+}
+
+/// A fraction: whether it has a whole part, its denominator, which is the
+/// largest it may be unless it is `fixed`, and the widths its numerator and
+/// denominator are padded to with figure spaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Fraction {
+    integer: bool,
+    denominator: u32,
+    fixed: bool,
+    numerator_digits: usize,
+    denominator_digits: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,8 +170,9 @@ pub struct DataStyle {
     language: Option<String>,
     country: Option<String>,
     colour: Option<Color>,
-    /// Whether hours past a day are shown as they are, `[HH]`, rather than
-    /// as the time of day they come to.
+    /// Whether a time is shown as the whole duration in its largest unit,
+    /// `[HH]`, `[MM]` or `[SS]`, rather than as the time of day it comes to:
+    /// `[MM]:SS` shows 144:00 for two hours and twenty-four minutes.
     elapsed: bool,
 }
 
@@ -198,16 +218,23 @@ impl DataStyle {
             let long = child.attr(&Ns::Number, "style") == Some("long");
             let part = match &*child.name.local {
                 "text" => Part::Text(child.plain_text()),
-                "number" => Part::Number(digits(child)),
+                "number" => Part::Number(digits(child), embedded(child)),
                 "scientific-number" => Part::Scientific {
                     digits: digits(child),
                     exponent_digits: count(child, "min-exponent-digits").unwrap_or(2),
                     forced_sign: child.attr(&Ns::Number, "forced-exponent-sign") != Some("false"),
+                    interval: count(child, "exponent-interval")
+                        .and_then(|n| i32::try_from(n).ok())
+                        .unwrap_or(1)
+                        .max(1),
                 },
-                "fraction" => Part::Fraction {
+                "fraction" => Part::Fraction(Fraction {
                     integer: child.attr(&Ns::Number, "min-integer-digits").is_some(),
                     denominator: denominator(child),
-                },
+                    fixed: child.attr(&Ns::Number, "denominator-value").is_some(),
+                    numerator_digits: count(child, "min-numerator-digits").unwrap_or(1),
+                    denominator_digits: count(child, "min-denominator-digits").unwrap_or(1),
+                }),
                 "currency-symbol" => {
                     if language.is_none() {
                         language = child.attr(&Ns::Number, "language").map(ToOwned::to_owned);
@@ -222,9 +249,17 @@ impl DataStyle {
                 },
                 "day" => Part::Day { long },
                 "day-of-week" => Part::DayOfWeek { long },
+                "quarter" => Part::Quarter { long },
+                "week-of-year" => Part::WeekOfYear,
                 "hours" => Part::Hours { long },
                 "minutes" => Part::Minutes { long },
-                "seconds" => Part::Seconds { long },
+                "seconds" => Part::Seconds {
+                    long,
+                    decimals: count(child, "decimal-places")
+                        .and_then(|n| u32::try_from(n).ok())
+                        .unwrap_or(0)
+                        .min(9),
+                },
                 "am-pm" => Part::AmPm,
                 "boolean" => Part::Boolean,
                 "text-content" => Part::TextContent,
@@ -278,16 +313,23 @@ impl DataStyle {
     ) -> Option<String> {
         if let Some(x) = amount(value) {
             if matches!(value, Value::Number(_)) && matches!(self.kind, Kind::Date | Kind::Time) {
-                return Moment::of_serial(x, self.kind == Kind::Time && self.elapsed)
-                    .map(|moment| self.format_moment(&moment));
+                return Moment::of_serial(
+                    x,
+                    self.kind == Kind::Time && self.elapsed,
+                    self.second_places(),
+                )
+                .map(|moment| self.format_moment(&moment));
             }
             if matches!(value, Value::Percentage(_)) && self.kind != Kind::Percentage {
                 return None;
             }
-            if !matches!(self.kind, Kind::Number | Kind::Currency | Kind::Percentage) {
+            let chosen = self.section(x, find);
+            if !matches!(
+                chosen.kind,
+                Kind::Number | Kind::Currency | Kind::Percentage
+            ) {
                 return None;
             }
-            let chosen = self.section(x, find);
             let x = if self.conditions.is_empty() {
                 x
             } else {
@@ -301,7 +343,11 @@ impl DataStyle {
             }
             (Kind::Time, Value::Time(text)) => {
                 let days = duration_days(text)?;
-                Some(self.format_moment(&Moment::of_serial(days, self.elapsed)?))
+                Some(self.format_moment(&Moment::of_serial(
+                    days,
+                    self.elapsed,
+                    self.second_places(),
+                )?))
             }
             (Kind::Boolean, Value::Boolean(truth)) => Some(self.substitute(&self.truth(*truth))),
             (Kind::Text, Value::Text(text)) => Some(self.substitute(text)),
@@ -364,9 +410,20 @@ impl DataStyle {
     /// are grouped, where the style shows a number.
     pub fn digits(&self) -> Option<(usize, bool)> {
         self.parts.iter().find_map(|part| match part {
-            Part::Number(digits) => Some((digits.decimals.unwrap_or(0), digits.grouping)),
+            Part::Number(digits, _) => Some((digits.decimals.unwrap_or(0), digits.grouping)),
             _ => None,
         })
+    }
+
+    /// How many decimals the seconds are shown with.
+    fn second_places(&self) -> u32 {
+        self.parts
+            .iter()
+            .find_map(|part| match part {
+                Part::Seconds { decimals, .. } => Some(*decimals),
+                _ => None,
+            })
+            .unwrap_or(0)
     }
 
     /// The ISO 4217 code of the currency this style shows, where its symbol
@@ -418,29 +475,26 @@ impl DataStyle {
         for part in &self.parts {
             match part {
                 Part::Text(text) | Part::CurrencySymbol(text) => out.push_str(text),
-                Part::Number(digits) => {
-                    out.push_str(&number(magnitude, digits, decimal, group));
+                Part::Number(digits, embedded) => {
+                    out.push_str(&number(magnitude, digits, embedded, decimal, group));
                     shown_number = true;
                 }
                 Part::Scientific {
                     digits,
                     exponent_digits,
                     forced_sign,
+                    interval,
                 } => {
                     out.push_str(&scientific(
                         magnitude,
                         digits,
-                        *exponent_digits,
-                        *forced_sign,
+                        (*exponent_digits, *forced_sign, *interval),
                         decimal,
                     ));
                     shown_number = true;
                 }
-                Part::Fraction {
-                    integer,
-                    denominator,
-                } => {
-                    out.push_str(&fraction(magnitude, *integer, *denominator));
+                Part::Fraction(spec) => {
+                    out.push_str(&fraction(magnitude, spec));
                     shown_number = true;
                 }
                 _ => {}
@@ -455,6 +509,7 @@ impl DataStyle {
                     min_integer: 1,
                     grouping: false,
                 },
+                &[],
                 decimal,
                 group,
             ));
@@ -468,6 +523,23 @@ impl DataStyle {
     fn format_moment(&self, moment: &Moment) -> String {
         let twelve = self.parts.contains(&Part::AmPm);
         let names = Names::of(self.language.as_deref());
+        let lead = self.parts.iter().find(|part| {
+            matches!(
+                part,
+                Part::Hours { .. } | Part::Minutes { .. } | Part::Seconds { .. }
+            )
+        });
+        let leads = |unit: fn(&Part) -> bool| self.elapsed && lead.is_some_and(unit);
+        let minutes = if leads(|p| matches!(p, Part::Minutes { .. })) {
+            moment.hours * 60 + moment.minutes
+        } else {
+            moment.minutes
+        };
+        let seconds = if leads(|p| matches!(p, Part::Seconds { .. })) {
+            (moment.hours * 60 + moment.minutes) * 60 + moment.seconds
+        } else {
+            moment.seconds
+        };
         let mut out = String::new();
         for part in &self.parts {
             match part {
@@ -512,8 +584,19 @@ impl DataStyle {
                     };
                     out.push_str(&pad(hours, *long));
                 }
-                Part::Minutes { long } => out.push_str(&pad(moment.minutes, *long)),
-                Part::Seconds { long } => out.push_str(&pad(moment.seconds, *long)),
+                Part::Quarter { long } => out.push_str(&names.quarter(moment.month, *long)),
+                Part::WeekOfYear => {
+                    out.push_str(&iso_week(moment.year, moment.month, moment.day).to_string());
+                }
+                Part::Minutes { long } => out.push_str(&pad(minutes, *long)),
+                Part::Seconds { long, decimals } => {
+                    out.push_str(&pad(seconds, *long));
+                    if *decimals > 0 {
+                        let places = *decimals as usize;
+                        let (decimal, _) = separators(self.language.as_deref());
+                        let _ = write!(out, "{decimal}{:0>places$}", moment.subsecond);
+                    }
+                }
                 Part::AmPm => out.push_str(if moment.hours % 24 < 12 { "AM" } else { "PM" }),
                 _ => {}
             }
@@ -560,6 +643,10 @@ impl DataStyle {
         if mistaken {
             text = text.replace(other, ".");
         } else {
+            let after_decimal = text.split_once(decimal).map_or("", |(_, rest)| rest);
+            if group.is_some_and(|group| group.chars().any(|c| after_decimal.contains(c))) {
+                return None;
+            }
             if let Some(group) = group {
                 for c in group.chars() {
                     text = text.replace(c, "");
@@ -575,7 +662,15 @@ impl DataStyle {
         if let Some(moment) = Moment::of_date(input)
             && input.len() >= 10
         {
-            return Some(Value::Date(moment.iso_date()));
+            let date = moment.iso_date();
+            return Some(Value::Date(if input.contains('T') {
+                format!(
+                    "{date}T{:02}:{:02}:{:02}",
+                    moment.hours, moment.minutes, moment.seconds
+                )
+            } else {
+                date
+            }));
         }
         let order: Vec<char> = self
             .parts
@@ -629,6 +724,9 @@ struct Moment {
     hours: u32,
     minutes: u32,
     seconds: u32,
+    /// The part of a second shown, in as many decimal places as the style
+    /// shows.
+    subsecond: u64,
     /// A duration below zero.
     negative: bool,
 }
@@ -659,19 +757,24 @@ impl Moment {
             hours: next(),
             minutes: next(),
             seconds: next(),
+            subsecond: 0,
             negative: false,
         })
     }
 
     /// A count of days from 30 December 1899 as a date and time of day, or,
-    /// as a `duration`, as the hours, minutes and seconds it comes to; `None`
-    /// for a date no calendar here reaches.
-    fn of_serial(serial: f64, duration: bool) -> Option<Self> {
+    /// as a `duration`, as the hours, minutes and seconds it comes to, rounded
+    /// to `places` decimals of a second; `None` for a date no calendar here
+    /// reaches.
+    fn of_serial(serial: f64, duration: bool, places: u32) -> Option<Self> {
         if !serial.is_finite() || !(-693_594.0..=2_958_466.0).contains(&serial) {
             return None;
         }
-        #[allow(clippy::cast_possible_truncation)]
-        let total = (serial * 86_400.0).round() as i64;
+        let scale = 10_i64.pow(places);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        let units = (serial * 86_400.0 * scale as f64).round() as i64;
+        let subsecond = units.unsigned_abs() % scale.unsigned_abs();
+        let total = units.signum() * (units.abs() / scale);
         let (days, of_day) = (total.div_euclid(86_400), total.rem_euclid(86_400));
         #[allow(clippy::cast_precision_loss)]
         let (year, month, day) = crate::formula::eval_civil(days as f64);
@@ -687,7 +790,8 @@ impl Moment {
             hours: u32::try_from(clock / 3600).ok()?,
             minutes: u32::try_from(clock / 60 % 60).ok()?,
             seconds: u32::try_from(clock % 60).ok()?,
-            negative: duration && total < 0,
+            subsecond,
+            negative: duration && units < 0,
         })
     }
 
@@ -818,7 +922,67 @@ fn separators(language: Option<&str>) -> (char, Option<&'static str>) {
     }
 }
 
-fn number(x: f64, digits: &Digits, decimal: char, group: Option<&str>) -> String {
+/// The literal text a number element puts among its integer digits, each
+/// with how many digits stand to its right.
+fn embedded(number: &Element) -> Vec<(usize, String)> {
+    number
+        .elements()
+        .filter(|child| child.is(&Ns::Number, "embedded-text"))
+        .filter_map(|child| Some((count(child, "position")?, child.plain_text())))
+        .collect()
+}
+
+/// A number with no decimals stated, as a spreadsheet's General format
+/// writes it, measured against `LibreOffice` in `corpus/libreoffice/codes.ods`:
+/// up to fifteen significant digits, and an integer below 2^53 in full. From
+/// 2^53 up it is written with an exponent of at least three digits,
+/// `1E+016`. Below a ten-thousandth it keeps to decimals while that takes no
+/// more than sixteen places and the number is at least a ten-billionth, and is
+/// otherwise written with an exponent of at least two digits, `1E-10`.
+fn general(x: f64) -> String {
+    const EXACT: f64 = 9_007_199_254_740_992.0;
+    if x == 0.0 || !x.is_finite() {
+        return "0".to_owned();
+    }
+    if x < EXACT && x.fract() == 0.0 {
+        return format!("{x:.0}");
+    }
+    let written = format!("{x:.14e}");
+    let (mantissa, exponent) = written.split_once('e').unwrap_or((&written, "0"));
+    let exponent: i32 = exponent.parse().unwrap_or(0);
+    let significant = mantissa.replace('.', "");
+    let significant = significant.trim_end_matches('0');
+    let count = i32::try_from(significant.len()).unwrap_or(15);
+    let decimal = x < EXACT && (exponent >= -4 || (exponent >= -9 && count - 1 - exponent <= 16));
+    if !decimal {
+        let (first, rest) = significant.split_at(1);
+        let mantissa = if rest.is_empty() {
+            first.to_owned()
+        } else {
+            format!("{first}.{rest}")
+        };
+        let (sign, width) = if exponent < 0 { ('-', 2) } else { ('+', 3) };
+        return format!("{mantissa}E{sign}{:0>width$}", exponent.unsigned_abs());
+    }
+    if exponent < 0 {
+        let zeros = "0".repeat(exponent.unsigned_abs() as usize - 1);
+        return format!("0.{zeros}{significant}");
+    }
+    let point = exponent.unsigned_abs() as usize + 1;
+    if significant.len() <= point {
+        format!("{significant:0<point$}")
+    } else {
+        format!("{}.{}", &significant[..point], &significant[point..])
+    }
+}
+
+fn number(
+    x: f64,
+    digits: &Digits,
+    embedded: &[(usize, String)],
+    decimal: char,
+    group: Option<&str>,
+) -> String {
     let written = if let Some(places) = digits.decimals {
         let x = half_away(x, places);
         let fixed = format!("{x:.places$}");
@@ -837,22 +1001,25 @@ fn number(x: f64, digits: &Digits, decimal: char, group: Option<&str>) -> String
             None => fixed,
         }
     } else {
-        let general = format!("{x}");
-        if general.contains('e') {
-            format!("{x:.10}")
-                .trim_end_matches('0')
-                .trim_end_matches('.')
-                .to_owned()
-        } else {
-            general
+        let general = general(x);
+        if general.contains('E') {
+            return general.replace('.', &decimal.to_string());
         }
+        general
     };
     let (whole, fraction) = written.split_once('.').unwrap_or((&written, ""));
-    let whole = if whole == "0" && digits.min_integer == 0 {
+    let mut whole = if whole == "0" && digits.min_integer == 0 {
         String::new()
     } else {
         format!("{whole:0>width$}", width = digits.min_integer)
     };
+    let mut embedded = embedded.to_vec();
+    embedded.sort_by_key(|(position, _)| std::cmp::Reverse(*position));
+    for (position, text) in embedded {
+        if let Some(at) = whole.len().checked_sub(position) {
+            whole.insert_str(at, &text);
+        }
+    }
     let whole = match group.filter(|_| digits.grouping) {
         Some(separator) => grouped(&whole, separator),
         None => whole,
@@ -887,17 +1054,29 @@ fn grouped(whole: &str, separator: &str) -> String {
     out
 }
 
+/// A number with an exponent that is a multiple of `interval`, its mantissa
+/// to the style's decimals: `1.23E+04`, or `12.35E+03` in engineering
+/// notation.
 fn scientific(
     x: f64,
     digits: &Digits,
-    exponent_digits: usize,
-    forced_sign: bool,
+    (exponent_digits, forced_sign, interval): (usize, bool, i32),
     decimal: char,
 ) -> String {
     let places = digits.decimals.unwrap_or(2);
-    let written = format!("{x:.places$e}");
-    let (mantissa, exponent) = written.split_once('e').unwrap_or((&written, "0"));
-    let exponent: i32 = exponent.parse().unwrap_or(0);
+    #[allow(clippy::cast_possible_truncation)]
+    let mut exponent = if x > 0.0 && x.is_finite() {
+        let magnitude = x.log10().floor() as i32;
+        magnitude - magnitude.rem_euclid(interval)
+    } else {
+        0
+    };
+    let mut mantissa = half_away(x / 10f64.powi(exponent), places);
+    if mantissa >= 10f64.powi(interval) {
+        exponent += interval;
+        mantissa = half_away(x / 10f64.powi(exponent), places);
+    }
+    let mantissa = format!("{mantissa:.places$}");
     let sign = if exponent < 0 {
         "-"
     } else if forced_sign {
@@ -912,33 +1091,86 @@ fn scientific(
     )
 }
 
-fn fraction(x: f64, integer: bool, most: u32) -> String {
-    let whole = if integer { x.trunc() } else { 0.0 };
+/// A fraction as `LibreOffice` writes one, measured in
+/// `corpus/libreoffice/codes.ods`: the whole part, blank where it is nought
+/// and there is a fraction, then a space and the fraction, its numerator
+/// padded on the left and a denominator that is not fixed padded on the
+/// right with figure spaces. A whole number is the number, then blanks where
+/// the fraction would be.
+fn fraction(x: f64, spec: &Fraction) -> String {
+    let whole = if spec.integer { x.trunc() } else { 0.0 };
     let rest = x - whole;
-    let (mut numerator, mut denominator) = (0_u32, 1_u32);
-    let mut best = rest.abs();
-    for candidate in 1..=most {
-        let scaled = rest * f64::from(candidate);
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let top = scaled.round() as u32;
-        let error = (rest - f64::from(top) / f64::from(candidate)).abs();
-        if error + f64::EPSILON < best {
-            best = error;
-            numerator = top;
-            denominator = candidate;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let (mut numerator, denominator) = if spec.fixed {
+        (
+            (rest * f64::from(spec.denominator)).round() as u32,
+            spec.denominator,
+        )
+    } else {
+        let (mut numerator, mut denominator) = (0_u32, 1_u32);
+        let mut best = rest.abs();
+        for candidate in 1..=spec.denominator {
+            let top = (rest * f64::from(candidate)).round() as u32;
+            let error = (rest - f64::from(top) / f64::from(candidate)).abs();
+            if error + f64::EPSILON < best {
+                best = error;
+                numerator = top;
+                denominator = candidate;
+            }
         }
-    }
+        (numerator, denominator)
+    };
     #[allow(clippy::cast_possible_truncation)]
     let mut whole = whole as i64;
-    if integer && numerator == denominator {
+    if spec.integer && numerator == denominator {
         whole += 1;
         numerator = 0;
     }
-    match (integer && whole != 0, numerator) {
-        (true, 0) => whole.to_string(),
-        (true, _) => format!("{whole} {numerator}/{denominator}"),
+    let blank = |width: usize| "\u{2007}".repeat(width);
+    let below = if spec.fixed {
+        String::new()
+    } else {
+        blank(spec.denominator_digits)
+    };
+    match (spec.integer, numerator) {
+        (true, 0) => format!("{whole} {} {below}", blank(spec.numerator_digits)),
         (false, 0) => "0".to_owned(),
-        (false, _) => format!("{numerator}/{denominator}"),
+        (integer, _) => {
+            let top = numerator.to_string();
+            let bottom = denominator.to_string();
+            let mut written = format!(
+                "{}{top}/{bottom}",
+                blank(spec.numerator_digits.saturating_sub(top.len()))
+            );
+            if !spec.fixed {
+                written.push_str(&blank(spec.denominator_digits.saturating_sub(bottom.len())));
+            }
+            if integer {
+                let shown = if whole == 0 {
+                    String::new()
+                } else {
+                    whole.to_string()
+                };
+                format!("{shown} {written}")
+            } else {
+                written
+            }
+        }
+    }
+}
+
+/// The ISO 8601 week a date falls in, Monday first.
+fn iso_week(year: i32, month: u32, day: u32) -> u32 {
+    let day_of_year = (1..month).map(|m| days_in(year, m)).sum::<u32>() + day;
+    let monday_first = u32::try_from((weekday(year, month, day) + 6) % 7).unwrap_or(0);
+    let week = (day_of_year + 9 - (monday_first + 1)) / 7;
+    if week == 0 {
+        iso_week(year - 1, 12, 31)
+    } else if week == 53 {
+        let december_31 = u32::try_from((weekday(year, 12, 31) + 6) % 7).unwrap_or(0);
+        if december_31 < 3 { 1 } else { 53 }
+    } else {
+        week
     }
 }
 
@@ -1043,6 +1275,18 @@ impl Names {
             .char_indices()
             .nth(3)
             .map_or(self.months[index].len(), |(at, _)| at)
+    }
+
+    /// The quarter a month falls in, `Q2` or, long, `2nd quarter`.
+    #[allow(clippy::unused_self)]
+    fn quarter(&self, month: u32, long: bool) -> String {
+        let quarter = (month.clamp(1, 12) - 1) / 3 + 1;
+        if long {
+            let ordinal = ["1st", "2nd", "3rd", "4th"][quarter as usize - 1];
+            format!("{ordinal} quarter")
+        } else {
+            format!("Q{quarter}")
+        }
     }
 
     /// The month a word names, in full or by its first three letters.

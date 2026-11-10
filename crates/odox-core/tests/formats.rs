@@ -139,6 +139,19 @@ fn input_reads_in_the_cells_format() {
         document.read_input(0, 1, 1, "words"),
         Value::Text("words".to_owned())
     );
+    assert_eq!(
+        document.read_input(0, 1, 1, "1.234,5"),
+        Value::Text("1.234,5".to_owned()),
+        "separators in another language's order do not fit the format"
+    );
+    assert_eq!(
+        document.read_input(0, 5, 1, "1,234.5 €"),
+        Value::Text("1,234.5 €".to_owned())
+    );
+    assert_eq!(
+        document.read_input(0, 8, 1, "2026-03-09T14:30:05"),
+        Value::Date("2026-03-09T14:30:05".to_owned())
+    );
 }
 
 #[test]
@@ -167,4 +180,29 @@ fn a_negative_amount_takes_the_colour_its_format_gives_it() {
         None,
         "text in no format"
     );
+}
+
+/// `corpus/libreoffice/codes.ods`: a value per row in a format LibreOffice
+/// made from a code, with the text it shows, and the code beside it.
+#[test]
+fn every_code_is_shown_as_calc_showed_it() {
+    let bytes = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/codes.ods"),
+    )
+    .expect("the codes fixture");
+    let document = SheetDocument::read(&bytes).expect("it reads");
+    let sheet = &document.sheets()[0];
+    let wrong: Vec<String> = (0..sheet.used_rows)
+        .filter_map(|row| {
+            let code = document.cell(sheet, row, 0)?.text();
+            let cell = document.cell(sheet, row, 1)?;
+            let style = document.data_style(0, row, 1)?;
+            let styles = document.document.styles.data_styles();
+            let ours = style.format(&cell.value(), |other| styles.get(other));
+            let calc = cell.text();
+            (ours.as_deref() != Some(calc.as_str()))
+                .then(|| format!("{code} {:?}: {ours:?}, Calc {calc:?}", cell.value()))
+        })
+        .collect();
+    assert!(wrong.is_empty(), "{wrong:#?}");
 }
