@@ -152,6 +152,26 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>general 1E20</text:p></table:table-cell><table:table-cell table:formula="of:=1E20"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>general -1E-20</text:p></table:table-cell><table:table-cell table:formula="of:=-1E-20"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>general 2^60</text:p></table:table-cell><table:table-cell table:formula="of:=2^60"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>first gregorian day</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1582;10;15)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>day before gregorian</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1582;10;14)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year 1000</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1000;1;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year 100</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(100;1;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>negative year</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(-1;1;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>negative year carried</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(-1;13;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year past 32767</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(32768;1;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>days carried to gregorian</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1582;9;45)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year 0</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(0;1;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>months back before gregorian</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1583;-12;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>julian day</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1582;10;15)-1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year of julian day</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(DATE(1582;10;15)-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>day of julian day</text:p></table:table-cell><table:table-cell table:formula="of:=DAY(DATE(1582;10;15)-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>before the first year</text:p></table:table-cell><table:table-cell table:formula="of:=DATE(1583;1;1)-600000"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year 1</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(-693593)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year before 1</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(-693594)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year long before</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(-700000)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>month long before</text:p></table:table-cell><table:table-cell table:formula="of:=MONTH(-700000)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>day long before</text:p></table:table-cell><table:table-cell table:formula="of:=DAY(-700000)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>year far ahead</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(1E9)"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

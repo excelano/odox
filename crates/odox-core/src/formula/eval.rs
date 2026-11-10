@@ -436,18 +436,25 @@ impl Context<'_> {
                 } else {
                     y
                 };
+                if !(0.0..=32767.0).contains(&y) {
+                    return Ok(Value::Error(Error::Argument));
+                }
                 let months = y * 12.0 + (m - 1.0);
                 let (y, m) = ((months / 12.0).floor(), months.rem_euclid(12.0) + 1.0);
                 #[allow(clippy::cast_possible_truncation)]
                 let first = serial(y as i64, m as i64, 1);
-                Value::Date(first + d - 1.0)
+                let date = first + d - 1.0;
+                if date < GREGORIAN {
+                    return Ok(Value::Error(Error::Value));
+                }
+                Value::Date(date)
             }
             "YEAR" | "MONTH" | "DAY" => {
                 count(1, 1)?;
                 let (y, m, d) = civil(tryv!(num(0)?));
                 #[allow(clippy::cast_precision_loss)]
                 Value::Number(match name {
-                    "YEAR" => y as f64,
+                    "YEAR" => (if y > 0 { y } else { y - 1 }).clamp(-32768, 32767) as f64,
                     "MONTH" => m as f64,
                     _ => d as f64,
                 })
@@ -991,6 +998,48 @@ fn glob(pattern: &str, text: &str) -> bool {
         }
     }
     pattern[p..].iter().all(|c| *c == '*')
+}
+
+/// The first day of the Gregorian calendar, 15 October 1582, as days from 30
+/// December 1899: `DATE` refuses a day before it, and a day before it is
+/// shown in the Julian calendar.
+pub(crate) const GREGORIAN: f64 = -115_858.0;
+
+/// A date as ODF writes it, `2026-11-05`, where a year before the first is
+/// written with a minus and counted without a year zero, as `LibreOffice`
+/// writes one: the year -60 of the proleptic calendar is `-0061`.
+pub(crate) fn iso_day((year, month, day): (i64, i64, i64)) -> String {
+    if year > 0 {
+        format!("{year:04}-{month:02}-{day:02}")
+    } else {
+        format!("-{:04}-{month:02}-{day:02}", 1 - year)
+    }
+}
+
+/// A date written as [`iso_day`] writes it, read back.
+pub(crate) fn read_iso_day(text: &str) -> Option<(i64, i64, i64)> {
+    let (before, text) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text),
+    };
+    let mut fields = text.splitn(3, '-');
+    let mut next = |width: usize| fields.next()?.get(..width)?.parse::<i64>().ok();
+    let (year, month, day) = (next(4)?, next(2)?, next(2)?);
+    Some((if before { 1 - year } else { year }, month, day))
+}
+
+/// The date a count of days from 30 December 1899 falls on in the Julian
+/// calendar, by Richards' method.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn julian(serial: f64) -> (i64, i64, i64) {
+    let serial = if serial.is_finite() { serial } else { 0.0 };
+    let day_number = serial.clamp(-1e9, 1e9).floor() as i64 + 2_415_019;
+    let c = day_number + 32_082;
+    let d = (4 * c + 3).div_euclid(1461);
+    let e = c - (1461 * d).div_euclid(4);
+    let m = (5 * e + 2).div_euclid(153);
+    let day = e - (153 * m + 2).div_euclid(5) + 1;
+    (d - 4800 + m / 10, m + 3 - 12 * (m / 10), day)
 }
 
 /// The days from 30 December 1899 to a date.

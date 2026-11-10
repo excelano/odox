@@ -19,7 +19,9 @@ mod shift;
 mod typed;
 
 pub use eval::{Cells, evaluate};
-pub(crate) use eval::{approx, civil as eval_civil, serial as eval_serial};
+pub(crate) use eval::{
+    GREGORIAN, approx, civil as eval_civil, iso_day, julian, read_iso_day, serial as eval_serial,
+};
 pub use parse::parse;
 pub use shift::shifted;
 pub use typed::{to_stored, to_typed};

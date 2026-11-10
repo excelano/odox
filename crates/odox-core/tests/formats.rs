@@ -206,3 +206,12 @@ fn every_code_is_shown_as_calc_showed_it() {
         .collect();
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
+
+#[test]
+fn a_date_before_the_gregorian_calendar_is_shown_in_the_julian() {
+    let shown_on = |date: &str| shown(8, 1, &Value::Date(date.to_owned())).expect("shown");
+    assert_eq!(shown_on("1582-10-15"), "10/15/1582");
+    assert_eq!(shown_on("1582-10-14"), "10/4/1582");
+    assert_eq!(shown_on("0983-05-26"), "5/21/0983");
+    assert_eq!(shown_on("-0061-04-04"), "4/6/-0061");
+}

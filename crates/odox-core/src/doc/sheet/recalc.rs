@@ -342,8 +342,7 @@ fn held(cell: &Cell<'_>) -> formula::Value {
 /// `2026-11-05` or `2026-11-05T14:30:00` as days from 30 December 1899.
 pub(super) fn date_serial(text: &str) -> Option<f64> {
     let (date, time) = text.split_once('T').unwrap_or((text, ""));
-    let mut fields = date.splitn(3, '-').map(|f| f.parse::<i64>().ok());
-    let (year, month, day) = (fields.next()??, fields.next()??, fields.next()??);
+    let (year, month, day) = formula::read_iso_day(date)?;
     let mut serial = formula::eval_serial(year, month, day);
     if !time.is_empty() {
         let mut clock = time.split(':').map(|f| f.parse::<f64>().unwrap_or(0.0));
@@ -373,14 +372,14 @@ pub(super) fn iso_date(serial: f64) -> String {
     } else {
         whole
     };
-    let (year, month, day) = formula::eval_civil(day);
+    let date = formula::iso_day(formula::eval_civil(day));
     if seconds == 0.0 {
-        format!("{year:04}-{month:02}-{day:02}")
+        date
     } else {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let seconds = seconds as u64;
         format!(
-            "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}",
+            "{date}T{:02}:{:02}:{:02}",
             seconds / 3600,
             seconds / 60 % 60,
             seconds % 60

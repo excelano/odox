@@ -519,29 +519,33 @@ impl DataStyle {
         } else {
             moment.seconds
         };
+        let (year, month, day) = moment.shown();
         let mut out = String::new();
         for part in &self.parts {
             match part {
                 Part::Text(text) => out.push_str(text),
                 Part::Year { long } => {
+                    if year < 0 {
+                        out.push('-');
+                    }
                     if *long {
-                        let _ = write!(out, "{:04}", moment.year);
+                        let _ = write!(out, "{:04}", year.unsigned_abs());
                     } else {
-                        let _ = write!(out, "{:02}", moment.year.rem_euclid(100));
+                        let _ = write!(out, "{:02}", year.unsigned_abs() % 100);
                     }
                 }
                 Part::Month { long, textual } => {
-                    let index = (moment.month as usize).saturating_sub(1).min(11);
+                    let index = (month as usize).saturating_sub(1).min(11);
                     match (textual, long) {
                         (true, true) => out.push_str(locale.months[index]),
                         (true, false) => out.push_str(locale.months_short[index]),
                         (false, true) => {
-                            let _ = write!(out, "{:02}", moment.month);
+                            let _ = write!(out, "{month:02}");
                         }
-                        (false, false) => out.push_str(&moment.month.to_string()),
+                        (false, false) => out.push_str(&month.to_string()),
                     }
                 }
-                Part::Day { long } => out.push_str(&pad(moment.day, *long)),
+                Part::Day { long } => out.push_str(&pad(day, *long)),
                 Part::DayOfWeek { long } => {
                     let day = weekday(moment.year, moment.month, moment.day);
                     out.push_str(if *long {
@@ -564,7 +568,7 @@ impl DataStyle {
                     out.push_str(&pad(hours, *long));
                 }
                 Part::Quarter { long } => {
-                    let quarter = (moment.month.clamp(1, 12) as usize - 1) / 3;
+                    let quarter = (month.clamp(1, 12) as usize - 1) / 3;
                     out.push_str(if *long {
                         locale.quarters_long[quarter]
                     } else {
@@ -719,10 +723,10 @@ impl Moment {
     /// `2026-11-05` or `2026-11-05T14:05:09`.
     fn of_date(text: &str) -> Option<Self> {
         let (date, time) = text.trim().split_once('T').unwrap_or((text.trim(), ""));
-        let mut fields = date.splitn(3, '-');
-        let year = fields.next()?.parse().ok()?;
-        let month = fields.next()?.parse().ok()?;
-        let day = fields.next()?.get(..2)?.parse().ok()?;
+        let (year, month, day) = crate::formula::read_iso_day(date)?;
+        let year = i32::try_from(year).ok()?;
+        let month = u32::try_from(month).ok()?;
+        let day = u32::try_from(day).ok()?;
         if !(1..=12).contains(&month) || day == 0 || day > days_in(year, month) {
             return None;
         }
@@ -751,7 +755,7 @@ impl Moment {
     /// to `places` decimals of a second; `None` for a date no calendar here
     /// reaches.
     fn of_serial(serial: f64, duration: bool, places: u32) -> Option<Self> {
-        if !serial.is_finite() || !(-693_594.0..=2_958_466.0).contains(&serial) {
+        if !serial.is_finite() || !(-12_000_000.0..=2_958_466.0).contains(&serial) {
             return None;
         }
         let scale = 10_i64.pow(places);
@@ -780,7 +784,34 @@ impl Moment {
     }
 
     fn iso_date(&self) -> String {
-        format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
+        crate::formula::iso_day((
+            i64::from(self.year),
+            i64::from(self.month),
+            i64::from(self.day),
+        ))
+    }
+
+    /// The year, month and day as a date is shown: in the Julian calendar
+    /// before 15 October 1582, as `LibreOffice` shows it, and with the years
+    /// before the first counted without a year zero.
+    fn shown(&self) -> (i32, u32, u32) {
+        let (year, month, day) = (
+            i64::from(self.year),
+            i64::from(self.month),
+            i64::from(self.day),
+        );
+        let serial = crate::formula::eval_serial(year, month, day);
+        let (year, month, day) = if serial < crate::formula::GREGORIAN {
+            crate::formula::julian(serial)
+        } else {
+            (year, month, day)
+        };
+        let year = if year > 0 { year } else { year - 1 };
+        (
+            i32::try_from(year).unwrap_or_default(),
+            u32::try_from(month).unwrap_or(1),
+            u32::try_from(day).unwrap_or(1),
+        )
     }
 }
 
