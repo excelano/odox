@@ -230,10 +230,16 @@ pub struct TextProperties {
     pub position: Option<Position>,
     /// Drawn in capitals whatever the text says.
     pub uppercase: Option<bool>,
+    /// Small capitals, `fo:font-variant="small-caps"`: each lowercase letter
+    /// drawn as a capital at [`SMALL_CAPS`] of the size.
+    pub small_caps: Option<bool>,
     /// Hidden, `text:display="none"`: text the author keeps in the document
     /// and out of print.
     pub hidden: Option<bool>,
 }
+
+/// The size a small capital is drawn at, as a share of the text's.
+pub const SMALL_CAPS: f32 = 0.8;
 
 impl TextProperties {
     /// These over a parent's: a property this does not state is the parent's.
@@ -253,8 +259,36 @@ impl TextProperties {
             background: self.background.or(parent.background),
             position: self.position.or(parent.position),
             uppercase: self.uppercase.or(parent.uppercase),
+            small_caps: self.small_caps.or(parent.small_caps),
             hidden: self.hidden.or(parent.hidden),
         }
+    }
+
+    /// Text as these properties draw it, in pieces, each with whether it is
+    /// drawn small: in capitals where they say uppercase, and in small
+    /// capitals where they say small caps. `ß` is `ẞ`, as `LibreOffice` writes
+    /// it, and a letter whose capital is more than one character keeps its own
+    /// form, so that what is drawn is as long as the text and a caret's place
+    /// in one is its place in the other.
+    pub fn cased(&self, text: &str) -> Vec<(String, bool)> {
+        let upper = self.uppercase == Some(true);
+        let small = !upper && self.small_caps == Some(true);
+        let mut pieces: Vec<(String, bool)> = Vec::new();
+        for c in text.chars() {
+            let mut capital = c.to_uppercase();
+            let one = match (c, capital.next(), capital.next()) {
+                ('ß', ..) => 'ẞ',
+                (_, Some(only), None) => only,
+                _ => c,
+            };
+            let drawn_small = small && c.is_lowercase() && one != c;
+            let drawn = if upper || drawn_small { one } else { c };
+            match pieces.last_mut() {
+                Some((piece, was_small)) if *was_small == drawn_small => piece.push(drawn),
+                _ => pieces.push((drawn.to_string(), drawn_small)),
+            }
+        }
+        pieces
     }
 }
 
@@ -1164,6 +1198,9 @@ impl TextProperties {
         if let Some(transform) = p.attr(&Ns::Fo, "text-transform") {
             self.uppercase = Some(transform == "uppercase");
         }
+        if let Some(variant) = p.attr(&Ns::Fo, "font-variant") {
+            self.small_caps = Some(variant == "small-caps");
+        }
         if let Some(display) = p.attr(&Ns::Text, "display") {
             self.hidden = Some(display == "none");
         }
@@ -1339,5 +1376,38 @@ impl GraphicProperties {
         {
             self.decorative = Some(decorative);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn small_caps_draw_lowercase_letters_as_smaller_capitals_and_keep_the_length() {
+        let small = TextProperties {
+            small_caps: Some(true),
+            ..TextProperties::default()
+        };
+        assert_eq!(
+            small.cased("Hello, Straße 9"),
+            [
+                ("H".to_owned(), false),
+                ("ELLO".to_owned(), true),
+                (", S".to_owned(), false),
+                ("TRAẞE".to_owned(), true),
+                (" 9".to_owned(), false),
+            ]
+        );
+        let upper = TextProperties {
+            uppercase: Some(true),
+            small_caps: Some(true),
+            ..TextProperties::default()
+        };
+        assert_eq!(upper.cased("Straße"), [("STRAẞE".to_owned(), false)]);
+        assert_eq!(
+            TextProperties::default().cased("Plain"),
+            [("Plain".to_owned(), false)]
+        );
     }
 }

@@ -15,7 +15,7 @@ use krilla::tagging::ListNumbering;
 use odox_core::edit::{self, Description, ListCounters};
 use odox_core::{
     Border, Break, Color, Document, Edges, Element, Family, Length, Measure, Node, Ns, Position,
-    Properties, TabStop, TextAlign, TextProperties,
+    Properties, SMALL_CAPS, TabStop, TextAlign, TextProperties,
 };
 use odox_fonts::Variant;
 
@@ -616,11 +616,18 @@ struct Text {
 
 impl Text {
     fn push(&mut self, characters: &str, style: &Style, properties: &TextProperties) {
-        let shown: String = if properties.uppercase.unwrap_or(false) {
-            characters.to_uppercase()
-        } else {
-            characters.to_owned()
-        };
+        for (piece, small) in properties.cased(characters) {
+            if small {
+                let mut smaller = style.clone();
+                smaller.size *= SMALL_CAPS;
+                self.append(&piece, &smaller);
+            } else {
+                self.append(&piece, style);
+            }
+        }
+    }
+
+    fn append(&mut self, shown: &str, style: &Style) {
         // A character that draws nothing and that no face need have, which a
         // PDF/UA file may not hold as a glyph, is left out.
         let shown: String = shown
