@@ -388,6 +388,8 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
+                    } else if element.is(&Ns::Text, "ruby-text") {
+                        text.push(&edit::ruby_shown(element), &current, inherited);
                     } else if edit::is_inline_passthrough(element)
                         && !(element.is(&Ns::Text, "hidden-text")
                             && element.attr(&Ns::Text, "is-hidden") == Some("true"))
@@ -813,5 +815,11 @@ mod tests {
                 "in a section"
             ]
         );
+    }
+
+    #[test]
+    fn ruby_is_printed_after_its_base_in_parentheses() {
+        let body = r#"<text:p><text:ruby><text:ruby-base>漢字</text:ruby-base><text:ruby-text>かんじ</text:ruby-text></text:ruby>です</text:p>"#;
+        assert_eq!(printed("", body), ["漢字(かんじ)です"]);
     }
 }

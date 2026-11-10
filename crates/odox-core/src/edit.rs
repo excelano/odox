@@ -131,6 +131,18 @@ pub fn holds_text(element: &Element) -> bool {
     is_inline_container_name(element)
 }
 
+/// What a `text:ruby-text` is drawn as after the text it annotates: itself
+/// in parentheses, `漢字(かんじ)`, as HTML writes ruby where it cannot set it
+/// above the line. Empty where it says nothing.
+pub fn ruby_shown(ruby_text: &Element) -> String {
+    let annotation = ruby_text.plain_text();
+    if annotation.trim().is_empty() {
+        String::new()
+    } else {
+        format!("({annotation})")
+    }
+}
+
 /// A number in the format a list level asks for.
 pub fn number_text(number: usize, format: &str) -> String {
     match format.chars().next() {

@@ -641,6 +641,8 @@ impl Flow<'_> {
                             raised.valign = Align::TOP;
                             job.atom(&citation.plain_text(), 0, raised);
                         }
+                    } else if element.is(&Ns::Text, "ruby-text") {
+                        job.atom(&edit::ruby_shown(element), 0, format.clone());
                     } else if edit::is_inline_passthrough(element) {
                         // A mark's contents are the paragraph's text; a field's
                         // are its value, which the paragraph's text does not
