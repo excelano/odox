@@ -404,6 +404,7 @@ impl Flow<'_> {
         let base = format::text_format(&properties.text, DEFAULT_SIZE, zoom, self.palette);
 
         let (mut job, frames) = self.layout_job(element, &properties, &base, size, wrap);
+        let ground = self.palette;
         self.palette = palette;
         let leaders = place_tabs(ui, &mut job, &properties.paragraph, indent.max(0.0), zoom);
         let (job, map) = job.into_parts();
@@ -441,7 +442,7 @@ impl Flow<'_> {
         if let Some(fill) = properties.paragraph.background {
             ui.painter().rect_filled(rect, 0.0, format::color32(fill));
         }
-        paint_borders(ui, rect, &properties.paragraph.border, zoom);
+        paint_borders(ui, rect, &properties.paragraph.border, zoom, ground);
 
         // The anchor the galley was laid out around: its rows are positioned
         // relative to this, which is what makes a centred paragraph centre each
@@ -916,23 +917,16 @@ impl Flow<'_> {
                 pos2(rect.left(), row_rect.top()),
                 pos2(rect.right(), row_rect.bottom()),
             );
+            let mut palette = self.palette;
             if let Some(fill) = properties.cell.background {
-                shapes.push(eframe::egui::Shape::rect_filled(
-                    cell_rect,
-                    0.0,
-                    format::color32(fill),
-                ));
+                let fill = format::color32(fill);
+                shapes.push(eframe::egui::Shape::rect_filled(cell_rect, 0.0, fill));
+                palette = palette.on(fill);
             }
-            for (edge, from, to) in edges(cell_rect) {
-                if let Some(border) = edge_of(&properties.cell.border, edge) {
-                    shapes.push(eframe::egui::Shape::line_segment(
-                        [from, to],
-                        Stroke::new(
-                            (border.width.points() * self.zoom).max(1.0),
-                            format::color32(border.color),
-                        ),
-                    ));
-                }
+            for (from, to, stroke) in
+                border_lines(cell_rect, &properties.cell.border, self.zoom, palette)
+            {
+                shapes.push(eframe::egui::Shape::line_segment([from, to], stroke));
             }
         }
         ui.painter().set(reserved, eframe::egui::Shape::Vec(shapes));
@@ -1059,18 +1053,34 @@ fn edge_of(borders: &odox_core::Edges<Border>, edge: Edge) -> Option<Border> {
     }
 }
 
-fn paint_borders(ui: &Ui, rect: Rect, borders: &odox_core::Edges<Border>, zoom: f32) {
-    for (edge, from, to) in edges(rect) {
-        if let Some(border) = edge_of(borders, edge) {
-            ui.painter().line_segment(
-                [from, to],
-                Stroke::new(
-                    (border.width.points() * zoom).max(1.0),
-                    format::color32(border.color),
-                ),
-            );
-        }
+fn paint_borders(
+    ui: &Ui,
+    rect: Rect,
+    borders: &odox_core::Edges<Border>,
+    zoom: f32,
+    palette: format::Palette,
+) {
+    for (from, to, stroke) in border_lines(rect, borders, zoom, palette) {
+        ui.painter().line_segment([from, to], stroke);
     }
+}
+
+/// The lines a box's borders are drawn as, a pure black one in the ink of
+/// the ground it is on.
+fn border_lines(
+    rect: Rect,
+    borders: &odox_core::Edges<Border>,
+    zoom: f32,
+    palette: format::Palette,
+) -> impl Iterator<Item = (Pos2, Pos2, Stroke)> {
+    edges(rect).into_iter().filter_map(move |(edge, from, to)| {
+        let border = edge_of(borders, edge)?;
+        let stroke = Stroke::new(
+            (border.width.points() * zoom).max(1.0),
+            format::ink_or(border.color, palette),
+        );
+        Some((from, to, stroke))
+    })
 }
 
 /// The width of each of a table's columns in screen points.
