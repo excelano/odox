@@ -905,7 +905,18 @@ fn embedded(number: &Element) -> Vec<(usize, String)> {
 }
 
 /// A number with no decimals stated, as a spreadsheet's General format
-/// writes it, measured against `LibreOffice` in `corpus/libreoffice/codes.ods`:
+/// writes it, sign and all.
+pub(crate) fn general_signed(x: f64) -> String {
+    let written = general(x.abs());
+    if x < 0.0 && written != "0" {
+        format!("-{written}")
+    } else {
+        written
+    }
+}
+
+/// The magnitude of a number with no decimals stated, as a spreadsheet's
+/// General format writes it, measured against `LibreOffice` in `corpus/libreoffice/codes.ods`:
 /// up to fifteen significant digits, and an integer below 2^53 in full. From
 /// 2^53 up it is written with an exponent of at least three digits,
 /// `1E+016`. Below a ten-thousandth it keeps to decimals while that takes no

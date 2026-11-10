@@ -465,8 +465,9 @@ DATE, YEAR, MONTH, DAY, VLOOKUP, SUMIF, COUNTIF and AVERAGEIF. What they answer
 is `LibreOffice`'s, measured on `corpus/libreoffice/formulas.ods`: a boolean is
 one or zero, `=` compares text with its case while a criterion ignores it, a
 date is days from 30 December 1899, a range where one value is wanted is its
-cell in the formula's row or column, and `SUMIF`'s sum range takes the shape of
-its criteria range. A result keeps the kind of value its cell
+cell in the formula's row or column, `SUMIF`'s sum range takes the shape of
+its criteria range, a number joined to text is written as `LibreOffice` writes
+it, `1E+020`, and `UPPER` makes ß the capital ẞ. A result keeps the kind of value its cell
 held and is shown in the cell's number format; an error is written as
 `LibreOffice` writes one. A formula outside the core keeps its result and is
 drawn faint once something it reads changes, or once anything does where it
