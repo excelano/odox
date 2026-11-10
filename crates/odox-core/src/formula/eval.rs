@@ -5,7 +5,7 @@
 
 use std::cmp::Ordering;
 
-use super::{Error, Expr, Op, Reference, Unsupported, Value};
+use super::{Address, Error, Expr, Op, Reference, Unsupported, Value};
 
 /// The prefix ODF writes before a function Excel added and `OpenFormula`
 /// names no other way, `COM.MICROSOFT.CONCAT`.
@@ -38,13 +38,18 @@ pub trait Cells {
     }
 }
 
-/// Work out a formula standing on a sheet.
+/// Work out a formula standing in a cell of a sheet.
 ///
 /// # Errors
 ///
 /// The formula, or a cell it reads, uses something outside the core.
-pub fn evaluate(expr: &Expr, sheet: usize, cells: &dyn Cells) -> Result<Value, Unsupported> {
-    let context = Context { sheet, cells };
+pub fn evaluate(
+    expr: &Expr,
+    sheet: usize,
+    at: Address,
+    cells: &dyn Cells,
+) -> Result<Value, Unsupported> {
+    let context = Context { sheet, at, cells };
     Ok(match context.scalar(expr)? {
         Value::Number(n) | Value::Date(n) if !n.is_finite() => Value::Error(Error::Number),
         value => value,
@@ -53,6 +58,7 @@ pub fn evaluate(expr: &Expr, sheet: usize, cells: &dyn Cells) -> Result<Value, U
 
 struct Context<'a> {
     sheet: usize,
+    at: Address,
     cells: &'a dyn Cells,
 }
 
@@ -63,14 +69,6 @@ enum Arg {
 }
 
 impl Arg {
-    fn into_scalar(self) -> Value {
-        match self {
-            Self::Scalar(value) => value,
-            Self::Range(mut rows) if rows.len() == 1 && rows[0].len() == 1 => rows[0].remove(0),
-            Self::Range(_) => Value::Error(Error::Value),
-        }
-    }
-
     fn cells(&self) -> impl Iterator<Item = &Value> {
         let (scalar, rows) = match self {
             Self::Scalar(value) => (Some(value), None),
@@ -92,13 +90,16 @@ macro_rules! tryv {
 }
 
 impl Context<'_> {
+    fn sheet_of(&self, reference: &Reference) -> Option<usize> {
+        match &reference.sheet {
+            Some(name) => self.cells.sheet(name),
+            None => Some(self.sheet),
+        }
+    }
+
     fn range(&self, reference: &Reference) -> Result<Vec<Vec<Value>>, Unsupported> {
-        let sheet = match &reference.sheet {
-            Some(name) => match self.cells.sheet(name) {
-                Some(sheet) => sheet,
-                None => return Ok(vec![vec![Value::Error(Error::Reference)]]),
-            },
-            None => self.sheet,
+        let Some(sheet) = self.sheet_of(reference) else {
+            return Ok(vec![vec![Value::Error(Error::Reference)]]);
         };
         (reference.from.row..=reference.to.row)
             .map(|row| {
@@ -107,6 +108,35 @@ impl Context<'_> {
                     .collect()
             })
             .collect()
+    }
+
+    /// A reference where one value is wanted: its one cell, or the cell of a
+    /// column on the formula's row or of a row in the formula's column.
+    fn intersection(&self, reference: &Reference) -> Result<Value, Unsupported> {
+        let Some(sheet) = self.sheet_of(reference) else {
+            return Ok(Value::Error(Error::Reference));
+        };
+        let (from, to) = (reference.from, reference.to);
+        let row = if from.row == to.row {
+            Some(from.row)
+        } else {
+            (from.row..=to.row)
+                .contains(&self.at.row)
+                .then_some(self.at.row)
+        };
+        let column = if from.column == to.column {
+            Some(from.column)
+        } else {
+            (from.column..=to.column)
+                .contains(&self.at.column)
+                .then_some(self.at.column)
+        };
+        match (row, column) {
+            (Some(row), Some(column)) if from.row == to.row || from.column == to.column => {
+                self.cells.value(sheet, row, column)
+            }
+            _ => Ok(Value::Error(Error::Value)),
+        }
     }
 
     fn arg(&self, expr: &Expr) -> Result<Arg, Unsupported> {
@@ -122,7 +152,7 @@ impl Context<'_> {
             Expr::Text(text) => Value::Text(text.clone()),
             Expr::Error(error) => Value::Error(*error),
             Expr::Missing => Value::Empty,
-            Expr::Reference(reference) => Arg::Range(self.range(reference)?).into_scalar(),
+            Expr::Reference(reference) => self.intersection(reference)?,
             Expr::Negate(inner) => Value::Number(-tryv!(number(&self.scalar(inner)?))),
             Expr::Percent(inner) => Value::Number(tryv!(number(&self.scalar(inner)?)) / 100.0),
             Expr::Binary(op, left, right) => {
@@ -160,9 +190,13 @@ impl Context<'_> {
                 count(0, 0)?;
                 Value::Boolean(false)
             }
-            "SUM" => Value::Number(tryv!(numbers(&all()?)).iter().fold(0.0, |a, b| a + b)),
+            "SUM" => Value::Number(
+                tryv!(numbers(&all()?, Error::Value))
+                    .iter()
+                    .fold(0.0, |a, b| a + b),
+            ),
             "PRODUCT" => {
-                let found = tryv!(numbers(&all()?));
+                let found = tryv!(numbers(&all()?, Error::Value));
                 Value::Number(if found.is_empty() {
                     0.0
                 } else {
@@ -170,7 +204,7 @@ impl Context<'_> {
                 })
             }
             "AVERAGE" => {
-                let found = tryv!(numbers(&all()?));
+                let found = tryv!(numbers(&all()?, Error::Value));
                 if found.is_empty() {
                     Value::Error(Error::DivisionByZero)
                 } else {
@@ -178,18 +212,18 @@ impl Context<'_> {
                     Value::Number(found.iter().sum::<f64>() / found.len() as f64)
                 }
             }
-            "MIN" => Value::Number(
-                tryv!(numbers(&all()?))
-                    .into_iter()
-                    .reduce(f64::min)
-                    .unwrap_or(0.0),
-            ),
-            "MAX" => Value::Number(
-                tryv!(numbers(&all()?))
-                    .into_iter()
-                    .reduce(f64::max)
-                    .unwrap_or(0.0),
-            ),
+            "MIN" | "MAX" => {
+                if args.is_empty() {
+                    return Ok(Value::Error(Error::ArgumentMissing));
+                }
+                let pick = if name == "MIN" { f64::min } else { f64::max };
+                Value::Number(
+                    tryv!(numbers(&all()?, Error::ArgumentKind))
+                        .into_iter()
+                        .reduce(pick)
+                        .unwrap_or(0.0),
+                )
+            }
             "COUNT" => {
                 let found = all()?;
                 let n = found
@@ -314,12 +348,19 @@ impl Context<'_> {
                 count(1, 1)?;
                 let x = tryv!(num(0)?);
                 if x < 0.0 {
-                    Value::Error(Error::Number)
+                    Value::Error(Error::Argument)
                 } else {
                     Value::Number(x.sqrt())
                 }
             }
-            "CONCATENATE" | "CONCAT" => {
+            "CONCATENATE" => {
+                let mut out = String::new();
+                for arg in args {
+                    out.push_str(&tryv!(text(&self.scalar(arg)?)));
+                }
+                Value::Text(out)
+            }
+            "CONCAT" => {
                 let mut out = String::new();
                 for arg in all()? {
                     for value in arg.cells() {
@@ -333,7 +374,7 @@ impl Context<'_> {
                 let source = tryv!(txt(0)?);
                 let n = if args.len() > 1 { tryv!(num(1)?) } else { 1.0 };
                 if n < 0.0 {
-                    return Ok(Value::Error(Error::Value));
+                    return Ok(Value::Error(Error::Argument));
                 }
                 let n = whole(n);
                 let chars: Vec<char> = source.chars().collect();
@@ -349,7 +390,7 @@ impl Context<'_> {
                 let source = tryv!(txt(0)?);
                 let (start, n) = (tryv!(num(1)?), tryv!(num(2)?));
                 if start < 1.0 || n < 0.0 {
-                    return Ok(Value::Error(Error::Value));
+                    return Ok(Value::Error(Error::Argument));
                 }
                 Value::Text(
                     source
@@ -422,11 +463,11 @@ impl Context<'_> {
                 };
                 let column = tryv!(num(2)?).trunc();
                 if column < 1.0 {
-                    return Ok(Value::Error(Error::Value));
+                    return Ok(Value::Error(Error::Argument));
                 }
                 let column = whole(column) - 1;
                 if rows.first().is_none_or(|row| column >= row.len()) {
-                    return Ok(Value::Error(Error::Reference));
+                    return Ok(Value::Error(Error::Argument));
                 }
                 let sorted = match args.get(3) {
                     Some(expr) => tryv!(truth(&self.scalar(expr)?)),
@@ -466,10 +507,19 @@ impl Context<'_> {
                 };
                 let criterion = Criterion::of(&self.scalar(&args[1])?, self.cells.wildcards());
                 let values = match args.get(2) {
-                    Some(expr) => match self.arg(expr)? {
-                        Arg::Range(values) => values,
-                        Arg::Scalar(_) => return Ok(Value::Error(Error::Value)),
-                    },
+                    Some(Expr::Reference(reference)) => {
+                        let from = reference.from;
+                        let width = range.first().map_or(1, Vec::len);
+                        self.range(&Reference {
+                            sheet: reference.sheet.clone(),
+                            from,
+                            to: Address {
+                                row: from.row + range.len().max(1) - 1,
+                                column: from.column + width.max(1) - 1,
+                            },
+                        })?
+                    }
+                    Some(_) => return Ok(Value::Error(Error::ArgumentKind)),
                     None => range.clone(),
                 };
                 let mut sum = 0.0;
@@ -581,12 +631,14 @@ fn truth(value: &Value) -> Result<bool, Error> {
 }
 
 /// The numbers among a function's arguments: every number written or worked
-/// out, and in a reference only the cells that hold one.
-fn numbers(args: &[Arg]) -> Result<Vec<f64>, Error> {
+/// out, and in a reference only the cells that hold one. Text written or
+/// worked out is the error given, even where it reads as a number.
+fn numbers(args: &[Arg], text: Error) -> Result<Vec<f64>, Error> {
     let mut out = Vec::new();
     for arg in args {
         match arg {
             Arg::Scalar(Value::Empty) => {}
+            Arg::Scalar(Value::Text(_)) => return Err(text),
             Arg::Scalar(value) => out.push(number(value)?),
             Arg::Range(_) => {
                 for value in arg.cells() {
@@ -620,7 +672,11 @@ fn binary(op: Op, left: &Value, right: &Value, case: bool) -> Value {
             }
         }),
         Op::Power => arithmetic(|a, b| {
-            let n = a.powf(b);
+            let n = if a < 0.0 && b.fract() != 0.0 && odd_root(b) {
+                -(-a).powf(b)
+            } else {
+                a.powf(b)
+            };
             if n.is_finite() {
                 Value::Number(n)
             } else {
@@ -643,6 +699,15 @@ fn binary(op: Op, left: &Value, right: &Value, case: bool) -> Value {
             Err(error) => Value::Error(error),
         },
     }
+}
+
+/// Whether a power is the reciprocal of an odd whole number, as `1/3` is,
+/// which takes a root of a negative number.
+fn odd_root(power: f64) -> bool {
+    let root = approx(1.0 / power);
+    #[allow(clippy::cast_possible_truncation)]
+    let odd = root.fract() == 0.0 && root.abs() < 1e15 && (root as i64) % 2 != 0;
+    odd
 }
 
 fn is_text(value: &Value) -> bool {

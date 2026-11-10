@@ -138,19 +138,28 @@ pub enum Error {
     Name,
     /// `#NUM!`
     Number,
+    /// `Err:502`, an argument outside what the function takes.
+    Argument,
+    /// `Err:504`, an argument of a kind the function does not take.
+    ArgumentKind,
+    /// `Err:511`, an argument the function needs left out.
+    ArgumentMissing,
     /// `Err:522`, a formula that comes back round to itself.
     Circular,
 }
 
 impl Error {
     /// Every error, longest code first where one begins another.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 10] = [
         Self::DivisionByZero,
         Self::Value,
         Self::NotAvailable,
         Self::Reference,
         Self::Name,
         Self::Number,
+        Self::Argument,
+        Self::ArgumentKind,
+        Self::ArgumentMissing,
         Self::Circular,
     ];
 
@@ -163,6 +172,9 @@ impl Error {
             Self::Reference => "#REF!",
             Self::Name => "#NAME?",
             Self::Number => "#NUM!",
+            Self::Argument => "Err:502",
+            Self::ArgumentKind => "Err:504",
+            Self::ArgumentMissing => "Err:511",
             Self::Circular => "Err:522",
         }
     }

@@ -26,7 +26,7 @@ const CALC: usize = 1;
 /// error, and the text it shows.
 fn results(document: &SheetDocument) -> Vec<(String, Value, bool, String)> {
     let sheet = &document.sheets()[CALC];
-    (0..80)
+    (0..200)
         .filter_map(|row| {
             let label = document.cell(sheet, row, 0)?.text();
             let cell = document.cell(sheet, row, 1)?;

@@ -97,6 +97,41 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>vlookup wildcard</text:p></table:table-cell><table:table-cell table:formula='of:=VLOOKUP("pe*";[$Data.A2:.C6];2;0)'/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>sum of nothing</text:p></table:table-cell><table:table-cell table:formula='of:=SUM([$Data.Z90:.Z91])'/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>text inf</text:p></table:table-cell><table:table-cell table:formula='of:="inf"+1'/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sqrt of negative</text:p></table:table-cell><table:table-cell table:formula="of:=SQRT(-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>left negative</text:p></table:table-cell><table:table-cell table:formula="of:=LEFT(&quot;abc&quot;;-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>right negative</text:p></table:table-cell><table:table-cell table:formula="of:=RIGHT(&quot;abc&quot;;-0.5)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>mid from zero</text:p></table:table-cell><table:table-cell table:formula="of:=MID(&quot;abc&quot;;0;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>mid negative length</text:p></table:table-cell><table:table-cell table:formula="of:=MID(&quot;abc&quot;;1;-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>mid past the end</text:p></table:table-cell><table:table-cell table:formula="of:=MID(&quot;abc&quot;;5;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>max of nothing</text:p></table:table-cell><table:table-cell table:formula="of:=MAX()"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>min of nothing</text:p></table:table-cell><table:table-cell table:formula="of:=MIN()"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>min of text</text:p></table:table-cell><table:table-cell table:formula="of:=MIN(&quot;a&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>max of number text</text:p></table:table-cell><table:table-cell table:formula="of:=MAX(&quot;3&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>min of a boolean</text:p></table:table-cell><table:table-cell table:formula="of:=MAX(TRUE();-1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>vlookup column out</text:p></table:table-cell><table:table-cell table:formula="of:=VLOOKUP(&quot;pear&quot;;[$Data.A2:.C6];5;0)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>vlookup column zero</text:p></table:table-cell><table:table-cell table:formula="of:=VLOOKUP(&quot;pear&quot;;[$Data.A2:.C6];0;0)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>vlookup column text</text:p></table:table-cell><table:table-cell table:formula="of:=VLOOKUP(&quot;pear&quot;;[$Data.A2:.C6];&quot;x&quot;;0)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>odd root</text:p></table:table-cell><table:table-cell table:formula="of:=POWER(-8;1/3)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>odd root operator</text:p></table:table-cell><table:table-cell table:formula="of:=(-8)^(1/3)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>odd root reciprocal</text:p></table:table-cell><table:table-cell table:formula="of:=POWER(-8;-1/3)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>fifth root</text:p></table:table-cell><table:table-cell table:formula="of:=POWER(-32;0.2)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>even root</text:p></table:table-cell><table:table-cell table:formula="of:=POWER(-8;1/2)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>not a root</text:p></table:table-cell><table:table-cell table:formula="of:=(-8)^(2/3)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sum of text</text:p></table:table-cell><table:table-cell table:formula="of:=SUM(&quot;5&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sum of empty text</text:p></table:table-cell><table:table-cell table:formula="of:=SUM(&quot;&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>average of text</text:p></table:table-cell><table:table-cell table:formula="of:=AVERAGE(&quot;5&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>product of text</text:p></table:table-cell><table:table-cell table:formula="of:=PRODUCT(&quot;5&quot;;2)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>count of text</text:p></table:table-cell><table:table-cell table:formula="of:=COUNT(&quot;5&quot;;&quot;x&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>concatenate range</text:p></table:table-cell><table:table-cell table:formula="of:=CONCATENATE([$Data.A2:.A4])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>concat range</text:p></table:table-cell><table:table-cell table:formula="of:=COM.MICROSOFT.CONCAT([$Data.A2:.A4])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>intersection row</text:p></table:table-cell><table:table-cell table:formula="of:=[.A1:.A200]&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>intersection column</text:p></table:table-cell><table:table-cell table:formula="of:=[$Data.A3:.E3]&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>intersection none</text:p></table:table-cell><table:table-cell table:formula="of:=[$Data.A2:.C4]&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sumif one cell</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.B4];&quot;&gt;1&quot;;[$Data.C4])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sumif wider</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.C3];&quot;&gt;1&quot;;[$Data.C2])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sumif shorter</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.B6];&quot;&gt;1&quot;;[$Data.C2:.C3])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>averageif one cell</text:p></table:table-cell><table:table-cell table:formula="of:=AVERAGEIF([$Data.B2:.B4];&quot;&gt;1&quot;;[$Data.C2])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sumif number</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.B4];&quot;&gt;1&quot;;5)"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

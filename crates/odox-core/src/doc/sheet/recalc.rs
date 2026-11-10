@@ -224,6 +224,7 @@ impl SheetDocument {
                 _ => Value::Number(*n),
             },
             formula::Value::Date(n) => Value::Date(iso_date(*n)),
+            formula::Value::Text(text) if text.is_empty() => Value::Empty,
             formula::Value::Text(text) => Value::Text(text.clone()),
             formula::Value::Boolean(b) => Value::Boolean(*b),
             formula::Value::Error(error) => Value::Error(error.code().to_owned()),
@@ -300,7 +301,9 @@ impl Cells for Book<'_> {
             return Ok(formula::Value::Error(Error::Circular));
         }
         let result = match self.formulas.get(&place).map(|f| &f.parsed) {
-            Some(Ok(expr)) => formula::evaluate(expr, sheet, self),
+            Some(Ok(expr)) => {
+                formula::evaluate(expr, sheet, formula::Address { row, column }, self)
+            }
             _ => Err(Unsupported),
         };
         self.visiting.borrow_mut().remove(&place);
