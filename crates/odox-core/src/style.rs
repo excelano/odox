@@ -230,6 +230,9 @@ pub struct TextProperties {
     pub position: Option<Position>,
     /// Drawn in capitals whatever the text says.
     pub uppercase: Option<bool>,
+    /// Hidden, `text:display="none"`: text the author keeps in the document
+    /// and out of print.
+    pub hidden: Option<bool>,
 }
 
 impl TextProperties {
@@ -250,6 +253,7 @@ impl TextProperties {
             background: self.background.or(parent.background),
             position: self.position.or(parent.position),
             uppercase: self.uppercase.or(parent.uppercase),
+            hidden: self.hidden.or(parent.hidden),
         }
     }
 }
@@ -1159,6 +1163,9 @@ impl TextProperties {
         }
         if let Some(transform) = p.attr(&Ns::Fo, "text-transform") {
             self.uppercase = Some(transform == "uppercase");
+        }
+        if let Some(display) = p.attr(&Ns::Text, "display") {
+            self.hidden = Some(display == "none");
         }
     }
 }

@@ -3,7 +3,7 @@
 //!
 //! A sheet prints its print range as far as the cells in use, or every cell
 //! up to the last that holds anything, leaving out the rows and columns it
-//! hides. Columns that do not
+//! hides and any page none of its cells draws on. Columns that do not
 //! fit across a page go on pages of their own, down the sheet and then across
 //! it unless its page style says across first, and the page style's scale or
 //! its number of pages to fit decides how large the cells are drawn. A cell
@@ -276,6 +276,8 @@ impl Sheets<'_, '_, '_> {
             }
         };
         let mut pages: Vec<Page> = (0..count).map(|_| Page::new(width, height)).collect();
+        let mut drawn = vec![false; count];
+        drawn[page_of(0, 0)] = true;
         pages[page_of(0, 0)]
             .items
             .extend(heading.into_iter().map(|item| (top, item)));
@@ -319,7 +321,9 @@ impl Sheets<'_, '_, '_> {
                 let x = left + column_at[column_index] * share;
                 let items =
                     self.cell(&grid, (at, column_index), (x, y), clip(column_index), read)?;
-                pages[page_of(band, column_band[column_index])]
+                let on = page_of(band, column_band[column_index]);
+                drawn[on] |= items.iter().any(|item| !matches!(item, Item::Empty { .. }));
+                pages[on]
                     .items
                     .extend(items.into_iter().map(|item| (top, item)));
             }
@@ -351,6 +355,11 @@ impl Sheets<'_, '_, '_> {
             }
         }
 
+        let pages = pages
+            .into_iter()
+            .zip(drawn)
+            .filter_map(|(page, drawn)| drawn.then_some(page))
+            .collect();
         Ok(Some(SheetPages { pages, top }))
     }
 
@@ -595,10 +604,16 @@ mod tests {
     use super::*;
 
     fn fixture() -> SheetDocument {
+        corpus("export.ods")
+    }
+
+    fn corpus(name: &str) -> SheetDocument {
         let bytes = std::fs::read(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/export.ods"),
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice")
+                .join(name),
         )
-        .expect("the export fixture");
+        .expect("the fixture");
         SheetDocument::read(&bytes).expect("it reads")
     }
 
@@ -620,6 +635,20 @@ mod tests {
     fn laid() -> Laid {
         let mut faces = Faces::new();
         lay_out(&fixture(), &mut faces).expect("laid out")
+    }
+
+    #[test]
+    fn a_page_no_cell_draws_on_is_left_out() {
+        let mut faces = Faces::new();
+        let laid = lay_out(&corpus("gaps.ods"), &mut faces).expect("laid out");
+        let pages: Vec<Vec<String>> = laid
+            .pages
+            .iter()
+            .map(|page| texts(page).into_iter().map(|(text, _)| text).collect())
+            .collect();
+        assert_eq!(pages.len(), 2, "{pages:?}");
+        assert!(pages[0].iter().any(|t| t == "Top"));
+        assert!(pages[1].iter().any(|t| t == "Far below"));
     }
 
     #[test]

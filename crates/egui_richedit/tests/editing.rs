@@ -543,7 +543,6 @@ fn keys_typed_in_the_frame_of_a_click_land_either_side_of_it() {
     let mut h = Harness::new(&["Hello", "world"]);
     h.caret(0, 5);
     h.frame(Vec::new());
-    // The start of the second paragraph, a line below the first.
     let at = Pos2::new(1.0, 22.0);
     let button = |pressed| Event::PointerButton {
         pos: at,
@@ -905,8 +904,6 @@ fn a_mark_at_a_caret_is_forgotten_when_the_caret_moves_or_is_toggled_back() {
 
 #[test]
 fn a_caret_put_down_in_the_frame_a_button_is_clicked_keeps_the_keyboard() {
-    // As a dialog's Insert does: its click puts a table in, and the caret into
-    // it, in one frame.
     let ctx = Context::default();
     let mut editor = RichEdit::new(Id::unique("editor"));
     let mut model = Plain::new(&["Hello", "world"]);

@@ -21,6 +21,7 @@ mod block;
 mod figure;
 pub(crate) mod format;
 pub mod html;
+mod numbering;
 mod table;
 
 use std::fmt;
@@ -35,6 +36,7 @@ pub use figure::{
 };
 pub use format::{Mark, format, marked};
 pub(crate) use format::{automatic_styles, element};
+pub use numbering::ListCounters;
 pub use table::{InTable, TableEdit, edit_table, insert_table, step_cell, table_at};
 
 /// Why an edit was not made. Each is a state of the document rather than a
