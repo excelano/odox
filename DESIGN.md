@@ -348,8 +348,15 @@ that time, and the separators are those of the format's language. The cell then
 shows the value as the format writes it, grouping, decimals, symbol, the
 section a `style:map` condition chooses, and month and day names, so a typed
 value looks as LibreOffice would show it; `corpus/libreoffice/formats.ods` is
-the measure. What does not fit the format, and anything typed into a cell with
-none, is read the way a spreadsheet reads it: a number is a number, a number
+the measure, and `codes.ods`, which `LibreOffice` builds from format codes
+through `src/codes.py`, measures fractions, embedded text, engineering
+notation, quarters and weeks, elapsed and fractional times and the General
+format. General writes up to fifteen significant digits and switches to an
+exponent at 2^53 and for small numbers as `LibreOffice` does, independent of
+the column's width, where `LibreOffice` also shrinks a number to fit its
+column. What does not fit the format, a number with its separators in another
+language's order among it, and anything typed into a cell with none, is read
+the way a spreadsheet reads it: a number is a number, a number
 with `%` a percentage, `true` and `false` are booleans, and anything else is
 text. A cell opens for editing with what reads back to its value: a percentage
 with its `%`, a date or a time as its format shows it, a formula as it is typed.

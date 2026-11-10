@@ -124,6 +124,8 @@ convert odp:impress8 slides.odp "OpenDocument Presentation Flat XML" slides.fodp
 # ranges or page styles.
 convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods
 convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
+python3 src/codes.py "$out/codes.ods"
+printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods
 convert ods:calc8 comments.ods "OpenDocument Spreadsheet Flat XML" comments.fods
 convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt
