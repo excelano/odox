@@ -1,3 +1,27 @@
+odox (0.15.0) unstable; urgency=low
+
+  * A document's PDF prints the page headers and footers its page styles give it, with their page numbers, titles and sheet names
+  * Dates, numbers and new amounts are written in the language and country of their format, from tables LibreOffice gave, in 46 locales
+  * Number formats show fractions, embedded text, engineering notation, quarters, weeks, elapsed and fractional times and large and small General numbers as LibreOffice does, and input in another language's separators is text
+  * A slide draws its tables, and the footer, date and slide number its master gives it
+  * Ruby text is shown after the text it annotates, in parentheses
+  * Small capitals are drawn as smaller capitals, and the window draws text its style puts in capitals in capitals
+  * Black cell borders show on a dark sheet, drawn in the sheet's ink
+  * A merged cell has no lines inside it, and Escape in a sheet question goes no further than the question
+  * A formula's error result reads as an error, drawn against the right edge and sorted after text
+  * A boolean cell written as a number reads as TRUE unless it is zero
+  * A list item's own start value restarts its numbering, and a label showing the levels above writes each in its own format
+  * Text the document hides is left out of the PDF
+  * A spreadsheet's PDF leaves out the pages none of its cells draws on
+  * A fill from dates a month apart goes on by months
+  * A slide added after a title slide puts its text under the title rather than over it
+  * Black table and paragraph borders show on a dark page, drawn in the page's ink
+  * Escape closes the find bar after Replace or Next was clicked
+  * A new deck puts the caret in its title, so typing starts at once
+  * Keys typed in the frame of a click are no longer lost, and land either side of where it puts the caret
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 10 Nov 2026 11:27:33 -0600
+
 odox (0.14.0) unstable; urgency=low
 
   * Release notes for 0.14.0
