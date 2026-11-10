@@ -154,6 +154,22 @@ impl View for SlideView {
         odox_core::blank::presentation(language)
     }
 
+    fn begin(&mut self) {
+        let title = self.document.as_ref().and_then(|document| {
+            document
+                .slides()
+                .get(self.slide)?
+                .shapes_indexed()
+                .find(|(_, shape)| shape.attr(&Ns::Presentation, "class") == Some("title"))
+                .map(|(index, _)| index)
+        });
+        if let Some(paragraph) = title.and_then(|title| self.empty_placeholder(title)) {
+            self.picked = title;
+            self.page_editor
+                .select(Selection::caret(Caret::new(paragraph, 0)));
+        }
+    }
+
     fn close(&mut self) {
         self.document = None;
         self.pictures.clear();
