@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.14.0"
+version = "0.15.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Exported PDFs now place tabs at the paragraph's tab stops, with dot leaders, as the window does. The caret before a tab sits where it belongs, Replace moves on to the next match, and Tab in a table that cannot grow says why."
+whats-new = "Exported PDFs now print the page headers and footers with their page numbers, leave out hidden text, and number lists as LibreOffice does. Typing just before or after a click is no longer lost, black table borders show on a dark page, small capitals and ruby text are drawn, and Escape closes the find bar after Replace."
 
 [products.xodt.locales.de-de]
-whats-new = "Exportierte PDFs setzen Tabulatoren jetzt an die Tabstopps des Absatzes, mit Füllzeichen, wie das Fenster. Die Schreibmarke vor einem Tabulator steht an der richtigen Stelle, Ersetzen geht zum nächsten Treffer weiter, und die Tabulatortaste in einer Tabelle, die nicht wachsen kann, sagt, warum."
+whats-new = "Exportierte PDFs drucken jetzt Kopf- und Fußzeilen mit ihren Seitenzahlen, lassen verborgenen Text weg und nummerieren Listen wie LibreOffice. Was kurz vor oder nach einem Klick getippt wird, geht nicht mehr verloren, schwarze Tabellenrahmen sind auf einer dunklen Seite sichtbar, Kapitälchen und Ruby-Text werden gezeichnet, und Escape schließt die Suchleiste nach Ersetzen."
 
 [products.xods.locales.en-us]
-whats-new = "Format cells with Sheet > Format cells or Ctrl+1: number format, bold, italic, underline, colours, alignment, wrapping and borders, and Ctrl+B, Ctrl+I and Ctrl+U on a selection. Formulas, rounding and number formats now agree with LibreOffice, sort and fill keep links and bold, and large sorts and fills are much faster."
+whats-new = "Number formats now match LibreOffice for fractions, engineering notation, quarters, weeks, elapsed times and very large or small numbers, and dates, separators and currencies follow 46 languages and countries. Filling dates a month apart goes on by months, errors from formulas line up on the right, merged cells have no lines inside, and exported PDFs print headers and footers without blank pages."
 
 [products.xods.locales.de-de]
-whats-new = "Zellen formatieren mit Blatt > Zellen formatieren oder Strg+1: Zahlenformat, fett, kursiv, unterstrichen, Farben, Ausrichtung, Zeilenumbruch und Rahmen, dazu Strg+B, Strg+I und Strg+U auf einer Auswahl. Formeln, Rundung und Zahlenformate stimmen jetzt mit LibreOffice überein, Sortieren und Ausfüllen behalten Links und Fettdruck, und große Bereiche sind deutlich schneller."
+whats-new = "Zahlenformate stimmen jetzt mit LibreOffice überein bei Brüchen, technischer Notation, Quartalen, Kalenderwochen, verstrichenen Zeiten und sehr großen oder kleinen Zahlen, und Datumsangaben, Trennzeichen und Währungen folgen 46 Sprachen und Ländern. Datumsangaben im Monatsabstand werden monatsweise ausgefüllt, Formelfehler stehen rechtsbündig, verbundene Zellen haben keine Linien mehr im Inneren, und exportierte PDFs drucken Kopf- und Fußzeilen ohne leere Seiten."
 
 [products.xodp.locales.en-us]
-whats-new = "A new slide's title now types in the same size as the title before it. Tabs in exported PDFs go to the paragraph's tab stops, and Replace moves on to the next match."
+whats-new = "A new presentation puts the caret in its title, so typing starts at once, and a slide added after a title slide puts its text below the title. Slides now show their tables, footer, date and slide number, small capitals and ruby text are drawn, and typing just before or after a click is no longer lost."
 
 [products.xodp.locales.de-de]
-whats-new = "Der Titel einer neuen Folie hat jetzt dieselbe Größe wie der Titel davor. Tabulatoren in exportierten PDFs gehen zu den Tabstopps des Absatzes, und Ersetzen geht zum nächsten Treffer weiter."
+whats-new = "Eine neue Präsentation setzt die Schreibmarke in den Titel, sodass sofort getippt werden kann, und eine Folie nach einer Titelfolie setzt ihren Text unter den Titel. Folien zeigen jetzt ihre Tabellen, Fußzeile, Datum und Foliennummer, Kapitälchen und Ruby-Text werden gezeichnet, und was kurz vor oder nach einem Klick getippt wird, geht nicht mehr verloren."
