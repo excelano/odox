@@ -419,3 +419,40 @@ fn a_block_inside_repeated_rows_is_split_and_the_rest_reads_the_same() {
         Some(true)
     );
 }
+
+#[test]
+fn a_new_amount_takes_its_countrys_currency_where_libreoffice_puts_it() {
+    let cases = [
+        ("sv-SE", "1\u{a0}234,50 kr", "SEK"),
+        ("pl-PL", "1\u{a0}234,50 zł", "PLN"),
+        ("pt-BR", "R$ 1.234,50", "BRL"),
+        ("da-DK", "kr. 1.234,50", "DKK"),
+        ("nb-NO", "kr 1\u{a0}234,50", "NOK"),
+        ("ko-KR", "\u{ffe6}1,234.50", "KRW"),
+    ];
+    let one = Block {
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: 0,
+    };
+    let currency = CellFormat {
+        number: Some(NumberFormat::Currency { decimals: 2 }),
+        ..CellFormat::default()
+    };
+    for (tag, shown, code) in cases {
+        let mut document = blank(tag);
+        document
+            .set_cell(0, 0, 0, &Value::Number(1234.5))
+            .expect("amount");
+        document.format_cells(0, one, &currency).expect("currency");
+        let sheet = &document.sheets()[0];
+        let cell = document.cell(sheet, 0, 0).expect("a cell");
+        assert_eq!(cell.text(), shown, "{tag}");
+        assert_eq!(
+            cell.value(),
+            Value::Currency(1234.5, Some(code.to_owned())),
+            "{tag}"
+        );
+    }
+}

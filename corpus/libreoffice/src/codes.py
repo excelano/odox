@@ -72,6 +72,22 @@ CASES = [
     ("en-US", "General", 1.0 / 3.0),
     ("en-US", "General", 2.0 / 3.0),
     ("en-US", "General", 123456.7891234567),
+    ("de-DE", "DDD, D. MMMM YYYY", DATE),
+    ("de-DE", "DDDD, D. MMM YYYY", DATE),
+    ("fr-FR", "DDDD D MMMM YYYY", DATE),
+    ("fr-FR", "DDD D MMM YYYY", DATE),
+    ("sv-SE", "DDDD D MMMM", DATE),
+    ("pl-PL", "D MMM YYYY", DATE),
+    ("hu-HU", "DDD", DATE),
+    ("de-DE", "QQ YYYY", DATE),
+    ("de-DE", "Q", DATE),
+    ("de-DE", "BOOLEAN", 1),
+    ("fr-FR", "BOOLEAN", 0),
+    ("de-CH", "#,##0.00", 1234567.5),
+    ("en-IN", "#,##0.00", 1234567.5),
+    ("fr-FR", "#,##0.00", 1234567.5),
+    ("sv-SE", "#,##0.00", -1234567.5),
+    ("de-DE", "0.00", 3.25),
 ]
 
 
@@ -121,9 +137,7 @@ def main(target):
             sheet = book.Sheets.getByIndex(0)
             formats = book.NumberFormats
             for row, (tag, code, value) in enumerate(CASES):
-                key = formats.queryKey(code, locale(tag), False)
-                if key == -1:
-                    key = formats.addNew(code, locale(tag))
+                key = formats.addNewConverted(code, locale("en-US"), locale(tag))
                 sheet.getCellByPosition(0, row).setString(f"{tag} {code}")
                 cell = sheet.getCellByPosition(1, row)
                 cell.NumberFormat = key

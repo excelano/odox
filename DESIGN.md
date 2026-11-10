@@ -344,9 +344,10 @@ cell style or its column's default cell style names: `1234.5` or `$1,234.50` in
 a currency cell is the amount, with the cell's currency or the one its symbol
 names, `15` or `15%` in a percentage cell is fifteen percent, `3/9/26` in a
 date cell written month first is the ninth of March, `9:30 pm` in a time cell is
-that time, and the separators are those of the format's language. The cell then
-shows the value as the format writes it, grouping, decimals, symbol, the
-section a `style:map` condition chooses, and month and day names, so a typed
+that time, and the separators are those of the format's language and country.
+The cell then shows the value as the format writes it, grouping, decimals,
+symbol, the section a `style:map` condition chooses, and month, day and quarter
+names, so a typed
 value looks as LibreOffice would show it; `corpus/libreoffice/formats.ods` is
 the measure, and `codes.ods`, which `LibreOffice` builds from format codes
 through `src/codes.py`, measures fractions, embedded text, engineering
@@ -354,8 +355,13 @@ notation, quarters and weeks, elapsed and fractional times and the General
 format. General writes up to fifteen significant digits and switches to an
 exponent at 2^53 and for small numbers as `LibreOffice` does, independent of
 the column's width, where `LibreOffice` also shrinks a number to fit its
-column. What does not fit the format, a number with its separators in another
-language's order among it, and anything typed into a cell with none, is read
+column. Separators, grouping, the names, `TRUE` and `FALSE` and the
+currency of a new amount come from `odox-core`'s `locales.rs`, which
+`locale.py` writes by asking `LibreOffice`, for 46 locales; a country outside
+it takes the first locale of its language, and a language outside it is
+written as United States English. What does not fit the format, a number with
+its separators in another language's order among it, and anything typed into a
+cell with none, is read
 the way a spreadsheet reads it: a number is a number, a number
 with `%` a percentage, `true` and `false` are booleans, and anything else is
 text. A cell opens for editing with what reads back to its value: a percentage
@@ -420,7 +426,7 @@ the comment, and a sort moves each comment with its row.
 **Cells are formatted from Sheet > Format cells…** (`sheet/format.rs`), or
 Ctrl+1: a number format (general, a number with its decimals and thousands
 grouped or not, a percentage, an amount in the currency of the document's
-country, a date in the order that country writes one, a time), bold, italic
+country with its symbol where that country puts it, a date in the order that country writes one, a time), bold, italic
 and underline, a font colour, a fill, the text's alignment across and down the
 cell and whether it wraps, and borders, none, around the selection or around
 every cell in it. The question opens with what the picked cell shows and
