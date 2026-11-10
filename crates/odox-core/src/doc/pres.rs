@@ -14,7 +14,7 @@ use super::Document;
 use crate::edit::Refused;
 use crate::style::{Family, Fill, PageLayout};
 use crate::value::Length;
-use crate::xml::{Element, Ns};
+use crate::xml::{Element, Node, Ns};
 use crate::{Error, media_type};
 
 /// An `OpenDocument` presentation.
@@ -240,6 +240,86 @@ impl Presentation {
             .collect()
     }
 
+    /// The master page's footer, date and slide-number frames a slide shows,
+    /// each a copy with its field put in as the text it stands for: the footer
+    /// the slide names, its date, and its number among the slides.
+    ///
+    /// A footer or a date is shown where the slide names one with something in
+    /// it and its style does not turn it off; a slide number only where its
+    /// style turns it on. That is how `LibreOffice` draws them, which writes the
+    /// footer and date switches on for nearly every slide whether or not there
+    /// is anything to show. A date that follows the clock shows `today`, as
+    /// year, month and day, in the date's data style.
+    pub fn master_fields(&self, slide: &Slide<'_>, today: (i64, i64, i64)) -> Vec<Element> {
+        let Some(master) = self.master(slide) else {
+            return Vec::new();
+        };
+        let properties = slide
+            .style_name()
+            .map(|name| self.document.styles.resolve(&Family::DrawingPage, name));
+        let switch = |get: fn(&crate::style::Properties) -> Option<bool>| {
+            properties.as_deref().and_then(get)
+        };
+        let declared = |kind: &str, naming: &str| {
+            let name = slide.element.attr(&Ns::Presentation, naming)?;
+            self.document.body_of("presentation")?.elements().find(|e| {
+                e.is(&Ns::Presentation, kind) && e.attr(&Ns::Presentation, "name") == Some(name)
+            })
+        };
+        let something = |text: &String| !text.trim().is_empty();
+
+        let footer = declared("footer-decl", "use-footer-name")
+            .filter(|_| switch(|p| p.display_footer) != Some(false))
+            .map(Element::plain_text)
+            .filter(something);
+        let date = declared("date-time-decl", "use-date-time-name")
+            .filter(|_| switch(|p| p.display_date_time) != Some(false))
+            .map(|declaration| self.date_shown(declaration, today))
+            .filter(something);
+        let number = (switch(|p| p.display_page_number) == Some(true))
+            .then(|| {
+                self.slides()
+                    .iter()
+                    .position(|other| other.position == slide.position)
+            })
+            .flatten()
+            .map(|index| (index + 1).to_string());
+
+        master
+            .elements()
+            .filter_map(|frame| {
+                let text = match frame.attr(&Ns::Presentation, "class")? {
+                    "footer" => footer.as_ref()?,
+                    "date-time" => date.as_ref()?,
+                    "page-number" => number.as_ref()?,
+                    _ => return None,
+                };
+                let mut frame = frame.clone();
+                put_fields(&mut frame, text);
+                Some(frame)
+            })
+            .collect()
+    }
+
+    /// What a `presentation:date-time-decl` shows: its own text where it is
+    /// fixed, and `today` in its data style where it follows the clock.
+    fn date_shown(&self, declaration: &Element, today: (i64, i64, i64)) -> String {
+        if declaration.attr(&Ns::Presentation, "source") != Some("current-date") {
+            return declaration.plain_text();
+        }
+        let (year, month, day) = today;
+        let iso = format!("{year:04}-{month:02}-{day:02}");
+        declaration
+            .attr(&Ns::Style, "data-style-name")
+            .and_then(|name| {
+                self.document
+                    .styles
+                    .data_styles()
+                    .format(name, &super::Value::Date(iso.clone()))
+            })
+            .unwrap_or(iso)
+    }
+
     /// The page geometry a slide is drawn in: the size of its master page's
     /// layout.
     ///
@@ -264,5 +344,23 @@ fn presentation_default() -> PageLayout {
         width: portrait.height,
         height: portrait.width,
         ..portrait
+    }
+}
+
+/// Put text in place of the footer, date and slide-number fields under an
+/// element.
+fn put_fields(element: &mut Element, text: &str) {
+    for node in &mut element.children {
+        let Node::Element(child) = node else {
+            continue;
+        };
+        if child.is(&Ns::Presentation, "footer")
+            || child.is(&Ns::Presentation, "date-time")
+            || child.is(&Ns::Text, "page-number")
+        {
+            *node = Node::Text(text.to_owned());
+        } else {
+            put_fields(child, text);
+        }
     }
 }

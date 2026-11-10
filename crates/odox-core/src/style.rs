@@ -533,6 +533,13 @@ pub struct Properties {
     pub background_visible: Option<bool>,
     /// Whether the master page's decorations are drawn.
     pub background_objects_visible: Option<bool>,
+    /// Whether the master's footer is shown, `presentation:display-footer`.
+    pub display_footer: Option<bool>,
+    /// Whether the master's date is shown, `presentation:display-date-time`.
+    pub display_date_time: Option<bool>,
+    /// Whether the master's slide number is shown,
+    /// `presentation:display-page-number`.
+    pub display_page_number: Option<bool>,
     /// Whether a slide is left out of a show, from `presentation:visibility`.
     pub hidden: Option<bool>,
     /// A column's width, from a `table-column` style.
@@ -1113,6 +1120,18 @@ impl Properties {
                     .and_then(crate::value::boolean)
                 {
                     self.background_objects_visible = Some(visible);
+                }
+                for (local, switch) in [
+                    ("display-footer", &mut self.display_footer),
+                    ("display-date-time", &mut self.display_date_time),
+                    ("display-page-number", &mut self.display_page_number),
+                ] {
+                    if let Some(shown) = properties
+                        .attr(&Ns::Presentation, local)
+                        .and_then(crate::value::boolean)
+                    {
+                        *switch = Some(shown);
+                    }
                 }
                 if let Some(visibility) = properties.attr(&Ns::Presentation, "visibility") {
                     self.hidden = Some(visibility == "hidden");

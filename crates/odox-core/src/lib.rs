@@ -54,7 +54,7 @@ pub use style::{
     GraphicProperties, ListKind, PageLayout, ParagraphProperties, Position, Properties, SMALL_CAPS,
     Style, Styles, TabKind, TabStop, TextAlign, TextProperties, VerticalAlign,
 };
-pub use value::{Color, Length, Measure, Percent};
+pub use value::{Color, Length, Measure, Percent, date_of};
 pub use xml::{Element, Name, Node, Ns};
 
 /// The media type of each format this crate reads, as written in a package's

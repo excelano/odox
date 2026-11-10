@@ -28,9 +28,13 @@ pub enum Description {
     Missing,
 }
 
-/// Whether a frame is a figure: one that holds a picture.
+/// Whether a frame is a figure: one that holds a picture. A frame holding a
+/// table is not, though it may hold a picture too: that is the producer's
+/// picture of the table, for a reader that cannot draw one.
 pub fn is_figure(frame: &Element) -> bool {
-    frame.is(&Ns::Draw, "frame") && frame.child(&Ns::Draw, "image").is_some()
+    frame.is(&Ns::Draw, "frame")
+        && frame.child(&Ns::Draw, "image").is_some()
+        && frame.child(&Ns::Table, "table").is_none()
 }
 
 /// The figures under an element, in reading order, as paths from it.

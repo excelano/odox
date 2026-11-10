@@ -54,3 +54,14 @@ pub use i18n::mark;
 pub use settings::Settings;
 pub use shapes::Canvas;
 pub use shell::{Notice, Product, Shell, View, Zoom, replace_file, run};
+
+/// Today, as year, month and day in UTC: what a date that follows the clock
+/// shows.
+pub fn today() -> (i64, i64, i64) {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
+        });
+    odox_core::date_of(seconds)
+}

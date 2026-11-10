@@ -166,13 +166,22 @@ impl Color {
     }
 }
 
-/// Read an ODF boolean attribute, which is spelled `true` or `false`.
+/// Read an ODF boolean attribute, an `xsd:boolean`: `true`, `false`, `1` or
+/// `0`.
 pub(crate) fn boolean(text: &str) -> Option<bool> {
     match text.trim() {
         "true" | "1" => Some(true),
         "false" | "0" => Some(false),
         _ => None,
     }
+}
+
+/// The date, as year, month and day, that a count of seconds since the start
+/// of 1970 falls on in UTC.
+#[allow(clippy::cast_precision_loss)]
+pub fn date_of(seconds: i64) -> (i64, i64, i64) {
+    const DAYS_FROM_1899_12_30_TO_1970: f64 = 25_569.0;
+    crate::formula::eval_civil(seconds.div_euclid(86_400) as f64 + DAYS_FROM_1899_12_30_TO_1970)
 }
 
 #[cfg(test)]

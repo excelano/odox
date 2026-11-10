@@ -54,6 +54,13 @@ fn run(
             .unwrap_or_default(),
         language: "en-US".to_owned(),
         untitled_slide: "Slide {number}".to_owned(),
+        today: odox_core::date_of(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| {
+                    i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
+                }),
+        ),
     };
     document.export(&options)
 }

@@ -430,6 +430,7 @@ impl View for SlideView {
         // Both resolved before the closure, which borrows the document again.
         let background = document.background(slide);
         let decorations = document.background_objects(slide);
+        let fields = document.master_fields(slide, odox_ui::today());
 
         egui::ScrollArea::both().show(ui, |ui| {
             ui.vertical_centered(|ui| {
@@ -452,7 +453,7 @@ impl View for SlideView {
                 // Back to front: the ground, then what the master page draws on
                 // every slide, then the slide's own.
                 canvas.background(ui, &background);
-                for shape in &decorations {
+                for shape in decorations.iter().copied().chain(&fields) {
                     canvas.shape(ui, shape);
                 }
                 for (index, shape) in slide.shapes_indexed() {
