@@ -276,10 +276,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
 
         // Registered every frame, because egui takes the focus from a widget
         // that did not appear in the last one. It senses no pointer, so the
-        // paragraphs over it still get theirs. A click anywhere but on it
-        // takes the focus from it here: a paragraph's click gives it back,
-        // which is why the keys are read first, and a caret put down from
-        // outside in the frame of a click, as a dialog's button does, keeps it.
+        // paragraphs over it still get theirs.
         ui.interact(ui.clip_rect(), self.id, Sense::focusable_noninteractive());
         if given {
             ui.memory_mut(|memory| memory.request_focus(self.id));

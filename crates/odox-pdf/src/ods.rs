@@ -276,8 +276,6 @@ impl Sheets<'_, '_, '_> {
             }
         };
         let mut pages: Vec<Page> = (0..count).map(|_| Page::new(width, height)).collect();
-        // Whether a page draws anything of its own cells; the first, which
-        // carries the sheet's name, is printed whatever it holds.
         let mut drawn = vec![false; count];
         drawn[page_of(0, 0)] = true;
         pages[page_of(0, 0)]
@@ -641,7 +639,6 @@ mod tests {
 
     #[test]
     fn a_page_no_cell_draws_on_is_left_out() {
-        // A value in the first row and another five hundred rows down.
         let mut faces = Faces::new();
         let laid = lay_out(&corpus("gaps.ods"), &mut faces).expect("laid out");
         let pages: Vec<Vec<String>> = laid

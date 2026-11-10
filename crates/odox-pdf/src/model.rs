@@ -230,11 +230,10 @@ impl Reader<'_> {
                 into.push(Block::Table(self.table(element)));
             } else if element.is(&Ns::Draw, "frame") {
                 self.frame(element, into);
-            } else if element.is(&Ns::Text, "section")
-                && element.attr(&Ns::Text, "display") == Some("none")
+            } else if edit::is_block_container(element)
+                && !(element.is(&Ns::Text, "section")
+                    && element.attr(&Ns::Text, "display") == Some("none"))
             {
-                // A hidden section stays in the document and out of print.
-            } else if edit::is_block_container(element) {
                 self.blocks(element, into, counters);
             }
             self.path.pop();
@@ -251,8 +250,6 @@ impl Reader<'_> {
 
     fn paragraph(&mut self, element: &Element, into: &mut Vec<Block>) {
         let properties = self.style_of(element, &Family::Paragraph);
-        // A paragraph its style hides, or that a hidden-paragraph field says
-        // is hidden now, is not printed.
         let hidden_field = element
             .descendant(&Ns::Text, "hidden-paragraph")
             .is_some_and(|field| field.attr(&Ns::Text, "is-hidden") == Some("true"));
@@ -391,11 +388,10 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
-                    } else if element.is(&Ns::Text, "hidden-text")
-                        && element.attr(&Ns::Text, "is-hidden") == Some("true")
+                    } else if edit::is_inline_passthrough(element)
+                        && !(element.is(&Ns::Text, "hidden-text")
+                            && element.attr(&Ns::Text, "is-hidden") == Some("true"))
                     {
-                        // The field's condition hides its text now.
-                    } else if edit::is_inline_passthrough(element) {
                         self.runs(element, inherited, size, link, text, anchored, path);
                     }
                     path.pop();
