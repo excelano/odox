@@ -243,11 +243,14 @@ fn frame_of<'a>(page: &'a Element, class: &str) -> &'a Element {
 }
 
 #[test]
-fn an_added_slide_follows_its_master_and_names_only_what_it_can_see() {
+fn a_slide_added_after_a_title_slide_takes_the_next_slide_s_master_and_a_name_of_its_own() {
     let mut deck = deck("deck.odp");
     let (position, master) = {
-        let first = &deck.slides()[0];
-        (first.position, first.master_page.map(ToOwned::to_owned))
+        let slides = deck.slides();
+        (
+            slides[0].position,
+            slides[1].master_page.map(ToOwned::to_owned),
+        )
     };
     let before = names(&deck);
     let at = deck.add_slide(position).expect("added");
@@ -256,12 +259,16 @@ fn an_added_slide_follows_its_master_and_names_only_what_it_can_see() {
         .iter()
         .find(|s| s.position == at)
         .expect("the new slide");
-    assert_eq!(added.master_page.map(ToOwned::to_owned), master);
+    assert_eq!(
+        added.master_page.map(ToOwned::to_owned),
+        master,
+        "the title slide's master puts its text frame over its title"
+    );
     assert!(!before.contains(&added.name.expect("named").to_owned()));
     let title = frame_of(added.element, "title");
     assert_eq!(
         title.attr(&Ns::Svg, "y"),
-        Some("4.438cm"),
+        Some("0.572cm"),
         "where the master puts it"
     );
     assert!(title.attr(&Ns::Draw, "layer").is_none());
@@ -285,8 +292,9 @@ fn an_added_slide_follows_its_master_and_names_only_what_it_can_see() {
     );
     let outline = frame_of(added.element, "outline");
     assert_eq!(
-        outline.attr(&Ns::Presentation, "style-name"),
-        Some("Title_20_Slide-outline1")
+        outline.attr(&Ns::Svg, "y"),
+        Some("3.334cm"),
+        "under the title"
     );
     drop(slides);
     let written = deck

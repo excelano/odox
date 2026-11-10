@@ -8,7 +8,7 @@
 //! has one, because an id names one element of a document, and the references
 //! between those elements inside the copy follow. A new slide takes the
 //! master of the one it follows, and a title and a text frame where that
-//! master puts its placeholders.
+//! master puts its placeholders, unless that master is a title slide's.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::Presentation;
 use crate::edit::Refused;
+use crate::value::Length;
 use crate::xml::{Attribute, Element, Node, Ns};
 
 /// The attributes that name another element by its id, which a copy of a
@@ -139,7 +140,10 @@ const PLACEHOLDERS: [&str; 2] = ["title", "outline"];
 
 impl Presentation {
     /// Put a new slide after a slide, on the same master, with an empty title
-    /// and an empty text frame, and answer where it is. Each frame is where
+    /// and an empty text frame, and answer where it is. A master whose text
+    /// placeholder overlaps its title is a title slide's, made for a title and
+    /// a subtitle, so the new slide takes the master of the nearest slide,
+    /// after it and then before, whose placeholders are apart. Each frame is where
     /// the master's placeholder of its class is, in that placeholder's style
     /// where the slide can name it; where the master has none, it is laid out
     /// across the page. Where the slide it follows has a frame of the class,
@@ -156,7 +160,25 @@ impl Presentation {
             .find(|slide| slide.position == position)
             .ok_or(Refused::NotFound)?;
         let layout = self.page_layout(slide);
-        let master = self.master(slide);
+        let apart = |name: &&str| {
+            self.document
+                .styles
+                .master_page(name)
+                .is_some_and(|master| !placeholders_overlap(master))
+        };
+        let index = slides
+            .iter()
+            .position(|other| other.position == position)
+            .unwrap_or_default();
+        let nearest = slides[index + 1..]
+            .iter()
+            .chain(slides[..index].iter().rev());
+        let master_name = slide
+            .master_page
+            .filter(apart)
+            .or_else(|| nearest.filter_map(|other| other.master_page).find(apart))
+            .or(slide.master_page);
+        let master = master_name.and_then(|name| self.document.styles.master_page(name));
         let mut runs = Vec::new();
         let mut frames: Vec<Element> = PLACEHOLDERS
             .iter()
@@ -182,7 +204,7 @@ impl Presentation {
         let mut page = Element::new("", "page", Ns::Draw);
         page.name = self.document.name(&Ns::Draw, "page");
         page.set_attr(self.document.name(&Ns::Draw, "name"), name);
-        if let Some(master) = slide.master_page {
+        if let Some(master) = master_name {
             page.set_attr(
                 self.document.name(&Ns::Draw, "master-page-name"),
                 master.to_owned(),
@@ -417,6 +439,21 @@ fn placeholder<'a>(master: &'a Element, class: &str) -> Option<&'a Element> {
     master
         .elements()
         .find(|e| e.is(&Ns::Draw, "frame") && e.attr(&Ns::Presentation, "class") == Some(class))
+}
+
+/// Whether a master's title and text placeholders cover some of the same
+/// ground.
+fn placeholders_overlap(master: &Element) -> bool {
+    let span = |class: &str| {
+        let frame = placeholder(master, class)?;
+        let length = |local: &str| Length::parse(frame.attr(&Ns::Svg, local)?).map(|l| l.0);
+        let (x, y) = (length("x")?, length("y")?);
+        Some((x, y, x + length("width")?, y + length("height")?))
+    };
+    let (Some(title), Some(text)) = (span("title"), span("outline")) else {
+        return false;
+    };
+    title.0 < text.2 && text.0 < title.2 && title.1 < text.3 && text.1 < title.3
 }
 
 /// Every id an element and what is under it has.
