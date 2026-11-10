@@ -178,6 +178,9 @@ impl Paint<'_> {
         let (_, row_height) = metrics.row(row);
         let (_, column_width) = metrics.column(column);
         let cell = document.cell(sheet, row, column);
+        if cell.as_ref().is_some_and(|cell| cell.covered) {
+            return;
+        }
         let style = document.cell_style(sheet, cell.as_ref(), column);
 
         // A merged cell is one cell over several columns and rows. Its fill,
@@ -230,7 +233,7 @@ impl Paint<'_> {
             }
         }
 
-        if let Some(cell) = cell.filter(|cell| !cell.covered) {
+        if let Some(cell) = cell {
             self.text(ui, painter, rect, &cell, &style, (row, column));
             // A comment is marked by a small red corner, as every
             // spreadsheet marks one.
@@ -1123,7 +1126,9 @@ impl SheetView {
                 if ui.button(t("Rename")).clicked() || entered {
                     answer = Some(true);
                 }
-                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+                {
                     answer = Some(false);
                 }
             });
@@ -1203,7 +1208,9 @@ impl SheetView {
                 if commenting.had && ui.button(t("Delete")).clicked() {
                     answer = Some(Said::Delete);
                 }
-                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+                {
                     answer = Some(Said::Cancel);
                 }
             });
@@ -1418,7 +1425,9 @@ impl SheetView {
                 {
                     answer = Some(true);
                 }
-                if ui.button(t("Cancel")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+                {
                     answer = Some(false);
                 }
             });
