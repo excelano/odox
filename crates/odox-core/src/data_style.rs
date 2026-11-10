@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::doc::Value;
+use crate::locale::{self, Locale};
 use crate::value::Color;
 use crate::xml::{Element, Ns};
 
@@ -436,33 +437,12 @@ impl DataStyle {
         if symbol.len() == 3 && symbol.chars().all(|c| c.is_ascii_uppercase()) {
             return Some(symbol.to_owned());
         }
-        let country = self.country.as_deref().unwrap_or_default();
-        let code = match symbol {
-            "$" => match country {
-                "CA" => "CAD",
-                "AU" => "AUD",
-                "NZ" => "NZD",
-                "MX" => "MXN",
-                _ => "USD",
-            },
-            "€" => "EUR",
-            "£" => "GBP",
-            "¥" => {
-                if country == "CN" {
-                    "CNY"
-                } else {
-                    "JPY"
-                }
-            }
-            "₹" => "INR",
-            "CHF" | "Fr." => "CHF",
-            _ => return None,
-        };
-        Some(code.to_owned())
+        locale::currency_code(symbol, self.country.as_deref()).map(ToOwned::to_owned)
     }
 
     fn format_amount(&self, x: f64) -> String {
-        let (decimal, group) = separators(self.language.as_deref());
+        let locale = self.locale();
+        let decimal = locale.decimal();
         let x = if self.kind == Kind::Percentage {
             x * 100.0
         } else {
@@ -476,7 +456,7 @@ impl DataStyle {
             match part {
                 Part::Text(text) | Part::CurrencySymbol(text) => out.push_str(text),
                 Part::Number(digits, embedded) => {
-                    out.push_str(&number(magnitude, digits, embedded, decimal, group));
+                    out.push_str(&number(magnitude, digits, embedded, locale));
                     shown_number = true;
                 }
                 Part::Scientific {
@@ -510,8 +490,7 @@ impl DataStyle {
                     grouping: false,
                 },
                 &[],
-                decimal,
-                group,
+                locale,
             ));
         }
         if signed && out.chars().any(|c| c.is_ascii_digit() && c != '0') {
@@ -522,7 +501,7 @@ impl DataStyle {
 
     fn format_moment(&self, moment: &Moment) -> String {
         let twelve = self.parts.contains(&Part::AmPm);
-        let names = Names::of(self.language.as_deref());
+        let locale = self.locale();
         let lead = self.parts.iter().find(|part| {
             matches!(
                 part,
@@ -554,8 +533,8 @@ impl DataStyle {
                 Part::Month { long, textual } => {
                     let index = (moment.month as usize).saturating_sub(1).min(11);
                     match (textual, long) {
-                        (true, true) => out.push_str(names.months[index]),
-                        (true, false) => out.push_str(&names.months[index][..names.short(index)]),
+                        (true, true) => out.push_str(locale.months[index]),
+                        (true, false) => out.push_str(locale.months_short[index]),
                         (false, true) => {
                             let _ = write!(out, "{:02}", moment.month);
                         }
@@ -564,12 +543,12 @@ impl DataStyle {
                 }
                 Part::Day { long } => out.push_str(&pad(moment.day, *long)),
                 Part::DayOfWeek { long } => {
-                    let day = names.days[weekday(moment.year, moment.month, moment.day)];
-                    if *long {
-                        out.push_str(day);
+                    let day = weekday(moment.year, moment.month, moment.day);
+                    out.push_str(if *long {
+                        locale.days[day]
                     } else {
-                        out.push_str(&day[..3.min(day.len())]);
-                    }
+                        locale.days_short[day]
+                    });
                 }
                 Part::Hours { long } => {
                     let hours = if twelve {
@@ -584,7 +563,14 @@ impl DataStyle {
                     };
                     out.push_str(&pad(hours, *long));
                 }
-                Part::Quarter { long } => out.push_str(&names.quarter(moment.month, *long)),
+                Part::Quarter { long } => {
+                    let quarter = (moment.month.clamp(1, 12) as usize - 1) / 3;
+                    out.push_str(if *long {
+                        locale.quarters_long[quarter]
+                    } else {
+                        locale.quarters[quarter]
+                    });
+                }
                 Part::WeekOfYear => {
                     out.push_str(&iso_week(moment.year, moment.month, moment.day).to_string());
                 }
@@ -593,8 +579,7 @@ impl DataStyle {
                     out.push_str(&pad(seconds, *long));
                     if *decimals > 0 {
                         let places = *decimals as usize;
-                        let (decimal, _) = separators(self.language.as_deref());
-                        let _ = write!(out, "{decimal}{:0>places$}", moment.subsecond);
+                        let _ = write!(out, "{}{:0>places$}", locale.decimal(), moment.subsecond);
                     }
                 }
                 Part::AmPm => out.push_str(if moment.hours % 24 < 12 { "AM" } else { "PM" }),
@@ -620,18 +605,17 @@ impl DataStyle {
     }
 
     fn truth(&self, truth: bool) -> String {
-        let german = self.language.as_deref() == Some("de");
-        match (truth, german) {
-            (true, false) => "TRUE",
-            (false, false) => "FALSE",
-            (true, true) => "WAHR",
-            (false, true) => "FALSCH",
-        }
-        .to_owned()
+        self.locale().truth[usize::from(!truth)].to_owned()
+    }
+
+    /// The locale the style is written in.
+    fn locale(&self) -> &'static Locale {
+        locale::find(self.language.as_deref(), self.country.as_deref())
     }
 
     fn parse_number(&self, input: &str) -> Option<f64> {
-        let (decimal, group) = separators(self.language.as_deref());
+        let locale = self.locale();
+        let (decimal, group) = (locale.decimal(), Some(locale.group));
         let mut text: String = input.chars().filter(|c| !c.is_whitespace()).collect();
         let other = if decimal == ',' { '.' } else { ',' };
         let mistaken = text.contains(other)
@@ -682,7 +666,7 @@ impl DataStyle {
                 _ => None,
             })
             .collect();
-        let names = Names::of(self.language.as_deref());
+        let locale = self.locale();
         let mut fields: Vec<(char, i64, usize)> = Vec::new();
         let taken = |fields: &[(char, i64, usize)], slot: char| fields.iter().any(|f| f.0 == slot);
         for token in input
@@ -692,7 +676,7 @@ impl DataStyle {
             if let Ok(n) = token.parse::<i64>() {
                 let slot = order.iter().copied().find(|slot| !taken(&fields, *slot))?;
                 fields.push((slot, n, token.len()));
-            } else if let Some(month) = names.month_named(token) {
+            } else if let Some(month) = month_named(locale, token) {
                 if taken(&fields, 'm') {
                     return None;
                 }
@@ -910,18 +894,6 @@ fn denominator(element: &Element) -> u32 {
         .max(1)
 }
 
-/// The decimal separator and the thousands separator a language writes.
-fn separators(language: Option<&str>) -> (char, Option<&'static str>) {
-    match language.unwrap_or("en") {
-        "de" | "es" | "it" | "nl" | "pt" | "da" | "tr" | "id" | "el" | "ro" | "hr" | "sl" => {
-            (',', Some("."))
-        }
-        "fr" | "ru" | "pl" | "cs" | "sk" | "sv" | "nb" | "nn" | "no" | "fi" | "uk" | "hu"
-        | "bg" | "et" | "lv" | "lt" => (',', Some("\u{a0}")),
-        _ => ('.', Some(",")),
-    }
-}
-
 /// The literal text a number element puts among its integer digits, each
 /// with how many digits stand to its right.
 fn embedded(number: &Element) -> Vec<(usize, String)> {
@@ -976,13 +948,8 @@ fn general(x: f64) -> String {
     }
 }
 
-fn number(
-    x: f64,
-    digits: &Digits,
-    embedded: &[(usize, String)],
-    decimal: char,
-    group: Option<&str>,
-) -> String {
+fn number(x: f64, digits: &Digits, embedded: &[(usize, String)], locale: &Locale) -> String {
+    let decimal = locale.decimal();
     let written = if let Some(places) = digits.decimals {
         let x = half_away(x, places);
         let fixed = format!("{x:.places$}");
@@ -1020,9 +987,10 @@ fn number(
             whole.insert_str(at, &text);
         }
     }
-    let whole = match group.filter(|_| digits.grouping) {
-        Some(separator) => grouped(&whole, separator),
-        None => whole,
+    let whole = if digits.grouping {
+        grouped(&whole, locale.group, locale.indian)
+    } else {
+        whole
     };
     if fraction.is_empty() {
         whole
@@ -1043,10 +1011,18 @@ fn half_away(x: f64, places: usize) -> f64 {
     crate::formula::approx(scaled).round() / factor
 }
 
-fn grouped(whole: &str, separator: &str) -> String {
+/// Integer digits with a separator between each group of three, or, `indian`,
+/// between the last three and each group of two before them.
+fn grouped(whole: &str, separator: &str, indian: bool) -> String {
     let mut out = String::new();
     for (index, c) in whole.chars().enumerate() {
-        if index > 0 && (whole.len() - index).is_multiple_of(3) {
+        let left = whole.len() - index;
+        let boundary = if indian {
+            left == 3 || (left > 3 && (left - 3).is_multiple_of(2))
+        } else {
+            left.is_multiple_of(3)
+        };
+        if index > 0 && boundary {
             out.push_str(separator);
         }
         out.push(c);
@@ -1205,99 +1181,21 @@ fn weekday(year: i32, month: u32, day: u32) -> usize {
     usize::try_from(index).unwrap_or(0)
 }
 
-/// Month and day names in a style's language: English, or German where the
-/// style says so.
-struct Names {
-    months: [&'static str; 12],
-    days: [&'static str; 7],
-}
-
-impl Names {
-    fn of(language: Option<&str>) -> Self {
-        if language == Some("de") {
-            Self {
-                months: [
-                    "Januar",
-                    "Februar",
-                    "März",
-                    "April",
-                    "Mai",
-                    "Juni",
-                    "Juli",
-                    "August",
-                    "September",
-                    "Oktober",
-                    "November",
-                    "Dezember",
-                ],
-                days: [
-                    "Sonntag",
-                    "Montag",
-                    "Dienstag",
-                    "Mittwoch",
-                    "Donnerstag",
-                    "Freitag",
-                    "Samstag",
-                ],
-            }
-        } else {
-            Self {
-                months: [
-                    "January",
-                    "February",
-                    "March",
-                    "April",
-                    "May",
-                    "June",
-                    "July",
-                    "August",
-                    "September",
-                    "October",
-                    "November",
-                    "December",
-                ],
-                days: [
-                    "Sunday",
-                    "Monday",
-                    "Tuesday",
-                    "Wednesday",
-                    "Thursday",
-                    "Friday",
-                    "Saturday",
-                ],
-            }
-        }
-    }
-
-    /// The byte length of a month's short name: its first three letters.
-    fn short(&self, index: usize) -> usize {
-        self.months[index]
-            .char_indices()
-            .nth(3)
-            .map_or(self.months[index].len(), |(at, _)| at)
-    }
-
-    /// The quarter a month falls in, `Q2` or, long, `2nd quarter`.
-    #[allow(clippy::unused_self)]
-    fn quarter(&self, month: u32, long: bool) -> String {
-        let quarter = (month.clamp(1, 12) - 1) / 3 + 1;
-        if long {
-            let ordinal = ["1st", "2nd", "3rd", "4th"][quarter as usize - 1];
-            format!("{ordinal} quarter")
-        } else {
-            format!("Q{quarter}")
-        }
-    }
-
-    /// The month a word names, in full or by its first three letters.
-    fn month_named(&self, word: &str) -> Option<u32> {
-        let word = word.to_lowercase();
-        let index = self.months.iter().position(|month| {
+/// The month a word names in a locale: in full, by its short name, or by the
+/// first three letters of its name.
+fn month_named(locale: &Locale, word: &str) -> Option<u32> {
+    let word = word.to_lowercase();
+    let index = locale
+        .months
+        .iter()
+        .zip(locale.months_short)
+        .position(|(month, short)| {
             let month = month.to_lowercase();
-            month == word || (word.chars().count() >= 3 && month.starts_with(&word))
+            month == word
+                || short.to_lowercase().trim_end_matches('.') == word
+                || (word.chars().count() >= 3 && month.starts_with(&word))
         })?;
-        u32::try_from(index + 1).ok()
-    }
+    u32::try_from(index + 1).ok()
 }
 
 /// Every data style in a document, by name.

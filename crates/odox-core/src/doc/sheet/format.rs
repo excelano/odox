@@ -595,7 +595,7 @@ fn data_style(root: &Element, number: NumberFormat, language: &str, country: &st
             ("percentage-style", vec![digits(decimals, false), text("%")])
         }
         NumberFormat::Currency { decimals } => {
-            let symbol = currency_symbol(country);
+            let currency = &crate::locale::find(Some(language), Some(country)).currency;
             let mut sign = leaf(
                 "currency-symbol",
                 &[
@@ -603,14 +603,16 @@ fn data_style(root: &Element, number: NumberFormat, language: &str, country: &st
                     ("country", country.to_owned()),
                 ],
             );
-            sign.children.push(Node::Text(symbol.to_owned()));
+            sign.children.push(Node::Text(currency.symbol.to_owned()));
             sign.self_closing = false;
             let amount = digits(decimals, true);
-            let parts = if language == "en" {
-                vec![sign, amount]
-            } else {
-                vec![amount, text(" "), sign]
-            };
+            let mut parts = vec![amount, sign];
+            if currency.before {
+                parts.reverse();
+            }
+            if !currency.between.is_empty() {
+                parts.insert(1, text(currency.between));
+            }
             ("currency-style", parts)
         }
         NumberFormat::Date => {
@@ -647,16 +649,4 @@ fn data_style(root: &Element, number: NumberFormat, language: &str, country: &st
     style.children = parts.into_iter().map(Node::Element).collect();
     style.self_closing = false;
     style
-}
-
-/// The symbol of a country's currency.
-fn currency_symbol(country: &str) -> &'static str {
-    match country {
-        "US" | "CA" | "AU" | "NZ" | "MX" => "$",
-        "GB" => "£",
-        "JP" | "CN" => "¥",
-        "IN" => "₹",
-        "CH" | "LI" => "CHF",
-        _ => "€",
-    }
 }

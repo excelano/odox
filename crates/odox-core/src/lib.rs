@@ -36,6 +36,8 @@ pub mod draw;
 pub mod edit;
 mod error;
 pub mod formula;
+mod locale;
+mod locales;
 mod meta;
 mod package;
 pub mod place;
