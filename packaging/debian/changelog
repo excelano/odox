@@ -1,3 +1,10 @@
+odox (0.15.1) unstable; urgency=low
+
+  * On Windows the windows draw through Direct3D 12 alone, so a faulty Vulkan driver cannot end them before they open
+  * Home and End go to the top and the bottom of a document that is being read
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 10 Nov 2026 15:09:20 -0600
+
 odox (0.15.0) unstable; urgency=low
 
   * A document's PDF prints the page headers and footers its page styles give it, with their page numbers, titles and sheet names
