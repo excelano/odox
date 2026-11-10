@@ -28,7 +28,7 @@ use eframe::egui::{
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
     Border, Document, Element, Family, Node, Ns, Properties, TabKind, TextAlign, TextProperties,
-    edit,
+    edit::{self, ListCounters},
 };
 
 use crate::find::Highlights;
@@ -206,44 +206,23 @@ struct Run<'a> {
     counted: bool,
 }
 
-/// Where a list's counters stand, one per level.
-#[derive(Default)]
-struct Counters(Vec<usize>);
-
-impl Counters {
-    fn bump(&mut self, level: usize, start: usize) -> usize {
-        while self.0.len() <= level {
-            self.0.push(0);
-        }
-        // A level that has not been counted at yet begins at the level style's
-        // start value, which is one unless the document says otherwise.
-        if self.0[level] == 0 {
-            self.0[level] = start;
-        } else {
-            self.0[level] += 1;
-        }
-        // Entering a list resets everything below it, which is what makes 2.1
-        // follow 1.3.
-        self.0.truncate(level + 1);
-        self.0[level]
-    }
-
-    fn at(&self, level: usize) -> usize {
-        self.0.get(level).copied().unwrap_or(1)
-    }
-}
-
 impl Flow<'_> {
     /// Draw every block under an element, in order.
     ///
     /// `width` is the space available in screen points, and is what a paragraph
     /// wraps to.
     pub fn blocks(&mut self, ui: &mut Ui, parent: &Element, width: f32) {
-        let mut counters = Counters::default();
+        let mut counters = ListCounters::default();
         self.blocks_with(ui, parent, width, &mut counters);
     }
 
-    fn blocks_with(&mut self, ui: &mut Ui, parent: &Element, width: f32, counters: &mut Counters) {
+    fn blocks_with(
+        &mut self,
+        ui: &mut Ui,
+        parent: &Element,
+        width: f32,
+        counters: &mut ListCounters,
+    ) {
         for (index, element) in parent.elements_indexed() {
             self.path.push(index);
             match () {
@@ -258,7 +237,7 @@ impl Flow<'_> {
                     let continues = element.attr(&Ns::Text, "continue-numbering") == Some("true")
                         || element.attr(&Ns::Text, "continue-list").is_some();
                     if !continues {
-                        *counters = Counters::default();
+                        *counters = ListCounters::default();
                     }
                     self.list(ui, element, width, 0, None, counters);
                 }
@@ -678,7 +657,7 @@ impl Flow<'_> {
         width: f32,
         level: usize,
         inherited_style: Option<&str>,
-        counters: &mut Counters,
+        counters: &mut ListCounters,
     ) {
         let style_name = element
             .attr(&Ns::Text, "style-name")
@@ -700,12 +679,8 @@ impl Flow<'_> {
             self.path.push(item_index);
             let label = if numbered {
                 let level_style = self.level_style(&style_name, level);
-                let start = level_style
-                    .as_ref()
-                    .and_then(|s| s.attr_usize(&Ns::Text, "start-value"))
-                    .unwrap_or(1);
-                let number = counters.bump(level, start);
-                Self::label(level_style.as_ref(), level, number, counters)
+                counters.count(item, level, level_style.as_ref());
+                counters.label(level, |at| self.level_style(&style_name, at))
             } else {
                 // A list header is the paragraph a list may begin with, and it
                 // is not numbered and does not count.
@@ -761,46 +736,6 @@ impl Flow<'_> {
             .elements()
             .find(|e| e.attr_usize(&Ns::Text, "level") == Some(level + 1))
             .cloned()
-    }
-
-    /// The text drawn in front of a list item.
-    fn label(
-        level_style: Option<&Element>,
-        level: usize,
-        number: usize,
-        counters: &Counters,
-    ) -> String {
-        let Some(style) = level_style else {
-            // A list whose style the document did not write, which happens in a
-            // document assembled by something that left the style behind.
-            return "\u{2022}".to_owned();
-        };
-        if style.is(&Ns::Text, "list-level-style-bullet") {
-            return style
-                .attr(&Ns::Text, "bullet-char")
-                .unwrap_or("\u{2022}")
-                .to_owned();
-        }
-        if style.is(&Ns::Text, "list-level-style-number") {
-            let format = style.attr(&Ns::Style, "num-format").unwrap_or("1");
-            let prefix = style.attr(&Ns::Style, "num-prefix").unwrap_or_default();
-            let suffix = style.attr(&Ns::Style, "num-suffix").unwrap_or_default();
-            // `text:display-levels` is how 1.2.3 is written: the level's own
-            // number preceded by its ancestors'.
-            let display = style
-                .attr_usize(&Ns::Text, "display-levels")
-                .unwrap_or(1)
-                .max(1);
-            let mut numbers = Vec::new();
-            let first = (level + 1).saturating_sub(display);
-            for ancestor in first..level {
-                numbers.push(edit::number_text(counters.at(ancestor), format));
-            }
-            numbers.push(edit::number_text(number, format));
-            return format!("{prefix}{}{suffix}", numbers.join("."));
-        }
-        // A level drawn with an image, which is a picture this does not fetch.
-        "\u{2022}".to_owned()
     }
 
     /// A table, drawn as a grid of cells with the document's own widths.

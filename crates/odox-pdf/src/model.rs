@@ -12,7 +12,7 @@
 use std::ops::Range;
 
 use krilla::tagging::ListNumbering;
-use odox_core::edit::{self, Description};
+use odox_core::edit::{self, Description, ListCounters};
 use odox_core::{
     Border, Break, Color, Document, Edges, Element, Family, Length, Measure, Node, Ns, Position,
     Properties, TabStop, TextAlign, TextProperties,
@@ -199,7 +199,7 @@ pub(crate) fn read(
         notes: Vec::new(),
     };
     let mut blocks = Vec::new();
-    reader.blocks(root, &mut blocks, &mut Counters::default());
+    reader.blocks(root, &mut blocks, &mut ListCounters::default());
     blocks.extend(reader.notes.into_iter().map(Block::Note));
     blocks
 }
@@ -213,31 +213,8 @@ struct Reader<'a> {
     notes: Vec<Note>,
 }
 
-/// Where a list's counters stand, one per level.
-#[derive(Default)]
-struct Counters(Vec<usize>);
-
-impl Counters {
-    fn bump(&mut self, level: usize, start: usize) -> usize {
-        while self.0.len() <= level {
-            self.0.push(0);
-        }
-        if self.0[level] == 0 {
-            self.0[level] = start;
-        } else {
-            self.0[level] += 1;
-        }
-        self.0.truncate(level + 1);
-        self.0[level]
-    }
-
-    fn at(&self, level: usize) -> usize {
-        self.0.get(level).copied().unwrap_or(1)
-    }
-}
-
 impl Reader<'_> {
-    fn blocks(&mut self, parent: &Element, into: &mut Vec<Block>, counters: &mut Counters) {
+    fn blocks(&mut self, parent: &Element, into: &mut Vec<Block>, counters: &mut ListCounters) {
         for (index, element) in parent.elements_indexed() {
             self.path.push(index);
             if element.is(&Ns::Text, "p") || element.is(&Ns::Text, "h") {
@@ -246,7 +223,7 @@ impl Reader<'_> {
                 let continues = element.attr(&Ns::Text, "continue-numbering") == Some("true")
                     || element.attr(&Ns::Text, "continue-list").is_some();
                 if !continues {
-                    *counters = Counters::default();
+                    *counters = ListCounters::default();
                 }
                 self.list(element, 0, None, counters, into);
             } else if element.is(&Ns::Table, "table") {
@@ -350,7 +327,7 @@ impl Reader<'_> {
         };
         self.path.push(index);
         let mut blocks = Vec::new();
-        self.blocks(body, &mut blocks, &mut Counters::default());
+        self.blocks(body, &mut blocks, &mut ListCounters::default());
         self.path.pop();
         self.notes.push(Note { citation, blocks });
     }
@@ -432,7 +409,7 @@ impl Reader<'_> {
         element: &Element,
         level: usize,
         inherited_style: Option<&str>,
-        counters: &mut Counters,
+        counters: &mut ListCounters,
         into: &mut Vec<Block>,
     ) {
         let style_name = element
@@ -454,12 +431,8 @@ impl Reader<'_> {
             }
             self.path.push(item_index);
             let label = numbered.then(|| {
-                let start = level_style
-                    .as_ref()
-                    .and_then(|s| s.attr_usize(&Ns::Text, "start-value"))
-                    .unwrap_or(1);
-                let number = counters.bump(level, start);
-                label(level_style.as_ref(), level, number, counters)
+                counters.count(item, level, level_style.as_ref());
+                counters.label(level, |at| self.level_style(&style_name, at))
             });
             let mut blocks = Vec::new();
             for (block_index, block) in item.elements_indexed() {
@@ -575,7 +548,7 @@ impl Reader<'_> {
                     let properties = self.style_of(cell, &Family::TableCell);
                     self.path.push(index);
                     let mut blocks = Vec::new();
-                    self.blocks(cell, &mut blocks, &mut Counters::default());
+                    self.blocks(cell, &mut blocks, &mut ListCounters::default());
                     self.path.pop();
                     cells.push(Cell {
                         column,
@@ -628,7 +601,7 @@ impl Reader<'_> {
         {
             self.path.push(index);
             let mut blocks = Vec::new();
-            self.blocks(text_box, &mut blocks, &mut Counters::default());
+            self.blocks(text_box, &mut blocks, &mut ListCounters::default());
             self.path.pop();
             into.push(Block::TextBox(TextBox {
                 width: declared("width"),
@@ -757,41 +730,6 @@ fn numbering(level_style: Option<&Element>) -> ListNumbering {
         None => ListNumbering::None,
         _ => ListNumbering::Decimal,
     }
-}
-
-/// The text drawn in front of a list item, as the window draws it.
-fn label(
-    level_style: Option<&Element>,
-    level: usize,
-    number: usize,
-    counters: &Counters,
-) -> String {
-    let Some(style) = level_style else {
-        return "\u{2022}".to_owned();
-    };
-    if style.is(&Ns::Text, "list-level-style-bullet") {
-        return style
-            .attr(&Ns::Text, "bullet-char")
-            .unwrap_or("\u{2022}")
-            .to_owned();
-    }
-    if style.is(&Ns::Text, "list-level-style-number") {
-        let format = style.attr(&Ns::Style, "num-format").unwrap_or("1");
-        let prefix = style.attr(&Ns::Style, "num-prefix").unwrap_or_default();
-        let suffix = style.attr(&Ns::Style, "num-suffix").unwrap_or_default();
-        let display = style
-            .attr_usize(&Ns::Text, "display-levels")
-            .unwrap_or(1)
-            .max(1);
-        let mut numbers = Vec::new();
-        let first = (level + 1).saturating_sub(display);
-        for ancestor in first..level {
-            numbers.push(odox_core::edit::number_text(counters.at(ancestor), format));
-        }
-        numbers.push(odox_core::edit::number_text(number, format));
-        return format!("{prefix}{}{suffix}", numbers.join("."));
-    }
-    "\u{2022}".to_owned()
 }
 
 /// The figures among blocks that say nothing in place of their picture.
