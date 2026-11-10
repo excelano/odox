@@ -89,6 +89,9 @@ pub struct RichEdit<P> {
     /// Where a copy goes beside egui's text, and a paste from elsewhere is
     /// looked for in HTML.
     clipboard: Option<&'static dyn Clipboard>,
+    /// Keys that came after a click in the frame the click came in, kept for
+    /// the next frame, when the caret is where the click put it.
+    deferred: Vec<Event>,
 }
 
 /// Marks given or taken off with a caret and nothing selected. The next text
@@ -152,6 +155,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             pending: None,
             clip: None,
             clipboard: None,
+            deferred: Vec::new(),
         }
     }
 
@@ -262,16 +266,32 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     /// has the keyboard. Answers whether the document changed.
     pub fn input<M: Model<Paragraph = P>>(&mut self, ui: &mut Ui, model: &mut M) -> bool {
         self.placed = std::mem::take(&mut self.placing).placed;
-
-        // Registered every frame, because egui takes the focus from a widget
-        // that did not appear in the last one. It senses no pointer, so the
-        // paragraphs over it still get theirs.
-        ui.interact(ui.clip_rect(), self.id, Sense::focusable_noninteractive());
         self.page_height = ui.clip_rect().height();
-        if self.owed == Owed::FocusAndReveal {
+        let given = self.owed == Owed::FocusAndReveal;
+        if given {
             self.owed = Owed::Reveal;
             ui.memory_mut(|memory| memory.request_focus(self.id));
         }
+        let changed = self.events(ui, model);
+
+        // Registered every frame, because egui takes the focus from a widget
+        // that did not appear in the last one. It senses no pointer, so the
+        // paragraphs over it still get theirs. A click anywhere but on it
+        // takes the focus from it here: a paragraph's click gives it back,
+        // which is why the keys are read first, and a caret put down from
+        // outside in the frame of a click, as a dialog's button does, keeps it.
+        ui.interact(ui.clip_rect(), self.id, Sense::focusable_noninteractive());
+        if given {
+            ui.memory_mut(|memory| memory.request_focus(self.id));
+        }
+        changed
+    }
+
+    /// Apply the keys that came before this frame's first click, and keep
+    /// those after it for the next frame, so they land either side of where
+    /// the click puts the caret.
+    fn events<M: Model<Paragraph = P>>(&mut self, ui: &Ui, model: &mut M) -> bool {
+        let mut events = std::mem::take(&mut self.deferred);
         if !ui.memory(|memory| memory.has_focus(self.id)) {
             self.dragging = false;
             return false;
@@ -283,7 +303,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
         self.settle(model);
 
-        let events = ui.input(|input| input.filtered_events(&FILTER));
+        events.extend(ui.input(|input| input.filtered_events(&FILTER)));
+        let click = |event: &Event| matches!(event, Event::PointerButton { .. });
+        if let Some(at) = events.iter().position(click) {
+            self.deferred = events.split_off(at);
+            self.deferred.retain(|event| !click(event));
+            ui.ctx().request_repaint();
+        }
         let mut changed = false;
         for event in &events {
             let (moved, edited) = self.event(ui, model, event);

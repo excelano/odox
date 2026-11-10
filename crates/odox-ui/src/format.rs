@@ -169,13 +169,9 @@ pub fn text_format(
         _ => (1.0, Align::BOTTOM),
     };
 
-    // Pure black is read as no colour at all: spreadsheet producers write it
-    // into every cell whether an author chose it or not, as they write a
-    // link's blue, and left as set it is black on a dark window's paper.
     let color = properties
         .color
-        .filter(|color| *color != Color { r: 0, g: 0, b: 0 })
-        .map_or(palette.ink, color32);
+        .map_or(palette.ink, |color| ink_or(color, palette));
     let line = Stroke::new((size * zoom * 0.06).max(1.0), color);
 
     TextFormat {
@@ -231,6 +227,20 @@ pub fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
 /// An ODF colour as egui's.
 pub fn color32(color: Color) -> Color32 {
     Color32::from_rgb(color.r, color.g, color.b)
+}
+
+/// A colour the document gives text or a border, as it is drawn.
+///
+/// Pure black is read as no colour at all, and takes the palette's ink:
+/// producers write it whether an author chose it or not, into every
+/// spreadsheet cell and onto the border of every table they insert, and left
+/// as set it is black on a dark window's paper.
+pub fn ink_or(color: Color, palette: Palette) -> Color32 {
+    if color == (Color { r: 0, g: 0, b: 0 }) {
+        palette.ink
+    } else {
+        color32(color)
+    }
 }
 
 /// What a match of a search is painted over: the current one in orange and the
@@ -314,6 +324,20 @@ mod tests {
             );
             assert_eq!(format.color, color32(navy()));
         }
+    }
+
+    #[test]
+    fn pure_black_is_drawn_in_the_ink_of_the_ground_and_other_colours_as_set() {
+        let black = Color { r: 0, g: 0, b: 0 };
+        let dark = Palette::for_theme(true);
+        assert_eq!(ink_or(black, dark), dark.ink, "light on the dark page");
+        let light_fill = dark.on(Color32::from_rgb(0xff, 0xff, 0xcc));
+        assert_eq!(
+            ink_or(black, light_fill),
+            Color32::BLACK,
+            "black on a light fill"
+        );
+        assert_eq!(ink_or(navy(), dark), color32(navy()));
     }
 
     #[test]

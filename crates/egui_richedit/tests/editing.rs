@@ -539,6 +539,51 @@ fn a_click_whose_release_comes_a_frame_later_keeps_the_caret() {
 }
 
 #[test]
+fn keys_typed_in_the_frame_of_a_click_land_either_side_of_it() {
+    let mut h = Harness::new(&["Hello", "world"]);
+    h.caret(0, 5);
+    h.frame(Vec::new());
+    // The start of the second paragraph, a line below the first.
+    let at = Pos2::new(1.0, 22.0);
+    let button = |pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    let text = |s: &str| Event::Text(s.to_owned());
+    h.frame(vec![
+        text("x"),
+        Event::PointerMoved(at),
+        button(true),
+        button(false),
+        text("z"),
+    ]);
+    h.frame(Vec::new());
+    assert_eq!(h.model.paragraphs, ["Hellox", "zworld"]);
+}
+
+#[test]
+fn keys_typed_around_a_click_spread_over_two_frames_are_kept() {
+    let mut h = Harness::new(&["Hello", "world"]);
+    h.caret(0, 5);
+    h.frame(Vec::new());
+    let at = Pos2::new(1.0, 22.0);
+    let button = |pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    let text = |s: &str| Event::Text(s.to_owned());
+    h.frame(vec![Event::PointerMoved(at)]);
+    h.frame(vec![text("1"), button(true), text("2")]);
+    h.frame(vec![text("3"), button(false), text("4")]);
+    h.frame(Vec::new());
+    assert_eq!(h.model.paragraphs, ["Hello1", "234world"]);
+}
+
+#[test]
 fn a_screen_reader_reads_each_paragraph_and_where_the_caret_is() {
     use egui::accesskit::Role;
     let mut h = Harness::new(&["Hello", "world"]);
@@ -856,4 +901,53 @@ fn a_mark_at_a_caret_is_forgotten_when_the_caret_moves_or_is_toggled_back() {
     assert_eq!(h.editor.marked(&h.model, Mark::Bold), Some(false));
     h.typed("y");
     assert_eq!(h.model.bold_text(0), "");
+}
+
+#[test]
+fn a_caret_put_down_in_the_frame_a_button_is_clicked_keeps_the_keyboard() {
+    // As a dialog's Insert does: its click puts a table in, and the caret into
+    // it, in one frame.
+    let ctx = Context::default();
+    let mut editor = RichEdit::new(Id::unique("editor"));
+    let mut model = Plain::new(&["Hello", "world"]);
+    let mut frame = |editor: &mut RichEdit<usize>, events: Vec<Event>| {
+        let input = RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
+            ..RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            editor.input(ui, &mut model);
+            for (index, text) in model.paragraphs.iter().enumerate() {
+                let mut job = ParagraphJob::new(LayoutJob::default());
+                job.text(text, TextFormat::default());
+                let (job, map) = job.into_parts();
+                let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+                let (rect, response) =
+                    ui.allocate_exact_size(vec2(300.0, galley.size().y), Sense::click_and_drag());
+                let laid = Laid {
+                    galley,
+                    map,
+                    origin: rect.min,
+                };
+                editor.paragraph(ui, &response, &index, laid);
+            }
+            ui.allocate_exact_size(vec2(300.0, 40.0), Sense::click());
+        });
+        output.textures_delta.clear();
+    };
+    let at = Pos2::new(10.0, 60.0);
+    let button = |pressed| Event::PointerButton {
+        pos: at,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    frame(&mut editor, Vec::new());
+    frame(&mut editor, vec![Event::PointerMoved(at)]);
+    frame(&mut editor, vec![button(true)]);
+    editor.select(Selection::caret(Position::new(1, 0)));
+    frame(&mut editor, vec![button(false)]);
+    frame(&mut editor, vec![Event::Text(">".to_owned())]);
+    assert_eq!(model.paragraphs, ["Hello", ">world"]);
 }
