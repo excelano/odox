@@ -39,6 +39,12 @@ struct Shown {
 }
 
 #[derive(Clone, Copy)]
+enum Move {
+    Page { down: bool },
+    End { bottom: bool },
+}
+
+#[derive(Clone, Copy)]
 struct Anchor {
     fraction: f32,
     at: f32,
@@ -95,10 +101,18 @@ impl Scroll {
         if keys {
             ui.input_mut(|input| {
                 if input.consume_key(egui::Modifiers::NONE, egui::Key::PageUp) {
-                    moved = Some(false);
+                    moved = Some(Move::Page { down: false });
                 }
                 if input.consume_key(egui::Modifiers::NONE, egui::Key::PageDown) {
-                    moved = Some(true);
+                    moved = Some(Move::Page { down: true });
+                }
+                for modifiers in [egui::Modifiers::NONE, egui::Modifiers::COMMAND] {
+                    if input.consume_key(modifiers, egui::Key::Home) {
+                        moved = Some(Move::End { bottom: false });
+                    }
+                    if input.consume_key(modifiers, egui::Key::End) {
+                        moved = Some(Move::End { bottom: true });
+                    }
                 }
             });
         }
@@ -108,18 +122,18 @@ impl Scroll {
                     .add_enabled(up, egui::Button::new(t("Page up")))
                     .clicked()
                 {
-                    moved = Some(false);
+                    moved = Some(Move::Page { down: false });
                 }
                 if ui
                     .add_enabled(down, egui::Button::new(t("Page down")))
                     .clicked()
                 {
-                    moved = Some(true);
+                    moved = Some(Move::Page { down: true });
                 }
             });
         });
-        if let Some(down) = moved {
-            self.page(ui.ctx(), down);
+        if let Some(moved) = moved {
+            self.go(ui.ctx(), moved);
         }
     }
 
@@ -130,16 +144,17 @@ impl Scroll {
         })
     }
 
-    /// Move the view most of a window up or down, settled on the next frame.
-    fn page(&mut self, ctx: &egui::Context, down: bool) {
+    /// Move the view, settled on the next frame.
+    fn go(&mut self, ctx: &egui::Context, moved: Move) {
         let Some(shown) = self.shown else {
             return;
         };
         let step = shown.viewport.height() * PAGE;
-        let offset = if down {
-            shown.offset + step
-        } else {
-            shown.offset - step
+        let offset = match moved {
+            Move::Page { down: true } => shown.offset + step,
+            Move::Page { down: false } => shown.offset - step,
+            Move::End { bottom: true } => shown.bottom(),
+            Move::End { bottom: false } => 0.0,
         };
         self.settle = Some(offset.clamp(0.0, shown.bottom()));
         ctx.request_repaint();
