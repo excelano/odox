@@ -4,10 +4,11 @@
 //! Each column of a fill down, or row of a fill across, is filled from its own
 //! source cells, over and over: a value is copied as it is, a formula with its
 //! relative references moved, and the cell style with either. A series goes
-//! on where the source cells start one: numbers or dates a constant step apart,
-//! text ending in a number, and the names of days and months. One source cell
-//! starts a series of names and of numbered text, as it does in every
-//! spreadsheet, and a lone number or date is copied.
+//! on where the source cells start one: numbers a constant step apart, dates
+//! a constant number of days or of months apart, text ending in a number, and
+//! the names of days and months. One source cell starts a series of names and
+//! of numbered text, as it does in every spreadsheet, and a lone number or
+//! date is copied.
 
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -273,27 +274,54 @@ fn numbers(values: &[&Value]) -> Option<Series> {
     }))
 }
 
+/// Dates a steady step apart: a number of months where every date falls on
+/// the same day of the month, and a number of days otherwise. A day past the
+/// end of a month the series reaches is that month's last.
 #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 fn dates(values: &[&Value]) -> Option<Series> {
-    let days: Vec<f64> = values
+    let fields: Vec<(i64, i64, i64)> = values
         .iter()
         .map(|value| match value {
             Value::Date(text) if text.len() == 10 => {
                 let mut fields = text.splitn(3, '-').map(|f| f.parse::<i64>().ok());
-                Some(formula::eval_serial(
-                    fields.next()??,
-                    fields.next()??,
-                    fields.next()??,
-                ))
+                Some((fields.next()??, fields.next()??, fields.next()??))
             }
             _ => None,
         })
         .collect::<Option<_>>()?;
+    let date =
+        |(year, month, day): (i64, i64, i64)| Value::Date(format!("{year:04}-{month:02}-{day:02}"));
+
+    let (year, month, day) = fields[0];
+    let months: Vec<f64> = fields
+        .iter()
+        .map(|(year, month, _)| (year * 12 + month - 1) as f64)
+        .collect();
+    if fields.iter().all(|f| f.2 == day)
+        && let Some(step) = steady(&months).filter(|step| *step != 0.0)
+    {
+        let (first, step) = (year * 12 + month - 1, step as i64);
+        return Some(Box::new(move |n| {
+            let n = i64::try_from(n).unwrap_or(i64::MAX);
+            let index = first.saturating_add(step.saturating_mul(n));
+            let (year, month) = (index.div_euclid(12), index.rem_euclid(12) + 1);
+            let next = index + 1;
+            let last = formula::eval_civil(
+                formula::eval_serial(next.div_euclid(12), next.rem_euclid(12) + 1, 1) - 1.0,
+            )
+            .2;
+            date((year, month, day.min(last)))
+        }));
+    }
+
+    let days: Vec<f64> = fields
+        .iter()
+        .map(|&(year, month, day)| formula::eval_serial(year, month, day))
+        .collect();
     let step = steady(&days)?;
     let first = days[0];
     Some(Box::new(move |n| {
-        let (year, month, day) = formula::eval_civil(first + (step * n as f64).round());
-        Value::Date(format!("{year:04}-{month:02}-{day:02}"))
+        date(formula::eval_civil(first + (step * n as f64).round()))
     }))
 }
 

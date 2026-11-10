@@ -365,9 +365,11 @@ first row, and Fill right from its first column; a selection one row deep or
 one column wide is filled from the row above or the column to its left. Fill
 right has no key, because Ctrl+R is Reload. The small square at the
 selection's far corner is dragged down or right to fill past it, and a drag
-also goes on with a series the selection starts: numbers or dates a steady
-step apart, text ending in a number (`Item 1`, `Q03`), and day and month
-names in English and German, kept in their case. One cell starts a series of
+also goes on with a series the selection starts: numbers a steady step apart,
+dates a steady number of days apart, or of months where each falls on the same
+day of the month (the last day where a month is shorter), text ending in a
+number (`Item 1`, `Q03`), and day and month names in English and German, kept
+in their case. One cell starts a series of
 names or numbered text, and a lone number or date is copied, as in every
 spreadsheet. A formula is copied with its relative references moved and its
 absolute ones kept, one moved off the sheet's edge becoming `#REF!`, and every

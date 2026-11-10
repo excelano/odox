@@ -100,6 +100,33 @@ fn a_series_goes_on_where_the_cells_start_one() {
                 Value::Date("2026-02-02".to_owned()),
             ],
         ),
+        (
+            vec![
+                Value::Date("2024-01-15".to_owned()),
+                Value::Date("2024-02-15".to_owned()),
+            ],
+            vec![
+                Value::Date("2024-03-15".to_owned()),
+                Value::Date("2024-04-15".to_owned()),
+            ],
+        ),
+        (
+            vec![
+                Value::Date("2023-10-31".to_owned()),
+                Value::Date("2023-12-31".to_owned()),
+            ],
+            vec![
+                Value::Date("2024-02-29".to_owned()),
+                Value::Date("2024-04-30".to_owned()),
+            ],
+        ),
+        (
+            vec![
+                Value::Date("2024-03-01".to_owned()),
+                Value::Date("2025-03-01".to_owned()),
+            ],
+            vec![Value::Date("2026-03-01".to_owned())],
+        ),
         (vec![text("Mon")], vec![text("Tue"), text("Wed")]),
         (vec![text("SATURDAY")], vec![text("SUNDAY"), text("MONDAY")]),
         (
