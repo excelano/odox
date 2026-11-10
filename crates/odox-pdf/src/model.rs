@@ -253,6 +253,10 @@ impl Reader<'_> {
                 into.push(Block::Table(self.table(element)));
             } else if element.is(&Ns::Draw, "frame") {
                 self.frame(element, into);
+            } else if element.is(&Ns::Text, "section")
+                && element.attr(&Ns::Text, "display") == Some("none")
+            {
+                // A hidden section stays in the document and out of print.
             } else if edit::is_block_container(element) {
                 self.blocks(element, into, counters);
             }
@@ -270,6 +274,14 @@ impl Reader<'_> {
 
     fn paragraph(&mut self, element: &Element, into: &mut Vec<Block>) {
         let properties = self.style_of(element, &Family::Paragraph);
+        // A paragraph its style hides, or that a hidden-paragraph field says
+        // is hidden now, is not printed.
+        let hidden_field = element
+            .descendant(&Ns::Text, "hidden-paragraph")
+            .is_some_and(|field| field.attr(&Ns::Text, "is-hidden") == Some("true"));
+        if properties.text.hidden == Some(true) || hidden_field {
+            return;
+        }
         let properties = match &self.shape {
             Some(shape) => std::rc::Rc::new(properties.in_shape(shape)),
             None => properties,
@@ -375,6 +387,10 @@ impl Reader<'_> {
                     } else if element.is(&Ns::Text, "span") || element.is(&Ns::Text, "a") {
                         let own = self.style_of(element, &Family::Text);
                         let merged = own.text.over(inherited);
+                        if merged.hidden == Some(true) {
+                            path.pop();
+                            continue;
+                        }
                         let inner = size_of(&merged, size);
                         let link = if element.is(&Ns::Text, "a") {
                             text.links.push(
@@ -398,6 +414,10 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
+                    } else if element.is(&Ns::Text, "hidden-text")
+                        && element.attr(&Ns::Text, "is-hidden") == Some("true")
+                    {
+                        // The field's condition hides its text now.
                     } else if edit::is_inline_passthrough(element) {
                         self.runs(element, inherited, size, link, text, anchored, path);
                     }
@@ -795,5 +815,62 @@ pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
             Block::Note(note) => undescribed(&note.blocks, into),
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use odox_core::Package;
+    use odox_core::doc::TextDocument;
+
+    use super::*;
+
+    /// The paragraphs a text document whose body is `body` prints, with the
+    /// automatic styles `styles`.
+    fn printed(styles: &str, body: &str) -> Vec<String> {
+        let ns = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3""#;
+        let content = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content {ns}><office:automatic-styles>{styles}</office:automatic-styles><office:body><office:text>{body}</office:text></office:body></office:document-content>"#
+        );
+        let mut package = Package::read(&odox_core::blank::text("en")).expect("a package");
+        package.set_part("content.xml", content.into_bytes());
+        let bytes = package.write().expect("written");
+        let document = TextDocument::read(&bytes).expect("a text document");
+        let blocks = read(
+            &document.document,
+            document.body().expect("a body"),
+            document.body_path().expect("a path"),
+            None,
+        );
+        blocks
+            .into_iter()
+            .filter_map(|block| match block {
+                Block::Paragraph(paragraph) => Some(paragraph.text),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn hidden_text_hidden_paragraphs_and_hidden_sections_are_not_printed() {
+        let styles = r#"<style:style style:name="T1" style:family="text"><style:text-properties text:display="none"/></style:style><style:style style:name="P1" style:family="paragraph"><style:text-properties text:display="none"/></style:style>"#;
+        let body = concat!(
+            r#"<text:p>shown <text:span text:style-name="T1">secret</text:span>end</text:p>"#,
+            r#"<text:p text:style-name="P1">a hidden paragraph</text:p>"#,
+            r#"<text:p><text:hidden-paragraph text:condition="ooow:1" text:is-hidden="true"/>hidden by a field</text:p>"#,
+            r#"<text:p><text:hidden-paragraph text:condition="ooow:0" text:is-hidden="false"/>kept by a field</text:p>"#,
+            r#"<text:p>a <text:hidden-text text:condition="ooow:1" text:string-value="field" text:is-hidden="true">field</text:hidden-text>and <text:hidden-text text:condition="ooow:0" text:string-value="shown" text:is-hidden="false">shown</text:hidden-text></text:p>"#,
+            r#"<text:section text:name="S1" text:display="none"><text:p>in a hidden section</text:p></text:section>"#,
+            r#"<text:section text:name="S2"><text:p>in a section</text:p></text:section>"#,
+        );
+        assert_eq!(
+            printed(styles, body),
+            [
+                "shown end",
+                "kept by a field",
+                "a and shown",
+                "in a section"
+            ]
+        );
     }
 }

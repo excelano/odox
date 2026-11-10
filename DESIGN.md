@@ -863,7 +863,10 @@ text into blocks with the same decisions the window's flow makes, which live in
 `odox-core` for both to call: which elements are blocks and which pass their
 text through, how a list level writes its numbers, a tab to its stop, a
 picture anchored in a paragraph after it. An object with no picture of its own,
-which the window shows as an empty box, is left out. A note in a text document
+which the window shows as an empty box, is left out. So is text the document
+hides, which the window shows to the person editing it: a run or a paragraph
+styled `text:display="none"`, a section displayed `none`, and a `hidden-text` or
+`hidden-paragraph` field whose condition hides it now. A note in a text document
 is the one thing the PDF holds that the window does not show: its citation stays
 in the text, and its own text goes to the end of the document with the other
 notes, in the order they are cited, below a short rule, each tagged as a Note
@@ -893,8 +896,8 @@ master page gives, beginning a new page with the sheet's name. What it prints is
 its print range, as far as the cells in use, since a print area written as whole
 columns reaches the last row a sheet can have, or every cell up to the last that
 holds anything; a print range of several areas prints the rectangle around them.
-Rows and columns the sheet hides are left out, and so are a hidden sheet and one
-with nothing in it. Columns that do not fit across the page continue on pages of
+Rows and columns the sheet hides are left out, and so are a hidden sheet, one
+with nothing in it, and a page that none of its cells draws on. Columns that do not fit across the page continue on pages of
 their own, down the sheet first and then across unless the page style's print
 order says across first, and the rows the sheet marks as its header
 (`table:table-header-rows`) are drawn again at the top of every page below the
