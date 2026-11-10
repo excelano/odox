@@ -161,9 +161,11 @@ impl SheetDocument {
     }
 }
 
-/// The order of two key cells: numbers before text, reversed for a descending
-/// sort, empty cells last either way, and text compared without its case.
+/// The order of two key cells: numbers, then text, then error results,
+/// reversed for a descending sort, empty cells last either way, and text and
+/// errors compared without their case.
 fn ordered(a: &Value, b: &Value, descending: bool) -> Ordering {
+    const EMPTY: u8 = 3;
     let rank = |value: &Value| match value {
         Value::Number(_)
         | Value::Percentage(_)
@@ -172,15 +174,18 @@ fn ordered(a: &Value, b: &Value, descending: bool) -> Ordering {
         | Value::Time(_)
         | Value::Boolean(_) => 0,
         Value::Text(_) => 1,
-        Value::Empty => 2,
+        Value::Error(_) => 2,
+        Value::Empty => EMPTY,
     };
     let (ra, rb) = (rank(a), rank(b));
-    if ra == 2 || rb == 2 {
+    if ra == EMPTY || rb == EMPTY {
         return ra.cmp(&rb);
     }
     let order = match (a, b) {
         _ if ra != rb => ra.cmp(&rb),
-        (Value::Text(x), Value::Text(y)) => x.to_lowercase().cmp(&y.to_lowercase()),
+        (Value::Text(x), Value::Text(y)) | (Value::Error(x), Value::Error(y)) => {
+            x.to_lowercase().cmp(&y.to_lowercase())
+        }
         _ => number(a).total_cmp(&number(b)),
     };
     if descending { order.reverse() } else { order }
@@ -192,6 +197,6 @@ fn number(value: &Value) -> f64 {
         Value::Boolean(b) => f64::from(u8::from(*b)),
         Value::Date(text) => date_serial(text).unwrap_or(0.0),
         Value::Time(text) => duration_days(text).unwrap_or(0.0),
-        Value::Text(_) | Value::Empty => 0.0,
+        Value::Text(_) | Value::Error(_) | Value::Empty => 0.0,
     }
 }

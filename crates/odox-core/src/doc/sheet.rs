@@ -143,6 +143,8 @@ pub enum Value {
     Boolean(bool),
     /// Text.
     Text(String),
+    /// A formula's error result, as the cell shows it: `#DIV/0!`, `Err:502`.
+    Error(String),
 }
 
 impl Value {
@@ -200,7 +202,7 @@ impl Value {
             Self::Empty => String::new(),
             Self::Number(n) | Self::Currency(n, _) => n.to_string(),
             Self::Percentage(n) => format!("{}%", shortest(n * 100.0)),
-            Self::Date(s) | Self::Time(s) | Self::Text(s) => s.clone(),
+            Self::Date(s) | Self::Time(s) | Self::Text(s) | Self::Error(s) => s.clone(),
             Self::Boolean(true) => "TRUE".to_owned(),
             Self::Boolean(false) => "FALSE".to_owned(),
         }
@@ -241,6 +243,9 @@ impl Cell<'_> {
     /// The cell's typed value.
     pub fn value(&self) -> Value {
         let e = self.element;
+        if e.attr(&Ns::Calcext, "value-type") == Some("error") {
+            return Value::Error(self.text());
+        }
         match e.attr(&Ns::Office, "value-type") {
             Some("float") => e
                 .attr(&Ns::Office, "value")
@@ -1094,12 +1099,11 @@ fn with_count(mut element: Element, count: usize, repeated: &Name) -> Element {
 /// Put a value into a cell element: the typed attributes and the displayed
 /// paragraphs replaced, the style and everything else kept.
 /// What a cell is being given: a value in place of whatever it held, or the
-/// result of the formula it keeps, which may be an error.
+/// result of the formula it keeps.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Writing {
     Value,
     Result,
-    Error,
 }
 
 fn write_value(
@@ -1136,27 +1140,24 @@ fn write_value(
         Value::Date(_) => Some("date"),
         Value::Time(_) => Some("time"),
         Value::Boolean(_) => Some("boolean"),
-        Value::Text(_) => Some("string"),
+        Value::Text(_) | Value::Error(_) => Some("string"),
     };
+    let error = matches!(value, Value::Error(_));
     if let Some(value_type) = value_type {
         cell.set_attr(names.value_type.clone(), value_type);
         // LibreOffice writes its own copy of the type in every cell and reads
         // a cell without one fine; it is written where the document declares
         // the namespace, and a document that never heard of it is left alone.
         if calcext {
-            let written = if writing == Writing::Error {
-                "error"
-            } else {
-                value_type
-            };
+            let written = if error { "error" } else { value_type };
             cell.set_attr(names.calcext_value_type.clone(), written);
         }
     }
-    if writing == Writing::Error {
+    if error {
         cell.set_attr(names.string_value.clone(), "");
     }
     match value {
-        Value::Empty | Value::Text(_) => {}
+        Value::Empty | Value::Text(_) | Value::Error(_) => {}
         Value::Number(n) | Value::Percentage(n) => {
             cell.set_attr(names.value.clone(), n.to_string());
         }

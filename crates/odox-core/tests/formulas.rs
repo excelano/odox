@@ -215,3 +215,23 @@ fn a_value_typed_over_a_formula_reaches_what_read_it() {
     document.recalculate(&[(CALC, 1, 1)]);
     assert_eq!(at(&document, "depends on a formula"), Value::Number(200.0));
 }
+
+#[test]
+fn an_error_result_reads_as_the_error_it_shows_and_sits_right() {
+    let document = fixture();
+    let errors: Vec<Value> = results(&document)
+        .into_iter()
+        .filter(|(.., error, _)| *error)
+        .map(|(_, value, ..)| value)
+        .collect();
+    assert!(
+        errors.contains(&Value::Error("#DIV/0!".to_owned())),
+        "{errors:?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|value| matches!(value, Value::Error(shown) if shown.starts_with(['#', 'E'])))
+    );
+    assert!(errors.iter().all(Value::aligns_right));
+}

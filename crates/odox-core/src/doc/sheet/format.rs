@@ -511,7 +511,7 @@ fn figure(value: &Value) -> Option<f64> {
         Value::Number(n) | Value::Percentage(n) | Value::Currency(n, _) => Some(*n),
         Value::Date(text) => date_serial(text),
         Value::Time(text) => duration_days(text),
-        Value::Boolean(_) | Value::Text(_) | Value::Empty => None,
+        Value::Boolean(_) | Value::Text(_) | Value::Error(_) | Value::Empty => None,
     }
 }
 
