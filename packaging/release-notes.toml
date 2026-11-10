@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.15.0"
+version = "0.15.1"
 
 [products.xodt.locales.en-us]
-whats-new = "Exported PDFs now print the page headers and footers with their page numbers, leave out hidden text, and number lists as LibreOffice does. Typing just before or after a click is no longer lost, black table borders show on a dark page, small capitals and ruby text are drawn, and Escape closes the find bar after Replace."
+whats-new = "On Windows the app now draws through Direct3D 12, so a faulty Vulkan graphics driver can no longer close it before it opens. Home and End go to the top and the bottom of a document that is being read."
 
 [products.xodt.locales.de-de]
-whats-new = "Exportierte PDFs drucken jetzt Kopf- und Fußzeilen mit ihren Seitenzahlen, lassen verborgenen Text weg und nummerieren Listen wie LibreOffice. Was kurz vor oder nach einem Klick getippt wird, geht nicht mehr verloren, schwarze Tabellenrahmen sind auf einer dunklen Seite sichtbar, Kapitälchen und Ruby-Text werden gezeichnet, und Escape schließt die Suchleiste nach Ersetzen."
+whats-new = "Unter Windows zeichnet die App jetzt über Direct3D 12, sodass ein fehlerhafter Vulkan-Grafiktreiber sie nicht mehr vor dem Öffnen beendet. Pos1 und Ende springen an den Anfang und das Ende eines Dokuments, das gelesen wird."
 
 [products.xods.locales.en-us]
-whats-new = "Number formats now match LibreOffice for fractions, engineering notation, quarters, weeks, elapsed times and very large or small numbers, and dates, separators and currencies follow 46 languages and countries. Filling dates a month apart goes on by months, errors from formulas line up on the right, merged cells have no lines inside, and exported PDFs print headers and footers without blank pages."
+whats-new = "On Windows the app now draws through Direct3D 12, so a faulty Vulkan graphics driver can no longer close it before it opens."
 
 [products.xods.locales.de-de]
-whats-new = "Zahlenformate stimmen jetzt mit LibreOffice überein bei Brüchen, technischer Notation, Quartalen, Kalenderwochen, verstrichenen Zeiten und sehr großen oder kleinen Zahlen, und Datumsangaben, Trennzeichen und Währungen folgen 46 Sprachen und Ländern. Datumsangaben im Monatsabstand werden monatsweise ausgefüllt, Formelfehler stehen rechtsbündig, verbundene Zellen haben keine Linien mehr im Inneren, und exportierte PDFs drucken Kopf- und Fußzeilen ohne leere Seiten."
+whats-new = "Unter Windows zeichnet die App jetzt über Direct3D 12, sodass ein fehlerhafter Vulkan-Grafiktreiber sie nicht mehr vor dem Öffnen beendet."
 
 [products.xodp.locales.en-us]
-whats-new = "A new presentation puts the caret in its title, so typing starts at once, and a slide added after a title slide puts its text below the title. Slides now show their tables, footer, date and slide number, small capitals and ruby text are drawn, and typing just before or after a click is no longer lost."
+whats-new = "On Windows the app now draws through Direct3D 12, so a faulty Vulkan graphics driver can no longer close it before it opens."
 
 [products.xodp.locales.de-de]
-whats-new = "Eine neue Präsentation setzt die Schreibmarke in den Titel, sodass sofort getippt werden kann, und eine Folie nach einer Titelfolie setzt ihren Text unter den Titel. Folien zeigen jetzt ihre Tabellen, Fußzeile, Datum und Foliennummer, Kapitälchen und Ruby-Text werden gezeichnet, und was kurz vor oder nach einem Klick getippt wird, geht nicht mehr verloren."
+whats-new = "Unter Windows zeichnet die App jetzt über Direct3D 12, sodass ein fehlerhafter Vulkan-Grafiktreiber sie nicht mehr vor dem Öffnen beendet."
