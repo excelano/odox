@@ -132,6 +132,26 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>sumif shorter</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.B6];&quot;&gt;1&quot;;[$Data.C2:.C3])"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>averageif one cell</text:p></table:table-cell><table:table-cell table:formula="of:=AVERAGEIF([$Data.B2:.B4];&quot;&gt;1&quot;;[$Data.C2])"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>sumif number</text:p></table:table-cell><table:table-cell table:formula="of:=SUMIF([$Data.B2:.B4];&quot;&gt;1&quot;;5)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>upper sharp s</text:p></table:table-cell><table:table-cell table:formula="of:=UPPER(&quot;straße&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>upper ligature</text:p></table:table-cell><table:table-cell table:formula="of:=UPPER(&quot;ﬁx&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>lower final sigma</text:p></table:table-cell><table:table-cell table:formula="of:=LOWER(&quot;ΑΣ&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E20</text:p></table:table-cell><table:table-cell table:formula="of:=1E20&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of -1E20</text:p></table:table-cell><table:table-cell table:formula="of:=-1E20&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E15</text:p></table:table-cell><table:table-cell table:formula="of:=1E15&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E15 and a half</text:p></table:table-cell><table:table-cell table:formula="of:=(1E15+0.5)&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 2^53</text:p></table:table-cell><table:table-cell table:formula="of:=2^53&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 2^53-1</text:p></table:table-cell><table:table-cell table:formula="of:=(2^53-1)&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E14 and a half</text:p></table:table-cell><table:table-cell table:formula="of:=(1E14+0.5)&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of a third</text:p></table:table-cell><table:table-cell table:formula="of:=1/3&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 0.1+0.2</text:p></table:table-cell><table:table-cell table:formula="of:=(0.1+0.2)&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E-14</text:p></table:table-cell><table:table-cell table:formula="of:=1E-14&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1.5E-15</text:p></table:table-cell><table:table-cell table:formula="of:=1.5E-15&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1.23456789E-13</text:p></table:table-cell><table:table-cell table:formula="of:=1.23456789E-13&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E-100</text:p></table:table-cell><table:table-cell table:formula="of:=1E-100&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text of 1E308</text:p></table:table-cell><table:table-cell table:formula="of:=1E308&amp;&quot;&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>general 1E20</text:p></table:table-cell><table:table-cell table:formula="of:=1E20"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>general -1E-20</text:p></table:table-cell><table:table-cell table:formula="of:=-1E-20"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>general 2^60</text:p></table:table-cell><table:table-cell table:formula="of:=2^60"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

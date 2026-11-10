@@ -406,7 +406,7 @@ impl Context<'_> {
             }
             "UPPER" => {
                 count(1, 1)?;
-                Value::Text(tryv!(txt(0)?).to_uppercase())
+                Value::Text(tryv!(txt(0)?).replace('ß', "ẞ").to_uppercase())
             }
             "LOWER" => {
                 count(1, 1)?;
@@ -594,25 +594,68 @@ fn text(value: &Value) -> Result<String, Error> {
     }
 }
 
-/// A number written with up to fifteen significant digits, as a spreadsheet
-/// writes one into text.
-pub(crate) fn spelled(n: f64) -> String {
+/// A number as a spreadsheet writes it into text, measured against
+/// `LibreOffice`: an integer below 2^53 in full, and otherwise fifteen
+/// significant digits, in decimals from a hundred-trillionth up to a
+/// quadrillion and beyond that with an exponent of at least three digits,
+/// `1E+020`, `1.5E-015`.
+fn spelled(n: f64) -> String {
+    const EXACT: f64 = 9_007_199_254_740_992.0;
     let n = n + 0.0;
-    if n.fract().abs() < f64::EPSILON && n.abs() < 1e15 {
+    if n.fract() == 0.0 && n.abs() < EXACT {
         return format!("{n:.0}");
     }
-    let digits = 14.0 - n.abs().log10().floor().clamp(-300.0, 300.0);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let places = digits.clamp(0.0, 20.0) as usize;
-    let written = format!("{n:.places$}");
-    if written.contains('.') {
-        written
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_owned()
-    } else {
-        written
+    let (digits, exponent) = fifteen_digits(n.abs());
+    let digits = digits.trim_end_matches('0');
+    let sign = if n < 0.0 { "-" } else { "" };
+    if !(-14..15).contains(&exponent) {
+        let (first, rest) = digits.split_at(1);
+        let point = if rest.is_empty() { "" } else { "." };
+        let exponent_sign = if exponent < 0 { '-' } else { '+' };
+        return format!(
+            "{sign}{first}{point}{rest}E{exponent_sign}{:03}",
+            exponent.unsigned_abs()
+        );
     }
+    if exponent < 0 {
+        let zeros = "0".repeat(exponent.unsigned_abs() as usize - 1);
+        return format!("{sign}0.{zeros}{digits}");
+    }
+    let point = exponent.unsigned_abs() as usize + 1;
+    if digits.len() <= point {
+        format!("{sign}{digits:0<point$}")
+    } else {
+        format!("{sign}{}.{}", &digits[..point], &digits[point..])
+    }
+}
+
+/// A positive number's first fifteen significant digits, the last rounded
+/// half away from zero, and the power of ten of the first.
+fn fifteen_digits(x: f64) -> (String, i32) {
+    let written = format!("{x:.16e}");
+    let (mantissa, exponent) = written.split_once('e').unwrap_or((&written, "0"));
+    let mut exponent: i32 = exponent.parse().unwrap_or(0);
+    let all: Vec<u8> = mantissa.bytes().filter(u8::is_ascii_digit).collect();
+    let mut digits = all[..15].to_vec();
+    if all[15] >= b'5' {
+        let mut i = digits.len();
+        loop {
+            if i == 0 {
+                digits.insert(0, b'1');
+                digits.pop();
+                exponent += 1;
+                break;
+            }
+            i -= 1;
+            if digits[i] == b'9' {
+                digits[i] = b'0';
+            } else {
+                digits[i] += 1;
+                break;
+            }
+        }
+    }
+    (String::from_utf8(digits).unwrap_or_default(), exponent)
 }
 
 /// A value as a condition: a number is true unless it is zero.

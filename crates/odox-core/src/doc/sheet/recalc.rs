@@ -235,7 +235,7 @@ impl SheetDocument {
                 .data_style_name(index, row, column)
                 .and_then(|name| self.document.styles.data_styles().format(name, &value))
                 .unwrap_or_else(|| match &value {
-                    Value::Number(n) => formula::spelled(*n),
+                    Value::Number(n) => crate::data_style::general_signed(*n),
                     other => other.cached_text(),
                 }),
         };
