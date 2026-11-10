@@ -51,10 +51,10 @@ pub use package::{Kept, Package, Part};
 pub use place::Transform;
 pub use style::{
     Anchor, Border, Break, CellProperties, Edges, Family, Fill, Fit, Gradient, GradientStyle,
-    GraphicProperties, ListKind, PageLayout, ParagraphProperties, Position, Properties, Style,
-    Styles, TabKind, TabStop, TextAlign, TextProperties, VerticalAlign,
+    GraphicProperties, ListKind, PageLayout, ParagraphProperties, Position, Properties, SMALL_CAPS,
+    Style, Styles, TabKind, TabStop, TextAlign, TextProperties, VerticalAlign,
 };
-pub use value::{Color, Length, Measure, Percent};
+pub use value::{Color, Length, Measure, Percent, date_of};
 pub use xml::{Element, Name, Node, Ns};
 
 /// The media type of each format this crate reads, as written in a package's

@@ -33,6 +33,7 @@ fn options() -> Options {
         title: "Untitled".to_owned(),
         language: "en-US".to_owned(),
         untitled_slide: "Slide {number}".to_owned(),
+        today: (2026, 1, 1),
     }
 }
 

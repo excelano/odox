@@ -253,6 +253,7 @@ impl Export {
             title: stem,
             language: reading_language(),
             untitled_slide: t("Slide {number}").to_owned(),
+            today: crate::today(),
         };
         let file = target.file_name().map_or_else(
             || target.display().to_string(),

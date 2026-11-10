@@ -58,6 +58,9 @@ pub struct Options {
     /// What a slide without a title is called in the outline, with
     /// `{number}` where its number goes.
     pub untitled_slide: String,
+    /// The date a slide's date that follows the clock shows, as year, month
+    /// and day.
+    pub today: (i64, i64, i64),
 }
 
 /// A finished export.

@@ -137,7 +137,12 @@ fn lay_out(
         // Decoration: laid out under a group of its own that nothing drawn
         // is read under, so that the tree drops it.
         let decoration = slides.layout.tree.group(None, Tag::Div);
-        for shape in presentation.background_objects(slide) {
+        let fields = presentation.master_fields(slide, options.today);
+        for shape in presentation
+            .background_objects(slide)
+            .into_iter()
+            .chain(&fields)
+        {
             for item in slides.shape(shape, decoration, false)? {
                 if !matches!(item, Item::Link { .. } | Item::Empty { .. }) {
                     page.items.push((0.0, item.decoration()));
@@ -288,8 +293,10 @@ fn label<'a>(shape: &'a Element, path: &[usize]) -> Option<(&'a Element, Vec<usi
     {
         return Some((text_box, [path, &[index]].concat()));
     }
-    (shape.child(&Ns::Text, "p").is_some() || shape.child(&Ns::Text, "list").is_some())
-        .then(|| (shape, path.to_vec()))
+    (shape.child(&Ns::Text, "p").is_some()
+        || shape.child(&Ns::Text, "list").is_some()
+        || shape.child(&Ns::Table, "table").is_some())
+    .then(|| (shape, path.to_vec()))
 }
 
 /// A frame's picture: the first of the ones it offers that can be embedded,
@@ -748,6 +755,7 @@ mod tests {
             title: "Untitled".to_owned(),
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
         }
     }
 

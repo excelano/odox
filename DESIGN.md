@@ -111,7 +111,14 @@ each shape is put where the document says. A slide is drawn back to front: the
 ground, the master page's contribution, the slide's own shapes. A child of a
 master page carrying a `presentation:class` is a slot and not a decoration: the
 slide's own frame of that class takes its place. The class is the test;
-`presentation:placeholder` is not written reliably and is not consulted. A
+`presentation:placeholder` is not written reliably and is not consulted. The
+footer, date and slide-number slots are the exception, drawn from the master
+with their field filled in: the footer and the date a slide names in
+`presentation:use-footer-name` and `use-date-time-name`, unless its style turns
+them off, and its number among the slides only where its style turns it on, as
+`LibreOffice` draws them; a date that follows the clock shows today, in UTC. A
+frame holding a table draws the table, and not the picture of it the producer
+keeps beside it. A
 shape's text is laid over the shape's own style: where a paragraph's style and
 its spans do not say, its face, size, weight and alignment are its frame's, the
 presentation style of a placeholder or the graphic style of a drawing, which is
@@ -181,7 +188,11 @@ default style spaces evenly, 1.25 cm apart where it says nothing; stops count
 from the paragraph's left margin, as `LibreOffice` counts them, and
 `corpus/libreoffice/tabs.odt` is the measure. The PDF export places a tab the
 same way (`odox-pdf`'s `text.rs`), its leader written as text a reader hears.
-Right-to-left text is drawn left to right.
+Right-to-left text is drawn left to right. Small capitals are capitals at 80%
+of the size. In them and in text a style puts in capitals, `ß` is `ẞ`, as
+`LibreOffice` writes it, and a letter whose capital is two letters keeps its own
+form, so what is drawn is as long as the text the caret moves through. Ruby is written after the text it
+annotates, in parentheses, `漢字(かんじ)`, rather than set above it.
 A `draw:measure` is undrawn. A radial, ellipsoidal, square or rectangular gradient
 is filled with the flat average of its two colours, and a tiled picture with
 nothing. A turned shape's label is undrawn, because an upright paragraph inside a

@@ -15,7 +15,7 @@ use krilla::tagging::ListNumbering;
 use odox_core::edit::{self, Description, ListCounters};
 use odox_core::{
     Border, Break, Color, Document, Edges, Element, Family, Length, Measure, Node, Ns, Position,
-    Properties, TabStop, TextAlign, TextProperties,
+    Properties, SMALL_CAPS, TabStop, TextAlign, TextProperties,
 };
 use odox_fonts::Variant;
 
@@ -388,6 +388,8 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
+                    } else if element.is(&Ns::Text, "ruby-text") {
+                        text.push(&edit::ruby_shown(element), &current, inherited);
                     } else if edit::is_inline_passthrough(element)
                         && !(element.is(&Ns::Text, "hidden-text")
                             && element.attr(&Ns::Text, "is-hidden") == Some("true"))
@@ -616,11 +618,18 @@ struct Text {
 
 impl Text {
     fn push(&mut self, characters: &str, style: &Style, properties: &TextProperties) {
-        let shown: String = if properties.uppercase.unwrap_or(false) {
-            characters.to_uppercase()
-        } else {
-            characters.to_owned()
-        };
+        for (piece, small) in properties.cased(characters) {
+            if small {
+                let mut smaller = style.clone();
+                smaller.size *= SMALL_CAPS;
+                self.append(&piece, &smaller);
+            } else {
+                self.append(&piece, style);
+            }
+        }
+    }
+
+    fn append(&mut self, shown: &str, style: &Style) {
         // A character that draws nothing and that no face need have, which a
         // PDF/UA file may not hold as a glyph, is left out.
         let shown: String = shown
@@ -806,5 +815,11 @@ mod tests {
                 "in a section"
             ]
         );
+    }
+
+    #[test]
+    fn ruby_is_printed_after_its_base_in_parentheses() {
+        let body = r#"<text:p><text:ruby><text:ruby-base>漢字</text:ruby-base><text:ruby-text>かんじ</text:ruby-text></text:ruby>です</text:p>"#;
+        assert_eq!(printed("", body), ["漢字(かんじ)です"]);
     }
 }

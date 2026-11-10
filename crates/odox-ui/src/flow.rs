@@ -27,7 +27,8 @@ use eframe::egui::{
 };
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
-    Border, Document, Element, Family, Node, Ns, Properties, TabKind, TextAlign, TextProperties,
+    Border, Document, Element, Family, Node, Ns, Properties, SMALL_CAPS, TabKind, TextAlign,
+    TextProperties,
     edit::{self, ListCounters},
 };
 
@@ -571,13 +572,19 @@ impl Flow<'_> {
             palette,
             counted,
         } = *run;
+        let mut small = format.clone();
+        small.font_id.size *= SMALL_CAPS;
         let put = |job: &mut ParagraphJob, shown: &str, model_len: usize| {
-            if !counted {
-                job.atom(shown, 0, format.clone());
-            } else if shown.chars().count() == model_len {
-                job.text(shown, format.clone());
-            } else {
-                job.atom(shown, model_len, format.clone());
+            let same_length = shown.chars().count() == model_len;
+            for (piece, drawn_small) in inherited.cased(shown) {
+                let format = if drawn_small { &small } else { format };
+                if !counted {
+                    job.atom(&piece, 0, format.clone());
+                } else if same_length {
+                    job.text(&piece, format.clone());
+                } else {
+                    job.atom(&piece, model_len, format.clone());
+                }
             }
         };
         for child in &parent.children {
@@ -634,6 +641,8 @@ impl Flow<'_> {
                             raised.valign = Align::TOP;
                             job.atom(&citation.plain_text(), 0, raised);
                         }
+                    } else if element.is(&Ns::Text, "ruby-text") {
+                        job.atom(&edit::ruby_shown(element), 0, format.clone());
                     } else if edit::is_inline_passthrough(element) {
                         // A mark's contents are the paragraph's text; a field's
                         // are its value, which the paragraph's text does not

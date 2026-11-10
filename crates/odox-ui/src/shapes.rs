@@ -428,7 +428,7 @@ impl Canvas<'_> {
         // A frame around a picture is handed over whole, because the renderer
         // finds a frame among a parent's children and here the shape is the
         // frame itself.
-        let picture = shape.child(&Ns::Draw, "image").is_some();
+        let picture = odox_core::edit::is_figure(shape);
         if picture && !place.is_upright() {
             self.turned_picture(ui, shape, place);
             return;
@@ -440,7 +440,9 @@ impl Canvas<'_> {
             (shape.clone(), None)
         } else if let Some((index, box_)) = text_box {
             (box_.clone(), Some(index))
-        } else if shape.child(&Ns::Text, "p").is_some() || shape.child(&Ns::Text, "list").is_some()
+        } else if shape.child(&Ns::Text, "p").is_some()
+            || shape.child(&Ns::Text, "list").is_some()
+            || shape.child(&Ns::Table, "table").is_some()
         {
             // A drawing shape keeps its label as paragraphs of its own. The box
             // is a frame's way of saying the same thing, and across the

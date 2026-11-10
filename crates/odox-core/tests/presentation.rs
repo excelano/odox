@@ -301,3 +301,73 @@ fn a_placeholders_text_takes_what_its_paragraph_does_not_say_from_the_frame() {
         "the paragraph's own wins"
     );
 }
+
+#[test]
+fn a_slide_shows_the_footer_date_and_number_it_names_and_turns_on() {
+    let Some(deck) = fixture("slides.odp") else {
+        return;
+    };
+    let slides = deck.slides();
+    let shown = |at: usize| -> Vec<(String, String)> {
+        deck.master_fields(&slides[at], (2026, 11, 10))
+            .iter()
+            .map(|frame| {
+                (
+                    frame
+                        .attr(&Ns::Presentation, "class")
+                        .unwrap_or_default()
+                        .to_owned(),
+                    frame.plain_text(),
+                )
+            })
+            .collect()
+    };
+    let pairs = |list: &[(&str, &str)]| -> Vec<(String, String)> {
+        list.iter()
+            .map(|(class, text)| ((*class).to_owned(), (*text).to_owned()))
+            .collect()
+    };
+    assert_eq!(
+        shown(0),
+        pairs(&[
+            ("date-time", "2026-03-14"),
+            ("footer", "Quarterly review"),
+            ("page-number", "1"),
+        ])
+    );
+    assert_eq!(
+        shown(1),
+        pairs(&[("footer", "Quarterly review"), ("page-number", "2")]),
+        "a slide that names no date shows none"
+    );
+}
+
+#[test]
+fn a_date_that_follows_the_clock_shows_today() {
+    let Some(mut deck) = fixture("slides.odp") else {
+        return;
+    };
+    let presentation = deck
+        .document
+        .content
+        .child_mut(&Ns::Office, "body")
+        .and_then(|body| body.child_mut(&Ns::Office, "presentation"))
+        .expect("a presentation body");
+    let declaration = presentation
+        .child_mut(&Ns::Presentation, "date-time-decl")
+        .expect("a date declaration");
+    let source = declaration
+        .attrs
+        .iter_mut()
+        .find(|a| a.name.is(&Ns::Presentation, "source"))
+        .expect("a source");
+    source.value = "current-date".to_owned();
+    let slides = deck.slides();
+    let date = deck
+        .master_fields(&slides[0], (2026, 11, 10))
+        .into_iter()
+        .find(|frame| frame.attr(&Ns::Presentation, "class") == Some("date-time"))
+        .expect("the date")
+        .plain_text();
+    assert_eq!(date, "2026-11-10");
+}

@@ -202,8 +202,10 @@ impl Paint<'_> {
             return;
         }
 
+        let mut ground = palette;
         if let Some(fill) = style.cell.background {
             painter.rect_filled(rect, 0.0, format::color32(fill));
+            ground = palette.on(format::color32(fill));
         } else if across > 1 || down > 1 {
             // One cell, so the grid's lines stop at its edge.
             painter.rect_filled(rect.shrink(0.5), 0.0, palette.paper);
@@ -227,7 +229,7 @@ impl Paint<'_> {
                     [from, to],
                     Stroke::new(
                         (border.width.points() * zoom).max(1.0),
-                        format::color32(border.color),
+                        format::ink_or(border.color, ground),
                     ),
                 );
             }
