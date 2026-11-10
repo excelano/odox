@@ -463,8 +463,10 @@ IFERROR, AND, OR, NOT, TRUE, FALSE, ROUND, ROUNDUP, ROUNDDOWN, ABS, INT, MOD,
 POWER, SQRT, CONCATENATE, CONCAT, LEFT, RIGHT, MID, LEN, UPPER, LOWER, TRIM,
 DATE, YEAR, MONTH, DAY, VLOOKUP, SUMIF, COUNTIF and AVERAGEIF. What they answer
 is `LibreOffice`'s, measured on `corpus/libreoffice/formulas.ods`: a boolean is
-one or zero, `=` compares text with its case while a criterion ignores it, and a
-date is days from 30 December 1899. A result keeps the kind of value its cell
+one or zero, `=` compares text with its case while a criterion ignores it, a
+date is days from 30 December 1899, a range where one value is wanted is its
+cell in the formula's row or column, and `SUMIF`'s sum range takes the shape of
+its criteria range. A result keeps the kind of value its cell
 held and is shown in the cell's number format; an error is written as
 `LibreOffice` writes one. A formula outside the core keeps its result and is
 drawn faint once something it reads changes, or once anything does where it
