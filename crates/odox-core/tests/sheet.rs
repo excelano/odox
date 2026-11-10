@@ -219,6 +219,38 @@ fn a_formula_loses_its_language_prefix_and_keeps_its_cached_value() {
 }
 
 #[test]
+fn a_boolean_written_as_a_number_is_true_unless_it_is_zero() {
+    let cell = |value: &str| {
+        format!(r#"<table:table-cell office:value-type="boolean" office:boolean-value="{value}"/>"#)
+    };
+    let row: String = ["true", "false", "1", "0", "5", "-0.5", "0.0", "yes"]
+        .map(cell)
+        .concat();
+    let bytes = spreadsheet(&format!(
+        r#"<table:table table:name="Booleans"><table:table-row>{row}</table:table-row></table:table>"#
+    ));
+    let document = SheetDocument::read(&bytes).expect("a readable spreadsheet");
+    let sheet = &document.sheets()[0];
+    let values: Vec<Value> = (0..8)
+        .map(|column| document.cell(sheet, 0, column).expect("a cell").value())
+        .collect();
+    let (t, f) = (Value::Boolean(true), Value::Boolean(false));
+    assert_eq!(
+        values,
+        [
+            t.clone(),
+            f.clone(),
+            t.clone(),
+            f.clone(),
+            t.clone(),
+            t,
+            f,
+            Value::Empty
+        ]
+    );
+}
+
+#[test]
 fn typed_values_read_as_their_types() {
     let bytes = spreadsheet(
         r#"<table:table table:name="Types">

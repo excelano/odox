@@ -169,8 +169,8 @@ impl Color {
 /// Read an ODF boolean attribute, which is spelled `true` or `false`.
 pub(crate) fn boolean(text: &str) -> Option<bool> {
     match text.trim() {
-        "true" => Some(true),
-        "false" => Some(false),
+        "true" | "1" => Some(true),
+        "false" | "0" => Some(false),
         _ => None,
     }
 }

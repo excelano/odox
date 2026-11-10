@@ -267,7 +267,10 @@ impl Cell<'_> {
                 .map_or(Value::Empty, |v| Value::Time(v.to_owned())),
             Some("boolean") => e
                 .attr(&Ns::Office, "boolean-value")
-                .and_then(crate::value::boolean)
+                .and_then(|value| {
+                    crate::value::boolean(value)
+                        .or_else(|| value.trim().parse::<f64>().ok().map(|n| n != 0.0))
+                })
                 .map_or(Value::Empty, Value::Boolean),
             // A string cell carries its text in its paragraphs, and
             // `office:string-value` only where the producer chose to write it
