@@ -374,12 +374,75 @@ pub enum Fill {
     /// The gradient of this name.
     Gradient(String),
     /// The picture of this name, stretched over the shape.
-    ///
-    /// Only stretched. ODF also tiles a fill image, at a size the style gives,
-    /// and a tiled fill is [`Fill::None`] here rather than a stretched
-    /// approximation — one tile blown up to the size of a slide is not a
-    /// smaller version of the same thing.
     Image(String),
+    /// The picture of this name, laid at a size of its own, repeated across
+    /// the shape or placed once.
+    Tiled(String, Tiling),
+}
+
+/// How a picture that is not stretched is laid over a shape, measured against
+/// `LibreOffice` on a deck of tiled fills.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tiling {
+    /// Whether the picture repeats across the shape or is placed once.
+    pub repeat: bool,
+    /// The tile's width, where the style gives one; otherwise the picture's own.
+    pub width: Option<Extent>,
+    /// The tile's height, where the style gives one; otherwise the picture's own.
+    pub height: Option<Extent>,
+    /// The point of the shape a tile is placed against, as fractions of its
+    /// width and height: `(0.5, 0.5)`, the centre, unless the style names a
+    /// corner or an edge.
+    pub anchor: (f32, f32),
+    /// How far the tiles are moved from there, right and down, as fractions of
+    /// a tile.
+    pub shift: (f32, f32),
+    /// Every other row moved across, or every other column moved down, by a
+    /// fraction of a tile.
+    pub offset: Option<Offset>,
+}
+
+/// A tile's width or height.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Extent {
+    /// A length.
+    Length(Length),
+    /// A fraction of the shape's own width or height.
+    Share(f32),
+}
+
+/// How alternate rows or columns of tiles are moved.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Offset {
+    /// Every other row, across by this fraction of a tile.
+    Rows(f32),
+    /// Every other column, down by this fraction of a tile.
+    Columns(f32),
+}
+
+impl Tiling {
+    /// One tile, `(x, y, width, height)`, from the shape's top left corner, for
+    /// a shape and a picture of these sizes. The others, where it repeats, lie
+    /// a tile's width and height apart from it. `None` where the tile has no
+    /// size.
+    pub fn tile(&self, shape: (f32, f32), picture: (f32, f32)) -> Option<(f32, f32, f32, f32)> {
+        let resolve = |extent: Option<Extent>, whole: f32, own: f32| match extent {
+            Some(Extent::Length(length)) => length.points(),
+            Some(Extent::Share(fraction)) => fraction * whole,
+            None => own,
+        };
+        let width = resolve(self.width, shape.0, picture.0);
+        let height = resolve(self.height, shape.1, picture.1);
+        if width <= 0.0 || height <= 0.0 || !width.is_finite() || !height.is_finite() {
+            return None;
+        }
+        Some((
+            self.anchor.0 * (shape.0 - width) + self.shift.0 * width,
+            self.anchor.1 * (shape.1 - height) + self.shift.1 * height,
+            width,
+            height,
+        ))
+    }
 }
 
 /// How a gradient runs, which is the part of it a renderer has to understand.
@@ -438,6 +501,90 @@ enum FillKind {
     Hatch,
 }
 
+/// What a style says about how its fill picture is laid, each part of which
+/// inherits on its own.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct PictureFill {
+    repeat: Option<String>,
+    width: Option<Extent>,
+    height: Option<Extent>,
+    anchor: Option<(f32, f32)>,
+    shift_x: Option<f32>,
+    shift_y: Option<f32>,
+    offset: Option<Offset>,
+}
+
+impl PictureFill {
+    fn fill(&self, name: String) -> Fill {
+        match self.repeat.as_deref() {
+            Some("stretch") => Fill::Image(name),
+            repeat => Fill::Tiled(
+                name,
+                Tiling {
+                    repeat: repeat != Some("no-repeat"),
+                    width: self.width,
+                    height: self.height,
+                    anchor: self.anchor.unwrap_or((0.5, 0.5)),
+                    shift: (self.shift_x.unwrap_or(0.0), self.shift_y.unwrap_or(0.0)),
+                    offset: self.offset,
+                },
+            ),
+        }
+    }
+
+    fn apply(&mut self, p: &Element) {
+        if let Some(repeat) = p.attr(&Ns::Style, "repeat") {
+            self.repeat = Some(repeat.to_owned());
+        }
+        let extent = |local: &str| {
+            let text = p.attr(&Ns::Draw, local)?;
+            match Percent::parse(text) {
+                Some(percent) => Some(Extent::Share(percent.fraction())),
+                None => Length::parse(text).map(Extent::Length),
+            }
+        };
+        if let Some(width) = extent("fill-image-width") {
+            self.width = Some(width);
+        }
+        if let Some(height) = extent("fill-image-height") {
+            self.height = Some(height);
+        }
+        if let Some(point) = p.attr(&Ns::Draw, "fill-image-ref-point") {
+            let across = if point.ends_with("left") {
+                0.0
+            } else if point.ends_with("right") {
+                1.0
+            } else {
+                0.5
+            };
+            let down = if point.starts_with("top") {
+                0.0
+            } else if point.starts_with("bottom") {
+                1.0
+            } else {
+                0.5
+            };
+            self.anchor = Some((across, down));
+        }
+        let share = |local: &str| p.attr(&Ns::Draw, local).and_then(Percent::parse);
+        if let Some(x) = share("fill-image-ref-point-x") {
+            self.shift_x = Some(x.fraction());
+        }
+        if let Some(y) = share("fill-image-ref-point-y") {
+            self.shift_y = Some(y.fraction());
+        }
+        if let Some(offset) = p.attr(&Ns::Draw, "tile-repeat-offset") {
+            let mut words = offset.split_whitespace();
+            if let Some(amount) = words.next().and_then(Percent::parse) {
+                self.offset = Some(match words.next() {
+                    Some("vertical") => Offset::Columns(amount.fraction()),
+                    _ => Offset::Rows(amount.fraction()),
+                });
+            }
+        }
+    }
+}
+
 /// How a shape is filled and outlined.
 ///
 /// **The kind of fill and the value it uses are separate properties and inherit
@@ -453,6 +600,7 @@ pub struct GraphicProperties {
     color: Option<Color>,
     gradient: Option<String>,
     image: Option<String>,
+    picture: PictureFill,
     /// Outline colour, absent when the stroke is `none`.
     pub stroke: Option<Color>,
     /// Outline width.
@@ -507,7 +655,10 @@ impl GraphicProperties {
             None | Some(FillKind::None | FillKind::Hatch) => Fill::None,
             Some(FillKind::Solid) => self.color.map_or(Fill::None, Fill::Solid),
             Some(FillKind::Gradient) => self.gradient.clone().map_or(Fill::None, Fill::Gradient),
-            Some(FillKind::Bitmap) => self.image.clone().map_or(Fill::None, Fill::Image),
+            Some(FillKind::Bitmap) => self
+                .image
+                .clone()
+                .map_or(Fill::None, |name| self.picture.fill(name)),
         }
     }
 }
@@ -1390,13 +1541,10 @@ impl GraphicProperties {
         if let Some(name) = p.attr(&Ns::Draw, "fill-gradient-name") {
             self.gradient = Some(name.to_owned());
         }
-        // Only a stretched picture: see `Fill::Image`. A tiled one leaves the
-        // name unset, so the fill resolves to nothing rather than to one tile
-        // blown up to the size of the shape.
         if let Some(name) = p.attr(&Ns::Draw, "fill-image-name") {
-            self.image = (p.attr(&Ns::Style, "repeat").unwrap_or("stretch") == "stretch")
-                .then(|| name.to_owned());
+            self.image = Some(name.to_owned());
         }
+        self.picture.apply(p);
 
         match p.attr(&Ns::Draw, "stroke") {
             Some("none") => self.stroke = None,

@@ -13,7 +13,9 @@
 use std::path::{Path, PathBuf};
 
 use odox_core::doc::Presentation;
-use odox_core::{Anchor, Color, Family, Fill, GradientStyle, Length, Ns, Transform};
+use odox_core::{
+    Anchor, Color, Family, Fill, GradientStyle, Length, Ns, Offset, Tiling, Transform,
+};
 
 fn fixture(name: &str) -> Option<Presentation> {
     let path: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -370,4 +372,73 @@ fn a_date_that_follows_the_clock_shows_today() {
         .expect("the date")
         .plain_text();
     assert_eq!(date, "2026-11-10");
+}
+
+#[test]
+fn a_tiled_picture_lies_where_libreoffice_draws_it() {
+    let Some(deck) = fixture("fills.odp") else {
+        return;
+    };
+    let points = |cm: f32| cm * 72.0 / 2.54;
+    let shape = (points(11.0), points(7.0));
+    let slides = deck.slides();
+    let fill = |index: usize| {
+        let shape = slides[index]
+            .element
+            .elements()
+            .find(|e| e.is(&Ns::Draw, "rect") || e.is(&Ns::Draw, "ellipse"))
+            .expect("a filled shape");
+        let style = shape.attr(&Ns::Draw, "style-name").unwrap_or_default();
+        deck.document
+            .styles
+            .resolve(&Family::Graphic, style)
+            .graphic
+            .fill()
+    };
+    let tile = |index: usize, picture: (f32, f32)| {
+        let Fill::Tiled(_, tiling) = fill(index) else {
+            panic!("slide {index} is not tiled: {:?}", fill(index));
+        };
+        let (x, y, width, height) = tiling.tile(shape, picture).expect("a tile");
+        [x, y, width, height].map(|n| (n * 2.54 / 72.0 * 1000.0).round() / 1000.0)
+    };
+    let own = (30.0, 22.5);
+    assert_eq!(
+        tile(0, own),
+        [4.971, 3.103, 1.058, 0.794],
+        "own size, centred"
+    );
+    assert_eq!(tile(1, own), [4.5, 3.0, 2.0, 1.0], "the style's size");
+    assert_eq!(tile(2, own), [9.0, 6.0, 2.0, 1.0], "the bottom right");
+    assert_eq!(tile(3, own), [5.5, 3.25, 2.0, 1.0], "moved by a share");
+    assert_eq!(
+        tile(6, own),
+        [4.125, 2.625, 2.75, 1.75],
+        "a share of the shape"
+    );
+    assert_eq!(tile(7, own), [0.0, 0.0, 2.0, 1.0], "the top left");
+    for (index, offset) in [(4, Offset::Rows(0.5)), (5, Offset::Columns(0.5))] {
+        let Fill::Tiled(_, tiling) = fill(index) else {
+            panic!("slide {index} is not tiled");
+        };
+        assert_eq!(tiling.offset, Some(offset));
+    }
+    let Fill::Tiled(_, once) = fill(7) else {
+        panic!("placed once");
+    };
+    assert!(!once.repeat);
+    let Fill::Tiled(name, _) = fill(8) else {
+        panic!("the dense picture is tiled");
+    };
+    let href = deck.document.styles.fill_image(&name).expect("a picture");
+    let bytes = deck.document.picture(href).expect("in the package");
+    assert_eq!(
+        odox_core::picture::dots_per_inch(bytes).map(|(x, _)| x.round()),
+        Some(72.0)
+    );
+    assert!(matches!(fill(9), Fill::Image(_)), "stretched");
+    assert!(matches!(
+        deck.background(&slides[10]),
+        Fill::Tiled(_, Tiling { repeat: true, .. })
+    ));
 }

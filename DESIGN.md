@@ -199,13 +199,18 @@ of the size. In them and in text a style puts in capitals, `ß` is `ẞ`, as
 form, so what is drawn is as long as the text the caret moves through. Ruby is written after the text it
 annotates, in parentheses, `漢字(かんじ)`, rather than set above it.
 A `draw:measure` is undrawn. A radial, ellipsoidal, square or rectangular gradient
-is filled with the flat average of its two colours, and a tiled picture with
-nothing. A turned shape's label is undrawn, because an upright paragraph inside a
+is filled with the flat average of its two colours. A turned shape's label is undrawn, because an upright paragraph inside a
 box that is not upright says something the document does not.
 
 **Shapes are drawn from their own geometry**: rectangles, ellipses, polygons,
 polylines, lines, paths, connectors and custom shapes, with a solid fill, a
-linear or axial gradient, or a stretched picture, and an outline. A `draw:path`
+linear or axial gradient, or a picture, and an outline. A picture is stretched
+over the shape, or laid at the style's size or its own, its pixels at the
+resolution its header gives or 96 to the inch, against the centre unless the
+style names a corner or an edge, and repeated across the shape or placed once,
+as `LibreOffice` lays it (`Tiling` in `odox-core`, measured on
+`corpus/libreoffice/fills.odp`); a fill that says nothing of repeating
+repeats. A `draw:path`
 states SVG path data, an elliptical arc becoming the straight line to its end. A
 connector is positioned by the two ends it joins, takes the route the producer
 wrote beside them or the straight line, and has no area whatever its style says,

@@ -118,6 +118,12 @@ convert odt:writer8 pages.odt "OpenDocument Text Flat XML" pages.fodt
 convert odp:impress8 export.odp "OpenDocument Presentation Flat XML" export.fodp
 convert odp:impress8 slides.odp "OpenDocument Presentation Flat XML" slides.fodp
 
+# Picture fills, tiled at the picture's own size and at the style's, against a
+# corner, moved by a share of a tile, with alternate rows and columns moved,
+# placed once and stretched, behind a shape and behind a slide. Two pictures,
+# one that says its resolution and one that does not.
+convert odp:impress8 fills.odp "OpenDocument Presentation Flat XML" fills.fodp
+
 # A spreadsheet for the PDF export: a sheet wider and longer than a page with
 # a marked header row, a hidden row and column and a merged cell; a sheet with
 # a print range fitted to one page; a hidden sheet and an empty one. Flat ODF

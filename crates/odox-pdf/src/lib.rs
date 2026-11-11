@@ -438,6 +438,22 @@ fn draw(
                         surface.pop();
                     }
                 }
+                Some(Ground::Tiled(image, (x, y, width, height), offset, opacity)) => {
+                    let pattern = tiles(surface, image, (*width, *height), *offset);
+                    if let Some(pattern) = pattern {
+                        surface.set_fill(Some(Fill {
+                            paint: krilla::paint::Pattern {
+                                transform: Transform::from_translate(*x, top + y),
+                                ..pattern
+                            }
+                            .into(),
+                            opacity: NormalizedF32::new(*opacity).unwrap_or(NormalizedF32::ONE),
+                            rule: FillRule::NonZero,
+                        }));
+                        surface.set_stroke(None);
+                        surface.draw_path(&path);
+                    }
+                }
                 None => {}
             }
             if let Some((color, width)) = stroke {
@@ -583,4 +599,48 @@ pub(crate) fn language(document: &Document, family: &str) -> Option<String> {
             )
         });
     from_style.or_else(|| document.meta.language.clone())
+}
+
+/// The cell a tiled fill repeats: one tile, or two rows or two columns of them
+/// where alternate ones are moved, each picture placed as often as it shows
+/// in the cell. Its transform is the identity; the caller moves it to the
+/// first tile.
+fn tiles(
+    surface: &mut Surface,
+    image: &krilla::image::Image,
+    (width, height): (f32, f32),
+    offset: Option<odox_core::Offset>,
+) -> Option<krilla::paint::Pattern> {
+    let size = Size::from_wh(width, height)?;
+    let (cell, places) = match offset {
+        None => ((width, height), vec![(0.0, 0.0)]),
+        Some(odox_core::Offset::Rows(fraction)) => {
+            let moved = fraction.rem_euclid(1.0) * width;
+            (
+                (width, height * 2.0),
+                vec![(0.0, 0.0), (moved, height), (moved - width, height)],
+            )
+        }
+        Some(odox_core::Offset::Columns(fraction)) => {
+            let moved = fraction.rem_euclid(1.0) * height;
+            (
+                (width * 2.0, height),
+                vec![(0.0, 0.0), (width, moved), (width, moved - height)],
+            )
+        }
+    };
+    let mut builder = surface.stream_builder();
+    let mut inner = builder.surface();
+    for (x, y) in places {
+        inner.push_transform(&Transform::from_translate(x, y));
+        inner.draw_image(image.clone(), size);
+        inner.pop();
+    }
+    inner.finish();
+    Some(krilla::paint::Pattern {
+        stream: builder.finish(),
+        transform: Transform::identity(),
+        width: cell.0,
+        height: cell.1,
+    })
 }
