@@ -1416,7 +1416,11 @@ fn is_column_container(element: &Element) -> bool {
 
 /// ODF's own column limit, and the point past which a repeat count is a way of
 /// saying *the rest of the sheet*.
-const MAX_COLUMNS: usize = 16_384;
+pub(crate) const MAX_COLUMNS: usize = 16_384;
+
+/// The last row a reference can name, 1048576, past which `LibreOffice` reads
+/// one as a name it does not know.
+pub(crate) const MAX_ROWS: usize = 1_048_576;
 
 /// The last column in a row that carries anything, or `None` for an empty row.
 fn last_occupied_column(row: &Element) -> Option<usize> {

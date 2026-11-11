@@ -128,5 +128,10 @@ convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods
+# Criteria as a document with no calculation settings reads them, which is
+# ODF's default of regular expressions matched against whole cells, and as
+# one that allows wildcards and regular expressions both and matches a part.
+convert ods:calc8 criteria.ods "OpenDocument Spreadsheet Flat XML" criteria.fods
+convert ods:calc8 parts.ods "OpenDocument Spreadsheet Flat XML" parts.fods
 convert ods:calc8 comments.ods "OpenDocument Spreadsheet Flat XML" comments.fods
 convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt

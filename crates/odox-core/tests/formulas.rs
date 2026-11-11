@@ -1,8 +1,9 @@
 //! Formulas worked out here against what LibreOffice worked out.
 //!
-//! `corpus/libreoffice/formulas.ods` was written by LibreOffice from formulas
-//! with no results, so every result in it is LibreOffice's own. Working each
-//! formula out again has to give the same value of the same kind.
+//! `corpus/libreoffice/formulas.ods`, `criteria.ods` and `parts.ods` were
+//! written by LibreOffice from formulas with no results, so every result in
+//! them is LibreOffice's own. Working each formula out again has to give the
+//! same value of the same kind.
 
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -13,10 +14,16 @@ use odox_core::Ns;
 use odox_core::doc::{SheetDocument, Value};
 
 fn fixture() -> SheetDocument {
+    read("formulas.ods")
+}
+
+fn read(name: &str) -> SheetDocument {
     let bytes = std::fs::read(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/formulas.ods"),
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../corpus/libreoffice")
+            .join(name),
     )
-    .expect("the formulas fixture");
+    .expect("the fixture");
     SheetDocument::read(&bytes).expect("it reads")
 }
 
@@ -58,29 +65,35 @@ fn at(document: &SheetDocument, label: &str) -> Value {
 
 #[test]
 fn every_formula_comes_to_what_libreoffice_worked_out() {
-    let mut document = fixture();
-    let before = results(&document);
-    assert!(
-        before.len() >= 60,
-        "the fixture has its formulas: {}",
-        before.len()
-    );
-    let done = document.recalculate_all();
-    assert!(
-        done.stale.is_empty(),
-        "nothing is beyond the core: {:?}",
-        done.stale
-    );
-    let after = results(&document);
-    let wrong: Vec<String> = before
-        .iter()
-        .zip(&after)
-        .filter(|((_, a, ae, at), (_, b, be, bt))| !same(a, b) || ae != be || (*ae && at != bt))
-        .map(|((label, a, _, at), (_, b, _, bt))| {
-            format!("{label}: {b:?} {bt:?}, LibreOffice {a:?} {at:?}")
-        })
-        .collect();
-    assert!(wrong.is_empty(), "{wrong:#?}");
+    for (name, least) in [
+        ("formulas.ods", 60),
+        ("criteria.ods", 90),
+        ("parts.ods", 33),
+    ] {
+        let mut document = read(name);
+        let before = results(&document);
+        assert!(
+            before.len() >= least,
+            "{name} has its formulas: {}",
+            before.len()
+        );
+        let done = document.recalculate_all();
+        assert!(
+            done.stale.is_empty(),
+            "nothing in {name} is beyond the core: {:?}",
+            done.stale
+        );
+        let after = results(&document);
+        let wrong: Vec<String> = before
+            .iter()
+            .zip(&after)
+            .filter(|((_, a, ae, at), (_, b, be, bt))| !same(a, b) || ae != be || (*ae && at != bt))
+            .map(|((label, a, _, at), (_, b, _, bt))| {
+                format!("{label}: {b:?} {bt:?}, LibreOffice {a:?} {at:?}")
+            })
+            .collect();
+        assert!(wrong.is_empty(), "{name}: {wrong:#?}");
+    }
 }
 
 #[test]
@@ -249,4 +262,16 @@ fn a_date_written_without_its_year_falls_in_this_year() {
         document.cell(sheet, 0, 1).expect("cell").value(),
         Value::Number(45413.0)
     );
+}
+
+#[test]
+fn a_typed_reference_past_the_last_column_is_a_name_not_known() {
+    let mut document = fixture();
+    let stored = odox_core::formula::to_stored("=XFE1+1").expect("readable");
+    assert_eq!(stored, "of:=[.XFE1]+1");
+    document.set_formula(CALC, 0, 2, &stored).expect("set");
+    let done = document.recalculate(&[(CALC, 0, 2)]);
+    assert!(done.stale.is_empty());
+    let sheet = &document.sheets()[CALC];
+    assert_eq!(document.cell(sheet, 0, 2).expect("cell").text(), "#NAME?");
 }

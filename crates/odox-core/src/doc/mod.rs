@@ -13,6 +13,7 @@ mod band;
 mod pres;
 mod refs;
 mod sheet;
+pub(crate) use sheet::{MAX_COLUMNS, MAX_ROWS};
 mod slides;
 mod text;
 
