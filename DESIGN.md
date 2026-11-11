@@ -477,7 +477,14 @@ conventions of United States English whatever the document's language, as
 `LibreOffice` reads it (`formula/convert.rs`): `1,000`, `(5)`, `$5`, `5 %`,
 `TRUE`, `1 1/2`, `5/1/2024`, `2024-05-01`, `May 1, 2024` and `9:30 pm` are
 numbers, and a date written without its year falls in the year the window
-read the clock when the file opened. `=` and `&` keep text as text. A result
+read the clock when the file opened. `=` and `&` keep text as text. A
+criterion of `SUMIF`, `COUNTIF`, `AVERAGEIF` and `VLOOKUP` is matched as the
+document's calculation settings say, measured on `criteria.ods` and
+`parts.ods`: with wildcards where they are allowed, and otherwise as a regular
+expression, ODF's default, against the whole cell unless the settings say a
+part will do. A number, a date or a boolean is matched by the text a number
+joined to text would be, `45413` for a date and `1` for true. A reference past
+column XFD or row 1048576 is a name `LibreOffice` does not know, `#NAME?`. A result
 keeps the kind of value its cell held and is shown in the cell's number format; an error is written as
 `LibreOffice` writes one. A formula outside the core keeps its result and is
 drawn faint once something it reads changes, or once anything does where it

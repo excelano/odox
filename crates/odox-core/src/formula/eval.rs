@@ -5,6 +5,8 @@
 
 use std::cmp::Ordering;
 
+use regex::{Regex, RegexBuilder};
+
 use super::convert::text_number;
 use super::{Address, Error, Expr, Op, Reference, Unsupported, Value};
 
@@ -30,6 +32,20 @@ pub trait Cells {
     /// document's calculation settings say.
     fn wildcards(&self) -> bool {
         false
+    }
+
+    /// Whether a criterion's text is a regular expression, as the document's
+    /// calculation settings say; ODF's default is that it is. Wildcards, where
+    /// a document allows both, come first.
+    fn regular_expressions(&self) -> bool {
+        true
+    }
+
+    /// Whether a criterion has to match the whole of a cell rather than a
+    /// part of it, as the document's calculation settings say; ODF's default
+    /// is that it does.
+    fn whole_cell(&self) -> bool {
+        true
     }
 
     /// Whether text compares with its case, as the document's calculation
@@ -149,6 +165,15 @@ impl Context<'_> {
     /// A value as a number, text read as `LibreOffice` reads it.
     fn number(&self, value: &Value) -> Result<f64, Error> {
         number(&self.converted(value.clone()))
+    }
+
+    fn matching(&self) -> Matching {
+        let wildcards = self.cells.wildcards();
+        Matching {
+            wildcards,
+            regular: !wildcards && self.cells.regular_expressions(),
+            whole: self.cells.whole_cell(),
+        }
     }
 
     /// Text that reads as a number, as that number; anything else as it is.
@@ -523,13 +548,13 @@ impl Context<'_> {
                     }
                     last
                 } else {
-                    let exact = Criterion::of(&wanted, self.cells.wildcards());
-                    rows.iter().find(|row| {
-                        same_kind(&row[0], &wanted)
-                            && match &wanted {
-                                Value::Text(_) => exact.matches(&row[0]),
-                                _ => compare(&row[0], &wanted, false) == Ok(Ordering::Equal),
-                            }
+                    let exact = Criterion::lookup(&wanted, self.matching());
+                    rows.iter().find(|row| match &wanted {
+                        Value::Text(_) => row[0] != Value::Empty && exact.matches(&row[0]),
+                        _ => {
+                            same_kind(&row[0], &wanted)
+                                && compare(&row[0], &wanted, false) == Ok(Ordering::Equal)
+                        }
                     })
                 };
                 match found {
@@ -542,7 +567,7 @@ impl Context<'_> {
                 let Arg::Range(range) = self.arg(&args[0])? else {
                     return Ok(Value::Error(Error::Value));
                 };
-                let criterion = Criterion::of(&self.scalar(&args[1])?, self.cells.wildcards());
+                let criterion = Criterion::of(&self.scalar(&args[1])?, self.matching());
                 let values = match args.get(2) {
                     Some(Expr::Reference(reference)) => {
                         let from = reference.from;
@@ -571,8 +596,10 @@ impl Context<'_> {
                             continue;
                         }
                         match values.get(r).and_then(|row| row.get(c)) {
-                            Some(Value::Number(x) | Value::Date(x)) => {
-                                sum += x;
+                            Some(
+                                value @ (Value::Number(_) | Value::Date(_) | Value::Boolean(_)),
+                            ) => {
+                                sum += number(value).unwrap_or(0.0);
                                 n += 1;
                             }
                             Some(Value::Error(error)) => return Ok(Value::Error(*error)),
@@ -835,25 +862,39 @@ fn compare(left: &Value, right: &Value, case: bool) -> Result<Ordering, Error> {
     }
 }
 
+/// How a criterion's text is matched, as the document's calculation settings
+/// say.
+#[derive(Debug, Clone, Copy)]
+struct Matching {
+    wildcards: bool,
+    regular: bool,
+    whole: bool,
+}
+
+impl Matching {
+    /// Text matched as it is written, against the whole of a cell.
+    const PLAIN: Self = Self {
+        wildcards: false,
+        regular: false,
+        whole: true,
+    };
+}
+
 /// A criterion of `SUMIF` and `COUNTIF`: a value, or a comparison written as
-/// text, `">2"`, `"<>apple"`, `"ap*"` where the document allows wildcards.
+/// text, `">2"`, `"<>apple"`, `"ap.*"` where the document reads criteria as
+/// regular expressions, `"ap*"` where it allows wildcards.
 struct Criterion {
     op: Op,
     against: Value,
-    /// The text after the comparison, which a text cell is compared with.
-    written: String,
-    wildcards: bool,
+    /// What a text cell, or a number written as text, is matched with; `None`
+    /// where the regular expression cannot be read, which matches nothing.
+    pattern: Option<Regex>,
 }
 
 impl Criterion {
-    fn of(value: &Value, wildcards: bool) -> Self {
+    fn of(value: &Value, matching: Matching) -> Self {
         let Value::Text(written) = value else {
-            return Self {
-                op: Op::Equal,
-                against: value.clone(),
-                written: text(value).unwrap_or_default(),
-                wildcards: false,
-            };
+            return Self::lookup(value, Matching::PLAIN);
         };
         let (op, rest) = [
             ("<>", Op::NotEqual),
@@ -873,50 +914,86 @@ impl Criterion {
         Self {
             op,
             against,
-            written: rest.to_owned(),
-            wildcards,
+            pattern: pattern(rest, matching),
+        }
+    }
+
+    /// What `VLOOKUP` looks for, whose text is matched as a criterion's is but
+    /// never holds a comparison.
+    fn lookup(value: &Value, matching: Matching) -> Self {
+        Self {
+            op: Op::Equal,
+            against: value.clone(),
+            pattern: pattern(&text(value).unwrap_or_default(), matching),
         }
     }
 
     fn matches(&self, cell: &Value) -> bool {
-        if matches!(cell, Value::Error(_)) {
-            return false;
-        }
-        if matches!(cell, Value::Empty) {
-            return match &self.against {
+        let equality = matches!(self.op, Op::Equal | Op::NotEqual);
+        match cell {
+            Value::Error(_) => false,
+            Value::Empty => match &self.against {
                 Value::Text(t) => match self.op {
                     Op::Equal => t.is_empty(),
                     Op::NotEqual => !t.is_empty(),
                     _ => false,
                 },
                 _ => self.op == Op::NotEqual,
-            };
+            },
+            Value::Text(t) if equality => self.found(t) == (self.op == Op::Equal),
+            _ if equality && is_text(&self.against) => {
+                self.found(&text(cell).unwrap_or_default()) == (self.op == Op::Equal)
+            }
+            _ if is_text(cell) != is_text(&self.against) => self.op == Op::NotEqual,
+            _ => {
+                let Ok(ordering) = compare(cell, &self.against, false) else {
+                    return false;
+                };
+                match self.op {
+                    Op::Equal => ordering == Ordering::Equal,
+                    Op::NotEqual => ordering != Ordering::Equal,
+                    Op::Less => ordering == Ordering::Less,
+                    Op::LessOrEqual => ordering != Ordering::Greater,
+                    Op::Greater => ordering == Ordering::Greater,
+                    _ => ordering != Ordering::Less,
+                }
+            }
         }
-        if let Value::Text(t) = cell
-            && matches!(self.op, Op::Equal | Op::NotEqual)
-        {
-            let fold = str::to_lowercase;
-            let same = if self.wildcards {
-                glob(&fold(&self.written), &fold(t))
-            } else {
-                fold(t) == fold(&self.written)
-            };
-            return same == (self.op == Op::Equal);
+    }
+
+    fn found(&self, text: &str) -> bool {
+        self.pattern.as_ref().is_some_and(|p| p.is_match(text))
+    }
+}
+
+/// The regular expression a criterion's text stands for, which ignores case.
+/// A single character other than `.` is never a regular expression, as
+/// `LibreOffice` reads one; with wildcards `*` stands for any run of
+/// characters, `?` for any one, and `~` makes the next one plain.
+fn pattern(written: &str, matching: Matching) -> Option<Regex> {
+    let body = if matching.wildcards {
+        let mut body = String::new();
+        let mut chars = written.chars();
+        while let Some(c) = chars.next() {
+            match c {
+                '*' => body.push_str(".*"),
+                '?' => body.push('.'),
+                '~' => body.push_str(&regex::escape(&chars.next().unwrap_or('~').to_string())),
+                _ => body.push_str(&regex::escape(&c.to_string())),
+            }
         }
-        if is_text(cell) != is_text(&self.against) {
-            return self.op == Op::NotEqual;
-        }
-        let Ok(ordering) = compare(cell, &self.against, false) else {
-            return false;
-        };
-        match self.op {
-            Op::Equal => ordering == Ordering::Equal,
-            Op::NotEqual => ordering != Ordering::Equal,
-            Op::Less => ordering == Ordering::Less,
-            Op::LessOrEqual => ordering != Ordering::Greater,
-            Op::Greater => ordering == Ordering::Greater,
-            _ => ordering != Ordering::Less,
-        }
+        body
+    } else if matching.regular && (written.chars().nth(1).is_some() || written == ".") {
+        written.to_owned()
+    } else {
+        regex::escape(written)
+    };
+    let built = |body: &str| RegexBuilder::new(body).case_insensitive(true).build().ok();
+    let bare = built(&body)?;
+    if matching.whole {
+        built(&format!("^(?:{body})$"))
+    } else {
+        Some(bare)
     }
 }
 
@@ -980,49 +1057,6 @@ fn sum(a: f64, b: f64) -> f64 {
         return 0.0;
     }
     a + b
-}
-
-/// Whether text matches a pattern in which `*` stands for any run of
-/// characters, `?` for any one, and `~` makes the next one plain.
-fn glob(pattern: &str, text: &str) -> bool {
-    let pattern: Vec<char> = pattern.chars().collect();
-    let text: Vec<char> = text.chars().collect();
-    let (mut p, mut t) = (0, 0);
-    let mut star: Option<(usize, usize)> = None;
-    while t < text.len() {
-        match pattern.get(p) {
-            Some('*') => {
-                star = Some((p, t));
-                p += 1;
-                continue;
-            }
-            Some('?') => {
-                p += 1;
-                t += 1;
-                continue;
-            }
-            Some('~') if pattern.get(p + 1) == Some(&text[t]) => {
-                p += 2;
-                t += 1;
-                continue;
-            }
-            Some(&c) if c == text[t] => {
-                p += 1;
-                t += 1;
-                continue;
-            }
-            _ => {}
-        }
-        match star {
-            Some((at, from)) => {
-                p = at + 1;
-                t = from + 1;
-                star = Some((at, from + 1));
-            }
-            None => return false,
-        }
-    }
-    pattern[p..].iter().all(|c| *c == '*')
 }
 
 /// The first day of the Gregorian calendar, 15 October 1582, as days from 30

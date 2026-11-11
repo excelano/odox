@@ -10,6 +10,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::{Address, Expr, Op, Reference, Unsupported};
+use crate::doc::{MAX_COLUMNS, MAX_ROWS};
 use crate::formula::Error;
 
 /// Read a formula as ODF writes it, with or without the `of:` namespace.
@@ -68,7 +69,10 @@ fn tokens(source: &str) -> Result<Vec<Token>, Unsupported> {
                 i += 1;
             }
             '"' => out.push(Token::Text(quoted(&chars, &mut i)?)),
-            '[' => out.push(Token::Reference(reference(&bracketed(&chars, &mut i)?)?)),
+            '[' => out.push(match reference(&bracketed(&chars, &mut i)?)? {
+                Some(reference) => Token::Reference(reference),
+                None => Token::Error(Error::Name),
+            }),
             '#' => {
                 let rest: String = chars[i..].iter().collect();
                 let (error, length) = Error::ALL
@@ -85,7 +89,10 @@ fn tokens(source: &str) -> Result<Vec<Token>, Unsupported> {
             c if c.is_alphabetic() || c == '_' => {
                 let start = i;
                 while i < chars.len()
-                    && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
+                    && (chars[i].is_alphanumeric()
+                        || chars[i] == '_'
+                        || chars[i] == '.'
+                        || (chars[i] == ':' && chars.get(i + 1).is_some_and(|c| c.is_alphabetic())))
                 {
                     i += 1;
                 }
@@ -183,8 +190,10 @@ fn number(chars: &[char], i: &mut usize) -> Result<f64, Unsupported> {
 }
 
 /// What is inside a reference's brackets: `.A1`, `$Sheet.$A$1`,
-/// `'A sheet'.A1:.B2`.
-fn reference(inside: &str) -> Result<Reference, Unsupported> {
+/// `'A sheet'.A1:.B2`, or `None` for one that names a cell past the sheet's
+/// last row or column, or row zero, which `LibreOffice` reads as a name it does
+/// not know.
+fn reference(inside: &str) -> Result<Option<Reference>, Unsupported> {
     let mut parts = Vec::new();
     let mut quoted = false;
     let mut start = 0;
@@ -202,16 +211,18 @@ fn reference(inside: &str) -> Result<Reference, Unsupported> {
     match parts.as_slice() {
         [one] => {
             let (sheet, address) = address(one)?;
-            Ok(Reference {
+            Ok(address.map(|address| Reference {
                 sheet,
                 from: address,
                 to: address,
-            })
+            }))
         }
         [first, last] => {
             let (sheet, from) = address(first)?;
-            let (_, to) = address(last)?;
-            Ok(Reference {
+            let (Some(from), (_, Some(to))) = (from, address(last)?) else {
+                return Ok(None);
+            };
+            Ok(Some(Reference {
                 sheet,
                 from: Address {
                     row: from.row.min(to.row),
@@ -221,14 +232,15 @@ fn reference(inside: &str) -> Result<Reference, Unsupported> {
                     row: from.row.max(to.row),
                     column: from.column.max(to.column),
                 },
-            })
+            }))
         }
         _ => Err(Unsupported),
     }
 }
 
-/// One end of a reference: the sheet it names, if any, and the cell.
-fn address(text: &str) -> Result<(Option<String>, Address), Unsupported> {
+/// One end of a reference: the sheet it names, if any, and the cell, `None`
+/// where it is past the sheet's last row or column.
+fn address(text: &str) -> Result<(Option<String>, Option<Address>), Unsupported> {
     let mut quoted = false;
     let mut dot = None;
     for (at, c) in text.char_indices() {
@@ -257,18 +269,33 @@ fn address(text: &str) -> Result<(Option<String>, Address), Unsupported> {
         .to_ascii_uppercase()
         .bytes()
         .try_fold(0usize, |n, b| {
-            n.checked_mul(26)?.checked_add(usize::from(b - b'A') + 1)
-        })
-        .ok_or(Unsupported)?
-        - 1;
-    let row = digits.parse::<usize>().map_err(|_| Unsupported)?;
+            Some(n * 26 + usize::from(b - b'A') + 1).filter(|n| *n <= MAX_COLUMNS)
+        });
+    let row = digits
+        .parse::<usize>()
+        .ok()
+        .filter(|row| (1..=MAX_ROWS).contains(row));
     Ok((
         sheet,
-        Address {
-            row: row.checked_sub(1).ok_or(Unsupported)?,
-            column,
-        },
+        column.zip(row).map(|(column, row)| Address {
+            row: row - 1,
+            column: column - 1,
+        }),
     ))
+}
+
+/// Whether a name is a cell, or a range of them, with an end past the sheet's
+/// last row or column, which `LibreOffice` writes without the brackets of a
+/// reference, `XFE1` or `A1:XFE1`, and reads as a name it does not know.
+fn past_the_grid(name: &str) -> bool {
+    let ends: Option<Vec<Option<Address>>> = name
+        .split(':')
+        .map(|end| match address(&format!(".{end}")) {
+            Ok((None, cell)) => Some(cell),
+            _ => None,
+        })
+        .collect();
+    ends.is_some_and(|ends| ends.len() <= 2 && ends.contains(&None))
 }
 
 struct Parser {
@@ -361,9 +388,12 @@ impl Parser {
                 }
             }
             Token::Name(name) => {
-                if self.next() != Some(Token::Open) {
-                    return Err(Unsupported);
+                if self.peek() != Some(&Token::Open) {
+                    return past_the_grid(&name)
+                        .then_some(Expr::Error(Error::Name))
+                        .ok_or(Unsupported);
                 }
+                self.at += 1;
                 let mut arguments = Vec::new();
                 if self.peek() == Some(&Token::Close) {
                     self.at += 1;

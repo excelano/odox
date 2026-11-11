@@ -274,6 +274,16 @@ impl Cells for Book<'_> {
         self.document.calculation_setting("use-wildcards") == Some("true")
     }
 
+    fn regular_expressions(&self) -> bool {
+        self.document.calculation_setting("use-regular-expressions") != Some("false")
+    }
+
+    fn whole_cell(&self) -> bool {
+        self.document
+            .calculation_setting("search-criteria-must-apply-to-whole-cell")
+            != Some("false")
+    }
+
     fn case_sensitive(&self) -> bool {
         self.document.calculation_setting("case-sensitive") != Some("false")
     }

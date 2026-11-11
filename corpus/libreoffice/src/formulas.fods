@@ -214,6 +214,13 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>compare text number</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5&quot;=5"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>join keeps text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5&quot;&amp;1"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>unreadable text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;abc&quot;+1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>past the last column</text:p></table:table-cell><table:table-cell table:formula="of:=[.XFE1]"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>the last cell</text:p></table:table-cell><table:table-cell table:formula="of:=[.XFD1048576]"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>past the last row</text:p></table:table-cell><table:table-cell table:formula="of:=[.A1048577]"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>row zero</text:p></table:table-cell><table:table-cell table:formula="of:=[.A0]"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>a range past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=SUM([.A1:.XFE1])"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>arithmetic past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=[.XFE1]+1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>an error past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=IFERROR([.XFE1];&quot;caught&quot;)"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>
