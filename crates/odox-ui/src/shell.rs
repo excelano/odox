@@ -598,7 +598,6 @@ impl<V: View> eframe::App for Shell<V> {
         }
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
-        crate::fonts::follow_input(&ctx);
 
         if !presenting {
             self.chrome(ui, &ctx);
@@ -1180,6 +1179,7 @@ pub fn run<V: View + 'static>(
         options,
         Box::new(move |cc| {
             crate::system_theme::follow(&cc.egui_ctx);
+            crate::fonts::fall_back(&cc.egui_ctx);
             cc.egui_ctx
                 .options_mut(|o| o.input_options.scroll_zoom_speed = 1.0 / 400.0);
             // Now that there is a context, a document that arrives has

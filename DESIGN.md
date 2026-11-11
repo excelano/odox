@@ -140,11 +140,14 @@ faces the machine has first, and the families with a metrically compatible
 substitute are named so that a document asking for Times New Roman keeps its
 line breaks under Liberation Serif. Both are in `crates/odox-fonts`, which an
 export asks too, and which embeds the face it answers (§12). egui's own fonts,
-which every chain ends in, cover few scripts, so a character in the document
-that no face loaded has is drawn from the first face on the machine that has
-it, added at the end of every chain; the export draws it from the same face.
-The characters are read when the document opens, as the families are, and
-again as each character a person types, pastes or composes arrives.
+which every chain ends in, cover few scripts, so a character no face of a
+family has is drawn from the first face on the machine that has it in the
+family's weight and slant, which is the face the export embeds for it. egui
+asks for it (`fonts::Fallback`, a `FontProvider`) when it first lays the
+character out, whichever way the character arrived, and adds the face to the
+end of that family's chain; the answer for each character is kept for as long
+as the application runs. The face is copied out of its file rather than mapped,
+since mapping a file is `unsafe` and this crate has none outside the macOS glue.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
