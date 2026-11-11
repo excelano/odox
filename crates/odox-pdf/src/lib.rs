@@ -500,6 +500,29 @@ fn draw(
                 drawn.insert(*leaf, id);
             }
         }
+        Item::Turned {
+            origin,
+            across,
+            down,
+            size: (width, height),
+            items,
+        } => {
+            if *width <= 0.0 || *height <= 0.0 {
+                return;
+            }
+            surface.push_transform(&Transform::from_row(
+                across.0 / width,
+                across.1 / width,
+                down.0 / height,
+                down.1 / height,
+                origin.0,
+                top + origin.1,
+            ));
+            for item in items {
+                draw(surface, item, 0.0, faces, drawn, links);
+            }
+            surface.pop();
+        }
         Item::Clipped {
             rect: (x, y, width, height),
             item,

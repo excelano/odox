@@ -198,8 +198,11 @@ of the size. In them and in text a style puts in capitals, `ß` is `ẞ`, as
 `LibreOffice` writes it, and a letter whose capital is two letters keeps its own
 form, so what is drawn is as long as the text the caret moves through. Ruby is written after the text it
 annotates, in parentheses, `漢字(かんじ)`, rather than set above it.
-A `draw:measure` is undrawn. A turned shape's label is undrawn, because an upright paragraph inside a
-box that is not upright says something the document does not.
+A `draw:measure` is undrawn. A turned shape's label is laid out upright in a
+box the shape's size and turned onto the shape, in the window by carrying the
+triangles egui cuts it into and in an exported PDF by a transform, so it is
+read and not edited: hovering it in edit mode says so, and a link in it is left
+out of the PDF, whose link areas cannot turn.
 
 **Shapes are drawn from their own geometry**: rectangles, ellipses, polygons,
 polylines, lines, paths, connectors and custom shapes, with a solid fill, a
@@ -987,8 +990,7 @@ A presentation is a page per slide at the slide's size, and a slide the show
 skips (`presentation:visibility`) is left out. A slide is drawn as the window
 draws it: its ground, the master page's decorations, then its own shapes back to
 front, each filled, outlined and labelled, and a shape the window leaves undrawn
-is left out too, as is a turned shape's label. The speaker's notes are not
-exported.
+is left out too. The speaker's notes are not exported.
 
 **Everything drawn is tagged as what it is, or marked as decoration.** The
 structure tree is built during layout, in reading order. Headings are H1 to H6,

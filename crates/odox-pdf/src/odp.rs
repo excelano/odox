@@ -65,7 +65,7 @@ fn collect_undescribed(
         }
         return;
     }
-    if placement(shape).is_some_and(Placement::is_upright)
+    if placement(shape).is_some()
         && let Some((content, content_path)) = label(shape, &path)
     {
         model::undescribed(&model::read(document, content, content_path, None), into);
@@ -487,9 +487,19 @@ impl Slides<'_, '_, '_> {
         let Some((content, path)) = label(shape, &[]) else {
             return Ok(Vec::new());
         };
-        if !place.is_upright() {
-            return Ok(Vec::new());
-        }
+        // A turned label is laid out upright in a box the shape's size at the
+        // page's corner, and turned onto the shape as one item.
+        let upright = place.is_upright();
+        let (x, y, width, height) = if upright {
+            (x, y, width, height)
+        } else {
+            (
+                0.0,
+                0.0,
+                place.x.0.hypot(place.x.1),
+                place.y.0.hypot(place.y.1),
+            )
+        };
         let style = style_of(self.document, shape);
         let mut blocks = model::read(
             self.document,
@@ -513,14 +523,26 @@ impl Slides<'_, '_, '_> {
         }
         let anchor = style.graphic.text_anchor.unwrap_or(Anchor::Top);
         let top = y + (height - at.min(height)) * anchor.share();
-        Ok(placed
-            .into_iter()
-            .flat_map(|(below, items)| {
-                items
-                    .into_iter()
-                    .map(move |item| item.shifted(0.0, top + below))
-            })
-            .collect())
+        let items = placed.into_iter().flat_map(|(below, items)| {
+            items
+                .into_iter()
+                .map(move |item| item.shifted(0.0, top + below))
+        });
+        if upright {
+            return Ok(items.collect());
+        }
+        // A link's area is a rectangle on the page, which cannot turn with
+        // the words it covers; the words are drawn and read, and the link is
+        // left out.
+        Ok(vec![Item::Turned {
+            origin: place.origin,
+            across: place.x,
+            down: place.y,
+            size: (width, height),
+            items: items
+                .filter(|item| !matches!(item, Item::Link { .. }))
+                .collect(),
+        }])
     }
 
     /// A custom shape's or a path's outlines, mapped from their own space
@@ -840,6 +862,40 @@ mod tests {
         assert_eq!(laid.pages.len(), 3);
         let titles: Vec<&str> = laid.headings.iter().map(|h| h.1.as_str()).collect();
         assert_eq!(titles, ["Exporting slides", "Pictures", "Slide 3"]);
+    }
+
+    #[test]
+    fn a_turned_label_is_laid_out_upright_and_turned_onto_its_shape() {
+        let bytes = std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/turned.odp"),
+        )
+        .expect("the turned fixture");
+        let presentation = Presentation::read(&bytes).expect("it reads");
+        let mut faces = Faces::new();
+        let laid = lay_out(&presentation, &options(), &mut faces).expect("laid out");
+        let turned: Vec<(String, bool)> = laid.pages[0]
+            .items
+            .iter()
+            .filter_map(|(_, item)| match item {
+                Item::Turned { items, .. } => Some(items),
+                _ => None,
+            })
+            .map(|items| {
+                let words: Vec<&str> = items
+                    .iter()
+                    .filter_map(|item| match item {
+                        Item::Text { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                let linked = items.iter().any(|item| matches!(item, Item::Link { .. }));
+                (words.concat(), linked)
+            })
+            .collect();
+        assert_eq!(turned.len(), 3, "{turned:?}");
+        assert!(turned.iter().any(|(words, _)| words.contains("thirty")));
+        assert!(turned.iter().any(|(words, _)| words.contains("a link")));
+        assert!(turned.iter().all(|(_, linked)| !linked));
     }
 
     #[test]

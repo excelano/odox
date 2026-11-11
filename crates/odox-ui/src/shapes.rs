@@ -16,7 +16,10 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use eframe::egui::{
-    Color32, Mesh, Pos2, Rect, Shape, Stroke, Ui, UiBuilder, Vec2, epaint::Vertex, pos2, vec2,
+    Color32, Mesh, Pos2, Rect, Sense, Shape, Stroke, Ui, UiBuilder, Vec2,
+    epaint::{ClippedShape, Primitive, Vertex},
+    layers::ShapeIdx,
+    pos2, vec2,
 };
 use odox_core::draw::Geometry;
 
@@ -317,6 +320,42 @@ impl Canvas<'_> {
         }
     }
 
+    /// Turn what has been painted since shape `first`, laid out upright in
+    /// `upright`, onto the shape: each is cut into triangles as the window
+    /// would cut it, and every corner of every triangle is carried to the
+    /// point of the shape that is the same share across and down.
+    fn turn(&self, ui: &Ui, first: usize, upright: Rect, place: Placement) {
+        let ctx = ui.ctx();
+        let painted: Vec<ClippedShape> = ctx.graphics_mut(|layers| {
+            let list = layers.entry(ui.layer_id());
+            let end = list.next_idx().0;
+            let mut painted = Vec::new();
+            for index in first..end {
+                list.mutate_shape(ShapeIdx(index), |clipped| {
+                    painted.push(clipped.clone());
+                    clipped.shape = Shape::Noop;
+                });
+            }
+            painted
+        });
+        let size = upright.size().max(vec2(f32::EPSILON, f32::EPSILON));
+        for primitive in ctx.tessellate(painted, ctx.pixels_per_point()) {
+            let Primitive::Mesh(mut mesh) = primitive.primitive else {
+                continue;
+            };
+            for vertex in &mut mesh.vertices {
+                let along = (vertex.pos - upright.min) / size;
+                vertex.pos = place.across(along.x, along.y);
+            }
+            self.painter(ui).add(Shape::mesh(mesh));
+        }
+        if self.page_editor.is_some() {
+            let id = ui.scope_id().with(("turned label", self.at));
+            ui.interact(place.bounds(), id, Sense::hover())
+                .on_hover_text(t("Text in a turned shape cannot be edited yet."));
+        }
+    }
+
     /// A connector, and the label it may carry.
     ///
     /// It is positioned by the two ends it joins and has no corner and no size
@@ -448,15 +487,20 @@ impl Canvas<'_> {
         } else {
             return;
         };
+        // A turned label is laid out upright in a box the shape's size and
+        // then turned onto the shape, which leaves nothing on the screen for a
+        // caret or a selection to follow: it is read, not edited.
+        let turned = !place.is_upright();
         // The way from the page to the content, for a label that is edited.
-        let prefix = self.at.map(|at| match below {
+        let prefix = self.at.filter(|_| !turned).map(|at| match below {
             Some(index) => vec![at, index],
             None => vec![at],
         });
-        if !place.is_upright() {
-            return;
-        }
-        let rect = place.bounds();
+        let rect = if turned {
+            Rect::from_min_size(place.origin, vec2(place.x.length(), place.y.length()))
+        } else {
+            place.bounds()
+        };
 
         let properties = self.style_of(shape);
         let anchor = if picture {
@@ -481,11 +525,19 @@ impl Canvas<'_> {
             // so it is laid out twice: once into a ui that draws nothing, to
             // measure, and then once for real at the offset that measurement
             // gives.
-            let sized = self.lay_out(ui, &label, rect, true, prefix.as_ref());
+            let sized = self.lay_out(ui, &label, rect, true, prefix.as_ref(), turned);
             top += (rect.height() - sized.min(rect.height())) * anchor.share();
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
-        self.lay_out(ui, &label, placed, false, prefix.as_ref());
+        let first = ui
+            .ctx()
+            .graphics_mut(|layers| layers.entry(ui.layer_id()).next_idx());
+        self.lay_out(ui, &label, placed, false, prefix.as_ref(), turned);
+        if turned {
+            self.turn(ui, first.0, rect, place);
+            self.palette = palette;
+            return;
+        }
         self.hint(
             ui,
             shape,
@@ -564,6 +616,7 @@ impl Canvas<'_> {
         rect: Rect,
         measuring: bool,
         prefix: Option<&Vec<usize>>,
+        turned: bool,
     ) -> f32 {
         let (page, scale, palette) = (self.page, self.scale, self.palette);
         let document = self.document;
@@ -581,7 +634,17 @@ impl Canvas<'_> {
             builder = builder.sizing_pass().invisible();
         }
         ui.scope_builder(builder, |ui| {
-            ui.set_clip_rect(rect.intersect(page));
+            if turned {
+                // Upright, where nothing of it will be seen, so it is cut to
+                // its own box and not the page's, and it answers no clicks:
+                // the shapes under where it is laid out take them.
+                ui.set_clip_rect(rect);
+                let opacity = ui.opacity();
+                ui.disable();
+                ui.set_opacity(opacity);
+            } else {
+                ui.set_clip_rect(rect.intersect(page));
+            }
             let mut flow = Flow::new(document, pictures, scale);
             flow.palette = palette;
             flow.under = Some(std::rc::Rc::clone(&label.style));

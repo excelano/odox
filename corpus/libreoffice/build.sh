@@ -128,6 +128,11 @@ convert odp:impress8 fills.odp "OpenDocument Presentation Flat XML" fills.fodp
 # border, off centre and turned, and a colour at half its intensity.
 convert odp:impress8 gradients.odp "OpenDocument Presentation Flat XML" gradients.fodp
 
+# Labels in turned shapes: a rectangle turned thirty degrees with its label in
+# the middle, a text box on its side holding a link, and an ellipse turned the
+# other way.
+convert odp:impress8 turned.odp "OpenDocument Presentation Flat XML" turned.fodp
+
 # A spreadsheet for the PDF export: a sheet wider and longer than a page with
 # a marked header row, a hidden row and column and a merged cell; a sheet with
 # a print range fitted to one page; a hidden sheet and an empty one. Flat ODF

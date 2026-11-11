@@ -112,6 +112,17 @@ pub(crate) enum Item {
         image: krilla::image::Image,
         leaf: Option<LeafId>,
     },
+    /// What a turned shape's label draws, laid out upright in a box of
+    /// `size` whose top left corner is the origin, and carried onto the
+    /// shape's own box: where its top left corner is, and the vectors along
+    /// its top and left edges.
+    Turned {
+        origin: (f32, f32),
+        across: (f32, f32),
+        down: (f32, f32),
+        size: (f32, f32),
+        items: Vec<Item>,
+    },
     /// Something drawn only inside the rectangle `(x, y, width, height)`: a
     /// spreadsheet cell's text, cut at the cell's edge as the window cuts it.
     Clipped {
@@ -209,7 +220,7 @@ impl Item {
                     *y += dy;
                 }
             }
-            Self::Placed { origin, .. } => {
+            Self::Placed { origin, .. } | Self::Turned { origin, .. } => {
                 origin.0 += dx;
                 origin.1 += dy;
             }
@@ -231,6 +242,12 @@ impl Item {
             | Self::Shape { leaf, .. }
             | Self::Placed { leaf, .. } => *leaf = None,
             Self::Clipped { item, .. } => **item = (**item).clone().decoration(),
+            Self::Turned { items, .. } => {
+                *items = std::mem::take(items)
+                    .into_iter()
+                    .map(Item::decoration)
+                    .collect();
+            }
             _ => {}
         }
         self
@@ -248,6 +265,12 @@ impl Item {
             Self::Shape { span, .. } => *span,
             Self::Clipped { item, .. } => item.extent(),
             Self::Placed {
+                origin,
+                across,
+                down,
+                ..
+            }
+            | Self::Turned {
                 origin,
                 across,
                 down,
