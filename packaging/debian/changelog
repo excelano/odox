@@ -1,3 +1,14 @@
+odox (0.16.0) unstable; urgency=low
+
+  * A dimension line is drawn and exported as LibreOffice draws it, with its guides, the markers its style names and its label
+  * Text that reads right to left is drawn and exported in the order the Unicode bidirectional algorithm gives, in the direction its paragraph says
+  * A turned shape's label is drawn and exported turned with the shape, read and not edited
+  * Radial, ellipsoidal, square and rectangular gradients are drawn and exported as LibreOffice draws them, and a colour keeps its intensity
+  * A tiled picture fill is drawn and exported as LibreOffice lays it, and an ellipse takes a picture fill
+  * LOWER leaves a dotted capital I as it is, as LibreOffice does
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 10 Nov 2026 20:43:19 -0600
+
 odox (0.15.2) unstable; urgency=low
 
   * A criterion is a regular expression where the document says so or says nothing, matched against the whole cell or a part, and a reference past the last column or row is #NAME?
