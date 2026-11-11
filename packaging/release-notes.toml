@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.15.2"
+version = "0.16.0"
 
 [products.xodt.locales.en-us]
-whats-new = "This release changes only Odox Grid. Odox Text is the same as in 0.15.1."
+whats-new = "Hebrew and Arabic now read in the right order, mixed with other text on the same line, in the window and in exported PDFs. A character the document's font lacks is drawn in a face of the same weight and slant, bold or italic where the text is."
 
 [products.xodt.locales.de-de]
-whats-new = "Diese Version ändert nur Odox Grid. Odox Text ist unverändert gegenüber 0.15.1."
+whats-new = "Hebräisch und Arabisch erscheinen jetzt in der richtigen Reihenfolge, auch gemischt mit anderem Text in derselben Zeile, im Fenster und in exportierten PDFs. Ein Zeichen, das der Schrift des Dokuments fehlt, wird in einer Schrift derselben Stärke und Lage gezeichnet, fett oder kursiv, wo der Text es ist."
 
 [products.xods.locales.en-us]
-whats-new = "Formulas now come to LibreOffice's answers in many more cases. Text such as 1,000, 5/1/2024 or 9:30 pm counts as a number in arithmetic. SUMIF, COUNTIF and VLOOKUP match their criteria as wildcards or regular expressions, as the document's settings say. Numbers joined to text, dates before 1583 and the errors for a wrong argument match LibreOffice's."
+whats-new = "Hebrew and Arabic in cells now read in the right order. LOWER leaves a dotted capital I as it is, as LibreOffice does. A character the document's font lacks is drawn in a face of the same weight and slant."
 
 [products.xods.locales.de-de]
-whats-new = "Formeln kommen jetzt in vielen weiteren Fällen auf die Ergebnisse von LibreOffice. Text wie 1,000, 5/1/2024 oder 9:30 pm zählt in Rechnungen als Zahl. SUMIF, COUNTIF und VLOOKUP werten ihre Kriterien als Platzhalter oder reguläre Ausdrücke aus, wie es die Einstellungen des Dokuments vorsehen. Mit Text verbundene Zahlen, Daten vor 1583 und die Fehler bei einem falschen Argument stimmen mit LibreOffice überein."
+whats-new = "Hebräisch und Arabisch in Zellen erscheinen jetzt in der richtigen Reihenfolge. LOWER lässt ein großes İ mit Punkt unverändert, wie LibreOffice. Ein Zeichen, das der Schrift des Dokuments fehlt, wird in einer Schrift derselben Stärke und Lage gezeichnet."
 
 [products.xodp.locales.en-us]
-whats-new = "This release changes only Odox Grid. Odox Deck is the same as in 0.15.1."
+whats-new = "Slides now show tiled picture fills, radial, elliptical, square and rectangular gradients, the text in a turned shape, and dimension lines with their arrows and lengths, in the window and in exported PDFs. Hebrew and Arabic read in the right order."
 
 [products.xodp.locales.de-de]
-whats-new = "Diese Version ändert nur Odox Grid. Odox Deck ist unverändert gegenüber 0.15.1."
+whats-new = "Folien zeigen jetzt gekachelte Bildfüllungen, radiale, elliptische, quadratische und rechteckige Verläufe, den Text in gedrehten Formen und Maßlinien mit Pfeilen und Längen, im Fenster und in exportierten PDFs. Hebräisch und Arabisch erscheinen in der richtigen Reihenfolge."
