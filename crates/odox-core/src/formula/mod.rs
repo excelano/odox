@@ -13,6 +13,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod convert;
 mod eval;
 mod parse;
 mod shift;

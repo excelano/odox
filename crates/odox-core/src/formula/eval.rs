@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 
+use super::convert::text_number;
 use super::{Address, Error, Expr, Op, Reference, Unsupported, Value};
 
 /// The prefix ODF writes before a function Excel added and `OpenFormula`
@@ -35,6 +36,12 @@ pub trait Cells {
     /// settings say; ODF's default is that it does.
     fn case_sensitive(&self) -> bool {
         true
+    }
+
+    /// The year a date written as text without its year falls in, which is
+    /// this year where the caller knows it.
+    fn year(&self) -> Option<i64> {
+        None
     }
 }
 
@@ -139,6 +146,19 @@ impl Context<'_> {
         }
     }
 
+    /// A value as a number, text read as `LibreOffice` reads it.
+    fn number(&self, value: &Value) -> Result<f64, Error> {
+        number(&self.converted(value.clone()))
+    }
+
+    /// Text that reads as a number, as that number; anything else as it is.
+    fn converted(&self, value: Value) -> Value {
+        match &value {
+            Value::Text(text) => text_number(text, self.cells.year()).map_or(value, Value::Number),
+            _ => value,
+        }
+    }
+
     fn arg(&self, expr: &Expr) -> Result<Arg, Unsupported> {
         match expr {
             Expr::Reference(reference) => Ok(Arg::Range(self.range(reference)?)),
@@ -153,10 +173,20 @@ impl Context<'_> {
             Expr::Error(error) => Value::Error(*error),
             Expr::Missing => Value::Empty,
             Expr::Reference(reference) => self.intersection(reference)?,
-            Expr::Negate(inner) => Value::Number(-tryv!(number(&self.scalar(inner)?))),
-            Expr::Percent(inner) => Value::Number(tryv!(number(&self.scalar(inner)?)) / 100.0),
+            Expr::Negate(inner) => Value::Number(-tryv!(self.number(&self.scalar(inner)?))),
+            Expr::Percent(inner) => Value::Number(tryv!(self.number(&self.scalar(inner)?)) / 100.0),
             Expr::Binary(op, left, right) => {
                 let (left, right) = (self.scalar(left)?, self.scalar(right)?);
+                let (left, right) = match op {
+                    Op::Join
+                    | Op::Equal
+                    | Op::NotEqual
+                    | Op::Less
+                    | Op::LessOrEqual
+                    | Op::Greater
+                    | Op::GreaterOrEqual => (left, right),
+                    _ => (self.converted(left), self.converted(right)),
+                };
                 binary(*op, &left, &right, self.cells.case_sensitive())
             }
             Expr::Call(name, arguments) => self.call(name, arguments)?,
@@ -174,7 +204,7 @@ impl Context<'_> {
             }
         };
         let num = |index: usize| -> Result<Result<f64, Error>, Unsupported> {
-            Ok(number(&self.scalar(&args[index])?))
+            Ok(self.number(&self.scalar(&args[index])?))
         };
         let txt = |index: usize| -> Result<Result<String, Error>, Unsupported> {
             Ok(text(&self.scalar(&args[index])?))
@@ -229,7 +259,7 @@ impl Context<'_> {
                 let n = found
                     .iter()
                     .map(|arg| match arg {
-                        Arg::Scalar(value) => usize::from(number(value).is_ok()),
+                        Arg::Scalar(value) => usize::from(self.number(value).is_ok()),
                         Arg::Range(_) => arg
                             .cells()
                             .filter(|v| {
@@ -573,19 +603,14 @@ fn whole(n: f64) -> usize {
     n.trunc().clamp(0.0, 1e9) as usize
 }
 
-/// A value as a number: an empty cell is zero, true is one, and text that
-/// reads as a number is that number.
+/// A value as a number: an empty cell is zero, true is one, and text is not
+/// one until [`Context::converted`] has read it.
 fn number(value: &Value) -> Result<f64, Error> {
     match value {
         Value::Empty => Ok(0.0),
         Value::Number(n) | Value::Date(n) => Ok(*n),
         Value::Boolean(b) => Ok(if *b { 1.0 } else { 0.0 }),
-        Value::Text(t) => t
-            .trim()
-            .parse::<f64>()
-            .ok()
-            .filter(|n| n.is_finite())
-            .ok_or(Error::Value),
+        Value::Text(_) => Err(Error::Value),
         Value::Error(error) => Err(*error),
     }
 }

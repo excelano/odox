@@ -471,8 +471,14 @@ it, `1E+020`, and `UPPER` makes ß the capital ẞ. `DATE` refuses a day before
 15 October 1582, where the Gregorian calendar begins, and a year below zero; a
 day before it that arithmetic reaches is written in the proleptic Gregorian
 calendar, with the years before the first counted without a year zero,
-`-0061-04-04`, and shown in the Julian calendar, as `LibreOffice` does both. A result keeps the kind of value its cell
-held and is shown in the cell's number format; an error is written as
+`-0061-04-04`, and shown in the Julian calendar, as `LibreOffice` does both.
+Text that arithmetic or a function's argument wants as a number is read in the
+conventions of United States English whatever the document's language, as
+`LibreOffice` reads it (`formula/convert.rs`): `1,000`, `(5)`, `$5`, `5 %`,
+`TRUE`, `1 1/2`, `5/1/2024`, `2024-05-01`, `May 1, 2024` and `9:30 pm` are
+numbers, and a date written without its year falls in the year the window
+read the clock when the file opened. `=` and `&` keep text as text. A result
+keeps the kind of value its cell held and is shown in the cell's number format; an error is written as
 `LibreOffice` writes one. A formula outside the core keeps its result and is
 drawn faint once something it reads changes, or once anything does where it
 cannot even be read, as is every formula that reads one; a formula that reads
