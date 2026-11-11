@@ -21,6 +21,7 @@ use eframe::egui::{
     layers::ShapeIdx,
     pos2, vec2,
 };
+use odox_core::dimension::{Dimension, MARKER_WIDTH};
 use odox_core::draw::Geometry;
 
 use odox_core::{
@@ -31,7 +32,7 @@ use odox_core::{
 use crate::find::Highlights;
 use crate::flow::{Flow, Pictures};
 use crate::flow_model::PageEditor;
-use crate::format::{self, Palette};
+use crate::format::{self, DEFAULT_SIZE, Palette};
 use crate::i18n::t;
 
 /// A page, and where on screen it is being drawn.
@@ -183,8 +184,8 @@ impl Canvas<'_> {
     /// last two have their outlines worked out by [`Geometry`], from ODF's own
     /// command language and from SVG's respectively — a `draw:frame` holding a
     /// picture or a text box, `draw:connector`, whose route between the two
-    /// shapes it joins the producer has already worked out, and `draw:g`, which
-    /// is a group and is descended into. Left undrawn: `draw:measure`.
+    /// shapes it joins the producer has already worked out, `draw:measure`, a
+    /// dimension line, and `draw:g`, which is a group and is descended into.
     pub fn shape(&mut self, ui: &mut Ui, shape: &Element) {
         if shape.is(&Ns::Draw, "g") {
             for child in shape.elements() {
@@ -209,6 +210,11 @@ impl Canvas<'_> {
 
         if shape.is(&Ns::Draw, "connector") {
             self.connector(ui, shape, &properties, outline);
+            return;
+        }
+
+        if shape.is(&Ns::Draw, "measure") {
+            self.measure(ui, shape, &properties, outline);
             return;
         }
 
@@ -354,6 +360,75 @@ impl Canvas<'_> {
             ui.interact(place.bounds(), id, Sense::hover())
                 .on_hover_text(t("Text in a turned shape cannot be edited yet."));
         }
+    }
+
+    /// A dimension line: its guides, the line and the markers at its ends in
+    /// the outline's colour, and its label along it.
+    fn measure(&self, ui: &Ui, shape: &Element, properties: &Properties, outline: Option<Stroke>) {
+        let at = |local: &str| {
+            shape
+                .attr(&Ns::Svg, local)
+                .and_then(Length::parse)
+                .map(Length::points)
+        };
+        let (Some(x1), Some(y1), Some(x2), Some(y2)) = (at("x1"), at("y1"), at("x2"), at("y2"))
+        else {
+            return;
+        };
+        let Some(dimension) = Dimension::new((x1, y1), (x2, y2), &properties.graphic) else {
+            return;
+        };
+        let (page, scale) = (self.page, self.scale);
+        let screen = |(x, y): (f32, f32)| pos2(page.left() + x * scale, page.top() + y * scale);
+        let painter = self.painter(ui);
+        if let Some(stroke) = outline {
+            for [from, to] in dimension.guides {
+                painter.line_segment([screen(from), screen(to)], stroke);
+            }
+            painter.line_segment(
+                [screen(dimension.line[0]), screen(dimension.line[1])],
+                stroke,
+            );
+            for (end, at_start) in [
+                (&properties.graphic.marker_start, true),
+                (&properties.graphic.marker_end, false),
+            ] {
+                let Some((name, width)) = end else { continue };
+                let Some(marker) = self.document.styles.marker(name) else {
+                    continue;
+                };
+                let width = width.map_or(MARKER_WIDTH, Length::points);
+                for outline in dimension.marker(marker, at_start, width) {
+                    let points: Vec<Pos2> = outline.into_iter().map(screen).collect();
+                    let mut mesh = Mesh::default();
+                    for point in &points {
+                        mesh.colored_vertex(*point, stroke.color);
+                    }
+                    for [a, b, c] in triangulate(&points) {
+                        mesh.add_triangle(a, b, c);
+                    }
+                    painter.add(Shape::mesh(mesh));
+                }
+            }
+        }
+
+        let label = shape.plain_text().trim().to_owned();
+        if label.is_empty() {
+            return;
+        }
+        let format = format::text_format(&properties.text, DEFAULT_SIZE, scale, self.palette);
+        let color = format.color;
+        let galley = ui.fonts_mut(|fonts| {
+            fonts.layout_job(eframe::egui::text::LayoutJob::single_section(label, format))
+        });
+        let (corner, along, _) = dimension.label(galley.size().y / scale);
+        let length = along.0.hypot(along.1) * scale;
+        let direction = vec2(along.0, along.1) / along.0.hypot(along.1).max(f32::EPSILON);
+        let start = screen(corner) + direction * ((length - galley.size().x) / 2.0);
+        painter.add(
+            eframe::egui::epaint::TextShape::new(start, galley, color)
+                .with_angle(direction.y.atan2(direction.x)),
+        );
     }
 
     /// A connector, and the label it may carry.

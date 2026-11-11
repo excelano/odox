@@ -133,6 +133,11 @@ convert odp:impress8 gradients.odp "OpenDocument Presentation Flat XML" gradient
 # other way.
 convert odp:impress8 turned.odp "OpenDocument Presentation Flat XML" turned.fodp
 
+# Dimension lines: in the default style, across the slide, with arrowheads
+# from a marker and a style of its own, on the other side of their points,
+# placed below, and drawn right to left.
+convert odp:impress8 measures.odp "OpenDocument Presentation Flat XML" measures.fodp
+
 # A spreadsheet for the PDF export: a sheet wider and longer than a page with
 # a marked header row, a hidden row and column and a merged cell; a sheet with
 # a print range fitted to one page; a hidden sheet and an empty one. Flat ODF

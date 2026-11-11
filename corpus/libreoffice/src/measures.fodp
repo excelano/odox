@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:meta><dc:title>Dimension lines</dc:title><dc:language>en-US</dc:language></office:meta>
+ <office:styles>
+  <draw:marker draw:name="Arrow" svg:viewBox="0 0 20 30" svg:d="M10 0l-10 30h20z"/>
+  <style:style style:name="neg" style:family="graphic"><style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" draw:line-distance="-1cm"/></style:style>
+  <style:style style:name="below" style:family="graphic"><style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" draw:placing="below"/></style:style>
+  <style:style style:name="dim" style:family="graphic"><style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" draw:line-distance="1.5cm" draw:guide-overhang="0.5cm" draw:guide-distance="0.3cm" draw:show-unit="true" draw:marker-start="Arrow" draw:marker-start-width="0.4cm" draw:marker-end="Arrow" draw:marker-end-width="0.4cm"/><style:text-properties fo:font-size="14pt"/></style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="Page"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm"/></style:page-layout>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Plain" style:page-layout-name="Page"/></office:master-styles>
+ <office:body>
+  <office:presentation>
+   <draw:page draw:name="Dimension lines" draw:master-page-name="Plain">
+    <draw:frame presentation:class="title" svg:x="1cm" svg:y="0.2cm" svg:width="26cm" svg:height="1.5cm"><draw:text-box><text:p>Dimension lines</text:p></draw:text-box></draw:frame>
+    <draw:measure svg:x1="2cm" svg:y1="4cm" svg:x2="12cm" svg:y2="4cm"/>
+    <draw:measure draw:style-name="neg" svg:x1="15cm" svg:y1="4cm" svg:x2="25cm" svg:y2="4cm"/>
+    <draw:measure draw:style-name="below" svg:x1="15cm" svg:y1="9cm" svg:x2="25cm" svg:y2="9cm"/>
+    <draw:measure svg:x1="25cm" svg:y1="13cm" svg:x2="15cm" svg:y2="13cm"/>
+    <draw:measure draw:style-name="dim" svg:x1="2cm" svg:y1="11cm" svg:x2="9cm" svg:y2="11cm"/>
+   </draw:page>
+  </office:presentation>
+ </office:body>
+</office:document>
