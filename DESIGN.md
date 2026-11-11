@@ -196,7 +196,16 @@ default style spaces evenly, 1.25 cm apart where it says nothing; stops count
 from the paragraph's left margin, as `LibreOffice` counts them, and
 `corpus/libreoffice/tabs.odt` is the measure. The PDF export places a tab the
 same way (`odox-pdf`'s `text.rs`), its leader written as text a reader hears.
-Right-to-left text is drawn left to right. Small capitals are capitals at 80%
+Text that reads right to left is put in order line by line by the Unicode
+bidirectional algorithm (`odox-core`'s `bidi`), in a paragraph that reads left
+to right unless `style:writing-mode` says otherwise, as `LibreOffice` reads it;
+`start` is still the left margin, as `LibreOffice` aligns it. egui has no such
+algorithm, so such a paragraph is broken into lines here and each line handed
+to egui in the order it is drawn, a word read right to left as written for the
+shaper to turn; what is drawn then does not line up with what is written, so
+it is read and not edited, and hovering it in edit mode says so. The PDF
+export shapes such a stretch right to left and draws each line's runs in the
+same order, its text read in the order it is written. Small capitals are capitals at 80%
 of the size. In them and in text a style puts in capitals, `ß` is `ẞ`, as
 `LibreOffice` writes it, and a letter whose capital is two letters keeps its own
 form, so what is drawn is as long as the text the caret moves through. Ruby is written after the text it

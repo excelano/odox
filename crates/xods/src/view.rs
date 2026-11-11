@@ -306,11 +306,15 @@ impl Paint<'_> {
         let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
         let wrapped = style.cell.wrap == Some(true);
         let room = (rect.width() - padding * 2.0).max(1.0);
+        let right_to_left = style.paragraph.right_to_left == Some(true);
         let lay = |text: String| {
             let mut job = egui::text::LayoutJob::single_section(text, format.clone());
             if wrapped {
                 job.wrap.max_width = room;
                 job.halign = align;
+            }
+            if odox_core::bidi::needed(&job.text, right_to_left) {
+                return odox_ui::flow::in_visual_order(ui, &job, right_to_left);
             }
             ui.fonts_mut(|fonts| fonts.layout_job(job))
         };

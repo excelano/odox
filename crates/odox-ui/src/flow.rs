@@ -29,13 +29,16 @@ use eframe::egui::{
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
     Border, Document, Element, Family, Gradient, Node, Ns, Offset, Properties, SMALL_CAPS, TabKind,
-    TextAlign, TextProperties, Tiling,
+    TextAlign, TextProperties, Tiling, bidi,
     edit::{self, ListCounters},
 };
+
+use eframe::egui::epaint::text::ByteRangeExt as _;
 
 use crate::find::Highlights;
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
+use crate::i18n::t;
 use crate::links;
 
 /// Pictures already decoded, kept for as long as the document is open.
@@ -520,9 +523,16 @@ impl Flow<'_> {
         let leaders = place_tabs(ui, &mut job, &properties.paragraph, indent.max(0.0), zoom);
         let (job, map) = job.into_parts();
 
+        let right_to_left = properties.paragraph.right_to_left == Some(true);
+        let written = bidi::needed(&job.text, right_to_left).then(|| job.clone());
         let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
-        let height = galley.size().y;
-        let edited = !self.detached && self.page.is_some();
+        // A paragraph with text that reads right to left is drawn from a
+        // second layout, each of its lines in the order it reads, which egui
+        // does not do; what is drawn then no longer lines up with what is
+        // written character for character, so it is read, not edited.
+        let visual = written.map(|written| in_visual_order(ui, &written, right_to_left));
+        let height = visual.as_ref().unwrap_or(&galley).size().y;
+        let edited = !self.detached && self.page.is_some() && visual.is_none();
         // Click and drag, and not merely hover: the selection plugin begins a
         // selection only on a response whose sense includes drag, which is what
         // `Label` adds to its own when it is selectable, and the click half is
@@ -573,33 +583,14 @@ impl Flow<'_> {
         // each paragraph was drawn.
         let origin = pos2(anchor, rect.top());
         paint_leaders(ui, &leaders, origin, &base);
-        let mut galley = galley;
-        self.show_matches(ui, &mut galley, &map, origin);
-        let readable = Arc::clone(&galley);
-        let links = edit::links(element);
-        let hit = (!links.is_empty()).then(|| (Arc::clone(&galley), map.clone()));
-        if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
-            let laid = Laid {
-                galley,
-                map,
-                origin,
-            };
-            page.paragraph(ui, &response, &self.path, laid);
+        if let Some(visual) = visual {
+            ui.painter().galley(origin, visual, base.color);
+            expose(ui, &response, element, &galley, origin, false);
+            if self.page.is_some() && !self.detached {
+                response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
+            }
         } else {
-            LabelSelectionState::label_text_selection(
-                ui,
-                &response,
-                origin,
-                galley,
-                base.color,
-                Stroke::NONE,
-            );
-        }
-
-        expose(ui, &response, element, &readable, origin, edited);
-
-        if let Some((galley, map)) = hit {
-            self.follow_link(ui, &response, &links, &galley, &map, origin, edited);
+            self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
         }
 
         if let Some(label) = label {
@@ -624,6 +615,49 @@ impl Flow<'_> {
         self.detached = was_detached;
         if after > 0.0 {
             ui.add_space(after);
+        }
+    }
+
+    /// Draw a paragraph laid out in the order it is written, through the page
+    /// editor in edit mode and egui's selection otherwise, with its links.
+    #[allow(clippy::too_many_arguments)]
+    fn written_order(
+        &mut self,
+        ui: &mut Ui,
+        element: &Element,
+        response: &Response,
+        (galley, map): (Arc<Galley>, OffsetMap),
+        origin: Pos2,
+        base: &TextFormat,
+        edited: bool,
+    ) {
+        let mut galley = galley;
+        self.show_matches(ui, &mut galley, &map, origin);
+        let readable = Arc::clone(&galley);
+        let links = edit::links(element);
+        let hit = (!links.is_empty()).then(|| (Arc::clone(&galley), map.clone()));
+        if let Some(page) = self.page.as_deref_mut().filter(|_| edited) {
+            let laid = Laid {
+                galley,
+                map,
+                origin,
+            };
+            page.paragraph(ui, response, &self.path, laid);
+        } else {
+            LabelSelectionState::label_text_selection(
+                ui,
+                response,
+                origin,
+                galley,
+                base.color,
+                Stroke::NONE,
+            );
+        }
+
+        expose(ui, response, element, &readable, origin, edited);
+
+        if let Some((galley, map)) = hit {
+            self.follow_link(ui, response, &links, &galley, &map, origin, edited);
         }
     }
 
@@ -1388,6 +1422,169 @@ fn paint_leaders(ui: &Ui, leaders: &[Leader], origin: Pos2, format: &TextFormat)
             format.color,
         );
     }
+}
+
+/// A paragraph laid out with each of its lines in the order it reads, as
+/// the Unicode bidirectional algorithm puts it, every line a line of its own.
+///
+/// egui shapes each section on its own and turns one whose script reads right
+/// to left round, so a stretch read right to left is given in pieces in the
+/// order they are drawn: a word in the order it is written, which the shaper
+/// turns, and the spaces and marks between words turned here, a bracket facing
+/// the other way. Where the lines break is worked out here too: egui breaks
+/// a line by where its glyphs stand, and a word turned round puts them out of
+/// order.
+pub fn in_visual_order(ui: &Ui, written: &LayoutJob, right_to_left: bool) -> Arc<Galley> {
+    let text = written.text.as_str();
+    let paragraph = bidi::Paragraph::new(text, right_to_left);
+    let mut job = LayoutJob {
+        wrap: eframe::egui::text::TextWrapping {
+            max_width: f32::INFINITY,
+            ..written.wrap.clone()
+        },
+        halign: written.halign,
+        first_row_min_height: written.first_row_min_height,
+        ..LayoutJob::default()
+    };
+    let format_at = |at: usize| {
+        written
+            .sections
+            .iter()
+            .find(|section| section.byte_range.as_usize().contains(&at))
+            .or(written.sections.last())
+            .map(|section| section.format.clone())
+            .unwrap_or_default()
+    };
+    for (index, line) in lines(ui, written).into_iter().enumerate() {
+        if index > 0 {
+            section(&mut job, "\n", format_at(line.start));
+        }
+        for run in paragraph.line(line) {
+            if run.right_to_left {
+                for piece in pieces(text, run.range).into_iter().rev() {
+                    append(&mut job, written, piece, true);
+                }
+            } else {
+                append(&mut job, written, run.range, false);
+            }
+        }
+    }
+    if let (Some(lead), Some(first)) = (written.sections.first(), job.sections.first_mut()) {
+        first.leading_space = lead.leading_space;
+    }
+    ui.ctx().fonts_mut(|fonts| fonts.layout_job(job))
+}
+
+/// Where a paragraph's lines break, as the bytes of each: after a space,
+/// where the next word no longer fits the width the paragraph wraps to, and at
+/// each line break written in it. A word wider than the line has one to itself.
+fn lines(ui: &Ui, written: &LayoutJob) -> Vec<std::ops::Range<usize>> {
+    let text = written.text.as_str();
+    let width = |range: std::ops::Range<usize>| {
+        if range.is_empty() {
+            return 0.0;
+        }
+        let mut job = LayoutJob::default();
+        for piece in pieces(text, range) {
+            append(&mut job, written, piece, false);
+        }
+        ui.ctx()
+            .fonts_mut(|fonts| fonts.layout_job(job))
+            .rect
+            .width()
+    };
+    let most = written.wrap.max_width;
+    let lead = written.sections.first().map_or(0.0, |s| s.leading_space);
+    let mut lines = Vec::new();
+    let mut start = 0;
+    for hard in text.split_inclusive('\n') {
+        let end = start + hard.len();
+        let body = start..end - usize::from(hard.ends_with('\n'));
+        let mut line = body.start;
+        let mut used = if lines.is_empty() { lead } else { 0.0 };
+        let mut at = body.start;
+        while at < body.end {
+            let word_end = text[at..body.end]
+                .find(char::is_whitespace)
+                .map_or(body.end, |offset| at + offset);
+            let space_end = text[word_end..body.end]
+                .find(|c: char| !c.is_whitespace())
+                .map_or(body.end, |offset| word_end + offset);
+            let word = width(at..word_end);
+            if at > line && used + word > most {
+                lines.push(line..line + text[line..at].trim_end().len());
+                line = at;
+                used = 0.0;
+            }
+            used += word + width(word_end..space_end);
+            at = space_end;
+        }
+        lines.push(line..body.end);
+        start = end;
+    }
+    lines
+}
+
+/// A stretch that reads right to left, cut into its words and what lies
+/// between them, in the order they are written.
+fn pieces(text: &str, range: std::ops::Range<usize>) -> Vec<std::ops::Range<usize>> {
+    let worded = |character: char| bidi::is_right_to_left(character) || bidi::is_mark(character);
+    let mut pieces: Vec<(std::ops::Range<usize>, bool)> = Vec::new();
+    for (offset, character) in text[range.clone()].char_indices() {
+        let at = range.start + offset;
+        let end = at + character.len_utf8();
+        let kind = worded(character);
+        match pieces.last_mut() {
+            Some((piece, last)) if *last == kind => piece.end = end,
+            _ => pieces.push((at..end, kind)),
+        }
+    }
+    pieces.into_iter().map(|(piece, _)| piece).collect()
+}
+
+/// Append a stretch of a paragraph's written text to a job, in the formats
+/// its sections give it: in the order it is written, or turned round and its
+/// brackets mirrored where it reads right to left and is not a word the shaper
+/// turns itself.
+fn append(job: &mut LayoutJob, written: &LayoutJob, range: std::ops::Range<usize>, turned: bool) {
+    let text = written.text.as_str();
+    let mut parts: Vec<(std::ops::Range<usize>, &TextFormat)> = written
+        .sections
+        .iter()
+        .filter_map(|section| {
+            let own = section.byte_range.as_usize();
+            let start = own.start.max(range.start);
+            let end = own.end.min(range.end);
+            (start < end).then_some((start..end, &section.format))
+        })
+        .collect();
+    let word = text[range.clone()].chars().any(bidi::is_right_to_left);
+    if turned {
+        parts.reverse();
+    }
+    for (part, format) in parts {
+        let piece = &text[part];
+        if turned && !word {
+            let mirrored: String = piece.chars().rev().map(bidi::mirrored).collect();
+            section(job, &mirrored, format.clone());
+        } else {
+            section(job, piece, format.clone());
+        }
+    }
+}
+
+/// Add text to a job as a section of its own, which egui shapes on its own:
+/// `LayoutJob::append` runs it into the section before when the format is the
+/// same, and the two would be turned round as one.
+fn section(job: &mut LayoutJob, text: &str, format: TextFormat) {
+    let start = job.text.len();
+    job.text.push_str(text);
+    job.sections.push(eframe::egui::text::LayoutSection {
+        leading_space: 0.0,
+        byte_range: eframe::egui::epaint::text::ByteIndex(start)
+            ..eframe::egui::epaint::text::ByteIndex(job.text.len()),
+        format,
+    });
 }
 
 #[cfg(test)]

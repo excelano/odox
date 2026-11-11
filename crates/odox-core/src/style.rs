@@ -317,6 +317,11 @@ pub struct ParagraphProperties {
     pub tab_stops: Option<Vec<TabStop>>,
     /// How far apart the stops are that nothing sets, from the default style.
     pub tab_distance: Option<Length>,
+    /// Whether the paragraph reads right to left, as `style:writing-mode`
+    /// says: which end of a line its first words go at. Where it is set,
+    /// `start` and `left` are still the left margin, as `LibreOffice` aligns
+    /// them.
+    pub right_to_left: Option<bool>,
 }
 
 /// A tab stop: where a tab takes the text after it, and how.
@@ -1532,17 +1537,20 @@ impl ParagraphProperties {
     fn apply(&mut self, p: &Element) {
         if let Some(align) = p.attr(&Ns::Fo, "text-align") {
             self.align = match align {
-                // `left` and `right` are the writing-direction-independent
-                // spellings' siblings, and for a left-to-right document they are
-                // the same thing. A right-to-left document would need the
-                // direction to tell them apart, which is what §6 of DESIGN.md
-                // says this release does not do.
+                // `LibreOffice` aligns `start` to the left margin in a
+                // paragraph that reads right to left too, and writes `left`
+                // back as `start`, so the two are the same thing.
                 "start" | "left" => Some(TextAlign::Start),
                 "end" | "right" => Some(TextAlign::End),
                 "center" => Some(TextAlign::Center),
                 "justify" => Some(TextAlign::Justify),
                 _ => self.align,
             };
+        }
+        match p.attr(&Ns::Style, "writing-mode") {
+            Some("rl-tb" | "rl" | "tb-rl") => self.right_to_left = Some(true),
+            Some("lr-tb" | "lr" | "tb-lr") => self.right_to_left = Some(false),
+            _ => {}
         }
         read_edges(p, "margin", &mut self.margin, Length::parse);
         read_edges(p, "padding", &mut self.padding, Length::parse);

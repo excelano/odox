@@ -67,6 +67,10 @@ zip = { version = "9.1", default-features = false, features = ["deflate-flate2-z
 # a criterion matches a cell, not a book, and the features kept are the ones
 # a criterion's case folding and `\d`, `\w` and `\s` need.
 regex = { version = "1.13", default-features = false, features = ["std", "unicode-case", "unicode-perl"] }
+# The Unicode bidirectional algorithm, for the order a line of Hebrew or Arabic
+# mixed with anything else is drawn in. egui has none, and the PDF export lays
+# its own lines; both take the runs from here.
+unicode-bidi = { version = "0.3.18", default-features = false, features = ["std", "hardcoded-data"] }
 
 # The window. The features are eframe's defaults less `system_fonts`, which
 # searches the machine for a character no loaded face has: `odox-ui` does that

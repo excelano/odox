@@ -12,13 +12,14 @@
 
 use std::collections::HashMap;
 use std::num::{NonZeroU16, NonZeroU32};
+use std::ops::Range;
 use std::rc::Rc;
 
 use krilla::paint::Paint;
 use krilla::tagging::{TableHeaderScope, Tag, TagKind};
 use krilla::text::KrillaGlyph;
 use odox_core::edit::Description;
-use odox_core::{Border, Color, Edges, Measure, TextAlign};
+use odox_core::{Border, Color, Edges, Measure, TextAlign, bidi};
 
 use crate::Refusal;
 use crate::fonts::Faces;
@@ -413,6 +414,8 @@ impl<'a> Layout<'a> {
             )
         };
         let glyphs = glyphs;
+        let directions = bidi::needed(&paragraph.text, paragraph.right_to_left)
+            .then(|| bidi::Paragraph::new(&paragraph.text, paragraph.right_to_left));
         let count = lines.len();
         let mut link_nodes: HashMap<usize, NodeId> = HashMap::new();
 
@@ -476,24 +479,39 @@ impl<'a> Layout<'a> {
             let mut decorations = Vec::new();
             let mut gaps = Vec::new();
             let mut pen = start;
-            for fragment in fragments(&in_line) {
+            // Every glyph of a cluster stands for the whole of it, which ends
+            // where the next cluster in the text begins.
+            let mut clusters: Vec<usize> = in_line.iter().map(|g| g.cluster).collect();
+            clusters.sort_unstable();
+            clusters.dedup();
+            let end_of = |cluster: usize| {
+                clusters
+                    .iter()
+                    .copied()
+                    .find(|&c| c > cluster)
+                    .unwrap_or(line.end)
+            };
+            let drawn = match &directions {
+                Some(directions) => visual(directions, &in_line, line.start..trimmed),
+                None => in_line.clone(),
+            };
+            for fragment in fragments(&drawn) {
                 let style = &paragraph.runs[fragment[0].run].style;
-                let begin = fragment[0].cluster;
-                let end = in_line
+                let begin = fragment
                     .iter()
                     .map(|g| g.cluster)
-                    .find(|&c| c > fragment[fragment.len() - 1].cluster)
+                    .min()
+                    .unwrap_or(line.start);
+                let end = fragment
+                    .iter()
+                    .map(|g| end_of(g.cluster))
+                    .max()
                     .unwrap_or(line.end);
                 let shown = paragraph.text[begin..end].trim_end_matches('\n');
                 let mut krilla = Vec::new();
                 let mut advance = 0.0;
-                for (index, glyph) in fragment.iter().enumerate() {
-                    // Every glyph of a cluster stands for the whole of it.
-                    let next = fragment[index..]
-                        .iter()
-                        .map(|g| g.cluster)
-                        .find(|&c| c != glyph.cluster)
-                        .unwrap_or(end);
+                for glyph in &fragment {
+                    let next = end_of(glyph.cluster);
                     let stretched = if stretch > 0.0
                         && glyph.cluster < trimmed
                         && paragraph.text[glyph.cluster..].starts_with(' ')
@@ -1103,6 +1121,25 @@ fn reading_level(above: &mut Vec<u8>, own: u8) -> u8 {
 
 /// The glyphs of a line in runs that are drawn together: the same run and the
 /// same face.
+/// A line's glyphs in the order they are drawn: the runs the bidirectional
+/// algorithm puts the line in, each run's glyphs turned round where it reads
+/// right to left, which is the order its shaper gave them.
+fn visual<'g>(
+    directions: &bidi::Paragraph<'_>,
+    glyphs: &[&'g Glyph],
+    line: Range<usize>,
+) -> Vec<&'g Glyph> {
+    let mut drawn = Vec::with_capacity(glyphs.len());
+    for run in directions.line(line) {
+        let start = drawn.len();
+        drawn.extend(glyphs.iter().filter(|g| run.range.contains(&g.cluster)));
+        if run.right_to_left {
+            drawn[start..].reverse();
+        }
+    }
+    drawn
+}
+
 fn fragments<'g>(glyphs: &[&'g Glyph]) -> Vec<Vec<&'g Glyph>> {
     let mut out: Vec<Vec<&Glyph>> = Vec::new();
     for &glyph in glyphs {
@@ -1286,6 +1323,30 @@ mod tests {
             .iter()
             .map(|&level| reading_level(&mut above, level))
             .collect()
+    }
+
+    #[test]
+    fn a_line_draws_a_stretch_read_right_to_left_from_its_last_glyph() {
+        let text = "ab שלום cd";
+        let glyphs: Vec<Glyph> = text
+            .char_indices()
+            .map(|(cluster, _)| Glyph {
+                id: 1,
+                cluster,
+                advance: 1.0,
+                dx: 0.0,
+                dy: 0.0,
+                run: 0,
+                face: 0,
+            })
+            .collect();
+        let line: Vec<&Glyph> = glyphs.iter().collect();
+        let directions = bidi::Paragraph::new(text, false);
+        let drawn: String = visual(&directions, &line, 0..text.len())
+            .iter()
+            .filter_map(|glyph| text[glyph.cluster..].chars().next())
+            .collect();
+        assert_eq!(drawn, "ab םולש cd");
     }
 
     #[test]

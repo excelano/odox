@@ -1,8 +1,10 @@
 //! A paragraph's characters as glyphs, and where its lines break.
 //!
 //! Each run is shaped in the face its style resolves to, and a character
-//! that face lacks is shaped in the first face that has it. Text is shaped
-//! left to right whatever its script, as the window draws it (DESIGN.md §6).
+//! that face lacks is shaped in the first face that has it. A stretch that
+//! reads right to left, by the Unicode bidirectional algorithm, is shaped
+//! right to left and its glyphs kept in the order its characters are written;
+//! a line puts them in the order they are drawn (DESIGN.md §6).
 //! Lines break where the Unicode line breaking algorithm allows, at the
 //! width the page gives; a word wider than the line is cut where it must be.
 //
@@ -12,7 +14,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use odox_core::TabKind;
+use odox_core::{TabKind, bidi};
 
 use unicode_linebreak::{BreakOpportunity, linebreaks};
 
@@ -41,13 +43,20 @@ pub(crate) struct Glyph {
 /// A face cannot be had for a run, or a character is in no face on the
 /// machine.
 pub(crate) fn shape(paragraph: &Paragraph, faces: &mut Faces) -> Result<Vec<Glyph>, Refusal> {
+    let directions = bidi::needed(&paragraph.text, paragraph.right_to_left)
+        .then(|| bidi::Paragraph::new(&paragraph.text, paragraph.right_to_left));
+    let reversed = |at: usize| {
+        directions
+            .as_ref()
+            .is_some_and(|directions| directions.reads_right_to_left(at))
+    };
     let mut glyphs = Vec::new();
     for (index, run) in paragraph.runs.iter().enumerate() {
         let primary = faces.request(&run.style.family, run.style.variant)?;
         // Split the run where the face that has its characters changes. A
         // character the previous one's face also has stays with it, so that a
         // combining mark is shaped with the letter it sits on.
-        let mut segments: Vec<(Range<usize>, usize)> = Vec::new();
+        let mut segments: Vec<(Range<usize>, usize, bool)> = Vec::new();
         let text = &paragraph.text[run.range.clone()];
         for (offset, character) in text.char_indices() {
             let at = run.range.start + offset;
@@ -57,19 +66,37 @@ pub(crate) fn shape(paragraph: &Paragraph, faces: &mut Faces) -> Result<Vec<Glyp
             }
             let character = if character == '\t' { ' ' } else { character };
             let face = match segments.last() {
-                Some((range, face)) if range.end == at && faces.covers(*face, character) => *face,
+                Some((range, face, _)) if range.end == at && faces.covers(*face, character) => {
+                    *face
+                }
                 _ if faces.covers(primary, character) => primary,
                 _ => faces
                     .fallback(character, run.style.variant)
                     .ok_or(Refusal::Glyph(character))?,
             };
+            let backward = reversed(at);
             match segments.last_mut() {
-                Some((range, last)) if *last == face && range.end == at => range.end = end,
-                _ => segments.push((at..end, face)),
+                Some((range, last, way))
+                    if *last == face && *way == backward && range.end == at =>
+                {
+                    range.end = end;
+                }
+                _ => segments.push((at..end, face, backward)),
             }
         }
-        for (range, face) in segments {
-            shape_segment(paragraph, range, face, index, faces, &mut glyphs)?;
+        for (range, face, backward) in segments {
+            let first = glyphs.len();
+            shape_segment(
+                paragraph,
+                (range, backward),
+                face,
+                index,
+                faces,
+                &mut glyphs,
+            )?;
+            if backward {
+                glyphs[first..].reverse();
+            }
         }
     }
     Ok(glyphs)
@@ -77,7 +104,7 @@ pub(crate) fn shape(paragraph: &Paragraph, faces: &mut Faces) -> Result<Vec<Glyp
 
 fn shape_segment(
     paragraph: &Paragraph,
-    range: Range<usize>,
+    (range, backward): (Range<usize>, bool),
     face: usize,
     run: usize,
     faces: &Faces,
@@ -89,7 +116,11 @@ fn shape_segment(
     let mut buffer = rustybuzz::UnicodeBuffer::new();
     buffer.push_str(&paragraph.text[range.clone()].replace('\t', " "));
     buffer.guess_segment_properties();
-    buffer.set_direction(rustybuzz::Direction::LeftToRight);
+    buffer.set_direction(if backward {
+        rustybuzz::Direction::RightToLeft
+    } else {
+        rustybuzz::Direction::LeftToRight
+    });
     let output = rustybuzz::shape(&shaper, &[], buffer);
     let size = paragraph.runs[run].style.size;
     let scale = size / loaded.units_per_em;

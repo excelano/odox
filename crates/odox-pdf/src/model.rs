@@ -68,6 +68,8 @@ pub(crate) struct Paragraph {
     pub page_after: bool,
     pub tabs: Vec<TabStop>,
     pub tab_distance: f32,
+    /// Whether it reads right to left as a whole, as its style says.
+    pub right_to_left: bool,
 }
 
 impl Paragraph {
@@ -95,6 +97,7 @@ impl Paragraph {
             page_after: false,
             tabs: Vec::new(),
             tab_distance: TAB_DISTANCE,
+            right_to_left: false,
         }
     }
 }
@@ -298,6 +301,7 @@ impl Reader<'_> {
             page_after: p.break_after == Some(Break::Page),
             tabs: p.tab_stops.clone().unwrap_or_default(),
             tab_distance: p.tab_distance.map_or(TAB_DISTANCE, Length::points),
+            right_to_left: p.right_to_left == Some(true),
         }));
         for (element, path) in anchored {
             let outer = std::mem::replace(&mut self.path, path);

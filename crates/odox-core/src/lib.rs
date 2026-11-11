@@ -29,6 +29,7 @@
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod bidi;
 pub mod blank;
 pub mod data_style;
 pub mod doc;

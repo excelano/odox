@@ -150,3 +150,8 @@ convert ods:calc8 criteria.ods "OpenDocument Spreadsheet Flat XML" criteria.fods
 convert ods:calc8 parts.ods "OpenDocument Spreadsheet Flat XML" parts.fods
 convert ods:calc8 comments.ods "OpenDocument Spreadsheet Flat XML" comments.fods
 convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt
+
+# Text that reads right to left: Hebrew and Arabic in paragraphs that read
+# left to right, the same in paragraphs whose style says they read right to
+# left, with Latin words and numbers among them, and long enough to wrap.
+convert odt:writer8 directions.odt "OpenDocument Text Flat XML" directions.fodt
