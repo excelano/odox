@@ -252,9 +252,8 @@ if ($All -and $Binary) {
 # publisher display name, and the calculated forms. `Publisher` is the X.500
 # string Partner Center assigns per account, the same for every Excelano
 # product, and it comes from the environment so that a public repository does
-# not carry an account identifier: `windows.yml` passes the organisation
-# secret STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
-# own environment before running this.
+# not carry an account identifier: the Windows machine sets STORE_PUBLISHER in
+# its own environment before running this.
 $identityFile = Join-Path $here 'identity.psd1'
 if (-not (Test-Path $identityFile)) {
     Refuse "no identity at $identityFile - it is committed beside this script and should not be missing"
@@ -402,9 +401,9 @@ function Build-Package([string] $name) {
     # is a certification tester's rather than this one. slipcase-desktop 0.1.1 was
     # packaged, certified, submitted and failed on exactly that: it imported
     # VCRUNTIME140.dll from the Visual C++ Redistributable, which every machine
-    # here has and a clean Windows does not. The check is its own script because
-    # CI runs it too, and it is here because this is the last place a bad binary
-    # can still be stopped.
+    # here has and a clean Windows does not. The check is its own script so that
+    # it can run on a binary alone, and it is here because this is the last place
+    # a bad binary can still be stopped.
     & (Join-Path $here 'check-imports.ps1') -Binary $exe
     if ($LASTEXITCODE -ne 0) {
         Refuse "$exe imports a DLL that does not ship with Windows - see above"

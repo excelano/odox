@@ -341,9 +341,9 @@ build_bundle() {
     binary="$binary_arg"
     if [ "$universal" = yes ]; then
         # `--binary` already names a joined executable where the App Store lane
-        # supplies one: the Apple silicon runner lipo'd it once in CI and
-        # attached it to the release, and ship's Mac step hands that file
-        # straight to this script rather than paying for the join twice. Only
+        # supplies one: `build-release` joins it once and attaches it to the
+        # release, and `ship-macstore` hands that file straight to this script
+        # rather than paying for the join twice. Only
         # where nothing was named does this script do what its own name says
         # and build the two slices itself.
         if [ -z "$binary" ]; then
