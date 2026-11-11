@@ -1,8 +1,7 @@
 [package]
 name = "xods"
 description = "A small, fast editor for OpenDocument spreadsheets"
-keywords = ["opendocument", "ods", "spreadsheet", "odf", "egui"]
-categories = ["gui"]
+publish = false
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

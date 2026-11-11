@@ -47,15 +47,6 @@ installs the whole suite. To take only the ones you want, name them instead —
 `sudo apt install xods`, say, and no application depends on another. amd64 and
 arm64 both.
 
-From crates.io, which gives you the binary and nothing around it — no desktop
-entry, no icon, so a file manager will not offer it:
-
-    cargo install xodt
-
-The launcher on its own is `cargo install odox`, and there it really is on its
-own: a crate cannot depend on a Debian package, so the applications are a
-separate `cargo install` each.
-
 From a clone, which is the same package the apt repository serves:
 
     cargo build --release

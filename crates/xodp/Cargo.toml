@@ -1,8 +1,7 @@
 [package]
 name = "xodp"
 description = "A small, fast editor for OpenDocument presentations"
-keywords = ["opendocument", "odp", "presentation", "odf", "egui"]
-categories = ["gui"]
+publish = false
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

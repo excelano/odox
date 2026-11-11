@@ -1,8 +1,7 @@
 [package]
 name = "odox-fonts"
 description = "Which of the machine's fonts an OpenDocument font family resolves to"
-keywords = ["opendocument", "odf", "fonts", "fontdb"]
-categories = ["text-processing"]
+publish = false
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
