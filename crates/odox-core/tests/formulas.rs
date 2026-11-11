@@ -26,7 +26,7 @@ const CALC: usize = 1;
 /// error, and the text it shows.
 fn results(document: &SheetDocument) -> Vec<(String, Value, bool, String)> {
     let sheet = &document.sheets()[CALC];
-    (0..200)
+    (0..300)
         .filter_map(|row| {
             let label = document.cell(sheet, row, 0)?.text();
             let cell = document.cell(sheet, row, 1)?;
@@ -234,4 +234,19 @@ fn an_error_result_reads_as_the_error_it_shows_and_sits_right() {
             .all(|value| matches!(value, Value::Error(shown) if shown.starts_with(['#', 'E'])))
     );
     assert!(errors.iter().all(Value::aligns_right));
+}
+
+#[test]
+fn a_date_written_without_its_year_falls_in_this_year() {
+    let mut document = with_formula(0, "of:=\"5/1\"+0");
+    document.recalculate_all();
+    let sheet = &document.sheets()[CALC];
+    assert_eq!(document.cell(sheet, 0, 1).expect("cell").text(), "#VALUE!");
+    document.this_year = Some(2024);
+    document.recalculate_all();
+    let sheet = &document.sheets()[CALC];
+    assert_eq!(
+        document.cell(sheet, 0, 1).expect("cell").value(),
+        Value::Number(45413.0)
+    );
 }

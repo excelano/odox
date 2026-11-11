@@ -172,6 +172,48 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>month long before</text:p></table:table-cell><table:table-cell table:formula="of:=MONTH(-700000)"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>day long before</text:p></table:table-cell><table:table-cell table:formula="of:=DAY(-700000)"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>year far ahead</text:p></table:table-cell><table:table-cell table:formula="of:=YEAR(1E9)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>text plus a number</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5&quot;+1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>grouped thousands</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1,000&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>groups of two</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1,00&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>a point is a decimal</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1.000&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>two points</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1.000.000&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>spaced thousands</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1 000&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>trailing minus</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5-&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>brackets</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;(5)&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>dollars</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;$5&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>euros</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;€5&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>pounds</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;£5&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>spaced percent</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5 %&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>exponent</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1.5E3&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>overflow</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1E400&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>inf</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;inf&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>true text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;TRUE&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>false text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;false&quot;*1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>mixed fraction</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1 1/2&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>slashed date</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5/1/2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>two digit year</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5/1/29&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>two digit year past</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5/1/30&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>dashed date</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;2024-05-01&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>dashed month first</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1-5-2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>slashed year first</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;2024/05/01&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>month named</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;May 1, 2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>month and year</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;May 2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>day before month</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;1 May 2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>month alone</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;Jan&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>no such day</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;2/30/2024&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>clock</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;12:30&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>clock with seconds</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;12:30:15.5&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>hour only</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;3:&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>afternoon</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;9:30 pm&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>date and time</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;2024-05-01 12:00&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>date T time</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;2024-05-01T12:00&quot;+0"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>negated text</text:p></table:table-cell><table:table-cell table:formula="of:=-&quot;5&quot;"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>percent of text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;50&quot;%"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>sum of text argument</text:p></table:table-cell><table:table-cell table:formula="of:=SUM(&quot;5&quot;;1)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>abs of text</text:p></table:table-cell><table:table-cell table:formula="of:=ABS(&quot;-3&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>compare text number</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5&quot;=5"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>join keeps text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;5&quot;&amp;1"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>unreadable text</text:p></table:table-cell><table:table-cell table:formula="of:=&quot;abc&quot;+1"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

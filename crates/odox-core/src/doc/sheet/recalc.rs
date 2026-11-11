@@ -278,6 +278,10 @@ impl Cells for Book<'_> {
         self.document.calculation_setting("case-sensitive") != Some("false")
     }
 
+    fn year(&self) -> Option<i64> {
+        self.document.this_year
+    }
+
     fn value(
         &self,
         sheet: usize,

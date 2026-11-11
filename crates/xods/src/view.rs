@@ -457,7 +457,7 @@ enum Step {
 
 impl View for SheetView {
     fn open(&mut self, ctx: &egui::Context, bytes: &[u8], path: &Path) -> Result<(), String> {
-        let document = SheetDocument::read(bytes).map_err(|e| {
+        let mut document = SheetDocument::read(bytes).map_err(|e| {
             fill(
                 t("{file} could not be opened: {reason}"),
                 &[
@@ -469,6 +469,7 @@ impl View for SheetView {
                 ],
             )
         })?;
+        document.this_year = Some(odox_ui::today().0);
         let mut parts = vec![&document.document.content];
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);

@@ -55,6 +55,10 @@ pub struct SheetDocument {
     /// A bulk edit is under way over a block split ahead of it, and the index
     /// is rebuilt once at its end instead of after every cell.
     batch: bool,
+    /// The year it is, which a formula reads a date written as text without
+    /// its year in, `"5/1"`. This crate keeps no clock: where nobody sets it,
+    /// such a date is not a number.
+    pub this_year: Option<i64>,
 }
 
 /// One sheet, indexed for lookup by row and column.
@@ -371,6 +375,7 @@ impl From<Document> for SheetDocument {
             document,
             sheets,
             batch: false,
+            this_year: None,
         }
     }
 }
