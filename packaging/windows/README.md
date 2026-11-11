@@ -12,8 +12,6 @@ product. From the repository root:
     ...\build-msix.ps1 xodt -SelfSign -Certify    # and the certification kit, elevated
     ...\install.ps1                               # per-user integration, under HKCU
     ...\uninstall.ps1
-    # install, uninstall and what is left is `windows.yml`'s, through
-    # excelano/.github's windows-install-check: it registers the real ProgIDs
     ...\shots.ps1                                # the listing's frames, all three
     ...\shots.ps1 -Only xodt                     # one application's
 
@@ -21,9 +19,9 @@ product. From the repository root:
 executable, the manifest with the identity and version substituted, and the
 assets under `assets\`. The Store signs what it distributes; `-SelfSign` makes a
 throwaway certificate so a package can be installed and looked at here, and
-`-Certify` runs the Windows App Certification Kit against it. `windows.yml`
-runs on every push the checks that need no identity; the package build, the kit
-and the screenshots need this machine.
+`-Certify` runs the Windows App Certification Kit against it. The package
+build, the kit and the screenshots need this machine; `shots-winstore` runs
+`shots.ps1` on it for a release.
 
 `odox.manifest` is embedded in all three editors by each crate's `build.rs`,
 through two linker arguments and no resource compiler; it declares per-monitor

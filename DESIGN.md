@@ -45,7 +45,7 @@ crate for any egui application.
 
 Pure Rust: a build that needs a Rust toolchain and nothing else cross-compiles
 from Linux with no MSVC toolchain, builds on a runner with nothing installed, and
-packages the same way on three platforms. The check is on the artefact, never
+packages the same way on three platforms. The check is on the artifact, never
 the manifest, because `cargo tree -i cc` is not empty in any eframe tree
 (`wayland-backend` declares `cc` under a feature nothing turns on):
 
@@ -151,10 +151,10 @@ since mapping a file is `unsafe` and this crate has none outside the macOS glue.
 
 **What a document leaves uncoloured follows the window's theme**: unset paper
 and ink turn dark together with a dark window, matching the chrome around
-them, so a document that colours nothing stays legible in either. A colour the
-document does set is drawn as set regardless — including text coloured dark
+them, so a document that colors nothing stays legible in either. A color the
+document does set is drawn as set regardless — including text colored dark
 against a page left unset, which the theme cannot then save from landing on
-now-dark paper. Pure black is the exception and counts as no colour, in text and
+now-dark paper. Pure black is the exception and counts as no color, in text and
 in borders: spreadsheet producers write it into every cell, and word processors
 onto the border of every table they insert, whether an author chose it or not,
 so left as set it would put most real workbooks and tables black on a dark
@@ -162,17 +162,17 @@ window.
 
 **Uncoloured text on a ground the document paints takes the ink that stands out
 against it.** A cell's or a paragraph's fill, a slide's background and a
-shape's fill are the document's own colours, so the theme's ink, chosen for the
+shape's fill are the document's own colors, so the theme's ink, chosen for the
 theme's paper, can land light on light. Text there is drawn in whichever of the
 light and dark palettes' inks has the higher contrast with the ground, and its
-links in that palette's link colour, which is what ODF's automatic font colour
-means. A gradient is judged by its middle colour; a picture is not judged, and
+links in that palette's link color, which is what ODF's automatic font color
+means. A gradient is judged by its middle color; a picture is not judged, and
 text on one keeps the theme's ink.
 
 **A hyperlink is the one exception**: every link is drawn in the theme's link
-colour even where the document's own character style resolves one, because
+color even where the document's own character style resolves one, because
 that style is almost always an ODF producer's boilerplate rather than
-something an author chose, unlike a heading someone coloured by hand.
+something an author chose, unlike a heading someone colored by hand.
 
 **A proportional line height is a proportion of each run's own size**, so a
 span set larger than its paragraph takes a taller line; an absolute one is the
@@ -190,7 +190,7 @@ senses drag, which a bare allocation does not.
 width, and page boxes, widows, floats and multiple columns are typesetting rather
 than reading. An export is where pages are made (§12).
 A tab goes to the paragraph's next stop (`flow.rs`'s `place_tabs`): the stops
-its style sets, left, right, centre or on a decimal character, with a leader
+its style sets, left, right, center or on a decimal character, with a leader
 of dots or a line where the stop has one, and past them the default stops the
 default style spaces evenly, 1.25 cm apart where it says nothing; stops count
 from the paragraph's left margin, as `LibreOffice` counts them, and
@@ -213,7 +213,7 @@ annotates, in parentheses, `漢字(かんじ)`, rather than set above it.
 A dimension line, `draw:measure`, is drawn as `LibreOffice` draws one
 (`odox-core`'s `dimension`, measured on `corpus/libreoffice/measures.odp`):
 its guides, the line standing off from the points, a marker at each end its
-style names, and the length `LibreOffice` wrote into it centred along the line
+style names, and the length `LibreOffice` wrote into it centered along the line
 and never upside down. A turned shape's label is laid out upright in a
 box the shape's size and turned onto the shape, in the window by carrying the
 triangles egui cuts it into and in an exported PDF by a transform, so it is
@@ -228,7 +228,7 @@ runs as `LibreOffice` draws it (`Gradient::level` in `odox-core`, measured on
 drawn as a picture of the gradient stretched over the shape, in the window and
 in an exported PDF alike. A picture is stretched
 over the shape, or laid at the style's size or its own, its pixels at the
-resolution its header gives or 96 to the inch, against the centre unless the
+resolution its header gives or 96 to the inch, against the center unless the
 style names a corner or an edge, and repeated across the shape or placed once,
 as `LibreOffice` lays it (`Tiling` in `odox-core`, measured on
 `corpus/libreoffice/fills.odp`); a fill that says nothing of repeating
@@ -251,7 +251,7 @@ module evaluates the formulas and flattens the path into polylines, because how
 finely a curve is broken depends on that space and not on the window. **A fill is
 cut into triangles by clipping ears**, because a fan from the first point is right
 only for a convex outline. **`draw:fill` and `draw:fill-color` inherit
-separately**: the colour names what a solid fill would use and does not turn the
+separately**: the color names what a solid fill would use and does not turn the
 fill on.
 
 ## §7 The window
@@ -270,7 +270,7 @@ or a text document with no headings, has no checkbox that does nothing.
 
 **A text document pages with buttons under it.** Page up and Page down move the
 view nine tenths of the window, so the line read last is still in sight, and
-grey out at the top and the bottom. The Page Up and Page Down keys do the same
+gray out at the top and the bottom. The Page Up and Page Down keys do the same
 while no caret is taking them, and Home and End, with or without Ctrl, go to
 the top and the bottom of the document; with a caret they move it, as §11
 says.
@@ -304,23 +304,23 @@ caret in it.
 ## §8 Language
 
 Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.
-There is one catalogue for the suite, under `crates/odox-ui/po`, because
+There is one catalog for the suite, under `crates/odox-ui/po`, because
 `potext::catalog!` gives the storage to the crate that invokes it and every
 message is invoked from `odox-ui`; the extraction globs every crate. An
 application contributes its own name, untranslated, and the name of the format
-it opens, a `const` built before `run` puts a catalogue in force, so it is
+it opens, a `const` built before `run` puts a catalog in force, so it is
 wrapped in `i18n::mark` and looked up through `t` where it is drawn. The desktop
 entries carry the same languages in `Comment[..]` and `GenericName[..]`, because
-a file manager reads those and never the catalogue. The launcher links no
+a file manager reads those and never the catalog. The launcher links no
 `odox-ui`, and its three sentences are English. German terminology follows the
 fleet glossary in Comma's `de.po` and LibreOffice's own German for the rest.
 
 `en-x-pseudo`, compiled into debug builds alone, returns every message accented,
 bracketed and 40% longer, and shows a string that never went through `t`, a
-sentence the catalogue never saw, and a label built to the width of English.
+sentence the catalog never saw, and a label built to the width of English.
 `po/update-po.sh` re-extracts and merges. `msgmerge` marks a reworded message `#, fuzzy` and `potext`
 refuses to load one, so a translation is current or visibly absent, never
-silently wrong, which is the property a key-value catalogue cannot offer.
+silently wrong, which is the property a key-value catalog cannot offer.
 
 ## §9 Size, speed and packaging
 
@@ -400,7 +400,7 @@ the way a spreadsheet reads it: a number is a number, a number
 with `%` a percentage, `true` and `false` are booleans, and anything else is
 text. A cell opens for editing with what reads back to its value: a percentage
 with its `%`, a date or a time as its format shows it, a formula as it is typed.
-The colour a format gives a section, red for a negative amount, is the colour
+The color a format gives a section, red for a negative amount, is the color
 the value is drawn in, in the window and in the PDF.
 Leaving a cell as it was is not an edit, so stepping through a currency does
 not retype it as a number.
@@ -461,7 +461,7 @@ the comment, and a sort moves each comment with its row.
 Ctrl+1: a number format (general, a number with its decimals and thousands
 grouped or not, a percentage, an amount in the currency of the document's
 country with its symbol where that country puts it, a date in the order that country writes one, a time), bold, italic
-and underline, a font colour, a fill, the text's alignment across and down the
+and underline, a font color, a fill, the text's alignment across and down the
 cell and whether it wraps, and borders, none, around the selection or around
 every cell in it. The question opens with what the picked cell shows and
 changes only what is changed in it, so cells that differ keep what nobody
@@ -636,9 +636,9 @@ the tree takes the prefix the document declares for its namespace on the
 content root, so a document that spells `text:` as `t:` is written its own way.
 A cell in a run the document wrote once with a repeat count is split into the
 run before, the one, and the run after, with the counts fixed, so the cell
-changes and its neighbours in the run keep what they had; a cell or row past
+changes and its neighbors in the run keep what they had; a cell or row past
 what the document wrote is created, with one repeated empty run filling the
-gap. A cell that holds a formula is refused, and so is one under a neighbour's
+gap. A cell that holds a formula is refused, and so is one under a neighbor's
 span. A shape's `svg:x`, `svg:y`, `svg:width` and `svg:height` are written in
 the unit each was read in.
 
@@ -646,7 +646,7 @@ the unit each was read in.
 slide's own shapes, a drag moves it, and a drag on a corner handle moves that
 corner with the opposite one fixed, never thinner than a point. The hit is
 tested where the button went down, because egui reports a drag only once the
-pointer has travelled, and a press on a handle is a press on the handle. What
+pointer has traveled, and a press on a handle is a press on the handle. What
 is not picked: a shape placed by `draw:transform`, which states no corner; a
 line, placed by its ends; a connector; a group; and everything the master page
 contributes. Each drag is one undo step, recorded when it begins.
@@ -656,7 +656,7 @@ click puts a caret into the paragraph under it, and typing goes into the tree
 before the next layout, so the paragraph is drawn with its own formatting as
 it changes and what is typed into a bold word is bold. Enter splits the
 paragraph, Shift+Enter is a line break inside it, and Backspace at its start
-or Delete at its end joins it to its neighbour; the arrows, Home and End
+or Delete at its end joins it to its neighbor; the arrows, Home and End
 cross from one paragraph into the next, Up, Down, Page Up and Page Down
 keeping to the column they began in, and Ctrl+Home, Ctrl+End and Ctrl+A reach
 the whole document. A selection made with Shift or a drag runs across paragraphs, and
@@ -691,7 +691,7 @@ go in above, below, left and right of the caret's cell and come out with it;
 the last row or column out takes the table, and Delete table takes it at once.
 The window draws columns at the widths their styles give, so a column put in
 shares the width of the one it goes beside and a column taken out gives its
-width to its neighbour, keeping the table as wide as it was. A table with merged
+width to its neighbor, keeping the table as wide as it was. A table with merged
 or repeated cells keeps its rows and columns, and the window says why. Tab in a
 table selects what the next cell holds and Shift+Tab the one before, row by
 row, and Tab in the last cell puts in a row and goes to its first. Each change
@@ -873,7 +873,7 @@ plain.
 **A deck's slides can be added, duplicated, deleted and moved.** A slide
 is a `draw:page` with its notes, shapes and animations, named by `draw:name`, and
 that name is what links, custom shows and the start page refer to it by. Moving
-swaps it with the neighbouring page and so changes nothing that refers to it.
+swaps it with the neighboring page and so changes nothing that refers to it.
 Deleting removes the page and takes its name out of the start page and the custom
 shows that list it, a show left with none going; the last slide is refused.
 Duplicating puts a copy after the original with a name no slide has (the
@@ -896,7 +896,7 @@ mode, and each is one undo step with the view following the slide.
 them following.** A row or a column is not always one element, since
 `table:number-rows-repeated` and `table:number-columns-repeated` stand for many,
 so an insert splits a run and a delete shortens one. An inserted row or column
-is a copy of its neighbour with what it held cleared and its formats kept, and a
+is a copy of its neighbor with what it held cleared and its formats kept, and a
 covered cell in the copy is an ordinary one, because a merged region does not
 grow. The whole change is made to a copy of the content and replaces it only
 when all of it can be made. It is refused when its line goes through a merged
@@ -949,7 +949,7 @@ is the one thing the PDF holds that the window does not show: its citation stays
 in the text, and its own text goes to the end of the document with the other
 notes, in the order they are cited, below a short rule, each tagged as a Note
 with its citation as its label. A sheet's name above its cells is the other.
-Every page is white with black ink where the document names no colour, whatever
+Every page is white with black ink where the document names no color, whatever
 the window's theme.
 
 **The windows have no pages; an export does.** Text is shaped by rustybuzz in
@@ -978,8 +978,8 @@ name, and today for a date that is not fixed. The body is shortened by the
 room they take, their height and the spacing their page layout asks between
 them and the body, and they are drawn inside the margins above and below it.
 A text document's keep their paragraphs' own alignment; a spreadsheet's left,
-centre and right regions each run across the page, and one with no regions is
-centred, as Calc prints it. Page numbers run on across a spreadsheet's sheets.
+center and right regions each run across the page, and one with no regions is
+centered, as Calc prints it. Page numbers run on across a spreadsheet's sheets.
 `corpus/libreoffice/pages.odt` is the measure. The windows have no pages and
 show neither.
 
@@ -1005,7 +1005,7 @@ the export.
 A presentation is a page per slide at the slide's size, and a slide the show
 skips (`presentation:visibility`) is left out. A slide is drawn as the window
 draws it: its ground, the master page's decorations, then its own shapes back to
-front, each filled, outlined and labelled, and a shape the window leaves undrawn
+front, each filled, outlined and labeled, and a shape the window leaves undrawn
 is left out too. The speaker's notes are not exported.
 
 **Everything drawn is tagged as what it is, or marked as decoration.** The
@@ -1048,7 +1048,7 @@ namespace is given the declaration. Only a picture that would be drawn is asked
 about: not one on a hidden slide or on the master page, whose pictures are
 decoration. Nothing unanswered is written under the PDF/UA label.
 
-**A font is embedded only where its licence allows it.** A face whose OS/2
+**A font is embedded only where its license allows it.** A face whose OS/2
 flags restrict embedding or forbid subsetting is replaced by its metric
 substitute or the generic family, and the export says so when it finishes. A
 family with no embeddable face at all, and a character no face on the machine

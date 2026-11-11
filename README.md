@@ -72,10 +72,10 @@ A Rust toolchain builds all of it and nothing else is needed: no C compiler, no
 system libraries at build time, no code generator. `Cargo.toml` names the
 toolchain version the build needs.
 
-Windows and macOS are built and tested from this repository; the applications
-are on the Microsoft Store and the Mac App Store as Odox Text, Odox Grid and
-Odox Deck. `packaging/windows/README.md` and `packaging/macos/README.md` say
-how each lane is run.
+https://excelano.com/odox/ is the product page for every platform. Windows and
+macOS are built and tested from this repository, and
+`packaging/windows/README.md` and `packaging/macos/README.md` say how each lane
+is run.
 
 ## Using them
 
@@ -193,3 +193,7 @@ the launcher, which draws nothing and links no toolkit. `corpus/` holds
 the documents the tests read. `packaging/` turns a build into something
 installable, one directory per platform. `DESIGN.md` is where every decision and
 its reasoning live; `CLAUDE.md` is the short guide for a session working here.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

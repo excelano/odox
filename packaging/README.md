@@ -7,7 +7,7 @@ application from a release build. `windows/` and `macos/` each carry
 their platform's manifest, build script, install check and screenshot script,
 with a README saying how to run that lane. `store-listing.toml` is the text
 both stores take, and `release-notes.toml` is what a release says changed.
-Releases are the apps in excelano/shipping, run from this directory.
+Releases are the apps in excelano/shipping, run from the repository root.
 
 `version.sh` is the only thing that reads the version, from the workspace
 `Cargo.toml`, in whichever spelling a caller needs: plain, `--appx` for the
@@ -26,8 +26,8 @@ a window, a launcher, a Dock and a store listing show. Check a change at 16, 24,
 `windows/`, the `.icns` files under `macos/`, and the squares under `icons/`
 that the store listing forms ask for. It is a standalone package so that nothing
 it depends on reaches a shipped binary. Its output is committed, because neither
-Windows nor macOS rasterizes at install time, and CI refuses a push where the
-committed files differ from what the generator writes.
+Windows nor macOS rasterizes at install time, so a change to a drawing is
+committed together with what the generator writes from it.
 
 Linux takes no rendered icon. `install.sh` and `build-deb.sh` put the
 application drawing straight into the hicolor theme and the desktop rasterizes

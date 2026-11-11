@@ -22,7 +22,7 @@ document tree stays faithful (DESIGN.md §3): a change that drops an element, an
 attribute or whitespace has to be argued against the round-trip test.
 
 Every sentence a person reads goes through `odox_ui::i18n::t`; a literal built
-before a catalogue is in force is wrapped in `i18n::mark`. After changing one, run
+before a catalog is in force is wrapped in `i18n::mark`. After changing one, run
 `update-po.sh` and commit what it changes.
 
 Clippy runs with `-D warnings`. `cargo test` and `cargo clippy` do not write

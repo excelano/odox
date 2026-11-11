@@ -8,8 +8,8 @@
 # the same fields and do not count them the same way. The name is under each
 # store because the two can disagree about it, though these three do not.
 #
-# Limits, which ship checks before the tag and counts in characters rather
-# than bytes: apple.name and apple.subtitle 30, apple.promotional-text 170,
+# Limits, which ship-macstore and ship-winstore check and count in characters
+# rather than bytes: apple.name and apple.subtitle 30, apple.promotional-text 170,
 # apple.keywords 100 including the commas, description 4,000 - the Microsoft
 # Store allows 10,000 and this is written to Apple's - microsoft.short-description
 # 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30, apple-review-notes
@@ -83,7 +83,7 @@ It is one of three. Odox Grid reads spreadsheets and Odox Deck reads presentatio
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. A test that every document in the corpus comes back the same, and that an edit to any paragraph of it changes that paragraph and nothing else, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Text&channel=Mac%20App%20Store"
@@ -122,7 +122,7 @@ features = [
     "No network connection of any kind, no account, and no telemetry",
     "Follows your desktop's light or dark setting",
     "Speaks English and German",
-    "Free and open source under the MIT licence",
+    "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "odt", "document editor", "edit document", "text document", "oasis"]
 
@@ -237,7 +237,7 @@ It is one of three. Odox Text reads text documents and Odox Deck reads presentat
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a run of a thousand identical rows the document wrote once is split around the one cell you changed and the rest stay one run. A test that every document in the corpus comes back the same, and that an edit changes one cell and no other, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Grid&channel=Mac%20App%20Store"
@@ -276,7 +276,7 @@ features = [
     "No network connection of any kind, no account, and no telemetry",
     "Follows your desktop's light or dark setting",
     "Speaks English and German",
-    "Free and open source under the MIT licence",
+    "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "ods", "spreadsheet editor", "edit spreadsheet", "sheet", "oasis"]
 
@@ -393,7 +393,7 @@ It is one of three. Odox Text reads text documents and Odox Grid reads spreadshe
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a moved shape is four attributes changed, in the unit the document wrote them in, and nothing else. A test that every document in the corpus comes back the same runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT licence, at https://github.com/excelano/odox.
+Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Deck&channel=Mac%20App%20Store"
@@ -432,7 +432,7 @@ features = [
     "No network connection of any kind, no account, and no telemetry",
     "Follows your desktop's light or dark setting",
     "Speaks English and German",
-    "Free and open source under the MIT licence",
+    "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "odp", "presentation editor", "edit slides", "slides", "oasis"]
 
