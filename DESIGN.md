@@ -467,7 +467,7 @@ one or zero, `=` compares text with its case while a criterion ignores it, a
 date is days from 30 December 1899, a range where one value is wanted is its
 cell in the formula's row or column, `SUMIF`'s sum range takes the shape of
 its criteria range, a number joined to text is written as `LibreOffice` writes
-it, `1E+020`, and `UPPER` makes ß the capital ẞ. `DATE` refuses a day before
+it, `1E+020`, and `UPPER` makes ß the capital ẞ while `LOWER` leaves a dotted capital İ as it is. `DATE` refuses a day before
 15 October 1582, where the Gregorian calendar begins, and a year below zero; a
 day before it that arithmetic reaches is written in the proleptic Gregorian
 calendar, with the years before the first counted without a year zero,

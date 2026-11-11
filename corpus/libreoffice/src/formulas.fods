@@ -221,6 +221,12 @@
     <table:table-row><table:table-cell office:value-type="string"><text:p>a range past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=SUM([.A1:.XFE1])"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>arithmetic past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=[.XFE1]+1"/></table:table-row>
     <table:table-row><table:table-cell office:value-type="string"><text:p>an error past the grid</text:p></table:table-cell><table:table-cell table:formula="of:=IFERROR([.XFE1];&quot;caught&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>lower dotted capital i</text:p></table:table-cell><table:table-cell table:formula="of:=LOWER(&quot;İ&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>lower final sigma</text:p></table:table-cell><table:table-cell table:formula="of:=LOWER(&quot;ΟΔΟΣ&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>lower capital sharp s</text:p></table:table-cell><table:table-cell table:formula="of:=LOWER(&quot;ẞ&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>lower dotted i length</text:p></table:table-cell><table:table-cell table:formula="of:=LEN(LOWER(&quot;İ&quot;))"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>upper dotless i</text:p></table:table-cell><table:table-cell table:formula="of:=UPPER(&quot;ı&quot;)"/></table:table-row>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>upper ligature</text:p></table:table-cell><table:table-cell table:formula="of:=UPPER(&quot;ﬁ&quot;)"/></table:table-row>
    </table:table>
   </office:spreadsheet>
  </office:body>

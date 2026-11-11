@@ -465,7 +465,14 @@ impl Context<'_> {
             }
             "LOWER" => {
                 count(1, 1)?;
-                Value::Text(tryv!(txt(0)?).to_lowercase())
+                let written = tryv!(txt(0)?);
+                Value::Text(
+                    written
+                        .split('İ')
+                        .map(str::to_lowercase)
+                        .collect::<Vec<_>>()
+                        .join("İ"),
+                )
             }
             "TRIM" => {
                 count(1, 1)?;
