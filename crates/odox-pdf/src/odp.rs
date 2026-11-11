@@ -614,6 +614,26 @@ impl Slides<'_, '_, '_> {
                 let image = model::decode(self.document.picture(href)?)?;
                 Some(Ground::Image(image, (x, y, width, height), opacity))
             }
+            Fill::Tiled(name, tiling) => {
+                let href = self.document.styles.fill_image(name)?;
+                let bytes = self.document.picture(href)?;
+                let image = model::decode(bytes)?;
+                let (across, down) =
+                    odox_core::picture::dots_per_inch(bytes).unwrap_or((96.0, 96.0));
+                let (pixels_across, pixels_down) = image.size();
+                #[allow(clippy::cast_precision_loss)]
+                let picture = (
+                    pixels_across as f32 * 72.0 / across,
+                    pixels_down as f32 * 72.0 / down,
+                );
+                let (tx, ty, tw, th) = tiling.tile((width, height), picture)?;
+                let tile = (x + tx, y + ty, tw, th);
+                Some(if tiling.repeat {
+                    Ground::Tiled(image, tile, tiling.offset, opacity)
+                } else {
+                    Ground::Image(image, tile, opacity)
+                })
+            }
             Fill::Gradient(name) => {
                 let gradient = self.document.styles.gradient(name)?;
                 let paint: Paint = match gradient.style {

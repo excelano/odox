@@ -159,6 +159,15 @@ pub(crate) enum Ground {
     /// A picture stretched over the rectangle `(x, y, width, height)` and
     /// cut to the outline, with how opaque it is.
     Image(krilla::image::Image, (f32, f32, f32, f32), f32),
+    /// A picture repeated from the tile `(x, y, width, height)` in every
+    /// direction and cut to the outline, with alternate rows or columns moved
+    /// where the fill says so, and how opaque it is.
+    Tiled(
+        krilla::image::Image,
+        (f32, f32, f32, f32),
+        Option<odox_core::Offset>,
+        f32,
+    ),
 }
 
 impl Item {
@@ -192,7 +201,10 @@ impl Item {
                 }
                 span.0 += dy;
                 span.1 += dy;
-                if let Some(Ground::Image(_, (x, y, _, _), _)) = ground {
+                if let Some(
+                    Ground::Image(_, (x, y, _, _), _) | Ground::Tiled(_, (x, y, _, _), _, _),
+                ) = ground
+                {
                     *x += dx;
                     *y += dy;
                 }

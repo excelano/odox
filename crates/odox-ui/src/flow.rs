@@ -27,8 +27,8 @@ use eframe::egui::{
 };
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
-    Border, Document, Element, Family, Node, Ns, Properties, SMALL_CAPS, TabKind, TextAlign,
-    TextProperties,
+    Border, Document, Element, Family, Node, Ns, Offset, Properties, SMALL_CAPS, TabKind,
+    TextAlign, TextProperties, Tiling,
     edit::{self, ListCounters},
 };
 
@@ -44,6 +44,18 @@ use crate::links;
 #[derive(Default)]
 pub struct Pictures {
     textures: HashMap<String, Option<TextureHandle>>,
+    tiles: HashMap<String, Option<Tile>>,
+}
+
+/// A picture made ready to fill a shape tile by tile.
+pub struct Tile {
+    /// One tile, or for tiles whose alternate rows or columns are moved, two
+    /// rows or two columns of them, each moved as the second is; or for a
+    /// picture placed once, the picture inside a clear border its edge
+    /// stretches into.
+    pub texture: TextureHandle,
+    /// The picture's own size in pixels.
+    pub pixels: [usize; 2],
 }
 
 impl Pictures {
@@ -64,10 +76,87 @@ impl Pictures {
         self.textures.get(href).and_then(Option::as_ref)
     }
 
+    /// The texture that fills a shape with a picture laid as `tiling` says,
+    /// built once for each picture and way of laying it.
+    pub fn tile(
+        &mut self,
+        ctx: &Context,
+        document: &Document,
+        href: &str,
+        tiling: &Tiling,
+    ) -> Option<&Tile> {
+        let key = format!("{href}\n{}\n{:?}", tiling.repeat, tiling.offset);
+        if !self.tiles.contains_key(&key) {
+            let tile = document.picture(href).and_then(decode).map(|image| {
+                let pixels = image.size;
+                let (laid, options) = laid(&image, tiling);
+                Tile {
+                    texture: ctx.load_texture(&key, laid, options),
+                    pixels,
+                }
+            });
+            self.tiles.insert(key.clone(), tile);
+        }
+        self.tiles.get(&key).and_then(Option::as_ref)
+    }
+
     /// Forget every picture, for a window that has closed its document.
     pub fn clear(&mut self) {
         self.textures.clear();
+        self.tiles.clear();
     }
+}
+
+/// The picture as the texture a tiled fill samples: repeating, with a second
+/// row or column moved where alternate ones are, or held inside a clear
+/// border where the picture is placed once.
+fn laid(image: &ColorImage, tiling: &Tiling) -> (ColorImage, TextureOptions) {
+    let [width, height] = image.size;
+    let at = |x: usize, y: usize| image.pixels[y * width + x];
+    let moved = |fraction: f32, length: usize| {
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let pixels = (fraction.rem_euclid(1.0) * length as f32).round() as usize;
+        pixels % length.max(1)
+    };
+    if !tiling.repeat {
+        let mut framed = ColorImage::filled([width + 2, height + 2], Color32::TRANSPARENT);
+        for y in 0..height {
+            for x in 0..width {
+                framed.pixels[(y + 1) * (width + 2) + x + 1] = at(x, y);
+            }
+        }
+        return (framed, TextureOptions::LINEAR);
+    }
+    let laid = match tiling.offset {
+        None => image.clone(),
+        Some(Offset::Rows(fraction)) => {
+            let shift = moved(fraction, width);
+            let mut laid = ColorImage::filled([width, height * 2], Color32::TRANSPARENT);
+            for y in 0..height {
+                for x in 0..width {
+                    laid.pixels[y * width + x] = at(x, y);
+                    laid.pixels[(y + height) * width + x] = at((x + width - shift) % width, y);
+                }
+            }
+            laid
+        }
+        Some(Offset::Columns(fraction)) => {
+            let shift = moved(fraction, height);
+            let mut laid = ColorImage::filled([width * 2, height], Color32::TRANSPARENT);
+            for y in 0..height {
+                for x in 0..width {
+                    laid.pixels[y * width * 2 + x] = at(x, y);
+                    laid.pixels[y * width * 2 + width + x] = at(x, (y + height - shift) % height);
+                }
+            }
+            laid
+        }
+    };
+    (laid, TextureOptions::LINEAR_REPEAT)
 }
 
 fn decode(bytes: &[u8]) -> Option<ColorImage> {

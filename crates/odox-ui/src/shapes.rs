@@ -21,8 +21,8 @@ use eframe::egui::{
 use odox_core::draw::Geometry;
 
 use odox_core::{
-    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns,
-    Properties, Transform,
+    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Offset,
+    Properties, Tiling, Transform,
 };
 
 use crate::find::Highlights;
@@ -292,10 +292,11 @@ impl Canvas<'_> {
         outline: Option<Stroke>,
     ) {
         let rect = place.bounds();
-        if place.is_upright() {
+        let fill = properties.graphic.fill();
+        let pictured = matches!(fill, Fill::Image(_) | Fill::Tiled(..));
+        if place.is_upright() && !pictured {
             let (centre, radius) = (rect.center(), rect.size() / 2.0);
-            if let Some(colour) = self.flat(&properties.graphic.fill(), properties.graphic.opacity)
-            {
+            if let Some(colour) = self.flat(&fill, properties.graphic.opacity) {
                 self.painter(ui)
                     .add(Shape::ellipse_filled(centre, radius, colour));
             }
@@ -304,17 +305,12 @@ impl Canvas<'_> {
                     .add(Shape::ellipse_stroke(centre, radius, stroke));
             }
         } else {
-            // A turned ellipse is no longer an ellipse of the window's, so
-            // it is drawn as the polygon it is: the same curve, in the
-            // shape's own box, mapped through the placement like any other.
+            // A turned ellipse is no longer an ellipse of the window's, and a
+            // picture has no room in one, so it is drawn as the polygon it is:
+            // the same curve, in the shape's own box, mapped through the
+            // placement like any other.
             let points = ellipse(place);
-            self.fill(
-                ui,
-                rect,
-                &properties.graphic.fill(),
-                properties.graphic.opacity,
-                &points,
-            );
+            self.fill(ui, rect, &fill, properties.graphic.opacity, &points);
             if let Some(stroke) = outline {
                 self.painter(ui).add(Shape::closed_line(points, stroke));
             }
@@ -707,6 +703,10 @@ impl Canvas<'_> {
         // while the document is being read from.
         let document = self.document;
 
+        if let Fill::Tiled(name, tiling) = fill {
+            self.tiled(ui, rect, (name, tiling), opacity, points);
+            return;
+        }
         if let Fill::Image(name) = fill {
             let Some(href) = document.styles.fill_image(name) else {
                 return;
@@ -740,7 +740,7 @@ impl Canvas<'_> {
         }
 
         let gradient = match fill {
-            Fill::None | Fill::Image(_) => return,
+            Fill::None | Fill::Image(_) | Fill::Tiled(..) => return,
             Fill::Solid(_) => None,
             Fill::Gradient(name) => match document.styles.gradient(name) {
                 Some(gradient) => Some(gradient),
@@ -767,12 +767,76 @@ impl Canvas<'_> {
         self.painter(ui).add(Shape::mesh(mesh));
     }
 
+    /// Paint a picture tile by tile inside an outline, or once where it does
+    /// not repeat. The mesh is the outline's own and the texture repeats, so a
+    /// fill of a thousand tiles costs what a fill of one does.
+    fn tiled(
+        &mut self,
+        ui: &Ui,
+        rect: Rect,
+        (name, tiling): (&str, &Tiling),
+        opacity: Option<f32>,
+        points: &[Pos2],
+    ) {
+        let document = self.document;
+        let scale = self.scale;
+        let Some(href) = document.styles.fill_image(name) else {
+            return;
+        };
+        let (across, down) = document
+            .picture(href)
+            .and_then(odox_core::picture::dots_per_inch)
+            .unwrap_or((96.0, 96.0));
+        let Some(tile) = self.pictures.tile(ui.ctx(), document, href, tiling) else {
+            return;
+        };
+        #[allow(clippy::cast_precision_loss)]
+        let picture = (
+            tile.pixels[0] as f32 * 72.0 / across,
+            tile.pixels[1] as f32 * 72.0 / down,
+        );
+        let Some((left, top, width, height)) =
+            tiling.tile((rect.width() / scale, rect.height() / scale), picture)
+        else {
+            return;
+        };
+        let origin = rect.left_top() + vec2(left, top) * scale;
+        let size = vec2(width, height) * scale;
+        #[allow(clippy::cast_precision_loss)]
+        let uv = |point: Pos2| {
+            let along = (point - origin) / size;
+            match (tiling.repeat, tiling.offset) {
+                (false, _) => {
+                    let pixels = vec2(tile.pixels[0] as f32, tile.pixels[1] as f32);
+                    let framed = (vec2(1.0, 1.0) + along * pixels) / (pixels + vec2(2.0, 2.0));
+                    framed.to_pos2()
+                }
+                (true, Some(Offset::Rows(_))) => pos2(along.x, along.y / 2.0),
+                (true, Some(Offset::Columns(_))) => pos2(along.x / 2.0, along.y),
+                (true, None) => along.to_pos2(),
+            }
+        };
+        let tint = alpha(Color32::WHITE, opacity);
+        let mut mesh = Mesh::with_texture(tile.texture.id());
+        for point in points {
+            mesh.vertices.push(Vertex {
+                pos: *point,
+                uv: uv(*point),
+                color: tint,
+            });
+        }
+        for [a, b, c] in triangulate(points) {
+            mesh.add_triangle(a, b, c);
+        }
+        self.painter(ui).add(Shape::mesh(mesh));
+    }
+
     /// One colour for a fill, where the shape being drawn cannot carry a mesh.
     fn flat(&self, fill: &Fill, opacity: Option<f32>) -> Option<Color32> {
         match fill {
-            // Nothing to draw, and a picture that has no room in an ellipse,
-            // which is drawn as an ellipse rather than as a mesh.
-            Fill::None | Fill::Image(_) => None,
+            // Nothing to draw, and a picture, which a shape that cannot carry
+            // a mesh has no room for.
+            Fill::None | Fill::Image(_) | Fill::Tiled(..) => None,
             Fill::Solid(colour) => Some(alpha(format::color32(*colour), opacity)),
             Fill::Gradient(name) => {
                 let gradient = self.document.styles.gradient(name)?;
