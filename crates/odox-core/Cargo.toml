@@ -13,6 +13,7 @@ rust-version.workspace = true
 [dependencies]
 quick-xml.workspace = true
 regex.workspace = true
+unicode-bidi.workspace = true
 zip.workspace = true
 
 [dev-dependencies]

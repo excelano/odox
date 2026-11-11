@@ -118,27 +118,46 @@ pub fn covers(data: &[u8], index: u32, character: char) -> bool {
 }
 
 /// The faces on the machine that have a glyph for a character, best first:
-/// the generic families' faces in the variant asked for, then every face in
-/// the order the machine lists them. What draws a character the face a
-/// document names does not have.
+/// the generic sans-serif and serif faces in the variant asked for, then every
+/// proportional face in the variant's weight and slant in the order the
+/// machine lists them, then every other face. What draws a character the face a document names
+/// does not have: a family whose faces run from light to black lists them in
+/// no order a reader would choose from, and a monospaced face sets a script
+/// meant to be set proportionally a letter to a cell.
 pub fn faces_with(
     database: &fontdb::Database,
     character: char,
     variant: Variant,
 ) -> impl Iterator<Item = fontdb::ID> + '_ {
-    [
-        fontdb::Family::SansSerif,
-        fontdb::Family::Serif,
-        fontdb::Family::Monospace,
-    ]
-    .into_iter()
-    .filter_map(move |generic| query(database, &[generic], variant))
-    .chain(database.faces().map(|info| info.id))
-    .filter(move |&id| {
-        database
-            .with_face_data(id, |data, index| covers(data, index, character))
-            .unwrap_or(false)
-    })
+    let weight = if variant.bold {
+        fontdb::Weight::BOLD
+    } else {
+        fontdb::Weight::NORMAL
+    };
+    let slanted = |style: fontdb::Style| style != fontdb::Style::Normal;
+    let fits = move |info: &fontdb::FaceInfo| {
+        info.weight == weight && slanted(info.style) == variant.italic && !info.monospaced
+    };
+    [fontdb::Family::SansSerif, fontdb::Family::Serif]
+        .into_iter()
+        .filter_map(move |generic| query(database, &[generic], variant))
+        .chain(
+            database
+                .faces()
+                .filter(move |info| fits(info))
+                .map(|info| info.id),
+        )
+        .chain(
+            database
+                .faces()
+                .filter(move |info| !fits(info))
+                .map(|info| info.id),
+        )
+        .filter(move |&id| {
+            database
+                .with_face_data(id, |data, index| covers(data, index, character))
+                .unwrap_or(false)
+        })
 }
 
 /// The families that are metrically compatible with the ones office documents

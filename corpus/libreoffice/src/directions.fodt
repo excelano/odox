@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text">
+  <office:meta><dc:title>Directions</dc:title><dc:language>en-US</dc:language></office:meta>
+ <office:styles>
+  <style:style style:name="Standard" style:family="paragraph"><style:text-properties style:font-name="DejaVu Sans" fo:font-family="'DejaVu Sans'" fo:font-size="16pt"/></style:style>
+  <style:style style:name="RTL" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties style:writing-mode="rl-tb" fo:text-align="start"/></style:style>
+  <style:style style:name="B" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
+ </office:styles>
+ <office:body><office:text>
+  <text:p text:style-name="Standard">1. שלום עולם, מה שלומך</text:p>
+  <text:p text:style-name="Standard">2. مرحبا بالعالم كيف حالك</text:p>
+  <text:p text:style-name="Standard">3. English then עברית אחת שתיים then English 123</text:p>
+  <text:p text:style-name="RTL">4. שלום עולם, abc def, מה שלומך 2024</text:p>
+  <text:p text:style-name="RTL">5. مرحبا <text:span text:style-name="B">بالعالم</text:span> كيف حالك</text:p>
+  <text:p text:style-name="RTL">7. זהו משפט ארוך בעברית שמכיל גם מילים באנגלית like this one ועוד מספרים 12345 ונמשך הלאה כדי לעבור לשורה הבאה ועוד קצת טקסט כדי שהשורה תישבר פעמיים לפחות בתוך העמוד</text:p>
+  <text:p text:style-name="Standard">8. Here is a long English paragraph with a Hebrew phrase שלום עולם מה שלומך היום in the middle and it keeps going so that it wraps onto a second line and maybe a third.</text:p>
+  <text:p text:style-name="RTL">6. Left to right words in a right to left paragraph.</text:p>
+ </office:text></office:body></office:document>
