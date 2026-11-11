@@ -229,6 +229,19 @@ pub fn color32(color: Color) -> Color32 {
     Color32::from_rgb(color.r, color.g, color.b)
 }
 
+/// The colour a share `t` of the way from one colour to another.
+pub fn blend(from: Color, to: Color, t: f32) -> Color32 {
+    let mix = |a: u8, b: u8| {
+        let a = f32::from(a);
+        let b = f32::from(b);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        {
+            (a + (b - a) * t).round().clamp(0.0, 255.0) as u8
+        }
+    };
+    Color32::from_rgb(mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b))
+}
+
 /// A colour the document gives text or a border, as it is drawn.
 ///
 /// Pure black is read as no colour at all, and takes the palette's ink:

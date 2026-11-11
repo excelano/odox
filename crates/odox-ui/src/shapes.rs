@@ -21,7 +21,7 @@ use eframe::egui::{
 use odox_core::draw::Geometry;
 
 use odox_core::{
-    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Offset,
+    Anchor, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns, Offset,
     Properties, Tiling, Transform,
 };
 
@@ -293,8 +293,8 @@ impl Canvas<'_> {
     ) {
         let rect = place.bounds();
         let fill = properties.graphic.fill();
-        let pictured = matches!(fill, Fill::Image(_) | Fill::Tiled(..));
-        if place.is_upright() && !pictured {
+        let meshed = matches!(fill, Fill::Image(_) | Fill::Tiled(..) | Fill::Gradient(_));
+        if place.is_upright() && !meshed {
             let (centre, radius) = (rect.center(), rect.size() / 2.0);
             if let Some(colour) = self.flat(&fill, properties.graphic.opacity) {
                 self.painter(ui)
@@ -306,9 +306,9 @@ impl Canvas<'_> {
             }
         } else {
             // A turned ellipse is no longer an ellipse of the window's, and a
-            // picture has no room in one, so it is drawn as the polygon it is:
-            // the same curve, in the shape's own box, mapped through the
-            // placement like any other.
+            // picture or a gradient has no room in one, so it is drawn as the
+            // polygon it is: the same curve, in the shape's own box, mapped
+            // through the placement like any other.
             let points = ellipse(place);
             self.fill(ui, rect, &fill, properties.graphic.opacity, &points);
             if let Some(stroke) = outline {
@@ -711,31 +711,10 @@ impl Canvas<'_> {
             let Some(href) = document.styles.fill_image(name) else {
                 return;
             };
-            let Some(texture) = self
-                .pictures
-                .get(ui.ctx(), document, href)
-                .map(eframe::egui::TextureHandle::id)
-            else {
-                return;
-            };
-            // Stretched over the shape's own rectangle: each corner takes the
-            // corner of the picture that the corner of the rectangle is at.
-            let tint = alpha(Color32::WHITE, opacity);
-            let mut mesh = Mesh::with_texture(texture);
-            for point in points {
-                mesh.vertices.push(Vertex {
-                    pos: *point,
-                    uv: pos2(
-                        (point.x - rect.left()) / rect.width().max(f32::EPSILON),
-                        (point.y - rect.top()) / rect.height().max(f32::EPSILON),
-                    ),
-                    color: tint,
-                });
+            if let Some(texture) = self.pictures.get(ui.ctx(), document, href) {
+                let texture = texture.id();
+                self.stretched(ui, rect, texture, opacity, points);
             }
-            for [a, b, c] in triangulate(points) {
-                mesh.add_triangle(a, b, c);
-            }
-            self.painter(ui).add(Shape::mesh(mesh));
             return;
         }
 
@@ -747,6 +726,16 @@ impl Canvas<'_> {
                 None => return,
             },
         };
+        if let (Fill::Gradient(name), Some(gradient)) = (fill, gradient)
+            && !matches!(gradient.style, GradientStyle::Linear | GradientStyle::Axial)
+        {
+            let texture = self
+                .pictures
+                .gradient(ui.ctx(), name, gradient, rect.size())
+                .id();
+            self.stretched(ui, rect, texture, opacity, points);
+            return;
+        }
         let flat = match fill {
             Fill::Solid(colour) => Some(alpha(format::color32(*colour), opacity)),
             _ => None,
@@ -760,6 +749,34 @@ impl Canvas<'_> {
                 })
             });
             mesh.colored_vertex(*point, colour);
+        }
+        for [a, b, c] in triangulate(points) {
+            mesh.add_triangle(a, b, c);
+        }
+        self.painter(ui).add(Shape::mesh(mesh));
+    }
+
+    /// Paint a texture stretched over the rectangle inside an outline: each
+    /// corner of the rectangle takes the texture's corner it is at.
+    fn stretched(
+        &self,
+        ui: &Ui,
+        rect: Rect,
+        texture: eframe::egui::TextureId,
+        opacity: Option<f32>,
+        points: &[Pos2],
+    ) {
+        let tint = alpha(Color32::WHITE, opacity);
+        let mut mesh = Mesh::with_texture(texture);
+        for point in points {
+            mesh.vertices.push(Vertex {
+                pos: *point,
+                uv: pos2(
+                    (point.x - rect.left()) / rect.width().max(f32::EPSILON),
+                    (point.y - rect.top()) / rect.height().max(f32::EPSILON),
+                ),
+                color: tint,
+            });
         }
         for [a, b, c] in triangulate(points) {
             mesh.add_triangle(a, b, c);
@@ -840,7 +857,10 @@ impl Canvas<'_> {
             Fill::Solid(colour) => Some(alpha(format::color32(*colour), opacity)),
             Fill::Gradient(name) => {
                 let gradient = self.document.styles.gradient(name)?;
-                Some(alpha(blend(gradient.start, gradient.end, 0.5), opacity))
+                Some(alpha(
+                    format::blend(gradient.start, gradient.end, 0.5),
+                    opacity,
+                ))
             }
         }
     }
@@ -904,59 +924,16 @@ fn alpha(colour: Color32, opacity: Option<f32>) -> Color32 {
     }
 }
 
-fn blend(from: Color, to: Color, t: f32) -> Color32 {
-    let mix = |a: u8, b: u8| {
-        let a = f32::from(a);
-        let b = f32::from(b);
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        {
-            (a + (b - a) * t).round().clamp(0.0, 255.0) as u8
-        }
-    };
-    Color32::from_rgb(mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b))
-}
-
-/// The colour a gradient has at one point of the rectangle it fills.
-///
-/// **Linear and axial run in the direction the document gives; the four that
-/// radiate from a point do not.** A radial gradient's colour depends on the
-/// distance from a centre, which this could compute — and no fixture uses one,
-/// so it would be a direction invented rather than measured. Those get the flat
-/// average of the two colours, which is visibly an approximation.
+/// The colour a linear or axial gradient has at one point of the rectangle it
+/// fills, which the mesh carries at its corners: the colour of those two runs
+/// straight across, so it is the same between corners as at them.
 fn gradient_colour(point: Pos2, rect: Rect, gradient: &Gradient) -> Color32 {
-    match gradient.style {
-        GradientStyle::Linear | GradientStyle::Axial => {}
-        _ => return blend(gradient.start, gradient.end, 0.5),
-    }
-
-    // ODF measures the angle counter-clockwise from the direction that runs
-    // bottom to top, and the screen's y grows downward, so the axis is the unit
-    // vector below. A point's place along the gradient is its projection onto
-    // it, rescaled so that the rectangle's own extent is nought to one.
-    let radians = gradient.angle.to_radians();
-    let axis = vec2(radians.sin(), -radians.cos());
-    let corners = [
-        rect.left_top(),
-        rect.right_top(),
-        rect.right_bottom(),
-        rect.left_bottom(),
-    ];
-    let projections = corners.map(|corner| (corner - rect.center()).dot(axis));
-    let low = projections.iter().copied().fold(f32::MAX, f32::min);
-    let high = projections.iter().copied().fold(f32::MIN, f32::max);
-    let span = (high - low).max(f32::EPSILON);
-
-    let mut t = ((point - rect.center()).dot(axis) - low) / span;
-    // The border is the fraction of the run that stays the start colour before
-    // the blend begins.
-    let border = gradient.border.clamp(0.0, 0.99);
-    t = ((t - border) / (1.0 - border)).clamp(0.0, 1.0);
-    // An axial gradient runs out from the middle to both edges, so each half of
-    // the rectangle takes the whole blend.
-    if gradient.style == GradientStyle::Axial {
-        t = (t - 0.5).abs() * 2.0;
-    }
-    blend(gradient.start, gradient.end, t)
+    let at = point - rect.left_top();
+    format::blend(
+        gradient.start,
+        gradient.end,
+        gradient.level((at.x, at.y), (rect.width(), rect.height())),
+    )
 }
 
 /// Cut a closed outline into triangles, by clipping ears.

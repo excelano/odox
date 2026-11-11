@@ -20,14 +20,15 @@ use eframe::egui::emath::TSTransform;
 use eframe::egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use eframe::egui::{
     Align, Align2, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Role,
-    Sense, Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, WidgetInfo, pos2,
+    Sense, Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, Vec2, WidgetInfo,
+    pos2,
     text::{CCursor, CCursorRange, LayoutJob},
     text_selection::{LabelSelectionState, visuals::paint_text_selection},
     vec2,
 };
 use egui_richedit::{Laid, OffsetMap, ParagraphJob};
 use odox_core::{
-    Border, Document, Element, Family, Node, Ns, Offset, Properties, SMALL_CAPS, TabKind,
+    Border, Document, Element, Family, Gradient, Node, Ns, Offset, Properties, SMALL_CAPS, TabKind,
     TextAlign, TextProperties, Tiling,
     edit::{self, ListCounters},
 };
@@ -45,6 +46,7 @@ use crate::links;
 pub struct Pictures {
     textures: HashMap<String, Option<TextureHandle>>,
     tiles: HashMap<String, Option<Tile>>,
+    gradients: HashMap<(String, u32), TextureHandle>,
 }
 
 /// A picture made ready to fill a shape tile by tile.
@@ -100,10 +102,50 @@ impl Pictures {
         self.tiles.get(&key).and_then(Option::as_ref)
     }
 
+    /// A gradient drawn as a picture to stretch over a shape of `size`, for
+    /// the styles whose colour does not run straight across it. The picture
+    /// depends only on the shape's proportions, and one is kept for each.
+    pub fn gradient(
+        &mut self,
+        ctx: &Context,
+        name: &str,
+        gradient: &Gradient,
+        size: Vec2,
+    ) -> &TextureHandle {
+        const LONGEST: f32 = 256.0;
+        let aspect = (size.x / size.y.max(f32::EPSILON)).clamp(1.0 / LONGEST, LONGEST);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let key = (name.to_owned(), (aspect * 100.0).round() as u32);
+        self.gradients.entry(key).or_insert_with(|| {
+            let drawn = if aspect >= 1.0 {
+                vec2(LONGEST, LONGEST / aspect)
+            } else {
+                vec2(LONGEST * aspect, LONGEST)
+            };
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let [width, height] = [
+                drawn.x.ceil().max(2.0) as usize,
+                drawn.y.ceil().max(2.0) as usize,
+            ];
+            let mut image = ColorImage::filled([width, height], Color32::TRANSPARENT);
+            #[allow(clippy::cast_precision_loss)]
+            for y in 0..height {
+                for x in 0..width {
+                    let point = ((x as f32 + 0.5), (y as f32 + 0.5));
+                    let level = gradient.level(point, (width as f32, height as f32));
+                    image.pixels[y * width + x] =
+                        format::blend(gradient.start, gradient.end, level);
+                }
+            }
+            ctx.load_texture(format!("gradient {name}"), image, TextureOptions::LINEAR)
+        })
+    }
+
     /// Forget every picture, for a window that has closed its document.
     pub fn clear(&mut self) {
         self.textures.clear();
         self.tiles.clear();
+        self.gradients.clear();
     }
 }
 

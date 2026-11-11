@@ -489,6 +489,112 @@ pub struct Gradient {
     pub center: (f32, f32),
 }
 
+impl Gradient {
+    /// How far a point is from the start colour towards the end one, from
+    /// nought to one, in a shape of `size` whose top left corner is the
+    /// origin, as `LibreOffice` draws it, measured on a deck of each style.
+    ///
+    /// Linear and axial run along the direction the gradient gives, across the
+    /// shape's extent in that direction. The other four run in from the
+    /// outside, at the start colour, to the centre `draw:cx` and `draw:cy`
+    /// name, turned by the angle: radial in circles through the shape's
+    /// corners; ellipsoidal in ellipses through them, `size / √2` across;
+    /// rectangular in the rectangles that are the shape's box turned; square in
+    /// squares as wide as the longer side turned. An ellipse or a rectangle
+    /// moves in the same distance on both axes, so it ends as a line rather
+    /// than a point. The border is the share of the run that stays the start
+    /// colour.
+    pub fn level(&self, point: (f32, f32), size: (f32, f32)) -> f32 {
+        let (width, height) = size;
+        let radians = self.angle.to_radians();
+        let (sin, cos) = radians.sin_cos();
+        let border = self.border.clamp(0.0, 0.99);
+        let blend = |t: f32| t.clamp(0.0, 1.0);
+        if matches!(self.style, GradientStyle::Linear | GradientStyle::Axial) {
+            let axis = (sin, -cos);
+            let along = |x: f32, y: f32| (x - width / 2.0) * axis.0 + (y - height / 2.0) * axis.1;
+            let corners = [(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)]
+                .map(|(x, y)| along(x, y));
+            let low = corners.iter().copied().fold(f32::MAX, f32::min);
+            let high = corners.iter().copied().fold(f32::MIN, f32::max);
+            let t = (along(point.0, point.1) - low) / (high - low).max(f32::EPSILON);
+            let t = blend((t - border) / (1.0 - border));
+            return if self.style == GradientStyle::Axial {
+                (t - 0.5).abs() * 2.0
+            } else {
+                t
+            };
+        }
+        let scale = 1.0 - border;
+        let (dx, dy) = (
+            point.0 - self.center.0 * width,
+            point.1 - self.center.1 * height,
+        );
+        let (x, y) = (dx * cos - dy * sin, dx * sin + dy * cos);
+        let (turned_width, turned_height) = (
+            width * cos.abs() + height * sin.abs(),
+            width * sin.abs() + height * cos.abs(),
+        );
+        match self.style {
+            GradientStyle::Radial => {
+                blend(1.0 - x.hypot(y) / (width.hypot(height) / 2.0 * scale).max(f32::EPSILON))
+            }
+            GradientStyle::Ellipsoidal => {
+                let radii = (
+                    width / std::f32::consts::SQRT_2 * scale,
+                    height / std::f32::consts::SQRT_2 * scale,
+                );
+                ellipse_level(x.abs(), y.abs(), radii)
+            }
+            GradientStyle::Rectangular => box_level(
+                x.abs(),
+                y.abs(),
+                (turned_width / 2.0 * scale, turned_height / 2.0 * scale),
+            ),
+            _ => {
+                let half_side = width.max(height) * (cos.abs() + sin.abs()) / 2.0 * scale;
+                box_level(x.abs(), y.abs(), (half_side, half_side))
+            }
+        }
+    }
+}
+
+/// How far in a point is among rectangles that shrink by the same distance
+/// on both sides from half-sizes `outer`.
+fn box_level(x: f32, y: f32, outer: (f32, f32)) -> f32 {
+    let step = outer.0.min(outer.1).max(f32::EPSILON);
+    ((outer.0 - x) / step)
+        .min((outer.1 - y) / step)
+        .clamp(0.0, 1.0)
+}
+
+/// How far in a point is among ellipses that shrink by the same distance on
+/// both axes from radii `outer`: the level whose ellipse passes through it,
+/// found by halving, since no formula gives it.
+fn ellipse_level(x: f32, y: f32, outer: (f32, f32)) -> f32 {
+    let step = outer.0.min(outer.1);
+    let inside = |t: f32| {
+        let (a, b) = (outer.0 - t * step, outer.1 - t * step);
+        if a <= 0.0 || b <= 0.0 {
+            return x <= a.max(0.0) && y <= b.max(0.0);
+        }
+        (x / a).powi(2) + (y / b).powi(2) <= 1.0
+    };
+    if !inside(0.0) {
+        return 0.0;
+    }
+    let (mut low, mut high) = (0.0f32, 1.0f32);
+    for _ in 0..24 {
+        let middle = f32::midpoint(low, high);
+        if inside(middle) {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    low
+}
+
 /// Which of ODF's fill styles a shape uses, before the value it needs is found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FillKind {
@@ -1099,10 +1205,22 @@ impl Styles {
 
 fn gradient(element: &Element) -> Gradient {
     let color = |local: &str, fallback: Color| {
-        element
+        let color = element
             .attr(&Ns::Draw, local)
             .and_then(Color::parse)
-            .unwrap_or(fallback)
+            .unwrap_or(fallback);
+        let intensity = element
+            .attr(&Ns::Draw, &local.replace("color", "intensity"))
+            .and_then(Percent::parse)
+            .map_or(1.0, Percent::fraction)
+            .clamp(0.0, 1.0);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let dim = |channel: u8| (f32::from(channel) * intensity).round() as u8;
+        Color {
+            r: dim(color.r),
+            g: dim(color.g),
+            b: dim(color.b),
+        }
     };
     let proportion = |local: &str| {
         element

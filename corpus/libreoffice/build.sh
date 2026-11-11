@@ -124,6 +124,10 @@ convert odp:impress8 slides.odp "OpenDocument Presentation Flat XML" slides.fodp
 # one that says its resolution and one that does not.
 convert odp:impress8 fills.odp "OpenDocument Presentation Flat XML" fills.fodp
 
+# Gradients that radiate from a point, each style centred and then with a
+# border, off centre and turned, and a colour at half its intensity.
+convert odp:impress8 gradients.odp "OpenDocument Presentation Flat XML" gradients.fodp
+
 # A spreadsheet for the PDF export: a sheet wider and longer than a page with
 # a marked header row, a hidden row and column and a merged cell; a sheet with
 # a print range fitted to one page; a hidden sheet and an empty one. Flat ODF
