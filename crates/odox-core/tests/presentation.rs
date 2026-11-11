@@ -442,3 +442,71 @@ fn a_tiled_picture_lies_where_libreoffice_draws_it() {
         Fill::Tiled(_, Tiling { repeat: true, .. })
     ));
 }
+
+#[test]
+fn a_gradient_from_a_point_runs_as_libreoffice_draws_it() {
+    let Some(deck) = fixture("gradients.odp") else {
+        return;
+    };
+    let gradient = |index: usize| {
+        let slides = deck.slides();
+        let shape = slides[index]
+            .element
+            .elements()
+            .find(|e| e.is(&Ns::Draw, "rect"))
+            .expect("a filled shape");
+        let style = shape.attr(&Ns::Draw, "style-name").unwrap_or_default();
+        let Fill::Gradient(name) = deck
+            .document
+            .styles
+            .resolve(&Family::Graphic, style)
+            .graphic
+            .fill()
+        else {
+            panic!("slide {index} has no gradient");
+        };
+        deck.document
+            .styles
+            .gradient(&name)
+            .expect("defined")
+            .clone()
+    };
+    // LibreOffice's own PDF of each slide at 100 pixels to the centimetre,
+    // black to white, at five points of the 11 by 7 centimetre shape.
+    let points = [
+        (100.0, 100.0),
+        (400.0, 200.0),
+        (550.0, 350.0),
+        (700.0, 550.0),
+        (1000.0, 650.0),
+    ];
+    let drawn: [[f32; 5]; 8] = [
+        [53.0, 173.0, 255.0, 157.0, 42.0],
+        [30.0, 84.0, 94.0, 46.0, 0.0],
+        [72.0, 173.0, 255.0, 147.0, 48.0],
+        [0.0, 86.0, 189.0, 52.0, 0.0],
+        [46.0, 187.0, 255.0, 163.0, 46.0],
+        [62.0, 141.0, 116.0, 104.0, 14.0],
+        [72.0, 147.0, 255.0, 108.0, 36.0],
+        [4.0, 135.0, 107.0, 90.0, 0.0],
+    ];
+    for (index, grey) in drawn.iter().enumerate() {
+        let gradient = gradient(index);
+        for (point, grey) in points.iter().zip(grey) {
+            let level = gradient.level(*point, (1100.0, 700.0)) * 255.0;
+            assert!(
+                (level - grey).abs() <= 4.0,
+                "slide {index} at {point:?}: {level}, LibreOffice {grey}"
+            );
+        }
+    }
+    assert_eq!(
+        gradient(8).start,
+        Color {
+            r: 128,
+            g: 128,
+            b: 128
+        },
+        "white at half its intensity"
+    );
+}

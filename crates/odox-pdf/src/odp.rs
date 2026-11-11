@@ -18,8 +18,8 @@ use odox_core::doc::{Presentation, Slide};
 use odox_core::draw::Geometry;
 use odox_core::edit::{self, Description};
 use odox_core::{
-    Anchor, Color, Document, Element, Family, Fill, GradientStyle, Length, Ns, Properties,
-    Transform,
+    Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns,
+    Properties, Transform,
 };
 
 use crate::fonts::Faces;
@@ -636,6 +636,10 @@ impl Slides<'_, '_, '_> {
             }
             Fill::Gradient(name) => {
                 let gradient = self.document.styles.gradient(name)?;
+                if !matches!(gradient.style, GradientStyle::Linear | GradientStyle::Axial) {
+                    let image = radiating(gradient, (width, height));
+                    return Some(Ground::Image(image, (x, y, width, height), opacity));
+                }
                 let paint: Paint = match gradient.style {
                     GradientStyle::Linear | GradientStyle::Axial => {
                         // As the window runs it: along the direction ODF
@@ -686,9 +690,7 @@ impl Slides<'_, '_, '_> {
                         }
                         .into()
                     }
-                    // The window draws the gradients that radiate from a point
-                    // as the even mix of their two colours.
-                    _ => crate::rgb(blend(gradient.start, gradient.end)).into(),
+                    _ => return None,
                 };
                 Some(Ground::Paint(paint, opacity))
             }
@@ -697,14 +699,41 @@ impl Slides<'_, '_, '_> {
 }
 
 /// The even mix of two colours.
-fn blend(from: Color, to: Color) -> Color {
-    #[allow(clippy::cast_possible_truncation)]
-    let mix = |a: u8, b: u8| ((u16::from(a) + u16::from(b)) / 2) as u8;
-    Color {
-        r: mix(from.r, to.r),
-        g: mix(from.g, to.g),
-        b: mix(from.b, to.b),
+/// A gradient whose colour does not run straight across a shape, drawn as a
+/// picture to stretch over a shape of `size`, at most 256 samples along its
+/// longer side, which is finer than eight bits of colour can step.
+fn radiating(gradient: &Gradient, size: (f32, f32)) -> krilla::image::Image {
+    const LONGEST: f32 = 256.0;
+    let scale = LONGEST / size.0.max(size.1).max(f32::EPSILON);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let (columns, rows) = (
+        (size.0 * scale).ceil().clamp(2.0, LONGEST) as u32,
+        (size.1 * scale).ceil().clamp(2.0, LONGEST) as u32,
+    );
+    let mut data = Vec::with_capacity(columns as usize * rows as usize * 4);
+    #[allow(clippy::cast_precision_loss)]
+    for row in 0..rows {
+        for column in 0..columns {
+            let t = gradient.level(
+                (column as f32 + 0.5, row as f32 + 0.5),
+                (columns as f32, rows as f32),
+            );
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let mix = |a: u8, b: u8| {
+                (f32::from(a) + (f32::from(b) - f32::from(a)) * t)
+                    .round()
+                    .clamp(0.0, 255.0) as u8
+            };
+            let (start, end) = (gradient.start, gradient.end);
+            data.extend([
+                mix(start.r, end.r),
+                mix(start.g, end.g),
+                mix(start.b, end.b),
+                255,
+            ]);
+        }
     }
+    krilla::image::Image::from_rgba8(data, columns, rows)
 }
 
 /// A polygon's points, mapped from the space `svg:viewBox` sets up onto the
