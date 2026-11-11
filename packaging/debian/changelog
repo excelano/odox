@@ -1,3 +1,13 @@
+odox (0.15.2) unstable; urgency=low
+
+  * A criterion is a regular expression where the document says so or says nothing, matched against the whole cell or a part, and a reference past the last column or row is #NAME?
+  * Text that arithmetic or a function wants as a number is read as LibreOffice reads it, in United States English conventions
+  * DATE refuses a day before the Gregorian calendar and a year below zero, and an earlier day is written and shown as LibreOffice writes and shows it
+  * A number joined to text is written as LibreOffice writes it, UPPER makes ß the capital ẞ, and a result with no number format is shown in General
+  * Formulas give LibreOffice's argument errors, take odd roots of negative numbers, refuse text in SUM, and read a range where one value is wanted from the formula's row or column
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 10 Nov 2026 18:29:37 -0600
+
 odox (0.15.1) unstable; urgency=low
 
   * On Windows the windows draw through Direct3D 12 alone, so a faulty Vulkan driver cannot end them before they open
