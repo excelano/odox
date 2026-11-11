@@ -166,7 +166,7 @@ fn refuse(application: &str, failure: &std::io::Error) -> ExitCode {
     if failure.kind() == std::io::ErrorKind::NotFound {
         eprintln!(
             "odox: {application} is not installed — it is a package of its own,\n\
-             \x20      `apt install {application}` or `cargo install {application}`"
+             \x20      `apt install {application}`"
         );
     } else {
         eprintln!("odox: {application} could not be started: {failure}");

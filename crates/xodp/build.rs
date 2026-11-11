@@ -55,15 +55,12 @@ fn main() {
         return;
     }
 
-    // The manifest is above this crate's own directory, and `cargo package`
-    // copies only what is under a crate root — so a crate published to
-    // crates.io and built for Windows would not find it. flyleaf lost a release
-    // tag to the same shape with `include_str!`. Rather than fail a build that
-    // is otherwise fine, the manifest is skipped when it is not there and the
-    // binary is left without it: no DPI declaration, which the certification kit
-    // would refuse and a person running `cargo install` will not notice.
-    // **A Store build is made from this repository, where the file exists.**
-    // `cargo package -p <crate> --list` is the check.
+    // The manifest is above this crate's own directory, so a build from
+    // anywhere but this repository would not find it. Rather than fail a build
+    // that is otherwise fine, the manifest is skipped when it is not there and
+    // the binary is left without it: no DPI declaration, which the
+    // certification kit would refuse. **A Store build is made from this
+    // repository, where the file exists.**
     if !manifest.exists() {
         println!(
             "cargo:warning=no {} — this build declares no DPI awareness",

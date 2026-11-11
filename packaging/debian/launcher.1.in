@@ -55,7 +55,7 @@ None. odox writes no configuration, no cache and no temporary copy.
 .SH NOTES
 The Debian package depends on all three applications, so
 .B apt install odox
-installs the whole suite. Installed any other way — from crates.io, say — the
+installs the whole suite. Built from source, the
 applications are separate, and a file whose application is absent is reported
 as such rather than opened.
 .SH SEE ALSO
