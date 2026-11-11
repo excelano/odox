@@ -32,6 +32,7 @@
 pub mod bidi;
 pub mod blank;
 pub mod data_style;
+pub mod dimension;
 pub mod doc;
 pub mod draw;
 pub mod edit;

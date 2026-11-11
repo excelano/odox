@@ -14,12 +14,13 @@
 
 use krilla::paint::{LinearGradient, Paint, SpreadMethod, Stop};
 use krilla::tagging::Tag;
+use odox_core::dimension::{Dimension, MARKER_WIDTH};
 use odox_core::doc::{Presentation, Slide};
 use odox_core::draw::Geometry;
 use odox_core::edit::{self, Description};
 use odox_core::{
     Anchor, Color, Document, Element, Family, Fill, Gradient, GradientStyle, Length, Ns,
-    Properties, Transform,
+    Properties, TextAlign, Transform,
 };
 
 use crate::fonts::Faces;
@@ -375,6 +376,45 @@ impl Slides<'_, '_, '_> {
             return Ok(items);
         }
 
+        if shape.is(&Ns::Draw, "measure") {
+            let (Some(from), Some(to)) = (point(shape, "x1", "y1"), point(shape, "x2", "y2"))
+            else {
+                return Ok(items);
+            };
+            let style = style_of(self.document, shape);
+            let Some(dimension) = Dimension::new(from, to, &style.graphic) else {
+                return Ok(items);
+            };
+            if let Some(stroke) = stroke {
+                for [start, end] in dimension.guides {
+                    items.extend(self.outline(&[start, end], false, None, Some(stroke), figure));
+                }
+                items.extend(self.outline(&dimension.line, false, None, Some(stroke), figure));
+                for (end, at_start) in [
+                    (&style.graphic.marker_start, true),
+                    (&style.graphic.marker_end, false),
+                ] {
+                    let Some((name, width)) = end else { continue };
+                    let Some(marker) = self.document.styles.marker(name) else {
+                        continue;
+                    };
+                    let width = width.map_or(MARKER_WIDTH, Length::points);
+                    for outline in dimension.marker(marker, at_start, width) {
+                        let ground = Ground::Paint(crate::rgb(stroke.0).into(), 1.0);
+                        items.extend(self.outline(&outline, true, Some(ground), None, figure));
+                    }
+                }
+            }
+            let size = style
+                .text
+                .size
+                .map_or(DEFAULT_LABEL, |size| size.resolve(DEFAULT_LABEL));
+            let (origin, x, y) = dimension.label(size * LINE);
+            let place = Placement { origin, x, y };
+            items.extend(self.text(shape, place, parent, Role::Dimension)?);
+            return Ok(items);
+        }
+
         if shape.is(&Ns::Draw, "connector") {
             let (Some(from), Some(to)) = (point(shape, "x1", "y1"), point(shape, "x2", "y2"))
             else {
@@ -394,7 +434,7 @@ impl Slides<'_, '_, '_> {
                     items.extend(self.outline(&[from, to], false, None, stroke, figure));
                 }
             }
-            items.extend(self.text(shape, place, parent, heading)?);
+            items.extend(self.text(shape, place, parent, Role::of(heading))?);
             return Ok(items);
         }
 
@@ -437,7 +477,7 @@ impl Slides<'_, '_, '_> {
         } else {
             return Ok(items);
         }
-        items.extend(self.text(shape, place, parent, heading)?);
+        items.extend(self.text(shape, place, parent, Role::of(heading))?);
         Ok(items)
     }
 
@@ -451,7 +491,7 @@ impl Slides<'_, '_, '_> {
         shape: &Element,
         place: Placement,
         parent: NodeId,
-        heading: bool,
+        role: Role,
     ) -> Result<Vec<Item>, Refusal> {
         let (x, y, width, height) = place.bounds();
         if edit::is_figure(shape) {
@@ -507,8 +547,17 @@ impl Slides<'_, '_, '_> {
             path,
             Some(std::rc::Rc::clone(&style)),
         );
-        if heading && let Some(Block::Paragraph(paragraph)) = blocks.first_mut() {
+        if role == Role::Title
+            && let Some(Block::Paragraph(paragraph)) = blocks.first_mut()
+        {
             paragraph.heading = Some(1);
+        }
+        if role == Role::Dimension {
+            for block in &mut blocks {
+                if let Block::Paragraph(paragraph) = block {
+                    paragraph.align = TextAlign::Center;
+                }
+            }
         }
         let mut pieces = Vec::new();
         self.layout
@@ -807,6 +856,29 @@ fn ellipse(place: Placement) -> Vec<Segment> {
     outline
 }
 
+/// What a shape's label is to the reader, which changes how it is laid out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    /// Text in a shape.
+    Plain,
+    /// A slide's title, read as its heading.
+    Title,
+    /// A dimension line's length, centred along the line.
+    Dimension,
+}
+
+impl Role {
+    fn of(heading: bool) -> Self {
+        if heading { Self::Title } else { Self::Plain }
+    }
+}
+
+/// The size a dimension line's label is set in where its style gives none,
+/// `LibreOffice`'s default for a drawing's text, and the height of its line as
+/// a share of that.
+const DEFAULT_LABEL: f32 = 18.0;
+const LINE: f32 = 1.17;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -896,6 +968,48 @@ mod tests {
         assert!(turned.iter().any(|(words, _)| words.contains("thirty")));
         assert!(turned.iter().any(|(words, _)| words.contains("a link")));
         assert!(turned.iter().all(|(_, linked)| !linked));
+    }
+
+    #[test]
+    fn a_dimension_line_is_drawn_with_its_guides_arrows_and_label() {
+        let bytes = std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/measures.odp"),
+        )
+        .expect("the measures fixture");
+        let presentation = Presentation::read(&bytes).expect("it reads");
+        let mut faces = Faces::new();
+        let laid = lay_out(&presentation, &options(), &mut faces).expect("laid out");
+        fn texts(item: &Item, into: &mut Vec<String>) {
+            match item {
+                Item::Text { text, .. } => into.push(text.clone()),
+                Item::Turned { items, .. } => items.iter().for_each(|item| texts(item, into)),
+                _ => {}
+            }
+        }
+        let mut labels = Vec::new();
+        for (_, item) in &laid.pages[0].items {
+            texts(item, &mut labels);
+        }
+        let lengths = labels
+            .iter()
+            .filter(|text| text.starts_with("3.94"))
+            .count();
+        assert_eq!(lengths, 4, "{labels:?}");
+        assert!(
+            labels.iter().any(|text| text.starts_with("2.76")),
+            "{labels:?}"
+        );
+        let arrows = laid.pages[0]
+            .items
+            .iter()
+            .filter(|(_, item)| {
+                matches!(item, Item::Shape { ground: Some(_), span, .. } if span.1 - span.0 < 20.0)
+            })
+            .count();
+        assert_eq!(
+            arrows, 2,
+            "an arrow at each end of the one line that asks for them"
+        );
     }
 
     #[test]

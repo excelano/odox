@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::data_style::DataStyles;
+use crate::draw::Geometry;
 use crate::value::{Color, Length, Measure, Percent};
 use crate::xml::{Element, Ns};
 
@@ -724,6 +725,21 @@ pub struct GraphicProperties {
     /// reading skips: `LibreOffice`'s `loext:decorative`, the one way ODF
     /// producers write it.
     pub decorative: Option<bool>,
+    /// A dimension line's distance from the points it measures, which may be
+    /// negative to put it on the other side: `draw:line-distance`.
+    pub line_distance: Option<Length>,
+    /// How far a dimension line's guides run past it: `draw:guide-overhang`.
+    pub guide_overhang: Option<Length>,
+    /// The gap between a point a dimension line measures and the start of its
+    /// guide: `draw:guide-distance`.
+    pub guide_distance: Option<Length>,
+    /// Whether a dimension line and its label go on the other side of the
+    /// points, the label under the line: `draw:placing="below"`.
+    pub placed_below: Option<bool>,
+    /// The marker at a line's first end, by name, and how wide it is drawn.
+    pub marker_start: Option<(String, Option<Length>)>,
+    /// The marker at a line's last end, by name, and how wide it is drawn.
+    pub marker_end: Option<(String, Option<Length>)>,
 }
 
 /// Where a shape's label sits between its top and bottom edges.
@@ -910,6 +926,7 @@ pub struct Styles {
     master_pages: HashMap<String, Element>,
     lists: HashMap<String, Element>,
     gradients: HashMap<String, Gradient>,
+    markers: HashMap<String, Geometry>,
     fill_images: HashMap<String, String>,
     font_faces: HashMap<String, String>,
     formats: DataStyles,
@@ -930,6 +947,7 @@ impl Styles {
             master_pages: HashMap::new(),
             lists: HashMap::new(),
             gradients: HashMap::new(),
+            markers: HashMap::new(),
             fill_images: HashMap::new(),
             font_faces: HashMap::new(),
             formats: DataStyles::default(),
@@ -1018,6 +1036,13 @@ impl Styles {
             ) {
                 self.fill_images.insert(name.to_owned(), href.to_owned());
             }
+        } else if element.is(&Ns::Draw, "marker") {
+            if let (Some(name), Some(outline)) = (
+                element.attr(&Ns::Draw, "name"),
+                Geometry::read_path(element),
+            ) {
+                self.markers.insert(name.to_owned(), outline);
+            }
         } else if element.is(&Ns::Draw, "gradient") {
             if let Some(name) = element.attr(&Ns::Draw, "name") {
                 self.gradients.insert(name.to_owned(), gradient(element));
@@ -1073,6 +1098,12 @@ impl Styles {
     /// A gradient by name, as a fill refers to one.
     pub fn gradient(&self, name: &str) -> Option<&Gradient> {
         self.gradients.get(name)
+    }
+
+    /// A named line-end marker's outline, in the space its `svg:viewBox`
+    /// declares.
+    pub fn marker(&self, name: &str) -> Option<&Geometry> {
+        self.markers.get(name)
     }
 
     /// Where the picture of a named fill image lives inside the package.
@@ -1685,6 +1716,28 @@ impl GraphicProperties {
         }
         if let Some(opacity) = p.attr(&Ns::Draw, "opacity").and_then(Percent::parse) {
             self.opacity = Some(opacity.fraction().clamp(0.0, 1.0));
+        }
+        let length = |local: &str| p.attr(&Ns::Draw, local).and_then(Length::parse);
+        if let Some(distance) = length("line-distance") {
+            self.line_distance = Some(distance);
+        }
+        if let Some(overhang) = length("guide-overhang") {
+            self.guide_overhang = Some(overhang);
+        }
+        if let Some(distance) = length("guide-distance") {
+            self.guide_distance = Some(distance);
+        }
+        if let Some(placing) = p.attr(&Ns::Draw, "placing") {
+            self.placed_below = Some(placing == "below");
+        }
+        for (end, slot) in [
+            ("marker-start", &mut self.marker_start),
+            ("marker-end", &mut self.marker_end),
+        ] {
+            if let Some(name) = p.attr(&Ns::Draw, end) {
+                let width = length(&format!("{end}-width"));
+                *slot = (!name.is_empty()).then(|| (name.to_owned(), width));
+            }
         }
         // `justify` spreads the lines to fill the height, which needs a line
         // box this renderer does not build; it reads as the top, which is where

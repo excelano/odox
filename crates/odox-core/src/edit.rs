@@ -270,6 +270,7 @@ pub fn is_inline_passthrough(element: &Element) -> bool {
                 | "conditional-text"
                 | "hidden-text"
                 | "text-input"
+                | "measure"
         )
 }
 

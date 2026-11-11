@@ -210,7 +210,11 @@ of the size. In them and in text a style puts in capitals, `ß` is `ẞ`, as
 `LibreOffice` writes it, and a letter whose capital is two letters keeps its own
 form, so what is drawn is as long as the text the caret moves through. Ruby is written after the text it
 annotates, in parentheses, `漢字(かんじ)`, rather than set above it.
-A `draw:measure` is undrawn. A turned shape's label is laid out upright in a
+A dimension line, `draw:measure`, is drawn as `LibreOffice` draws one
+(`odox-core`'s `dimension`, measured on `corpus/libreoffice/measures.odp`):
+its guides, the line standing off from the points, a marker at each end its
+style names, and the length `LibreOffice` wrote into it centred along the line
+and never upside down. A turned shape's label is laid out upright in a
 box the shape's size and turned onto the shape, in the window by carrying the
 triangles egui cuts it into and in an exported PDF by a transform, so it is
 read and not edited: hovering it in edit mode says so, and a link in it is left
