@@ -1071,6 +1071,22 @@ impl Styles {
         self.collect_style(element);
     }
 
+    /// The families the document's font face declarations ask for, sorted.
+    pub fn font_families(&self) -> Vec<String> {
+        let mut families: Vec<String> = self.font_faces.values().cloned().collect();
+        families.sort_by_key(|family| family.to_lowercase());
+        families.dedup();
+        families
+    }
+
+    /// Learn of a font face declaration written into a document after it was
+    /// read: `name` is what a style names it by, `family` the family it asks
+    /// for.
+    pub fn add_font_face(&mut self, name: &str, family: &str) {
+        self.font_faces.insert(name.to_owned(), family.to_owned());
+        self.cache.borrow_mut().clear();
+    }
+
     /// The data styles, by name.
     pub fn data_styles(&self) -> &DataStyles {
         &self.formats

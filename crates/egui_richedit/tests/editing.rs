@@ -12,7 +12,7 @@ use egui::output::OutputCommand;
 use egui::text::LayoutJob;
 use egui::{Context, Event, Id, Key, Modifiers, Pos2, RawInput, Rect, Sense, TextFormat, vec2};
 use egui_richedit::{
-    Edit, Fragment, Laid, Mark, Model, ParagraphJob, Position, RichEdit, Selection,
+    Edit, Fragment, Laid, Mark, Model, ParagraphJob, Position, Property, RichEdit, Selection, Value,
 };
 
 /// Paragraphs of plain text, named by their index.
@@ -22,6 +22,8 @@ struct Plain {
     bold: Vec<Vec<bool>>,
     /// How many undo steps the edits made so far began.
     steps: usize,
+    /// The values given so far, each with where it began and ended.
+    values: Vec<(Position<usize>, Position<usize>, Value)>,
 }
 
 impl Plain {
@@ -33,6 +35,7 @@ impl Plain {
                 .map(|p| vec![false; p.chars().count()])
                 .collect(),
             steps: 0,
+            values: Vec::new(),
         }
     }
 
@@ -184,6 +187,10 @@ impl Model for Plain {
                         self.bold[p][range].fill(on);
                     }
                 }
+                Some(to)
+            }
+            Edit::Set { from, to, value } => {
+                self.values.push((from, to.clone(), value));
                 Some(to)
             }
         }
@@ -884,6 +891,38 @@ fn a_mark_at_a_caret_goes_to_what_is_typed_there_next() {
     assert_eq!(h.model.paragraphs, ["axyb"]);
     assert_eq!(h.model.bold_text(0), "xy");
     assert_eq!(h.model.steps, 1, "the typing and its mark are one step");
+}
+
+#[test]
+fn a_value_at_a_caret_goes_to_what_is_typed_there_next_in_the_same_step() {
+    let mut h = Harness::new(&["ab"]);
+    h.caret(0, 1);
+    let size = Value::Size(18 * 20);
+    assert!(!h.editor.set(&mut h.model, size.clone()));
+    assert_eq!(h.editor.value(&h.model, Property::Size), Some(size.clone()));
+    assert_eq!(h.editor.value(&h.model, Property::Family), None);
+    h.typed("x");
+    assert_eq!(h.model.paragraphs, ["axb"]);
+    assert_eq!(
+        h.model.values,
+        [(Position::new(0, 1), Position::new(0, 2), size)]
+    );
+    assert_eq!(h.model.steps, 1, "the typing and its value are one step");
+}
+
+#[test]
+fn a_value_given_a_selection_is_one_edit_over_it() {
+    let mut h = Harness::new(&["abcd"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 3),
+        focus: Position::new(0, 1),
+    });
+    let family = Value::Family("DejaVu Sans".to_owned());
+    assert!(h.editor.set(&mut h.model, family.clone()));
+    assert_eq!(
+        h.model.values,
+        [(Position::new(0, 1), Position::new(0, 3), family)]
+    );
 }
 
 #[test]

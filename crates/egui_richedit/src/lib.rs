@@ -123,6 +123,46 @@ pub enum Edit<'a, P> {
         /// Given, or taken off.
         on: bool,
     },
+    /// Give the text from one position to another a value of a property:
+    /// a family, or a size. The two may be in different paragraphs, `from`
+    /// first in document order; no paragraph is joined or split.
+    Set {
+        /// Where the text begins.
+        from: Position<P>,
+        /// Where it ends.
+        to: Position<P>,
+        /// What it is given.
+        value: Value,
+    },
+}
+
+/// A property of text that takes a value rather than being on or off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Property {
+    /// The font family.
+    Family,
+    /// The size.
+    Size,
+}
+
+/// A value of a [`Property`]. Like [`Mark`], the set is fixed.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Value {
+    /// A font family, by the name a person picks it by.
+    Family(String),
+    /// A size, in twentieths of a point, which holds every size a person
+    /// types to a twentieth.
+    Size(u32),
+}
+
+impl Value {
+    /// The property this is a value of.
+    pub fn property(&self) -> Property {
+        match self {
+            Self::Family(_) => Property::Family,
+            Self::Size(_) => Property::Size,
+        }
+    }
 }
 
 /// Formatting a range of text is given or has taken off. The set is fixed, so
@@ -210,6 +250,21 @@ pub trait Model {
     ) -> Option<bool> {
         let _ = (from, to, mark);
         Some(false)
+    }
+
+    /// The value of a property the text from one position to another has:
+    /// `None` when it differs or the model cannot say. Two positions that are
+    /// the same answer for the text typed there, as [`Self::marked`] does. A
+    /// model that keeps no formatting leaves this as it is and refuses
+    /// [`Edit::Set`].
+    fn value(
+        &self,
+        from: &Position<Self::Paragraph>,
+        to: &Position<Self::Paragraph>,
+        property: Property,
+    ) -> Option<Value> {
+        let _ = (from, to, property);
+        None
     }
 
     /// A copy of the text from one position to another that keeps what the

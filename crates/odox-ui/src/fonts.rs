@@ -23,11 +23,61 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use eframe::egui::epaint::text::{FallbackRequest, FontInsert, FontProvider};
+use eframe::egui::epaint::text::{
+    FallbackRequest, FontInsert, FontPriority, FontProvider, InsertFontFamily,
+};
 use eframe::egui::{Context, FontData, FontDefinitions, FontFamily};
 use odox_core::{Element, Ns};
 
 pub use odox_fonts::Variant;
+
+/// The machine's fonts, read the first time a list of them or one of them is
+/// asked for after a document has opened.
+fn machine() -> &'static odox_fonts::fontdb::Database {
+    static DATABASE: OnceLock<odox_fonts::fontdb::Database> = OnceLock::new();
+    DATABASE.get_or_init(odox_fonts::database)
+}
+
+/// The families this machine has, by the name each gives first, sorted as a
+/// person reads them.
+pub fn system_families() -> &'static [String] {
+    static FAMILIES: OnceLock<Vec<String>> = OnceLock::new();
+    FAMILIES.get_or_init(|| {
+        let mut families: Vec<String> = machine()
+            .faces()
+            .filter_map(|face| face.families.first().map(|(name, _)| name.clone()))
+            .collect();
+        families.sort_by_key(|family| family.to_lowercase());
+        families.dedup();
+        families
+    })
+}
+
+/// Hand a window the faces of a family a person has just picked, which the
+/// document did not name when it opened. A face the window has already is not
+/// read again, and a character the face lacks is asked of [`Fallback`].
+pub fn add_family(ctx: &Context, family: &str) {
+    let database = machine();
+    for variant in Variant::ALL {
+        let named = family_of(family, variant);
+        let FontFamily::Name(key) = &named else {
+            continue;
+        };
+        let Some(data) =
+            odox_fonts::find(database, family, variant).and_then(|id| load(database, id))
+        else {
+            continue;
+        };
+        ctx.add_font(FontInsert::new(
+            key,
+            data,
+            vec![InsertFontFamily {
+                family: named.clone(),
+                priority: FontPriority::Highest,
+            }],
+        ));
+    }
+}
 
 /// The egui font family a document's family name and variant resolve to.
 ///

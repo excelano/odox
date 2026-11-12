@@ -66,7 +66,7 @@ impl Model for Notes {
                 Some(Position::new(at.paragraph + 1, 0))
             }
             // Plain notes keep no formatting.
-            Edit::Format { .. } => None,
+            Edit::Format { .. } | Edit::Set { .. } => None,
         }
     }
 }

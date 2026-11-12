@@ -14,7 +14,7 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
+use egui_richedit::{Edit, Fragment, Mark, Model, Position, Property, RichEdit, Selection, Value};
 use odox_core::edit::{self, TableEdit, html, is_paragraph};
 use odox_core::{Element, ListKind, Ns, Refused, Styles, TextAlign};
 
@@ -301,16 +301,13 @@ impl<'a> FlowModel<'a> {
     /// put the selection back over them. Answers whether the document changed.
     pub fn apply_alignment(&mut self, editor: &mut PageEditor, align: TextAlign) -> bool {
         self.over_paragraphs(editor, |model, paragraphs| {
-            let had = model
-                .content
-                .child(&Ns::Office, "automatic-styles")
-                .is_some();
+            let before = model.content.children.len();
             let paths: Vec<Vec<usize>> = paragraphs
                 .iter()
                 .map(|paragraph| [model.root.as_slice(), paragraph].concat())
                 .collect();
             edit::set_alignment(model.content, &paths, align, model.styles).ok()?;
-            model.follow_styles(had);
+            model.follow_styles(before);
             Some(())
         })
     }
@@ -359,6 +356,11 @@ impl<'a> FlowModel<'a> {
             });
         }
         true
+    }
+
+    /// The families the document declares, for a list to offer first.
+    pub fn document_families(&self) -> Vec<String> {
+        self.styles.font_families()
     }
 
     /// Whether the paragraph a selection ends in is in a table.
@@ -456,10 +458,7 @@ impl<'a> FlowModel<'a> {
     ) -> Result<(), Refused> {
         let selection = editor.selection().cloned().ok_or(Refused::NotFound)?;
         let before = self.content.clone();
-        let had = self
-            .content
-            .child(&Ns::Office, "automatic-styles")
-            .is_some();
+        let children = self.content.children.len();
         let root = self.root.clone();
         let path = [root.as_slice(), &selection.focus.paragraph].concat();
         let caret = match change(self.content, &path, self.styles) {
@@ -473,7 +472,7 @@ impl<'a> FlowModel<'a> {
             .strip_prefix(root.as_slice())
             .map(<[usize]>::to_vec)
             .ok_or(Refused::NotFound)?;
-        self.follow_styles(had);
+        self.follow_styles(children);
         self.order = OnceCell::new();
         let begins = Position::new(
             [self.tag.as_slice(), &selection.focus.paragraph].concat(),
@@ -579,12 +578,9 @@ impl<'a> FlowModel<'a> {
         read: &[html::Paragraph],
         style: Option<String>,
     ) -> Option<(Vec<usize>, usize)> {
-        let had = self
-            .content
-            .child(&Ns::Office, "automatic-styles")
-            .is_some();
+        let before = self.content.children.len();
         let mut items = html::paragraphs(self.content, read, self.styles).ok()?;
-        self.follow_styles(had);
+        self.follow_styles(before);
         if let Some(style) = style {
             let name = self.content.name_for(&Ns::Text, "style-name");
             for item in &mut items {
@@ -596,42 +592,32 @@ impl<'a> FlowModel<'a> {
     }
 
     fn set_headings(&mut self, paragraphs: &[Vec<usize>], level: Option<u8>) -> Option<()> {
-        let automatic =
-            |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
         for paragraph in paragraphs {
-            let had = automatic(self.content);
+            let before = self.content.children.len();
             let path = [self.root.as_slice(), paragraph].concat();
             edit::set_heading(self.content, &path, level, self.styles).ok()?;
-            self.follow_styles(had);
+            self.follow_styles(before);
         }
         Some(())
     }
 
     fn set_lists(&mut self, paragraphs: &[Vec<usize>], kind: Option<ListKind>) -> Option<()> {
-        let had = self
-            .content
-            .child(&Ns::Office, "automatic-styles")
-            .is_some();
+        let before = self.content.children.len();
         let paths: Vec<Vec<usize>> = paragraphs
             .iter()
             .map(|paragraph| [self.root.as_slice(), paragraph].concat())
             .collect();
         edit::set_list(self.content, &paths, kind, self.styles).ok()?;
-        self.follow_styles(had);
+        self.follow_styles(before);
         Some(())
     }
 
-    /// Styles written into a document that had nowhere to keep them go before
-    /// its body, and move the body, and the root, one along.
-    fn follow_styles(&mut self, had: bool) {
-        if !had
-            && self
-                .content
-                .child(&Ns::Office, "automatic-styles")
-                .is_some()
-            && let Some(first) = self.root.first_mut()
-        {
-            *first += 1;
+    /// Containers written into a document that had none go before its body,
+    /// and move the body, and the root, along by as many as were written.
+    fn follow_styles(&mut self, before: usize) {
+        let written = self.content.children.len().saturating_sub(before);
+        if let Some(first) = self.root.first_mut() {
+            *first += written;
         }
     }
 
@@ -656,36 +642,50 @@ impl<'a> FlowModel<'a> {
         Some(second)
     }
 
-    /// Give the text from one position to another a mark, or take it off,
-    /// paragraph by paragraph.
-    fn format(
+    /// Give the text from one position to another a setting, paragraph by
+    /// paragraph.
+    fn restyle(
         &mut self,
         from: &Position<Vec<usize>>,
         to: &Position<Vec<usize>>,
-        mark: edit::Mark,
-        on: bool,
+        setting: &edit::Setting,
     ) -> Option<()> {
-        let automatic =
-            |content: &Element| content.child(&Ns::Office, "automatic-styles").is_some();
         for (path, range) in self.covered(from, to)? {
             if range.is_empty() {
                 continue;
             }
-            let had = automatic(self.content);
+            let before = self.content.children.len();
             let mut at = self.root.clone();
             at.extend(&path);
-            edit::format(self.content, &at, range, mark, on, self.styles).ok()?;
-            // Styles written into a document that had nowhere to keep them go
-            // before its body, and move the body, and the root, one along.
-            if !had
-                && automatic(self.content)
-                && let Some(first) = self.root.first_mut()
-            {
-                *first += 1;
-            }
+            edit::set_text(self.content, &at, range, setting, self.styles).ok()?;
+            self.follow_styles(before);
         }
         Some(())
     }
+}
+
+/// What the editor asks a value for, as the library sets it.
+fn core_setting(value: Value) -> edit::Setting {
+    match value {
+        Value::Family(family) => edit::Setting::Family(family),
+        #[allow(clippy::cast_precision_loss)]
+        Value::Size(twentieths) => edit::Setting::Size(twentieths as f32 / 20.0),
+    }
+}
+
+/// A value the library read, as the editor shows it.
+fn editor_value(setting: edit::Setting) -> Option<Value> {
+    match setting {
+        edit::Setting::Family(family) => Some(Value::Family(family)),
+        edit::Setting::Size(points) => Some(Value::Size(twentieths(points))),
+        edit::Setting::Mark(..) => None,
+    }
+}
+
+/// A size in points, in twentieths of a point.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn twentieths(points: f32) -> u32 {
+    (points.max(0.0) * 20.0).round() as u32
 }
 
 /// The library's name for a mark.
@@ -745,6 +745,43 @@ impl Model for FlowModel<'_> {
         for (path, range) in ranges {
             let value = edit::marked(root.at(&path)?, range, mark, self.styles)?;
             if answer.is_some_and(|a| a != value) {
+                return None;
+            }
+            answer = Some(value);
+        }
+        answer
+    }
+
+    fn value(
+        &self,
+        from: &Position<Vec<usize>>,
+        to: &Position<Vec<usize>>,
+        property: Property,
+    ) -> Option<Value> {
+        let root = self.root()?;
+        let property = match property {
+            Property::Family => edit::TextProperty::Family,
+            Property::Size => edit::TextProperty::Size,
+        };
+        let ranges: Vec<_> = self
+            .covered(from, to)?
+            .into_iter()
+            .filter(|(_, range)| !range.is_empty())
+            .collect();
+        let ranges = if ranges.is_empty() {
+            vec![(from.paragraph.clone(), from.offset..from.offset)]
+        } else {
+            ranges
+        };
+        let mut answer = None;
+        for (path, range) in ranges {
+            let value = editor_value(edit::text_value(
+                root.at(&path)?,
+                range,
+                property,
+                self.styles,
+            )?)?;
+            if answer.as_ref().is_some_and(|a| *a != value) {
                 return None;
             }
             answer = Some(value);
@@ -817,7 +854,7 @@ impl Model for FlowModel<'_> {
         // Where the edit begins is where an undo of it puts the caret.
         let before = new_step.then(|| self.content.clone());
         let begins = match &edit {
-            Edit::Replace { from, .. } | Edit::Format { from, .. } => from,
+            Edit::Replace { from, .. } | Edit::Format { from, .. } | Edit::Set { from, .. } => from,
             Edit::Split { at } => at,
         };
         let begins = Position::new(
@@ -829,8 +866,11 @@ impl Model for FlowModel<'_> {
                 .replace(&from, &to, text)
                 .map(|()| Position::new(from.paragraph, from.offset + text.chars().count())),
             Edit::Split { at } => self.split(&at).map(|second| Position::new(second, 0)),
-            Edit::Format { from, to, mark, on } => {
-                self.format(&from, &to, core_mark(mark), on).map(|()| to)
+            Edit::Format { from, to, mark, on } => self
+                .restyle(&from, &to, &edit::Setting::Mark(core_mark(mark), on))
+                .map(|()| to),
+            Edit::Set { from, to, value } => {
+                self.restyle(&from, &to, &core_setting(value)).map(|()| to)
             }
         };
         if at.is_some() {

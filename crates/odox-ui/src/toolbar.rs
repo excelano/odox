@@ -4,18 +4,20 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Response, RichText, Ui, vec2};
-use egui_richedit::{Mark, Model};
+use egui_richedit::{Mark, Model, Property, Value};
 use odox_core::TextAlign;
 use odox_core::edit::TableEdit;
 
 use crate::i18n::t;
-use crate::{Block, FlowModel, PageEditor};
+use crate::{Block, FlowModel, PageEditor, fonts};
 
 /// What was pressed on the toolbar over a page.
 #[derive(Default)]
 pub struct Pressed {
     /// A mark's button, for the editor to toggle over the model.
     pub mark: Option<Mark>,
+    /// A family or a size picked, for the editor to give the selection.
+    pub value: Option<Value>,
     /// An alignment's button, for the model to apply.
     pub align: Option<TextAlign>,
     /// A kind of paragraph's button, for the model to apply.
@@ -34,9 +36,17 @@ pub fn label(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed
     pressed
 }
 
-/// The marks, each lit where the whole selection has it, and the alignments,
-/// lit where every paragraph the selection runs over is aligned that way.
+/// The family and the size the selection has, blank where it differs; the
+/// marks, each lit where the whole selection has it; and the alignments, lit
+/// where every paragraph the selection runs over is aligned that way.
 fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed: &mut Pressed) {
+    pressed.value = family_box(ui, editor, model).or(size_box(ui, editor, model));
+    for (key, larger) in [(Key::CloseBracket, true), (Key::OpenBracket, false)] {
+        if ui.input_mut(|input| input.consume_key(Modifiers::COMMAND, key)) {
+            pressed.value = stepped(editor.value(model, Property::Size).as_ref(), larger);
+        }
+    }
+    ui.separator();
     pressed.mark = mark_buttons(ui, editor, model);
     ui.separator();
     let current = editor
@@ -50,6 +60,124 @@ fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed
             pressed.align = Some(align);
         }
     }
+}
+
+/// The families a list offers: the document's own, then the machine's.
+/// Answers the one picked.
+fn family_box(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Option<Value> {
+    let current = match editor.value(model, Property::Family) {
+        Some(Value::Family(family)) => Some(family),
+        _ => None,
+    };
+    let mut picked = None;
+    let mut offer = |ui: &mut Ui, family: &str| {
+        if ui
+            .selectable_label(current.as_deref() == Some(family), family)
+            .clicked()
+        {
+            fonts::add_family(ui.ctx(), family);
+            picked = Some(Value::Family(family.to_owned()));
+        }
+    };
+    egui::ComboBox::from_id_salt("family")
+        .width(150.0)
+        .height(400.0)
+        .selected_text(current.clone().unwrap_or_default())
+        .show_ui(ui, |ui| {
+            for family in model.document_families() {
+                offer(ui, &family);
+            }
+            ui.separator();
+            for family in fonts::system_families() {
+                offer(ui, family);
+            }
+        })
+        .response
+        .on_hover_text(t("Font"));
+    picked
+}
+
+/// The sizes offered beside the size box, in points.
+const SIZES: [f32; 16] = [
+    8.0, 9.0, 10.0, 10.5, 11.0, 12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 32.0, 36.0, 48.0, 72.0,
+];
+
+/// A size in twentieths of a point, as the editor carries one.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn twentieths(points: f32) -> u32 {
+    (points * 20.0).round() as u32
+}
+
+/// A size in twentieths of a point as a person reads it, in points.
+fn shown(twentieths: u32) -> String {
+    let points = format!("{:.2}", f64::from(twentieths) / 20.0);
+    points
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_owned()
+}
+
+/// A size as a person types it, `12`, `10.5`, `10,5` or `12pt`, between one
+/// point and a thousand.
+fn typed_size(text: &str) -> Option<u32> {
+    let text = text.trim().trim_end_matches("pt").trim().replace(',', ".");
+    let points: f32 = text.parse().ok()?;
+    (1.0..1000.0).contains(&points).then(|| twentieths(points))
+}
+
+/// The next size offered above or below a size, or none where there is no
+/// one size to step from.
+fn stepped(current: Option<&Value>, larger: bool) -> Option<Value> {
+    let Some(&Value::Size(current)) = current else {
+        return None;
+    };
+    let mut sizes = SIZES.into_iter().map(twentieths);
+    let next = if larger {
+        sizes.find(|&size| size > current)
+    } else {
+        sizes.rev().find(|&size| size < current)
+    };
+    next.map(Value::Size)
+}
+
+/// A box showing the selection's size, which a size is typed into and Enter
+/// gives, with the sizes offered beside it. Answers the size given.
+fn size_box(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Option<Value> {
+    let current = match editor.value(model, Property::Size) {
+        Some(Value::Size(size)) => Some(size),
+        _ => None,
+    };
+    let id = ui.make_persistent_id("size");
+    let mut text = ui
+        .data(|data| data.get_temp::<String>(id))
+        .unwrap_or_else(|| current.map(shown).unwrap_or_default());
+    let response = ui
+        .add(egui::TextEdit::singleline(&mut text).desired_width(32.0))
+        .on_hover_text(t("Size"));
+    let mut given = None;
+    if response.has_focus() {
+        ui.data_mut(|data| data.insert_temp(id, text.clone()));
+    } else {
+        ui.data_mut(|data| data.remove::<String>(id));
+    }
+    if response.lost_focus() && ui.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Enter))
+    {
+        given = typed_size(&text).map(Value::Size);
+    }
+    egui::ComboBox::from_id_salt("sizes")
+        .width(0.0)
+        .selected_text("")
+        .show_ui(ui, |ui| {
+            for size in SIZES.map(twentieths) {
+                if ui
+                    .selectable_label(current == Some(size), shown(size))
+                    .clicked()
+                {
+                    given = Some(Value::Size(size));
+                }
+            }
+        });
+    given
 }
 
 /// The alignments, in the order the toolbar and the menu offer them.
@@ -187,6 +315,8 @@ fn mark_buttons<M: Model<Paragraph = Vec<usize>>>(
 pub enum Command {
     /// Bold, italic, underline or strikethrough.
     Mark(Mark),
+    /// The next size offered, larger or not.
+    Size(bool),
     /// An alignment.
     Align(TextAlign),
     /// A kind of paragraph.
@@ -195,6 +325,16 @@ pub enum Command {
     InsertTable,
     /// Change the table the caret is in.
     Table(TableEdit),
+}
+
+impl Command {
+    /// The value the command gives the selection, where it gives one.
+    pub fn value(self, editor: &PageEditor, model: &FlowModel<'_>) -> Option<Value> {
+        match self {
+            Self::Size(larger) => stepped(editor.value(model, Property::Size).as_ref(), larger),
+            _ => None,
+        }
+    }
 }
 
 /// The kinds of paragraph, in the order the toolbar and the menu offer them.
@@ -270,8 +410,9 @@ impl MenuState {
     }
 }
 
-/// The Format menu's entries: the marks, each with its shortcut, the
-/// alignments, and where the page has them the kinds of paragraph. Lit where the whole selection is one,
+/// The Format menu's entries: the marks, each with its shortcut, a size larger
+/// and smaller, the alignments, and where the page has them the kinds of
+/// paragraph. Lit where the whole selection is one,
 /// and not live without a caret. Answers the command chosen.
 pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
@@ -286,6 +427,20 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         }
         if ui.add_enabled(state.enabled, button).clicked() {
             chosen = Some(Command::Mark(mark));
+            ui.close();
+        }
+    }
+    ui.separator();
+    for (larger, name, key) in [
+        (true, t("Larger"), Key::CloseBracket),
+        (false, t("Smaller"), Key::OpenBracket),
+    ] {
+        let button = egui::Button::new(name).shortcut_text(
+            ui.ctx()
+                .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, key)),
+        );
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Size(larger));
             ui.close();
         }
     }

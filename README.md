@@ -26,8 +26,8 @@ ODF is a document they are meant to open, whichever application wrote it.
 
 Editing covers what is basic to each kind of document and stops there: a
 feature a full suite needs and a quick edit does not stays out. You can type
-and delete text, make it bold, italic, underlined or struck through, align a
-paragraph, make it a heading or a list item and put a table in a text document, enter
+and delete text, change its font and size, make it bold, italic, underlined or
+struck through, align a paragraph, make it a heading or a list item and put a table in a text document, enter
 values and formulas in a spreadsheet and format its cells, move and resize the
 shapes on a slide and add or rearrange slides, undo any of that, and save. What
 you did not touch is written back as it was read, element for element, including the
@@ -95,7 +95,9 @@ before, and the arrows, Page Up and Page Down, Ctrl+Home and Ctrl+End, Ctrl+A,
 Shift and the clipboard work across paragraphs the way they do in any word
 processor. Copied text keeps its bold, italic, underline, strikethrough, headings and lists
 pasted back into the window, into another window, or into another program that reads HTML,
-and text copied from a browser or a word processor keeps the same pasted in. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
+and text copied from a browser or a word processor keeps the same pasted in. The row over the page begins with the font and the size: pick a font from the
+list, type a size and press Enter or pick one beside it, or step the size with
+Ctrl+] and Ctrl+[. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons after them, make the
 selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Next come the alignments, left,
 centered, right and justified, for the paragraphs the selection runs over, in

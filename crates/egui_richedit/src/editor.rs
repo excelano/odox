@@ -20,7 +20,9 @@ use egui::{
     Response, Role, Sense, Ui, WidgetInfo, vec2,
 };
 
-use crate::{Clipboard, Edit, Fragment, Mark, Model, OffsetMap, Position, Selection};
+use crate::{
+    Clipboard, Edit, Fragment, Mark, Model, OffsetMap, Position, Property, Selection, Value,
+};
 
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
@@ -94,12 +96,19 @@ pub struct RichEdit<P> {
     deferred: Vec<Event>,
 }
 
-/// Marks given or taken off with a caret and nothing selected. The next text
-/// typed at that caret takes them; once the caret is anywhere else, or the
-/// document has changed, they are forgotten.
+/// Marks given or taken off and values given with a caret and nothing
+/// selected. The next text typed at that caret takes them; once the caret is
+/// anywhere else, or the document has changed, they are forgotten.
 struct Pending<P> {
     at: Position<P>,
     marks: Vec<(Mark, bool)>,
+    values: Vec<Value>,
+}
+
+impl<P> Pending<P> {
+    fn is_empty(&self) -> bool {
+        self.marks.is_empty() && self.values.is_empty()
+    }
 }
 
 /// What the caret is owed by the next frame that draws it.
@@ -231,22 +240,82 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         let on = self.marked(model, mark) != Some(true);
         if selection.is_caret() {
             let at = selection.focus;
-            let mut marks = match self.pending.take() {
-                Some(pending) if pending.at == at => pending.marks,
-                _ => Vec::new(),
-            };
-            marks.retain(|(m, _)| *m != mark);
+            let mut pending = self.pending_at(at.clone());
+            pending.marks.retain(|(m, _)| *m != mark);
             if model.marked(&at, &at, mark) != Some(on) {
-                marks.push((mark, on));
+                pending.marks.push((mark, on));
             }
-            self.pending = (!marks.is_empty()).then_some(Pending { at, marks });
+            self.pending = (!pending.is_empty()).then_some(pending);
             return false;
         }
         let (from, to) = self.ordered(&selection);
         self.group = None;
-        let changed = self.format(model, from, to, mark, on, Group::Other);
+        let changed = self.restyle(model, Edit::Format { from, to, mark, on }, Group::Other);
         self.group = None;
         changed
+    }
+
+    /// The value of a property the selection has, as a toolbar shows it:
+    /// `None` where it differs, and for a caret what text typed there would
+    /// take, a value given at the caret included. `None` too when there is no
+    /// caret.
+    pub fn value<M: Model<Paragraph = P>>(&self, model: &M, property: Property) -> Option<Value> {
+        let selection = self.selection.as_ref()?;
+        if let Some(value) = self.pending_value(property) {
+            return Some(value);
+        }
+        let (from, to) = self.ordered(selection);
+        model.value(&from, &to, property)
+    }
+
+    /// Give the selection a value of a property, in one undo step; with a
+    /// caret and nothing selected, give it to what is typed next at the
+    /// caret. Answers whether the document changed. The editor takes the
+    /// keyboard back from whatever asked.
+    pub fn set<M: Model<Paragraph = P>>(&mut self, model: &mut M, value: Value) -> bool {
+        let Some(selection) = self.selection.clone() else {
+            return false;
+        };
+        self.owed = Owed::FocusAndReveal;
+        if selection.is_caret() {
+            let at = selection.focus;
+            let mut pending = self.pending_at(at.clone());
+            pending.values.retain(|v| v.property() != value.property());
+            if model.value(&at, &at, value.property()).as_ref() != Some(&value) {
+                pending.values.push(value);
+            }
+            self.pending = (!pending.is_empty()).then_some(pending);
+            return false;
+        }
+        let (from, to) = self.ordered(&selection);
+        self.group = None;
+        let changed = self.restyle(model, Edit::Set { from, to, value }, Group::Other);
+        self.group = None;
+        changed
+    }
+
+    /// What is pending at a caret: what was given there already, or nothing.
+    fn pending_at(&mut self, at: Position<P>) -> Pending<P> {
+        match self.pending.take() {
+            Some(pending) if pending.at == at => pending,
+            _ => Pending {
+                at,
+                marks: Vec::new(),
+                values: Vec::new(),
+            },
+        }
+    }
+
+    /// What a value given at the caret says, while the caret is where it was
+    /// then.
+    fn pending_value(&self, property: Property) -> Option<Value> {
+        let selection = self.selection.as_ref().filter(|s| s.is_caret())?;
+        let pending = self.pending.as_ref().filter(|p| p.at == selection.focus)?;
+        pending
+            .values
+            .iter()
+            .find(|v| v.property() == property)
+            .cloned()
     }
 
     /// What a mark given or taken off at the caret says, while the caret is
@@ -677,7 +746,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     }
 
     /// Replace the selection with text, as typing does, and give what was
-    /// typed the marks given or taken off at the caret.
+    /// typed the marks given or taken off and the values given at the caret.
     fn type_text<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
         let Some(selection) = &self.selection else {
             return false;
@@ -686,6 +755,10 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         let marks: Vec<(Mark, bool)> = Mark::ALL
             .into_iter()
             .filter_map(|mark| self.pending_mark(mark).map(|on| (mark, on)))
+            .collect();
+        let values: Vec<Value> = [Property::Family, Property::Size]
+            .into_iter()
+            .filter_map(|property| self.pending_value(property))
             .collect();
         let edit = Edit::Replace {
             from: from.clone(),
@@ -697,7 +770,12 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
         if let Some(end) = self.selection.as_ref().map(|s| s.focus.clone()) {
             for (mark, on) in marks {
-                self.format(model, from.clone(), end.clone(), mark, on, Group::Typing);
+                let (from, to) = (from.clone(), end.clone());
+                self.restyle(model, Edit::Format { from, to, mark, on }, Group::Typing);
+            }
+            for value in values {
+                let (from, to) = (from.clone(), end.clone());
+                self.restyle(model, Edit::Set { from, to, value }, Group::Typing);
             }
         }
         true
@@ -822,17 +900,13 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
 
     /// Hand a format to the model, as [`Self::apply`] does an edit, leaving
     /// the selection where it is.
-    fn format<M: Model<Paragraph = P>>(
+    fn restyle<M: Model<Paragraph = P>>(
         &mut self,
         model: &mut M,
-        from: Position<P>,
-        to: Position<P>,
-        mark: Mark,
-        on: bool,
+        edit: Edit<'_, P>,
         group: Group,
     ) -> bool {
         let new_step = self.group != Some(group);
-        let edit = Edit::Format { from, to, mark, on };
         if model.apply(edit, new_step).is_none() {
             return false;
         }
