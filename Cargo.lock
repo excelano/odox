@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "egui_richedit"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "eframe",
  "egui",
@@ -1682,9 +1682,9 @@ checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
 name = "jiff"
-version = "0.2.42"
+version = "0.2.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fefca06093eeaed707a905795e68206da0edca4edef23d2a3997a3ddbee462aa"
+checksum = "26699905cc795a23e3949585cc7ba3ee8ade090872a27e4316304a777297894a"
 dependencies = [
  "jiff-core",
  "jiff-static",
@@ -1698,18 +1698,18 @@ dependencies = [
 
 [[package]]
 name = "jiff-core"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a24020db0ee88d1c681d677681bd31f9f4ea189a455425223d52ce4f1508aa"
+checksum = "ffe6854081f5ac0a3046a9b223729ccd7a20b1e0e8277e44dc0660eedf67dfe2"
 dependencies = [
  "log",
 ]
 
 [[package]]
 name = "jiff-static"
-version = "0.2.42"
+version = "0.2.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d3213549742662eea1a18e6c5af9be5dfbabeb7611ab71356a54928ec398f0"
+checksum = "4b4ff49b2887190c760b86207b55cdcaabbdecaf7a0660d68aa2ed6f652abf0a"
 dependencies = [
  "jiff-core",
  "proc-macro2",
@@ -2465,14 +2465,14 @@ dependencies = [
 
 [[package]]
 name = "odox"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "odox-core",
 ]
 
 [[package]]
 name = "odox-core"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "quick-xml 0.42.0",
  "regex",
@@ -2482,7 +2482,7 @@ dependencies = [
 
 [[package]]
 name = "odox-fonts"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "fontdb",
  "ttf-parser",
@@ -2490,7 +2490,7 @@ dependencies = [
 
 [[package]]
 name = "odox-pdf"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "krilla",
  "odox-core",
@@ -2501,7 +2501,7 @@ dependencies = [
 
 [[package]]
 name = "odox-ui"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "arboard",
  "block2 0.6.2",
@@ -4047,9 +4047,9 @@ dependencies = [
 
 [[package]]
 name = "webbrowser"
-version = "1.2.6"
+version = "1.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe8d20d0214027baf11b8b0cc307c1da7657d8f4db9aa956f7de27a6fb1acbd5"
+checksum = "73e91ccd4698f2647d6137e8eb17a3f1dcfd63810be9029fb2398f507279b95b"
 dependencies = [
  "jni",
  "log",
@@ -4645,7 +4645,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xodp"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "eframe",
  "egui_richedit",
@@ -4655,7 +4655,7 @@ dependencies = [
 
 [[package]]
 name = "xods"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "eframe",
  "jiff",
@@ -4665,7 +4665,7 @@ dependencies = [
 
 [[package]]
 name = "xodt"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "eframe",
  "egui_richedit",
