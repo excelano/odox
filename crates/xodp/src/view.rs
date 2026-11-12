@@ -572,12 +572,19 @@ impl SlideView {
             .within(scope)
             .tagged(vec![self.slide]);
         let command = self.command.take();
-        let mark = toolbar::marks(ui, &self.page_editor, &model).or(match command {
+        let pressed = toolbar::label(ui, &self.page_editor, &model);
+        let mark = pressed.mark.or(match command {
             Some(Command::Mark(mark)) => Some(mark),
             _ => None,
         });
         if let Some(mark) = mark {
             self.page_editor.toggle(&mut model, mark);
+        }
+        if let Some(align) = pressed.align.or(match command {
+            Some(Command::Align(align)) => Some(align),
+            _ => None,
+        }) {
+            model.apply_alignment(&mut self.page_editor, align);
         }
         self.menu = MenuState::of(&self.page_editor, &model, false);
         ui.separator();

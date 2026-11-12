@@ -672,6 +672,12 @@ fn toolbar_commands(
     if let Some(mark) = mark {
         page.toggle(model, mark);
     }
+    if let Some(align) = pressed.align.or(match command {
+        Some(Command::Align(align)) => Some(align),
+        _ => None,
+    }) {
+        model.apply_alignment(page, align);
+    }
     if let Some(block) = block {
         model.apply_block(page, block);
     }

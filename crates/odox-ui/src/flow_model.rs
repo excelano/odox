@@ -16,7 +16,7 @@ use std::ops::Range;
 use eframe::egui::Id;
 use egui_richedit::{Edit, Fragment, Mark, Model, Position, RichEdit, Selection};
 use odox_core::edit::{self, TableEdit, html, is_paragraph};
-use odox_core::{Element, ListKind, Ns, Refused, Styles};
+use odox_core::{Element, ListKind, Ns, Refused, Styles, TextAlign};
 
 use crate::Editing;
 use crate::find::{Match, Replaced};
@@ -264,6 +264,66 @@ impl<'a> FlowModel<'a> {
     /// the selection back over the same paragraphs. Answers whether the
     /// document changed.
     pub fn apply_block(&mut self, editor: &mut PageEditor, block: Block) -> bool {
+        let lit = editor
+            .selection()
+            .is_some_and(|selection| self.is_block(selection, block));
+        self.over_paragraphs(editor, |model, paragraphs| match block {
+            Block::Heading(_) | Block::Body => {
+                let level = match block {
+                    Block::Heading(level) if !lit => Some(level),
+                    _ => None,
+                };
+                model.set_headings(paragraphs, level)
+            }
+            Block::Bullets | Block::Numbers => {
+                let kind = match block {
+                    Block::Bullets => ListKind::Bullet,
+                    _ => ListKind::Number,
+                };
+                model.set_lists(paragraphs, (!lit).then_some(kind))
+            }
+        })
+    }
+
+    /// How every paragraph a selection runs over is aligned, where they are
+    /// all aligned alike.
+    pub fn alignment(&self, selection: &Selection<Vec<usize>>) -> Option<TextAlign> {
+        let paragraphs = self.selected_paragraphs(selection)?;
+        let mut aligned = paragraphs.iter().map(|paragraph| {
+            let path = [self.root.as_slice(), paragraph].concat();
+            edit::alignment(self.content, &path, self.styles)
+        });
+        let first = aligned.next()?;
+        aligned.all(|align| align == first).then_some(first)
+    }
+
+    /// Align the paragraphs a selection runs over, as one step to undo, and
+    /// put the selection back over them. Answers whether the document changed.
+    pub fn apply_alignment(&mut self, editor: &mut PageEditor, align: TextAlign) -> bool {
+        self.over_paragraphs(editor, |model, paragraphs| {
+            let had = model
+                .content
+                .child(&Ns::Office, "automatic-styles")
+                .is_some();
+            let paths: Vec<Vec<usize>> = paragraphs
+                .iter()
+                .map(|paragraph| [model.root.as_slice(), paragraph].concat())
+                .collect();
+            edit::set_alignment(model.content, &paths, align, model.styles).ok()?;
+            model.follow_styles(had);
+            Some(())
+        })
+    }
+
+    /// A change to the paragraphs a selection runs over that adds and removes
+    /// none: tried on the tree, put back if it fails or changes nothing, and
+    /// otherwise recorded as one step to undo with the selection put back over
+    /// the same paragraphs.
+    fn over_paragraphs(
+        &mut self,
+        editor: &mut PageEditor,
+        change: impl FnOnce(&mut Self, &[Vec<usize>]) -> Option<()>,
+    ) -> bool {
         let Some(selection) = editor.selection().cloned() else {
             return false;
         };
@@ -277,26 +337,11 @@ impl<'a> FlowModel<'a> {
         ) else {
             return false;
         };
-        let lit = self.is_block(&selection, block);
         let before = self.content.clone();
-        let done = match block {
-            Block::Heading(_) | Block::Body => {
-                let level = match block {
-                    Block::Heading(level) if !lit => Some(level),
-                    _ => None,
-                };
-                self.set_headings(&paragraphs, level)
-            }
-            Block::Bullets | Block::Numbers => {
-                let kind = match block {
-                    Block::Bullets => ListKind::Bullet,
-                    _ => ListKind::Number,
-                };
-                self.set_lists(&paragraphs, (!lit).then_some(kind))
-            }
-        };
-        if done.is_none() || *self.content == before {
+        let root = self.root.clone();
+        if change(self, &paragraphs).is_none() || *self.content == before {
             *self.content = before;
+            self.root = root;
             return false;
         }
         self.order = OnceCell::new();

@@ -3,48 +3,110 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, RichText, Ui};
+use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Response, RichText, Ui, vec2};
 use egui_richedit::{Mark, Model};
+use odox_core::TextAlign;
 use odox_core::edit::TableEdit;
 
 use crate::i18n::t;
 use crate::{Block, FlowModel, PageEditor};
 
-/// Bold, italic, underline and strikethrough, each lit where the whole
-/// selection has it, and none of them live without a caret. Answers the mark
-/// whose button was pressed, for the editor to toggle over the model.
-pub fn marks<M: Model<Paragraph = Vec<usize>>>(
-    ui: &mut Ui,
-    editor: &PageEditor,
-    model: &M,
-) -> Option<Mark> {
-    let mut pressed = None;
-    ui.add_enabled_ui(editor.selection().is_some(), |ui| {
-        ui.horizontal(|ui| pressed = mark_buttons(ui, editor, model));
-    });
-    pressed
-}
-
-/// What was pressed on a text document's toolbar.
+/// What was pressed on the toolbar over a page.
 #[derive(Default)]
 pub struct Pressed {
     /// A mark's button, for the editor to toggle over the model.
     pub mark: Option<Mark>,
+    /// An alignment's button, for the model to apply.
+    pub align: Option<TextAlign>,
     /// A kind of paragraph's button, for the model to apply.
     pub block: Option<Block>,
     /// The table button, which asks how many rows and columns.
     pub table: bool,
 }
 
-/// The marks, and after them the kinds of paragraph: body text, three
-/// levels of heading, a bulleted and a numbered list. Each is lit where every
-/// paragraph the selection runs over is one, and pressing a lit one takes it
-/// off.
+/// The buttons over a slide's label: the marks and the alignments, none of
+/// them live without a caret.
+pub fn label(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed {
+    let mut pressed = Pressed::default();
+    ui.add_enabled_ui(editor.selection().is_some(), |ui| {
+        ui.horizontal(|ui| text_buttons(ui, editor, model, &mut pressed));
+    });
+    pressed
+}
+
+/// The marks, each lit where the whole selection has it, and the alignments,
+/// lit where every paragraph the selection runs over is aligned that way.
+fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed: &mut Pressed) {
+    pressed.mark = mark_buttons(ui, editor, model);
+    ui.separator();
+    let current = editor
+        .selection()
+        .and_then(|selection| model.alignment(selection));
+    for align in ALIGNMENTS {
+        if align_button(ui, current == Some(align), align)
+            .on_hover_text(align_name(align))
+            .clicked()
+        {
+            pressed.align = Some(align);
+        }
+    }
+}
+
+/// The alignments, in the order the toolbar and the menu offer them.
+const ALIGNMENTS: [TextAlign; 4] = [
+    TextAlign::Start,
+    TextAlign::Center,
+    TextAlign::End,
+    TextAlign::Justify,
+];
+
+fn align_name(align: TextAlign) -> &'static str {
+    match align {
+        TextAlign::Start => t("Align left"),
+        TextAlign::Center => t("Center"),
+        TextAlign::End => t("Align right"),
+        TextAlign::Justify => t("Justify"),
+    }
+}
+
+/// A button drawn as lines of text set the way an alignment sets them.
+fn align_button(ui: &mut Ui, lit: bool, align: TextAlign) -> Response {
+    let height = ui.spacing().interact_size.y;
+    let response = ui.add(egui::Button::selectable(lit, "").min_size(vec2(height, height)));
+    let color = ui
+        .style()
+        .interact_selectable(&response, lit)
+        .fg_stroke
+        .color;
+    let area = response.rect.shrink2(vec2(height * 0.22, height * 0.25));
+    let stroke = egui::Stroke::new(1.5, color);
+    for (line, full) in [(0.0, true), (1.0, false), (2.0, true), (3.0, false)] {
+        let y = area.top() + area.height() * line / 3.0;
+        let width = if full || align == TextAlign::Justify {
+            area.width()
+        } else {
+            area.width() * 0.6
+        };
+        let left = match align {
+            TextAlign::Start | TextAlign::Justify => area.left(),
+            TextAlign::Center => area.center().x - width / 2.0,
+            TextAlign::End => area.right() - width,
+        };
+        ui.painter()
+            .line_segment([egui::pos2(left, y), egui::pos2(left + width, y)], stroke);
+    }
+    response
+}
+
+/// The marks and the alignments, and after them the kinds of paragraph: body
+/// text, three levels of heading, a bulleted and a numbered list. Each kind is
+/// lit where every paragraph the selection runs over is one, and pressing a
+/// lit one takes it off.
 pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed {
     let mut pressed = Pressed::default();
     ui.add_enabled_ui(editor.selection().is_some(), |ui| {
         ui.horizontal(|ui| {
-            pressed.mark = mark_buttons(ui, editor, model);
+            text_buttons(ui, editor, model, &mut pressed);
             ui.separator();
             for (block, label, name) in [
                 (Block::Body, "\u{b6}", t("Body text")),
@@ -125,6 +187,8 @@ fn mark_buttons<M: Model<Paragraph = Vec<usize>>>(
 pub enum Command {
     /// Bold, italic, underline or strikethrough.
     Mark(Mark),
+    /// An alignment.
+    Align(TextAlign),
     /// A kind of paragraph.
     Block(Block),
     /// Ask how large a table to put in.
@@ -162,6 +226,7 @@ pub struct MenuState {
     blocks: bool,
     in_table: bool,
     marks: Vec<Mark>,
+    align: Option<TextAlign>,
     kinds: Vec<Block>,
 }
 
@@ -183,6 +248,7 @@ impl MenuState {
                 .into_iter()
                 .filter(|mark| editor.marked(model, *mark) == Some(true))
                 .collect(),
+            align: model.alignment(selection),
             kinds: if blocks {
                 BLOCKS
                     .into_iter()
@@ -204,8 +270,8 @@ impl MenuState {
     }
 }
 
-/// The Format menu's entries: the marks, each with its shortcut, and where the
-/// page has them the kinds of paragraph. Lit where the whole selection is one,
+/// The Format menu's entries: the marks, each with its shortcut, the
+/// alignments, and where the page has them the kinds of paragraph. Lit where the whole selection is one,
 /// and not live without a caret. Answers the command chosen.
 pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
@@ -220,6 +286,14 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         }
         if ui.add_enabled(state.enabled, button).clicked() {
             chosen = Some(Command::Mark(mark));
+            ui.close();
+        }
+    }
+    ui.separator();
+    for align in ALIGNMENTS {
+        let button = egui::Button::new(align_name(align)).selected(state.align == Some(align));
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Align(align));
             ui.close();
         }
     }

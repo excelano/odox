@@ -821,6 +821,20 @@ stands beside it. One pass over the selection is one undo step, and the buttons
 are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.
 
+**A paragraph is aligned by a style of its own** (`edit/align.rs`): against
+the start, centered, against the end, or justified, from the buttons after the
+marks and the Format menu, in a text document and in a slide's label. The
+paragraph is given an automatic paragraph style in `content.xml` saying
+`fo:text-align`: a copy of its own automatic style with the alignment changed,
+or one inheriting from the named style it had, and an automatic style already
+saying the same thing is used again. The style it had is never changed, since
+other paragraphs may name it. A paragraph already drawn as asked is left alone.
+What is drawn is what is lit: on a slide a paragraph that says nothing takes
+its frame's alignment, and the button for that alignment is lit. The written
+word is `start` or `end`, as `LibreOffice` writes them, and the buttons are
+named for a left-to-right page. There is no shortcut, because Ctrl+E is edit
+mode and Ctrl+R reload. One pass over the selection is one undo step.
+
 **A page is told to assistive technology a paragraph at a time.** Each paragraph
 the flow draws is a node carrying its text as the rows the galley laid out, with
 the role of a heading and its level where the paragraph is a `text:h`, and
