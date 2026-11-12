@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.16.0"
+version = "0.17.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Hebrew and Arabic now read in the right order, mixed with other text on the same line, in the window and in exported PDFs. A character the document's font lacks is drawn in a face of the same weight and slant, bold or italic where the text is."
+whats-new = "Text can now be given a font and a size, and paragraphs aligned left, centered, right or justified. Insert a picture puts a PNG or JPEG into the document and asks what it shows, for someone who cannot see it. Format > Page setup sets the paper, portrait or landscape, and the margins."
 
 [products.xodt.locales.de-de]
-whats-new = "Hebräisch und Arabisch erscheinen jetzt in der richtigen Reihenfolge, auch gemischt mit anderem Text in derselben Zeile, im Fenster und in exportierten PDFs. Ein Zeichen, das der Schrift des Dokuments fehlt, wird in einer Schrift derselben Stärke und Lage gezeichnet, fett oder kursiv, wo der Text es ist."
+whats-new = "Text erhält jetzt eine Schriftart und eine Schriftgröße, Absätze lassen sich links, zentriert, rechts oder im Blocksatz ausrichten. Bild einfügen setzt ein PNG- oder JPEG-Bild ins Dokument und fragt, was es zeigt, für jemanden, der es nicht sehen kann. Format > Seite einrichten legt Papier, Hoch- oder Querformat und die Ränder fest."
 
 [products.xods.locales.en-us]
-whats-new = "Hebrew and Arabic in cells now read in the right order. LOWER leaves a dotted capital I as it is, as LibreOffice does. A character the document's font lacks is drawn in a face of the same weight and slant."
+whats-new = "This release changes only Odox Text and Odox Deck. Odox Grid is the same as in 0.16.0."
 
 [products.xods.locales.de-de]
-whats-new = "Hebräisch und Arabisch in Zellen erscheinen jetzt in der richtigen Reihenfolge. LOWER lässt ein großes İ mit Punkt unverändert, wie LibreOffice. Ein Zeichen, das der Schrift des Dokuments fehlt, wird in einer Schrift derselben Stärke und Lage gezeichnet."
+whats-new = "Diese Version ändert nur Odox Text und Odox Deck. Odox Grid ist unverändert gegenüber 0.16.0."
 
 [products.xodp.locales.en-us]
-whats-new = "Slides now show tiled picture fills, radial, elliptical, square and rectangular gradients, the text in a turned shape, and dimension lines with their arrows and lengths, in the window and in exported PDFs. Hebrew and Arabic read in the right order."
+whats-new = "The text on a slide can now be given a font and a size and aligned left, centered, right or justified. The text in a turned shape can now be edited where it is drawn."
 
 [products.xodp.locales.de-de]
-whats-new = "Folien zeigen jetzt gekachelte Bildfüllungen, radiale, elliptische, quadratische und rechteckige Verläufe, den Text in gedrehten Formen und Maßlinien mit Pfeilen und Längen, im Fenster und in exportierten PDFs. Hebräisch und Arabisch erscheinen in der richtigen Reihenfolge."
+whats-new = "Der Text auf einer Folie erhält jetzt eine Schriftart und eine Schriftgröße und lässt sich links, zentriert, rechts oder im Blocksatz ausrichten. Der Text in einer gedrehten Form lässt sich jetzt dort bearbeiten, wo er steht."
