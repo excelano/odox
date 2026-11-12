@@ -292,11 +292,7 @@ fn mark_buttons<M: Model<Paragraph = Vec<usize>>>(
             Mark::Strike => RichText::new(t("S")).strikethrough(),
         };
         let hint = match key {
-            Some(key) => format!(
-                "{name} ({})",
-                ui.ctx()
-                    .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, key))
-            ),
+            Some(key) => format!("{name} ({})", shortcut(ui.ctx(), key)),
             None => name.to_owned(),
         };
         if ui
@@ -308,6 +304,14 @@ fn mark_buttons<M: Model<Paragraph = Vec<usize>>>(
         }
     }
     pressed
+}
+
+/// A key with Ctrl, or Command on a Mac, as a menu shows it: egui spells a
+/// key by its name in the long form, `Ctrl+CloseBracket`, and a person reads
+/// its symbol, `Ctrl+]`.
+fn shortcut(ctx: &egui::Context, key: Key) -> String {
+    ctx.format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, key))
+        .replace(key.name(), key.symbol_or_name())
 }
 
 /// What the Format menu asks of the page: one of the buttons' commands.
@@ -420,10 +424,7 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         let (name, key) = mark_facts(mark);
         let mut button = egui::Button::new(name).selected(state.marks.contains(&mark));
         if let Some(key) = key {
-            button = button.shortcut_text(
-                ui.ctx()
-                    .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, key)),
-            );
+            button = button.shortcut_text(shortcut(ui.ctx(), key));
         }
         if ui.add_enabled(state.enabled, button).clicked() {
             chosen = Some(Command::Mark(mark));
@@ -435,10 +436,7 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         (true, t("Larger"), Key::CloseBracket),
         (false, t("Smaller"), Key::OpenBracket),
     ] {
-        let button = egui::Button::new(name).shortcut_text(
-            ui.ctx()
-                .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, key)),
-        );
+        let button = egui::Button::new(name).shortcut_text(shortcut(ui.ctx(), key));
         if ui.add_enabled(state.enabled, button).clicked() {
             chosen = Some(Command::Size(larger));
             ui.close();
