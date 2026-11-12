@@ -17,6 +17,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+mod align;
 mod block;
 mod figure;
 pub(crate) mod format;
@@ -29,6 +30,7 @@ use std::ops::Range;
 
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
+pub use align::{alignment, set_alignment};
 pub(crate) use block::name_for;
 pub use block::{block_state, heading_level, set_heading, set_list};
 pub use figure::{

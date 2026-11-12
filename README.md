@@ -26,8 +26,8 @@ ODF is a document they are meant to open, whichever application wrote it.
 
 Editing covers what is basic to each kind of document and stops there: a
 feature a full suite needs and a quick edit does not stays out. You can type
-and delete text, make it bold, italic, underlined or struck through, make a
-paragraph a heading or a list item and put a table in a text document, enter
+and delete text, make it bold, italic, underlined or struck through, align a
+paragraph, make it a heading or a list item and put a table in a text document, enter
 values and formulas in a spreadsheet and format its cells, move and resize the
 shapes on a slide and add or rearrange slides, undo any of that, and save. What
 you did not touch is written back as it was read, element for element, including the
@@ -97,7 +97,9 @@ processor. Copied text keeps its bold, italic, underline, strikethrough, heading
 pasted back into the window, into another window, or into another program that reads HTML,
 and text copied from a browser or a word processor keeps the same pasted in. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons over the page, make the
 selection bold, italic or underlined, or what you type next when nothing is
-selected; strikethrough is a button. Beside them are buttons that make the
+selected; strikethrough is a button. Next come the alignments, left,
+centered, right and justified, for the paragraphs the selection runs over, in
+`xodt` and on a slide alike, and beside them buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, and in `xodp` the marks. The
