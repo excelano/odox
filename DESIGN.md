@@ -216,8 +216,10 @@ its guides, the line standing off from the points, a marker at each end its
 style names, and the length `LibreOffice` wrote into it centered along the line
 and never upside down. A turned shape's label is laid out upright in a
 box the shape's size and turned onto the shape, in the window by carrying the
-triangles egui cuts it into and in an exported PDF by a transform, so it is
-read and not edited: hovering it in edit mode says so, and a link in it is left
+triangles egui cuts it into and in an exported PDF by a transform. It is
+edited where it is drawn: the shape takes the pointer, turned back into the
+upright box before the page editor sees it, and the caret and the selection are
+painted upright and carried onto the shape with the text. A link in it is left
 out of the PDF, whose link areas cannot turn.
 
 **Shapes are drawn from their own geometry**: rectangles, ellipses, polygons,

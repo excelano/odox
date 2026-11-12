@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-10 20:13-0600\n"
+"POT-Creation-Date: 2026-11-11 20:43-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -156,9 +156,10 @@ msgstr "Ersetzen"
 msgid "Replace all"
 msgstr "Alle ersetzen"
 
-#: crates/odox-ui/src/flow.rs:590
+#: crates/odox-ui/src/flow.rs:605
 msgid "Text that reads right to left cannot be edited yet."
-msgstr "Text, der von rechts nach links läuft, kann noch nicht bearbeitet werden."
+msgstr ""
+"Text, der von rechts nach links läuft, kann noch nicht bearbeitet werden."
 
 #: crates/odox-ui/src/i18n.rs:97 crates/odox-ui/src/i18n.rs:101
 #: crates/odox-ui/src/shell.rs:713 crates/odox-ui/tests/german.rs:24
@@ -171,15 +172,11 @@ msgstr "Datei"
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
 
-#: crates/odox-ui/src/shapes.rs:355
-msgid "Text in a turned shape cannot be edited yet."
-msgstr "Text in einer gedrehten Form kann noch nicht bearbeitet werden."
-
-#: crates/odox-ui/src/shapes.rs:558
+#: crates/odox-ui/src/shapes.rs:657
 msgid "Click to add a title"
 msgstr "Klicken, um einen Titel hinzuzufügen"
 
-#: crates/odox-ui/src/shapes.rs:559
+#: crates/odox-ui/src/shapes.rs:658
 msgid "Click to add text"
 msgstr "Klicken, um Text hinzuzufügen"
 
@@ -880,6 +877,9 @@ msgstr ""
 #: crates/xodt/src/view.rs:603
 msgid "The table could not be changed here."
 msgstr "Die Tabelle konnte hier nicht geändert werden."
+
+#~ msgid "Text in a turned shape cannot be edited yet."
+#~ msgstr "Text in einer gedrehten Form kann noch nicht bearbeitet werden."
 
 #~ msgid "All"
 #~ msgstr "Alle"

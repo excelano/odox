@@ -30,7 +30,7 @@ use odox_core::{
 };
 
 use crate::find::Highlights;
-use crate::flow::{Flow, Pictures};
+use crate::flow::{Flow, Pictures, Turned};
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE, Palette};
 use crate::i18n::t;
@@ -91,6 +91,20 @@ impl Placement {
     /// A point of the box, in the fractions of it across and down.
     fn across(self, u: f32, v: f32) -> Pos2 {
         self.origin + self.x * u + self.y * v
+    }
+
+    /// The fractions across and down the box that a point on screen is at,
+    /// which [`Self::across`] turns back into the point; none for a box with
+    /// no area.
+    fn fractions(self, point: Pos2) -> Option<(f32, f32)> {
+        let det = self.x.x.mul_add(self.y.y, -(self.x.y * self.y.x));
+        if det.abs() < f32::EPSILON {
+            return None;
+        }
+        let d = point - self.origin;
+        let u = d.x.mul_add(self.y.y, -(d.y * self.y.x)) / det;
+        let v = self.x.x.mul_add(d.y, -(self.x.y * d.x)) / det;
+        Some((u, v))
     }
 
     /// The four corners, going round.
@@ -355,10 +369,28 @@ impl Canvas<'_> {
             }
             self.painter(ui).add(Shape::mesh(mesh));
         }
-        if self.page_editor.is_some() {
-            let id = ui.scope_id().with(("turned label", self.at));
-            ui.interact(place.bounds(), id, Sense::hover())
-                .on_hover_text(t("Text in a turned shape cannot be edited yet."));
+    }
+
+    /// The shape a turned label is drawn on, taking the pointer for it.
+    ///
+    /// egui finds what is under the pointer by upright rectangles, so the
+    /// shape senses clicks over the rectangle around it while the pointer is
+    /// inside the shape itself, and the pointer is turned back into `upright`,
+    /// where the label is laid out, for the page editor.
+    fn turned_pointer(&self, ui: &Ui, upright: Rect, place: Placement) -> Turned {
+        let inside = ui
+            .input(|input| input.pointer.interact_pos())
+            .and_then(|at| place.fractions(at))
+            .filter(|&(u, v)| (0.0..=1.0).contains(&u) && (0.0..=1.0).contains(&v));
+        let sense = if self.page_editor.is_some() && inside.is_some() {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let id = ui.scope_id().with(("turned label", self.at));
+        Turned {
+            response: ui.interact(place.bounds(), id, sense),
+            pointer: inside.map(|(u, v)| upright.min + vec2(u, v) * upright.size()),
         }
     }
 
@@ -528,12 +560,6 @@ impl Canvas<'_> {
     }
 
     /// The paragraphs a shape holds, or the picture it frames.
-    ///
-    /// **A turned shape keeps its picture and loses its label.** A picture is
-    /// four corners and a texture and turns exactly; a paragraph is a line
-    /// breaker, a font and a selection, and drawing one upright inside a box
-    /// that is not upright says something the document does not. Across the
-    /// templates that is twenty-two text boxes, and they stay undrawn.
     fn text(&mut self, ui: &mut Ui, shape: &Element, place: Placement) {
         // A frame around a picture is handed over whole, because the renderer
         // finds a frame among a parent's children and here the shape is the
@@ -562,12 +588,9 @@ impl Canvas<'_> {
         } else {
             return;
         };
-        // A turned label is laid out upright in a box the shape's size and
-        // then turned onto the shape, which leaves nothing on the screen for a
-        // caret or a selection to follow: it is read, not edited.
         let turned = !place.is_upright();
         // The way from the page to the content, for a label that is edited.
-        let prefix = self.at.filter(|_| !turned).map(|at| match below {
+        let prefix = self.at.map(|at| match below {
             Some(index) => vec![at, index],
             None => vec![at],
         });
@@ -600,14 +623,15 @@ impl Canvas<'_> {
             // so it is laid out twice: once into a ui that draws nothing, to
             // measure, and then once for real at the offset that measurement
             // gives.
-            let sized = self.lay_out(ui, &label, rect, true, prefix.as_ref(), turned);
+            let sized = self.lay_out(ui, &label, rect, true, prefix.as_ref(), None);
             top += (rect.height() - sized.min(rect.height())) * anchor.share();
         }
         let placed = Rect::from_min_max(pos2(rect.left(), top), rect.max);
         let first = ui
             .ctx()
             .graphics_mut(|layers| layers.entry(ui.layer_id()).next_idx());
-        self.lay_out(ui, &label, placed, false, prefix.as_ref(), turned);
+        let pointer = turned.then(|| self.turned_pointer(ui, rect, place));
+        self.lay_out(ui, &label, placed, false, prefix.as_ref(), pointer);
         if turned {
             self.turn(ui, first.0, rect, place);
             self.palette = palette;
@@ -683,7 +707,8 @@ impl Canvas<'_> {
 
     /// Draw a shape's content into a rectangle, or measure how tall it is
     /// without drawing it, its paragraphs over the shape's own style. Returns
-    /// the height it took.
+    /// the height it took. A label that is drawn turned says so with the
+    /// pointer turned back into `rect`.
     fn lay_out(
         &mut self,
         ui: &mut Ui,
@@ -691,7 +716,7 @@ impl Canvas<'_> {
         rect: Rect,
         measuring: bool,
         prefix: Option<&Vec<usize>>,
-        turned: bool,
+        turned: Option<Turned>,
     ) -> f32 {
         let (page, scale, palette) = (self.page, self.scale, self.palette);
         let document = self.document;
@@ -709,7 +734,7 @@ impl Canvas<'_> {
             builder = builder.sizing_pass().invisible();
         }
         ui.scope_builder(builder, |ui| {
-            if turned {
+            if turned.is_some() {
                 // Upright, where nothing of it will be seen, so it is cut to
                 // its own box and not the page's, and it answers no clicks:
                 // the shapes under where it is laid out take them.
@@ -725,6 +750,7 @@ impl Canvas<'_> {
             flow.under = Some(std::rc::Rc::clone(&label.style));
             flow.selectable = !edit_mode;
             flow.page = page_editor;
+            flow.turned = turned;
             flow.find = self.find.clone().filter(|_| prefix.is_some() && !measuring);
             if let Some(prefix) = prefix {
                 flow.start_at(prefix.clone());
@@ -1163,8 +1189,8 @@ fn triangulate(points: &[Pos2]) -> Vec<[u32; 3]> {
 
 #[cfg(test)]
 mod tests {
-    use super::triangulate;
-    use eframe::egui::{Pos2, pos2};
+    use super::{Placement, triangulate};
+    use eframe::egui::{Pos2, pos2, vec2};
 
     /// Twice the area a run of triangles covers, and twice the area the outline
     /// encloses. Equal means the triangles cover the shape and nothing else.
@@ -1269,5 +1295,28 @@ mod tests {
         assert_eq!(triangulate(&square).len(), 2);
         let (triangles, outline) = areas(&square);
         assert!((triangles - outline).abs() < 1e-4);
+    }
+
+    #[test]
+    fn a_point_on_a_turned_and_leaned_box_comes_back_to_its_fractions() {
+        let place = Placement {
+            origin: pos2(100.0, 50.0),
+            x: vec2(60.0, 80.0),
+            y: vec2(-30.0, 40.0),
+        };
+        for (u, v) in [(0.0, 0.0), (1.0, 0.0), (0.25, 0.75), (1.5, -0.5)] {
+            let (back_u, back_v) = place.fractions(place.across(u, v)).unwrap();
+            assert!((back_u - u).abs() < 1e-4 && (back_v - v).abs() < 1e-4);
+        }
+    }
+
+    #[test]
+    fn a_box_with_no_area_has_no_fractions() {
+        let flat = Placement {
+            origin: pos2(0.0, 0.0),
+            x: vec2(10.0, 10.0),
+            y: vec2(20.0, 20.0),
+        };
+        assert!(flat.fractions(pos2(5.0, 5.0)).is_none());
     }
 }
