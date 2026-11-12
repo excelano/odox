@@ -580,6 +580,12 @@ impl SlideView {
         if let Some(mark) = mark {
             self.page_editor.toggle(&mut model, mark);
         }
+        if let Some(value) = pressed
+            .value
+            .or_else(|| command.and_then(|command| command.value(&self.page_editor, &model)))
+        {
+            self.page_editor.set(&mut model, value);
+        }
         if let Some(align) = pressed.align.or(match command {
             Some(Command::Align(align)) => Some(align),
             _ => None,

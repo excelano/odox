@@ -1,5 +1,5 @@
-//! Bold, italic, underline and strikethrough over a range of a paragraph's
-//! text. DESIGN.md §11.
+//! Bold, italic, underline and strikethrough, a font family and a size, over
+//! a range of a paragraph's text. DESIGN.md §11.
 //!
 //! The range's ends are cut into the nodes they fall inside, and what lies
 //! between is given the mark in one of two ways: a span the range holds whole
@@ -24,7 +24,139 @@ use super::{
     text,
 };
 use crate::style::{Family, Styles, TextProperties};
+use crate::value::Measure;
 use crate::xml::{Attribute, Element, Name, Node, Ns};
+
+/// What a range of text is given: a mark on or off, a font family by the name
+/// a person picks it by, or a size in points.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Setting {
+    /// A mark, given or taken off.
+    Mark(Mark, bool),
+    /// A font family.
+    Family(String),
+    /// A size, in points.
+    Size(f32),
+}
+
+/// A property of text that takes a value: the family or the size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextProperty {
+    /// The font family.
+    Family,
+    /// The size.
+    Size,
+}
+
+/// What a property reads as at some text, compared with what a setting asks
+/// for. A size stated as a share of another reads as no size a setting asks.
+#[derive(Debug, Clone, PartialEq)]
+enum Reading {
+    Flag(bool),
+    Family(String),
+    Hundredths(i64),
+    Relative,
+}
+
+/// A size in points, in hundredths, which is as fine as a size is compared.
+fn hundredths(points: f32) -> i64 {
+    #[allow(clippy::cast_possible_truncation)]
+    let hundredths = (f64::from(points) * 100.0).round() as i64;
+    hundredths
+}
+
+impl Setting {
+    /// What properties say of the property this sets.
+    fn read(&self, properties: &TextProperties) -> Option<Reading> {
+        match self {
+            Self::Mark(mark, _) => mark.of(properties).map(Reading::Flag),
+            Self::Family(_) => properties.font_family.clone().map(Reading::Family),
+            Self::Size(_) => properties.size.map(|size| match size {
+                Measure::Absolute(length) => Reading::Hundredths(hundredths(length.points())),
+                Measure::Relative(_) => Reading::Relative,
+            }),
+        }
+    }
+
+    /// What text reads where nothing says.
+    fn unsaid(&self) -> Reading {
+        match self {
+            Self::Mark(..) => Reading::Flag(false),
+            Self::Family(_) => Reading::Family(String::new()),
+            Self::Size(_) => Reading::Hundredths(0),
+        }
+    }
+
+    /// What text reads once it has been given this.
+    fn target(&self) -> Reading {
+        match self {
+            Self::Mark(_, on) => Reading::Flag(*on),
+            Self::Family(family) => Reading::Family(family.clone()),
+            Self::Size(points) => Reading::Hundredths(hundredths(*points)),
+        }
+    }
+
+    /// Every attribute of `style:text-properties` that says something about
+    /// the property: what is cleared before the setting is written.
+    fn attributes(&self) -> Vec<(Ns, &'static str)> {
+        match self {
+            Self::Mark(mark, _) => mark.attributes(),
+            Self::Family(_) => vec![
+                (Ns::Style, "font-name"),
+                (Ns::Fo, "font-family"),
+                (Ns::Style, "font-family-generic"),
+                (Ns::Style, "font-pitch"),
+                (Ns::Style, "font-charset"),
+                (Ns::Style, "font-style-name"),
+            ],
+            Self::Size(_) => vec![
+                (Ns::Fo, "font-size"),
+                (Ns::Style, "font-size-asian"),
+                (Ns::Style, "font-size-complex"),
+                (Ns::Style, "font-size-rel"),
+                (Ns::Style, "font-size-rel-asian"),
+                (Ns::Style, "font-size-rel-complex"),
+            ],
+        }
+    }
+
+    /// What is written for the setting, a family by the font face declaration
+    /// `face` names. A size is written for Asian and complex scripts too, as a
+    /// mark is; a family is written for Western text only, because a family a
+    /// person picks for Latin letters seldom has the others.
+    fn written(&self, face: &str) -> Vec<(Ns, &'static str, String)> {
+        match self {
+            Self::Mark(mark, on) => mark
+                .written(*on)
+                .into_iter()
+                .map(|(ns, local, value)| (ns, local, value.to_owned()))
+                .collect(),
+            Self::Family(_) => vec![(Ns::Style, "font-name", face.to_owned())],
+            Self::Size(points) => {
+                let size = format!(
+                    "{}pt",
+                    format!("{points:.2}")
+                        .trim_end_matches('0')
+                        .trim_end_matches('.')
+                );
+                vec![
+                    (Ns::Fo, "font-size", size.clone()),
+                    (Ns::Style, "font-size-asian", size.clone()),
+                    (Ns::Style, "font-size-complex", size),
+                ]
+            }
+        }
+    }
+
+    /// The namespaces the setting is written in, beside the style namespace.
+    fn spaces(&self) -> Vec<Ns> {
+        match self {
+            Self::Mark(Mark::Bold | Mark::Italic, _) | Self::Size(_) => vec![Ns::Fo],
+            Self::Mark(..) => Vec::new(),
+            Self::Family(_) => vec![Ns::Svg],
+        }
+    }
+}
 
 /// Formatting a range of text is given or has taken off.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -131,7 +263,42 @@ pub fn marked(
     mark: Mark,
     styles: &Styles,
 ) -> Option<bool> {
-    let base = paragraph_mark(paragraph, mark, styles);
+    match reading(paragraph, range, &Setting::Mark(mark, true), styles)? {
+        Reading::Flag(on) => Some(on),
+        _ => None,
+    }
+}
+
+/// The family or the size the characters of a range have, as [`marked`]
+/// answers for a mark: `None` where they differ, and where a size is a share
+/// of another's.
+pub fn text_value(
+    paragraph: &Element,
+    range: Range<usize>,
+    property: TextProperty,
+    styles: &Styles,
+) -> Option<Setting> {
+    let probe = match property {
+        TextProperty::Family => Setting::Family(String::new()),
+        TextProperty::Size => Setting::Size(0.0),
+    };
+    match reading(paragraph, range, &probe, styles)? {
+        Reading::Family(family) if !family.is_empty() => Some(Setting::Family(family)),
+        #[allow(clippy::cast_precision_loss)]
+        Reading::Hundredths(size) if size > 0 => Some(Setting::Size(size as f32 / 100.0)),
+        _ => None,
+    }
+}
+
+/// What the characters of a range read as for the property a setting sets,
+/// as [`marked`] describes.
+fn reading(
+    paragraph: &Element,
+    range: Range<usize>,
+    setting: &Setting,
+    styles: &Styles,
+) -> Option<Reading> {
+    let base = paragraph_value(paragraph, setting, styles);
     let (start, end) = if range.start < range.end {
         (range.start, range.end)
     } else if range.start > 0 {
@@ -145,8 +312,8 @@ pub fn marked(
         if segment.kind.len() == 0 || segment_end <= start || end <= segment.start {
             continue;
         }
-        let value = mark_at(paragraph, &segment.path, base, mark, styles);
-        if answer.is_some_and(|a| a != value) {
+        let value = value_at(paragraph, &segment.path, &base, setting, styles);
+        if answer.as_ref().is_some_and(|a| *a != value) {
             return None;
         }
         answer = Some(value);
@@ -175,12 +342,30 @@ pub fn format(
     on: bool,
     styles: &mut Styles,
 ) -> Result<(), Refused> {
+    set_text(content, path, range, &Setting::Mark(mark, on), styles)
+}
+
+/// Give a range of the text of the paragraph at a path under the content root
+/// a setting, as [`format`] gives a mark. A family is named through a font
+/// face declaration in `content.xml`: one already there for the family, or
+/// one written into `office:font-face-decls`, which a document without them
+/// is given before its automatic styles, moving the body along as they do.
+///
+/// # Errors
+///
+/// As for [`format`].
+pub fn set_text(
+    content: &mut Element,
+    path: &[usize],
+    range: Range<usize>,
+    setting: &Setting,
+    styles: &mut Styles,
+) -> Result<(), Refused> {
     let paragraph = content
         .at(path)
         .filter(|e| is_paragraph(e))
         .ok_or(Refused::NotFound)?;
-    let needs_fo = matches!(mark, Mark::Bold | Mark::Italic);
-    if !content.declares(&Ns::Style) || needs_fo && !content.declares(&Ns::Fo) {
+    if !content.declares(&Ns::Style) || setting.spaces().iter().any(|ns| !content.declares(ns)) {
         return Err(Refused::Namespace);
     }
     let len = text(paragraph).chars().count();
@@ -203,14 +388,20 @@ pub fn format(
         })
         .map(|s| s.path)
         .collect();
-    let base = paragraph_mark(&edited, mark, styles);
+    let base = paragraph_value(&edited, setting, styles);
     let root = Element {
         attrs: content.attrs.clone(),
         ..element(content.name.clone())
     };
+    let (face, declaration) = match setting {
+        Setting::Family(family) => font_face(content, family),
+        _ => (String::new(), None),
+    };
     let mut formatter = Formatter {
-        mark,
-        on,
+        setting: setting.clone(),
+        target: setting.target(),
+        attributes: setting.attributes(),
+        written: setting.written(&face),
         selected,
         automatic: automatic_text_styles(content),
         text: edited.name.prefix.as_deref().unwrap_or("text").to_owned(),
@@ -218,7 +409,7 @@ pub fn format(
         styles,
         minted: Vec::new(),
     };
-    formatter.within(&mut edited, &mut Vec::new(), base);
+    formatter.within(&mut edited, &mut Vec::new(), &base);
     normalize(&mut edited);
     let minted = formatter.minted;
 
@@ -232,7 +423,77 @@ pub fn format(
             .extend(minted.into_iter().map(Node::Element));
         container.self_closing = false;
     }
+    if let Some(declaration) = declaration {
+        if let (Some(name), Some(family)) = (
+            declaration.attr(&Ns::Style, "name"),
+            declaration.attr(&Ns::Svg, "font-family"),
+        ) {
+            styles.add_font_face(name, family.trim_matches('\''));
+        }
+        font_face_decls(content)
+            .children
+            .push(Node::Element(declaration));
+    }
     Ok(())
+}
+
+/// The name of the font face declaration in `content.xml` for a family: one
+/// there already, or a new one, answered beside the name to be written.
+fn font_face(content: &Element, family: &str) -> (String, Option<Element>) {
+    let declared = content.child(&Ns::Office, "font-face-decls");
+    let faces = || declared.into_iter().flat_map(Element::elements);
+    if let Some(name) = faces()
+        .find(|face| {
+            face.attr(&Ns::Svg, "font-family")
+                .or_else(|| face.attr(&Ns::Style, "name"))
+                .is_some_and(|f| f.trim_matches('\'') == family)
+        })
+        .and_then(|face| face.attr(&Ns::Style, "name"))
+    {
+        return (name.to_owned(), None);
+    }
+    let taken = |name: &str| faces().any(|face| face.attr(&Ns::Style, "name") == Some(name));
+    let mut name = family.to_owned();
+    let mut number = 1;
+    while taken(&name) {
+        number += 1;
+        name = format!("{family}{number}");
+    }
+    let mut face = element(content.name_for(&Ns::Style, "font-face"));
+    face.set_attr(content.name_for(&Ns::Style, "name"), name.as_str());
+    let quoted = if family.contains(' ') {
+        format!("'{family}'")
+    } else {
+        family.to_owned()
+    };
+    face.set_attr(content.name_for(&Ns::Svg, "font-family"), quoted);
+    (name, Some(face))
+}
+
+/// The content root's `office:font-face-decls`, written before its automatic
+/// styles, or before its body where it has none, where the document has none.
+fn font_face_decls(content: &mut Element) -> &mut Element {
+    let found = |local: &'static str| move |n: &Node| matches!(n, Node::Element(e) if e.is(&Ns::Office, local));
+    let at = if let Some(at) = content.children.iter().position(found("font-face-decls")) {
+        at
+    } else {
+        let before = content
+            .children
+            .iter()
+            .position(|n| {
+                found("automatic-styles")(n) || found("master-styles")(n) || found("body")(n)
+            })
+            .unwrap_or(content.children.len());
+        let container = element(content.name_for(&Ns::Office, "font-face-decls"));
+        content.children.insert(before, Node::Element(container));
+        content.self_closing = false;
+        before
+    };
+    let Node::Element(container) = &mut content.children[at] else {
+        unreachable!("found or written as an element");
+    };
+    container.self_closing = false;
+    container
 }
 
 /// The name a paragraph, a span or a link is resolved by, as the renderer
@@ -243,29 +504,40 @@ fn style_name(element: &Element) -> &str {
 
 /// What the paragraph's own style says, which everything in it reads unless
 /// a span says otherwise.
-fn paragraph_mark(paragraph: &Element, mark: Mark, styles: &Styles) -> bool {
-    mark.of(&styles
-        .resolve(&Family::Paragraph, style_name(paragraph))
-        .text)
-        .unwrap_or(false)
+fn paragraph_value(paragraph: &Element, setting: &Setting, styles: &Styles) -> Reading {
+    setting
+        .read(
+            &styles
+                .resolve(&Family::Paragraph, style_name(paragraph))
+                .text,
+        )
+        .unwrap_or_else(|| setting.unsaid())
 }
 
-/// What an element's own style says about the mark: a span's or a link's, and
-/// nothing for anything else inside a paragraph.
-fn own(element: &Element, mark: Mark, styles: &Styles) -> Option<bool> {
+/// What an element's own style says about the property: a span's or a
+/// link's, and nothing for anything else inside a paragraph.
+fn own(element: &Element, setting: &Setting, styles: &Styles) -> Option<Reading> {
     if element.is(&Ns::Text, "span") || element.is(&Ns::Text, "a") {
-        mark.of(&styles.resolve(&Family::Text, style_name(element)).text)
+        setting.read(&styles.resolve(&Family::Text, style_name(element)).text)
     } else {
         None
     }
 }
 
-/// Whether the node at a path under a paragraph reads the mark: the nearest
-/// container above it that says so, or the paragraph.
-fn mark_at(paragraph: &Element, path: &[usize], base: bool, mark: Mark, styles: &Styles) -> bool {
+/// What the node at a path under a paragraph reads: the nearest container
+/// above it that says, or the paragraph.
+fn value_at(
+    paragraph: &Element,
+    path: &[usize],
+    base: &Reading,
+    setting: &Setting,
+    styles: &Styles,
+) -> Reading {
     (1..path.len())
         .filter_map(|depth| paragraph.at(&path[..depth]))
-        .fold(base, |value, e| own(e, mark, styles).unwrap_or(value))
+        .fold(base.clone(), |value, e| {
+            own(e, setting, styles).unwrap_or(value)
+        })
 }
 
 /// Cut the node whose characters surround an offset in two, so that the
@@ -352,10 +624,15 @@ enum Held {
     Neutral,
 }
 
-/// One range being given a mark, or having it taken off.
+/// One range being given a setting.
 struct Formatter<'a> {
-    mark: Mark,
-    on: bool,
+    setting: Setting,
+    /// What the range reads once it is given the setting.
+    target: Reading,
+    /// What is cleared before the setting is written.
+    attributes: Vec<(Ns, &'static str)>,
+    /// What writing the setting writes.
+    written: Vec<(Ns, &'static str, String)>,
     /// The paths from the paragraph of what the range holds.
     selected: HashSet<Vec<usize>>,
     /// The text styles among the automatic styles, with those written here.
@@ -401,7 +678,7 @@ impl Formatter<'_> {
     /// read `context`. Runs of what it holds whole are wrapped where they read
     /// otherwise; a span it holds whole whose own style says otherwise is
     /// restyled; and whatever it holds part of is gone into.
-    fn within(&mut self, element: &mut Element, path: &mut Vec<usize>, context: bool) {
+    fn within(&mut self, element: &mut Element, path: &mut Vec<usize>, context: &Reading) {
         let held: Vec<Held> = (0..element.children.len())
             .map(|index| {
                 path.push(index);
@@ -421,7 +698,8 @@ impl Formatter<'_> {
         {
             path.push(index);
             let contrary = matches!(&node, Node::Element(e)
-                if is_inline_container(e) && own(e, self.mark, self.styles) == Some(!self.on));
+                if is_inline_container(e)
+                    && own(e, &self.setting, self.styles).is_some_and(|v| v != self.target));
             match (held, node) {
                 (Held::Neutral, node) if !run.is_empty() => waiting.push(node),
                 (Held::Whole, mut node) if !contrary => {
@@ -430,7 +708,8 @@ impl Formatter<'_> {
                     if let Node::Element(e) = &mut node
                         && is_inline_container(e)
                     {
-                        self.within(e, path, self.on);
+                        let target = self.target.clone();
+                        self.within(e, path, &target);
                     }
                     run.append(&mut waiting);
                     run.push(node);
@@ -440,7 +719,8 @@ impl Formatter<'_> {
                     out.append(&mut waiting);
                     match (held, node) {
                         (Held::Whole, Node::Element(mut e)) if e.is(&Ns::Text, "span") => {
-                            self.within(&mut e, path, self.on);
+                            let target = self.target.clone();
+                            self.within(&mut e, path, &target);
                             if self.restyle(&mut e, context) {
                                 out.extend(e.children);
                             } else {
@@ -450,12 +730,15 @@ impl Formatter<'_> {
                         // A link whose own style says otherwise: its contents
                         // are wrapped inside it.
                         (Held::Whole, Node::Element(mut e)) => {
-                            self.within(&mut e, path, !self.on);
+                            let inner = own(&e, &self.setting, self.styles)
+                                .unwrap_or_else(|| context.clone());
+                            self.within(&mut e, path, &inner);
                             out.push(Node::Element(e));
                         }
                         (Held::Part, Node::Element(mut e)) => {
-                            let inner = own(&e, self.mark, self.styles).unwrap_or(context);
-                            self.within(&mut e, path, inner);
+                            let inner = own(&e, &self.setting, self.styles)
+                                .unwrap_or_else(|| context.clone());
+                            self.within(&mut e, path, &inner);
                             out.push(Node::Element(e));
                         }
                         (_, node) => out.push(node),
@@ -471,15 +754,15 @@ impl Formatter<'_> {
 
     /// Give a run the mark where its surroundings do not: a lone span by its
     /// style, anything else by a new span around it.
-    fn close(&mut self, run: &mut Vec<Node>, out: &mut Vec<Node>, context: bool) {
+    fn close(&mut self, run: &mut Vec<Node>, out: &mut Vec<Node>, context: &Reading) {
         if run.is_empty() {
             return;
         }
-        if context != self.on {
+        if *context != self.target {
             if let [Node::Element(span)] = run.as_mut_slice()
                 && span.is(&Ns::Text, "span")
             {
-                if own(span, self.mark, self.styles) != Some(self.on) {
+                if own(span, &self.setting, self.styles).as_ref() != Some(&self.target) {
                     // The mark is written, so the span is never left empty.
                     self.restyle(span, context);
                 }
@@ -507,7 +790,7 @@ impl Formatter<'_> {
     /// the smaller, and is taken unless the document has a style that says it
     /// the written way and none that says it the other, which is what brings
     /// a span back to the style it had when a mark is put on and taken off.
-    fn restyle(&mut self, span: &mut Element, context: bool) -> bool {
+    fn restyle(&mut self, span: &mut Element, context: &Reading) -> bool {
         let current = span.attr(&Ns::Text, "style-name").map(ToOwned::to_owned);
         let style = match current.as_deref().and_then(|n| self.automatic(n)) {
             Some(existing) => existing.clone(),
@@ -517,8 +800,8 @@ impl Formatter<'_> {
         self.write_mark(&mut written);
         let mut bare = style;
         if let Some(properties) = bare.child_mut(&Ns::Style, "text-properties") {
-            for (ns, local) in self.mark.attributes() {
-                properties.remove_attr(&ns, local);
+            for (ns, local) in &self.attributes {
+                properties.remove_attr(ns, local);
             }
         }
         bare.children.retain(|n| {
@@ -530,14 +813,16 @@ impl Formatter<'_> {
         // what a name the document does not have resolves to.
         let parent = bare.attr(&Ns::Style, "parent-style-name");
         let bare_reads = self
-            .mark
-            .of(&self
-                .styles
-                .resolve(&Family::Text, parent.unwrap_or(""))
-                .text)
-            .unwrap_or(context);
+            .setting
+            .read(
+                &self
+                    .styles
+                    .resolve(&Family::Text, parent.unwrap_or(""))
+                    .text,
+            )
+            .unwrap_or_else(|| context.clone());
 
-        let style = if bare_reads != self.on {
+        let style = if bare_reads != self.target {
             written
         } else if parent.is_none() && bare.elements().next().is_none() {
             span.remove_attr(&Ns::Text, "style-name");
@@ -571,16 +856,15 @@ impl Formatter<'_> {
         let Some(properties) = style.child_mut(&Ns::Style, "text-properties") else {
             return;
         };
-        let written = self.mark.written(self.on);
-        for (ns, local) in self.mark.attributes() {
-            if !written.iter().any(|(n, l, _)| *n == ns && *l == local) {
-                properties.remove_attr(&ns, local);
+        for (ns, local) in &self.attributes {
+            if !self.written.iter().any(|(n, l, _)| n == ns && l == local) {
+                properties.remove_attr(ns, local);
             }
         }
-        for (ns, local, value) in written {
-            match properties.attrs.iter_mut().find(|a| a.name.is(&ns, local)) {
-                Some(attr) => value.clone_into(&mut attr.value),
-                None => properties.set_attr(self.root.name_for(&ns, local), value),
+        for (ns, local, value) in &self.written {
+            match properties.attrs.iter_mut().find(|a| a.name.is(ns, local)) {
+                Some(attr) => attr.value.clone_from(value),
+                None => properties.set_attr(self.root.name_for(ns, local), value.as_str()),
             }
         }
     }
