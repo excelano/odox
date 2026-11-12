@@ -12,6 +12,7 @@ use odox_core::Document;
 use odox_core::doc::TextDocument;
 use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
@@ -209,6 +210,10 @@ pub struct TextView {
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
     table_wanted: Option<(usize, usize)>,
+    /// What a chosen picture shows, while the question is up.
+    picture_question: Option<PictureQuestion>,
+    /// The picture the question was answered with, put in on the next frame.
+    picture_wanted: Option<odox_ui::Picture>,
     notice: Option<Notice>,
 }
 
@@ -227,6 +232,8 @@ impl Default for TextView {
             export: Export::default(),
             scroll: Scroll::default(),
             table_size: None,
+            picture_question: None,
+            picture_wanted: None,
             table_wanted: None,
             notice: None,
         }
@@ -352,12 +359,14 @@ impl View for TextView {
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let asked = self.table_size.is_some();
+        let asked = self.table_size.is_some() || self.picture_question.is_some();
         self.ask_table_size(ui.ctx());
+        self.ask_picture(ui.ctx());
         let edit_mode = editing.on && !editing.asking && !self.export.asking() && !asked;
         if !editing.on {
             self.page.clear();
         }
+        self.edit_toolbar(ui, editing, edit_mode);
         let Some(document) = &mut self.document else {
             return;
         };
@@ -377,39 +386,6 @@ impl View for TextView {
         let page = document.text_width() * scale;
         let page_height = document.text_height() * scale;
         let margin = MARGIN * scale;
-
-        if edit_mode && let Some(root) = document.body_path() {
-            let text_width = document.text_width();
-            let Document {
-                content, styles, ..
-            } = &mut document.document;
-            let mut model = FlowModel::new(content, styles, root, editing);
-            if std::mem::take(&mut self.begin)
-                && let Some(first) = model.first()
-            {
-                self.page
-                    .select(Selection::caret(egui_richedit::Position::new(first, 0)));
-            }
-            let asked = toolbar_commands(
-                ui,
-                &mut self.page,
-                &mut model,
-                self.command.take(),
-                self.table_wanted.take(),
-                text_width,
-            );
-            if asked.size {
-                self.table_size = Some((2, 3));
-            }
-            if asked.notice.is_some() {
-                self.notice = asked.notice;
-            }
-            self.menu = MenuState::of(&self.page, &model, true);
-            ui.separator();
-        } else {
-            self.command = None;
-            self.menu = MenuState::offering_blocks(true);
-        }
 
         // The caret's own Page Up and Page Down move it, and the view with it.
         let keys = !editing.asking
@@ -577,6 +553,81 @@ impl TextView {
         }
     }
 
+    /// The toolbar over the page in edit mode, and what it and the Format menu
+    /// asked for: carried out here, or asked about first.
+    fn edit_toolbar(&mut self, ui: &mut Ui, editing: &mut Editing, edit_mode: bool) {
+        let found = self
+            .document
+            .as_mut()
+            .filter(|_| edit_mode)
+            .and_then(|document| {
+                let root = document.body_path()?;
+                Some((document, root))
+            });
+        let Some((document, root)) = found else {
+            self.command = None;
+            self.menu = MenuState::offering_blocks(true);
+            return;
+        };
+        let text_width = document.text_width();
+        let Document {
+            content,
+            styles,
+            package,
+            ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, editing);
+        if std::mem::take(&mut self.begin)
+            && let Some(first) = model.first()
+        {
+            self.page
+                .select(Selection::caret(egui_richedit::Position::new(first, 0)));
+        }
+        let asked = toolbar_commands(
+            ui,
+            &mut self.page,
+            &mut model,
+            self.command.take(),
+            self.table_wanted.take(),
+            text_width,
+        );
+        if asked.size {
+            self.table_size = Some((2, 3));
+        }
+        if asked.picture {
+            match PictureQuestion::choose(ui.ctx(), text_width) {
+                Ok(question) => self.picture_question = question,
+                Err(problem) => self.notice = Some(Notice::Problem(problem)),
+            }
+        }
+        if let Some(picture) = self.picture_wanted.take()
+            && let Err(refused) = model.insert_picture(&mut self.page, package, &picture)
+        {
+            self.notice = Some(Notice::Problem(refused.to_string()));
+        }
+        if asked.notice.is_some() {
+            self.notice = asked.notice;
+        }
+        self.menu = MenuState::of(&self.page, &model, true);
+        ui.separator();
+    }
+
+    /// Ask what a chosen picture shows, while the question is up, and keep
+    /// the answer for the page to put in.
+    fn ask_picture(&mut self, ctx: &egui::Context) {
+        let Some(question) = &mut self.picture_question else {
+            return;
+        };
+        match question.show(ctx) {
+            Some(true) => {
+                self.picture_wanted = self.picture_question.take().map(PictureQuestion::picture);
+                ctx.request_repaint();
+            }
+            Some(false) => self.picture_question = None,
+            None => {}
+        }
+    }
+
     /// Load the faces the document's styles name, once, when it opens.
     ///
     /// egui rebuilds its glyph atlas when the font definitions change, so this
@@ -646,6 +697,7 @@ fn table_keys(
 /// with: the question of a table's size, and a refusal to tell.
 struct Asked {
     size: bool,
+    picture: bool,
     notice: Option<Notice>,
 }
 
@@ -694,6 +746,7 @@ fn toolbar_commands(
     };
     Asked {
         size: pressed.table || command == Some(Command::InsertTable),
+        picture: pressed.picture || command == Some(Command::InsertPicture),
         notice: changed
             .and_then(Result::err)
             .map(|refused| Notice::Problem(table_refused(&refused))),

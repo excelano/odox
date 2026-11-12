@@ -39,6 +39,7 @@ pub mod links;
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 pub mod opened_document;
+pub mod picture_question;
 pub mod settings;
 pub mod shapes;
 pub mod shell;
@@ -49,7 +50,7 @@ pub use edit::{Caret, Editing};
 pub use export::Export;
 pub use find::{Found, Highlights, Replaced};
 pub use flow::{Flow, Pictures};
-pub use flow_model::{Block, FlowModel, PageEditor, page_editor};
+pub use flow_model::{Block, FlowModel, PageEditor, Picture, page_editor};
 pub use i18n::mark;
 pub use settings::Settings;
 pub use shapes::Canvas;

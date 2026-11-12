@@ -224,6 +224,33 @@ impl Package {
         self.set_xml(MANIFEST, &root);
     }
 
+    /// The entry a picture is kept in: `Pictures/`, a hash of its bytes and
+    /// its extension, so that the same picture put in twice is kept once, and
+    /// a number after the hash in the rare case another picture has it.
+    pub fn picture_name(&self, bytes: &[u8], extension: &str) -> String {
+        let hash = bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, &byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+        });
+        let mut name = format!("Pictures/{hash:016x}.{extension}");
+        let mut number = 1;
+        while self.part(&name).is_some_and(|part| part.data != bytes) {
+            number += 1;
+            name = format!("Pictures/{hash:016x}-{number}.{extension}");
+        }
+        name
+    }
+
+    /// Keep a picture in the package under [`Self::picture_name`], listed in
+    /// the manifest, and answer the name.
+    pub fn add_picture(&mut self, bytes: &[u8], extension: &str, media_type: &str) -> String {
+        let name = self.picture_name(bytes, extension);
+        if self.part(&name).is_none() {
+            self.set_part(&name, bytes.to_vec());
+        }
+        self.list(&name, media_type);
+        name
+    }
+
     /// Some entries as they stand, to be put back with [`Package::restore`]:
     /// what an undo step holds of a change outside the content tree.
     pub fn keep(&self, names: &[&str]) -> Kept {

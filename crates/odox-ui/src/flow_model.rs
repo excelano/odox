@@ -16,7 +16,7 @@ use std::ops::Range;
 use eframe::egui::Id;
 use egui_richedit::{Edit, Fragment, Mark, Model, Position, Property, RichEdit, Selection, Value};
 use odox_core::edit::{self, TableEdit, html, is_paragraph};
-use odox_core::{Element, ListKind, Ns, Refused, Styles, TextAlign};
+use odox_core::{Element, Kept, ListKind, Ns, Package, Refused, Styles, TextAlign};
 
 use crate::Editing;
 use crate::find::{Match, Replaced};
@@ -48,6 +48,20 @@ pub enum Block {
     Bullets,
     /// A numbered list, or no list where the paragraphs already are one.
     Numbers,
+}
+
+/// A picture a person chose to put in, and what they said it shows.
+pub struct Picture {
+    /// The file's bytes.
+    pub bytes: Vec<u8>,
+    /// Its media type, from [`odox_core::picture::kind`].
+    pub media_type: &'static str,
+    /// The extension its part is named with.
+    pub extension: &'static str,
+    /// How wide and how tall it is drawn, in points.
+    pub size: (f32, f32),
+    /// What it shows, or `None` for decoration only.
+    pub description: Option<String>,
 }
 
 /// A copy made here: its paragraphs as [`edit::slice`] carries them, and the
@@ -456,6 +470,17 @@ impl<'a> FlowModel<'a> {
         editor: &mut PageEditor,
         change: impl FnOnce(&mut Element, &[usize], &mut Styles) -> Result<Vec<usize>, Refused>,
     ) -> Result<(), Refused> {
+        self.structural_step(editor, Kept::default(), change)
+    }
+
+    /// The same, for an edit that also writes package entries, kept as they
+    /// stood before it in `parts`.
+    fn structural_step(
+        &mut self,
+        editor: &mut PageEditor,
+        parts: Kept,
+        change: impl FnOnce(&mut Element, &[usize], &mut Styles) -> Result<Vec<usize>, Refused>,
+    ) -> Result<(), Refused> {
         let selection = editor.selection().cloned().ok_or(Refused::NotFound)?;
         let before = self.content.clone();
         let children = self.content.children.len();
@@ -479,8 +504,38 @@ impl<'a> FlowModel<'a> {
             selection.focus.offset,
         );
         self.editing.touch();
-        self.editing.record_snapshot(before, Some(begins));
+        self.editing.record_step(before, parts, Some(begins));
         editor.select(Selection::caret(Position::new(paragraph, 0)));
+        Ok(())
+    }
+
+    /// Put a picture in beside the paragraph the caret is in, kept in the
+    /// package, as one step to undo that takes the package's entries back too,
+    /// with the caret in the paragraph after it.
+    ///
+    /// # Errors
+    ///
+    /// What the edit refused, with the document and the package left as they
+    /// were.
+    pub fn insert_picture(
+        &mut self,
+        editor: &mut PageEditor,
+        package: &mut Package,
+        picture: &Picture,
+    ) -> Result<(), Refused> {
+        const MANIFEST: &str = "META-INF/manifest.xml";
+        let href = package.picture_name(&picture.bytes, picture.extension);
+        let parts = package.keep(&[href.as_str(), MANIFEST]);
+        self.structural_step(editor, parts, |content, paragraph, styles| {
+            let new = edit::NewPicture {
+                href: &href,
+                media_type: picture.media_type,
+                size: picture.size,
+                description: picture.description.as_deref(),
+            };
+            edit::insert_picture(content, paragraph, &new, styles)
+        })?;
+        package.add_picture(&picture.bytes, picture.extension, picture.media_type);
         Ok(())
     }
 

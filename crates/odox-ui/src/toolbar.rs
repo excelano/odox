@@ -24,6 +24,8 @@ pub struct Pressed {
     pub block: Option<Block>,
     /// The table button, which asks how many rows and columns.
     pub table: bool,
+    /// The picture button, which asks for a file.
+    pub picture: bool,
 }
 
 /// The buttons over a slide's label: the marks and the alignments, none of
@@ -260,6 +262,10 @@ pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed 
                 .button(t("Table"))
                 .on_hover_text(t("Insert a table"))
                 .clicked();
+            pressed.picture = ui
+                .button(t("Picture"))
+                .on_hover_text(t("Insert a picture"))
+                .clicked();
         });
     });
     pressed
@@ -323,6 +329,8 @@ pub enum Command {
     Block(Block),
     /// Ask how large a table to put in.
     InsertTable,
+    /// Ask for a picture to put in.
+    InsertPicture,
     /// Change the table the caret is in.
     Table(TableEdit),
 }
@@ -492,6 +500,13 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
                 }
             });
         });
+        if ui
+            .add_enabled(state.enabled, egui::Button::new(t("Insert a picture…")))
+            .clicked()
+        {
+            chosen = Some(Command::InsertPicture);
+            ui.close();
+        }
     }
     chosen
 }
