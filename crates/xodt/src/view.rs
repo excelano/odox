@@ -9,9 +9,10 @@ use eframe::egui::scroll_area::ScrollAreaOutput;
 use eframe::egui::{self, Pos2, Rect, Ui};
 use egui_richedit::{Model, Selection};
 use odox_core::Document;
-use odox_core::doc::TextDocument;
+use odox_core::doc::{PageSetup, TextDocument};
 use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
@@ -209,6 +210,10 @@ pub struct TextView {
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
     table_wanted: Option<(usize, usize)>,
+    /// The page's paper, orientation and margins, while the question is up.
+    page_question: Option<PageSetupQuestion>,
+    /// What the question was answered with, made on the next frame.
+    page_wanted: Option<PageSetup>,
     notice: Option<Notice>,
 }
 
@@ -227,6 +232,8 @@ impl Default for TextView {
             export: Export::default(),
             scroll: Scroll::default(),
             table_size: None,
+            page_question: None,
+            page_wanted: None,
             table_wanted: None,
             notice: None,
         }
@@ -352,12 +359,15 @@ impl View for TextView {
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let asked = self.table_size.is_some();
+        let asked = self.table_size.is_some() || self.page_question.is_some();
         self.ask_table_size(ui.ctx());
+        self.ask_page_setup(ui.ctx());
+        self.set_page(editing);
         let edit_mode = editing.on && !editing.asking && !self.export.asking() && !asked;
         if !editing.on {
             self.page.clear();
         }
+        self.edit_toolbar(ui, editing, edit_mode);
         let Some(document) = &mut self.document else {
             return;
         };
@@ -377,39 +387,6 @@ impl View for TextView {
         let page = document.text_width() * scale;
         let page_height = document.text_height() * scale;
         let margin = MARGIN * scale;
-
-        if edit_mode && let Some(root) = document.body_path() {
-            let text_width = document.text_width();
-            let Document {
-                content, styles, ..
-            } = &mut document.document;
-            let mut model = FlowModel::new(content, styles, root, editing);
-            if std::mem::take(&mut self.begin)
-                && let Some(first) = model.first()
-            {
-                self.page
-                    .select(Selection::caret(egui_richedit::Position::new(first, 0)));
-            }
-            let asked = toolbar_commands(
-                ui,
-                &mut self.page,
-                &mut model,
-                self.command.take(),
-                self.table_wanted.take(),
-                text_width,
-            );
-            if asked.size {
-                self.table_size = Some((2, 3));
-            }
-            if asked.notice.is_some() {
-                self.notice = asked.notice;
-            }
-            self.menu = MenuState::of(&self.page, &model, true);
-            ui.separator();
-        } else {
-            self.command = None;
-            self.menu = MenuState::offering_blocks(true);
-        }
 
         // The caret's own Page Up and Page Down move it, and the view with it.
         let keys = !editing.asking
@@ -574,6 +551,88 @@ impl TextView {
             }
             Some(false) => self.table_size = None,
             None => {}
+        }
+    }
+
+    /// The toolbar over the page in edit mode, and what it and the Format menu
+    /// asked for: carried out here, or asked about first.
+    fn edit_toolbar(&mut self, ui: &mut Ui, editing: &mut Editing, edit_mode: bool) {
+        let found = self
+            .document
+            .as_mut()
+            .filter(|_| edit_mode)
+            .and_then(|document| {
+                let root = document.body_path()?;
+                Some((document, root))
+            });
+        let Some((document, root)) = found else {
+            self.command = None;
+            self.menu = MenuState::offering_blocks(true);
+            return;
+        };
+        let text_width = document.text_width();
+        let command = self.command.take();
+        if command == Some(Command::PageSetup) {
+            self.page_question = Some(PageSetupQuestion::new(document.page_setup()));
+        }
+        let Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = FlowModel::new(content, styles, root, editing);
+        if std::mem::take(&mut self.begin)
+            && let Some(first) = model.first()
+        {
+            self.page
+                .select(Selection::caret(egui_richedit::Position::new(first, 0)));
+        }
+        let asked = toolbar_commands(
+            ui,
+            &mut self.page,
+            &mut model,
+            command,
+            self.table_wanted.take(),
+            text_width,
+        );
+        if asked.size {
+            self.table_size = Some((2, 3));
+        }
+        if asked.notice.is_some() {
+            self.notice = asked.notice;
+        }
+        self.menu = MenuState::of(&self.page, &model, true);
+        ui.separator();
+    }
+
+    /// Ask about the page's paper, orientation and margins while the
+    /// question is up, and keep the answer for the next frame to make.
+    fn ask_page_setup(&mut self, ctx: &egui::Context) {
+        let Some(question) = &mut self.page_question else {
+            return;
+        };
+        match question.show(ctx) {
+            Some(true) => {
+                self.page_wanted = self.page_question.take().map(|q| q.setup());
+                ctx.request_repaint();
+            }
+            Some(false) => self.page_question = None,
+            None => {}
+        }
+    }
+
+    /// Make the page the question was answered with, as one step to undo.
+    fn set_page(&mut self, editing: &mut Editing) {
+        let (Some(setup), Some(document)) = (self.page_wanted.take(), &mut self.document) else {
+            return;
+        };
+        let content = document.document.content.clone();
+        let styles = document.document.styles_part.clone();
+        match document.set_page_setup(&setup) {
+            Ok(true) => {
+                let caret = self.page.selection().map(|s| s.focus.clone());
+                editing.record_styles(content, styles, caret);
+            }
+            Ok(false) => {}
+            Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
         }
     }
 

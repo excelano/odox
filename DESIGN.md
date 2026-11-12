@@ -838,6 +838,19 @@ stands beside it. One pass over the selection is one undo step, and the buttons
 are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.
 
+**A text document's page is set up from Format > Page setup…**: the paper,
+A4, A5, Letter, Legal or a size of its own, portrait or landscape, and the four
+margins, in inches where the page was on Letter or Legal and in centimetres
+otherwise. The window has no pages, so what changes there is the width the
+page is drawn at; an export makes its pages on the paper set. The page layout
+the body's first master page names is changed where it stands in `styles.xml`
+(`TextDocument::set_page_setup`), so another master page naming it changes
+too; only an attribute whose length differs is written, in the unit the
+layout already writes it in, and `style:print-orientation` follows the shape.
+Headers, footers, columns and numbering are not offered. It is one step to
+undo: an undo step can hold the styles part as it stood, and `Styles` reads the
+part again when it is put back.
+
 **A paragraph is aligned by a style of its own** (`edit/align.rs`): against
 the start, centered, against the end, or justified, from the buttons after the
 marks and the Format menu, in a text document and in a slide's label. The

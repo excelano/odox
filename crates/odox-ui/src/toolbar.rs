@@ -329,6 +329,8 @@ pub enum Command {
     InsertTable,
     /// Change the table the caret is in.
     Table(TableEdit),
+    /// Ask about the page's paper, orientation and margins.
+    PageSetup,
 }
 
 impl Command {
@@ -490,6 +492,14 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
                 }
             });
         });
+        ui.separator();
+        if ui
+            .add_enabled(state.enabled, egui::Button::new(t("Page setup…")))
+            .clicked()
+        {
+            chosen = Some(Command::PageSetup);
+            ui.close();
+        }
     }
     chosen
 }

@@ -39,6 +39,7 @@ pub mod links;
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 pub mod opened_document;
+pub mod page_setup;
 pub mod settings;
 pub mod shapes;
 pub mod shell;

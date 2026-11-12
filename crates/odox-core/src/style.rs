@@ -1071,6 +1071,13 @@ impl Styles {
         self.collect_style(element);
     }
 
+    /// Read a part again after it has changed: what it declares replaces what
+    /// was known of the same names, and nothing else is forgotten.
+    pub fn reread(&mut self, root: &Element) {
+        self.collect_from(root);
+        self.cache.borrow_mut().clear();
+    }
+
     /// The families the document's font face declarations ask for, sorted.
     pub fn font_families(&self) -> Vec<String> {
         let mut families: Vec<String> = self.font_faces.values().cloned().collect();

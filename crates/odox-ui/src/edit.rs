@@ -28,7 +28,16 @@ pub type Caret = Position<Vec<usize>>;
 struct Snapshot {
     content: Element,
     parts: Kept,
+    styles: StylesPart,
     caret: Option<Caret>,
+}
+
+/// What a snapshot holds of the styles part.
+enum StylesPart {
+    /// The edit did not change it.
+    Untouched,
+    /// The part as it stood before the edit, which a document may not have.
+    Was(Option<Element>),
 }
 
 /// The shell's editing state, handed to the view on every frame.
@@ -89,17 +98,38 @@ impl Editing {
     /// The same, with the package entries the edit is about to write besides
     /// the tree, as they stood before it.
     pub fn record_step(&mut self, content: Element, parts: Kept, caret: Option<Caret>) {
+        self.push(Snapshot {
+            content,
+            parts,
+            styles: StylesPart::Untouched,
+            caret,
+        });
+    }
+
+    /// The same, for an edit to the styles part, with that part as it stood
+    /// before the edit.
+    pub fn record_styles(
+        &mut self,
+        content: Element,
+        styles: Option<Element>,
+        caret: Option<Caret>,
+    ) {
+        self.push(Snapshot {
+            content,
+            parts: Kept::default(),
+            styles: StylesPart::Was(styles),
+            caret,
+        });
+    }
+
+    fn push(&mut self, snapshot: Snapshot) {
         if self.saved_at.is_some_and(|depth| depth > self.undo.len()) {
             // The saved state was above this point and is now off the line.
             self.saved_at = None;
         }
         self.redo.clear();
         self.touch();
-        self.undo.push(Snapshot {
-            content,
-            parts,
-            caret,
-        });
+        self.undo.push(snapshot);
         if self.undo.len() > DEPTH {
             self.undo.remove(0);
             self.saved_at = self.saved_at.and_then(|depth| depth.checked_sub(1));
@@ -111,33 +141,46 @@ impl Editing {
     /// edit can be redone; answers where the caret was.
     pub fn undo(&mut self, document: &mut Document, caret: Option<Caret>) -> Option<Option<Caret>> {
         let previous = self.undo.pop()?;
-        let current = Self::put_back(document, previous.content, previous.parts, caret);
+        let (current, was) = Self::put_back(document, previous, caret);
         self.redo.push(current);
         self.touch();
-        Some(previous.caret)
+        Some(was)
     }
 
     /// Put back the edit last taken back, the same way.
     pub fn redo(&mut self, document: &mut Document, caret: Option<Caret>) -> Option<Option<Caret>> {
         let next = self.redo.pop()?;
-        let current = Self::put_back(document, next.content, next.parts, caret);
+        let (current, was) = Self::put_back(document, next, caret);
         self.undo.push(current);
         self.touch();
-        Some(next.caret)
+        Some(was)
     }
 
-    /// Put a state into the document, answering the one it replaced.
+    /// Put a snapshot back over the document, and answer what it replaced,
+    /// with `caret` as where the caret stood in that, and where the caret
+    /// stood in the snapshot.
     fn put_back(
         document: &mut Document,
-        content: Element,
-        parts: Kept,
+        snapshot: Snapshot,
         caret: Option<Caret>,
-    ) -> Snapshot {
-        Snapshot {
-            content: std::mem::replace(&mut document.content, content),
-            parts: document.package.restore(parts),
+    ) -> (Snapshot, Option<Caret>) {
+        let styles = match snapshot.styles {
+            StylesPart::Untouched => StylesPart::Untouched,
+            StylesPart::Was(styles) => {
+                let current = std::mem::replace(&mut document.styles_part, styles);
+                if let Some(part) = &document.styles_part {
+                    document.styles.reread(part);
+                }
+                StylesPart::Was(current)
+            }
+        };
+        let current = Snapshot {
+            content: std::mem::replace(&mut document.content, snapshot.content),
+            parts: document.package.restore(snapshot.parts),
+            styles,
             caret,
-        }
+        };
+        (current, snapshot.caret)
     }
 
     /// Whether there is anything to undo.
