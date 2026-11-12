@@ -27,7 +27,8 @@ ODF is a document they are meant to open, whichever application wrote it.
 Editing covers what is basic to each kind of document and stops there: a
 feature a full suite needs and a quick edit does not stays out. You can type
 and delete text, change its font and size, make it bold, italic, underlined or
-struck through, align a paragraph, make it a heading or a list item and put a table in a text document, enter
+struck through, align a paragraph, make it a heading or a list item and put a table or a picture in a
+text document, enter
 values and formulas in a spreadsheet and format its cells, move and resize the
 shapes on a slide and add or rearrange slides, undo any of that, and save. What
 you did not touch is written back as it was read, element for element, including the
@@ -107,9 +108,11 @@ third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, and in `xodp` the marks. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
-last one adds a row. Format > Page setup… sets the paper, portrait or landscape
-and the margins, which is the width the page is drawn at and the pages an
-export makes. Undo puts the caret back where the edit was.
+last one adds a row. The Picture button, or Format > Insert a picture…, puts a
+PNG or a JPEG in after the caret's paragraph, once you have said what it shows
+or that it is decoration only. Format > Page setup… sets the paper, portrait or
+landscape and the margins, which is the width the page is drawn at and the
+pages an export makes. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, text wrapped where a cell says so, one tab per sheet, and shows the

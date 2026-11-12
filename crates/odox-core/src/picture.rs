@@ -3,6 +3,49 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
+/// What kind of picture the bytes are, among those a window draws and a
+/// package is given: its media type and the extension its part is named with.
+pub fn kind(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
+    match bytes {
+        [0x89, b'P', b'N', b'G', ..] => Some(("image/png", "png")),
+        [0xFF, 0xD8, ..] => Some(("image/jpeg", "jpg")),
+        _ => None,
+    }
+}
+
+/// How many pixels across and down a PNG or a JPEG is, as its header says.
+pub fn pixel_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    match bytes {
+        [0x89, b'P', b'N', b'G', ..] => {
+            let read =
+                |at: usize| Some(u32::from_be_bytes(bytes.get(at..at + 4)?.try_into().ok()?));
+            Some((read(16)?, read(20)?))
+        }
+        [0xFF, 0xD8, ..] => jpeg_size(bytes),
+        _ => None,
+    }
+}
+
+/// A JPEG's size, from the first start-of-frame marker: every `0xC0` to
+/// `0xCF` but the three that are tables and arithmetic coding conditions.
+fn jpeg_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    let mut at = 2;
+    while let [0xFF, marker, high, low, ..] = *bytes.get(at..)? {
+        let length = usize::from(u16::from_be_bytes([high, low]));
+        if matches!(marker, 0xC0..=0xCF) && !matches!(marker, 0xC4 | 0xC8 | 0xCC) {
+            let data = bytes.get(at + 4..at + 2 + length)?;
+            let down = u32::from(u16::from_be_bytes([*data.get(1)?, *data.get(2)?]));
+            let across = u32::from(u16::from_be_bytes([*data.get(3)?, *data.get(4)?]));
+            return Some((across, down));
+        }
+        if matches!(marker, 0xDA | 0xD9) {
+            return None;
+        }
+        at += 2 + length;
+    }
+    None
+}
+
 /// The resolution a picture was saved at, across and down, in dots per inch:
 /// a PNG's `pHYs` chunk or a JPEG's JFIF density. `None` where the picture
 /// does not say, which `LibreOffice` reads as 96.

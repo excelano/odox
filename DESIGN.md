@@ -838,6 +838,25 @@ stands beside it. One pass over the selection is one undo step, and the buttons
 are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.
 
+**A picture is put in from the toolbar's Picture button or Format > Insert a
+picture…** (`edit/picture.rs`). A PNG or a JPEG is chosen, and the person is
+asked what it shows, for someone who cannot see it, or whether it is
+decoration only, before it goes in; an answer left blank says nothing, and an
+export asks again. The picture is kept in the package as
+`Pictures/` and a hash of its bytes, so a picture put in twice is kept once,
+and is listed in the manifest. It goes in a paragraph of its own, as a
+`draw:frame` anchored as a character holding a `draw:image`, the way
+`LibreOffice` writes one: after the caret's paragraph, or after the list that
+paragraph is an item of, and before an empty paragraph, which is left below it
+to type in; the paragraph holding it takes the style of the one beside it
+unless that is a heading's, and one with nothing after it is given an empty
+paragraph to follow. It is drawn at its pixels at the resolution its header
+gives, or 96 to the inch, and no wider than the text. Its alternative text is
+`svg:title`, as `set_alternative_text` writes it, and decoration is marked as
+`set_decorative` marks it. The caret goes to the paragraph after it. It is one
+step to undo, which takes the package's part and its manifest entry back as
+well as the tree.
+
 **A text document's page is set up from Format > Page setup…**: the paper,
 A4, A5, Letter, Legal or a size of its own, portrait or landscape, and the four
 margins, in inches where the page was on Letter or Legal and in centimetres

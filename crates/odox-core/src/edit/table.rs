@@ -696,7 +696,7 @@ fn remove_at(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
 
 /// The path of what a table beside a paragraph goes beside: the paragraph, or
 /// the outermost list it is an item of.
-fn outside_lists(content: &Element, paragraph: &[usize]) -> Vec<usize> {
+pub(super) fn outside_lists(content: &Element, paragraph: &[usize]) -> Vec<usize> {
     let mut place = paragraph.to_vec();
     for depth in (1..paragraph.len()).rev() {
         match content.at(&paragraph[..depth]) {

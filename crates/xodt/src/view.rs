@@ -13,6 +13,7 @@ use odox_core::doc::{PageSetup, TextDocument};
 use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::page_setup::PageSetupQuestion;
+use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
@@ -210,6 +211,10 @@ pub struct TextView {
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
     table_wanted: Option<(usize, usize)>,
+    /// What a chosen picture shows, while the question is up.
+    picture_question: Option<PictureQuestion>,
+    /// The picture the question was answered with, put in on the next frame.
+    picture_wanted: Option<odox_ui::Picture>,
     /// The page's paper, orientation and margins, while the question is up.
     page_question: Option<PageSetupQuestion>,
     /// What the question was answered with, made on the next frame.
@@ -232,6 +237,8 @@ impl Default for TextView {
             export: Export::default(),
             scroll: Scroll::default(),
             table_size: None,
+            picture_question: None,
+            picture_wanted: None,
             page_question: None,
             page_wanted: None,
             table_wanted: None,
@@ -359,8 +366,11 @@ impl View for TextView {
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let asked = self.table_size.is_some() || self.page_question.is_some();
+        let asked = self.table_size.is_some()
+            || self.picture_question.is_some()
+            || self.page_question.is_some();
         self.ask_table_size(ui.ctx());
+        self.ask_picture(ui.ctx());
         self.ask_page_setup(ui.ctx());
         self.set_page(editing);
         let edit_mode = editing.on && !editing.asking && !self.export.asking() && !asked;
@@ -576,7 +586,10 @@ impl TextView {
             self.page_question = Some(PageSetupQuestion::new(document.page_setup()));
         }
         let Document {
-            content, styles, ..
+            content,
+            styles,
+            package,
+            ..
         } = &mut document.document;
         let mut model = FlowModel::new(content, styles, root, editing);
         if std::mem::take(&mut self.begin)
@@ -596,11 +609,38 @@ impl TextView {
         if asked.size {
             self.table_size = Some((2, 3));
         }
+        if asked.picture {
+            match PictureQuestion::choose(ui.ctx(), text_width) {
+                Ok(question) => self.picture_question = question,
+                Err(problem) => self.notice = Some(Notice::Problem(problem)),
+            }
+        }
+        if let Some(picture) = self.picture_wanted.take()
+            && let Err(refused) = model.insert_picture(&mut self.page, package, &picture)
+        {
+            self.notice = Some(Notice::Problem(refused.to_string()));
+        }
         if asked.notice.is_some() {
             self.notice = asked.notice;
         }
         self.menu = MenuState::of(&self.page, &model, true);
         ui.separator();
+    }
+
+    /// Ask what a chosen picture shows, while the question is up, and keep
+    /// the answer for the page to put in.
+    fn ask_picture(&mut self, ctx: &egui::Context) {
+        let Some(question) = &mut self.picture_question else {
+            return;
+        };
+        match question.show(ctx) {
+            Some(true) => {
+                self.picture_wanted = self.picture_question.take().map(PictureQuestion::picture);
+                ctx.request_repaint();
+            }
+            Some(false) => self.picture_question = None,
+            None => {}
+        }
     }
 
     /// Ask about the page's paper, orientation and margins while the
@@ -705,6 +745,7 @@ fn table_keys(
 /// with: the question of a table's size, and a refusal to tell.
 struct Asked {
     size: bool,
+    picture: bool,
     notice: Option<Notice>,
 }
 
@@ -753,6 +794,7 @@ fn toolbar_commands(
     };
     Asked {
         size: pressed.table || command == Some(Command::InsertTable),
+        picture: pressed.picture || command == Some(Command::InsertPicture),
         notice: changed
             .and_then(Result::err)
             .map(|refused| Notice::Problem(table_refused(&refused))),

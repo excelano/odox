@@ -23,6 +23,7 @@ mod figure;
 pub(crate) mod format;
 pub mod html;
 mod numbering;
+mod picture;
 mod table;
 
 use std::fmt;
@@ -39,6 +40,7 @@ pub use figure::{
 pub use format::{Mark, Setting, TextProperty, format, marked, set_text, text_value};
 pub(crate) use format::{automatic_styles, element};
 pub use numbering::ListCounters;
+pub use picture::{NewPicture, insert_picture};
 pub use table::{InTable, TableEdit, edit_table, insert_table, step_cell, table_at};
 
 /// Why an edit was not made. Each is a state of the document rather than a

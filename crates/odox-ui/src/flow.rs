@@ -204,7 +204,7 @@ fn laid(image: &ColorImage, tiling: &Tiling) -> (ColorImage, TextureOptions) {
     (laid, TextureOptions::LINEAR_REPEAT)
 }
 
-fn decode(bytes: &[u8]) -> Option<ColorImage> {
+pub(crate) fn decode(bytes: &[u8]) -> Option<ColorImage> {
     let decoded = image::load_from_memory(bytes).ok()?.to_rgba8();
     let size = [decoded.width() as usize, decoded.height() as usize];
     Some(ColorImage::from_rgba_unmultiplied(size, decoded.as_raw()))
