@@ -326,6 +326,41 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     /// `response` is the paragraph's, allocated to sense clicks and, for a
     /// drag to select, drags.
     pub fn paragraph(&mut self, ui: &Ui, response: &Response, paragraph: &P, laid: Laid) {
+        let pointer = ui.input(|input| input.pointer.interact_pos());
+        self.place(ui, response, paragraph, laid, (pointer, true));
+    }
+
+    /// [`Self::paragraph`] for a paragraph laid out in one place and drawn in
+    /// another, as a label is turned onto a shape after it is laid out
+    /// upright: what is painted here is carried there by the application.
+    ///
+    /// `response` is the one under the pointer where the paragraph is drawn,
+    /// with its `rect` set to the paragraph's where it was laid out, and
+    /// `pointer` is where the pointer is in that space. The paragraph takes the
+    /// pointer only where `pointer` falls inside `rect`.
+    pub fn paragraph_moved(
+        &mut self,
+        ui: &Ui,
+        response: &Response,
+        paragraph: &P,
+        laid: Laid,
+        pointer: Option<Pos2>,
+    ) {
+        let here = pointer.is_some_and(|pos| response.rect.contains(pos));
+        self.place(ui, response, paragraph, laid, (pointer, here));
+    }
+
+    /// Paint a paragraph and take the pointer, which is where it is in the
+    /// space the paragraph was laid out in and whether it is on the paragraph
+    /// beyond what `response` says.
+    fn place(
+        &mut self,
+        ui: &Ui,
+        response: &Response,
+        paragraph: &P,
+        laid: Laid,
+        (pointer, here): (Option<Pos2>, bool),
+    ) {
         let Laid {
             mut galley,
             map,
@@ -333,10 +368,16 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         } = laid;
         let focused = ui.memory(|memory| memory.has_focus(self.id));
 
-        if response.hovered() {
+        if here && response.hovered() {
             ui.ctx().set_cursor_icon(CursorIcon::Text);
         }
-        self.pointer(ui, response, paragraph, &galley, &map, origin);
+        self.pointer(
+            ui,
+            response,
+            paragraph,
+            (&galley, &map, origin),
+            (pointer, here),
+        );
 
         if let Some(range) = self.selected_here(paragraph, &map)
             && focused
@@ -977,17 +1018,16 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         ui: &Ui,
         response: &Response,
         paragraph: &P,
-        galley: &Galley,
-        map: &OffsetMap,
-        origin: Pos2,
+        (galley, map, origin): (&Galley, &OffsetMap, Pos2),
+        (pos, here): (Option<Pos2>, bool),
     ) {
+        let clicked = here && response.clicked();
         let at_pointer = |pos: Pos2| galley.cursor_from_pos(pos - origin);
-        let (pressed, down, shift, pos) = ui.input(|input| {
+        let (pressed, down, shift) = ui.input(|input| {
             (
                 input.pointer.primary_pressed(),
                 input.pointer.primary_down(),
                 input.modifiers.shift,
-                input.pointer.interact_pos(),
             )
         });
 
@@ -997,9 +1037,9 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         // under it takes the click alone, so a press that becomes a drag puts
         // no caret down.
         let placed = if response.sense.senses_drag() {
-            pressed && (response.is_pointer_button_down_on() || response.clicked())
+            here && pressed && (response.is_pointer_button_down_on() || clicked)
         } else {
-            response.clicked()
+            clicked
         };
         if placed && let Some(pos) = pos {
             let cursor = at_pointer(pos);
@@ -1035,11 +1075,12 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         // and the editor's own is under the paragraphs, so a click ending on
         // one would take the keyboard from the caret it just put down. The
         // paragraph is the editor's, and the focus comes back to it.
-        if response.clicked() {
+        if clicked {
             ui.memory_mut(|memory| memory.request_focus(self.id));
         }
 
-        if (response.double_clicked() || response.triple_clicked())
+        if here
+            && (response.double_clicked() || response.triple_clicked())
             && let Some(pos) = pos
         {
             let (start, end) = if response.triple_clicked() {

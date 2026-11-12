@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-10 20:14-0600\n"
+"POT-Creation-Date: 2026-11-11 20:43-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -149,7 +149,7 @@ msgstr ""
 msgid "Replace all"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:590
+#: crates/odox-ui/src/flow.rs:605
 msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 
@@ -164,15 +164,11 @@ msgstr ""
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shapes.rs:355
-msgid "Text in a turned shape cannot be edited yet."
-msgstr ""
-
-#: crates/odox-ui/src/shapes.rs:558
+#: crates/odox-ui/src/shapes.rs:657
 msgid "Click to add a title"
 msgstr ""
 
-#: crates/odox-ui/src/shapes.rs:559
+#: crates/odox-ui/src/shapes.rs:658
 msgid "Click to add text"
 msgstr ""
 

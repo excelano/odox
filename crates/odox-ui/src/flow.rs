@@ -210,6 +210,18 @@ fn decode(bytes: &[u8]) -> Option<ColorImage> {
     Some(ColorImage::from_rgba_unmultiplied(size, decoded.as_raw()))
 }
 
+/// A flow laid out upright where nothing of it is seen and drawn turned onto
+/// a shape: the pointer is taken on the shape, and the page editor sees it
+/// turned back into the upright layout.
+#[derive(Clone)]
+pub struct Turned {
+    /// The shape's own response, which takes the clicks the upright
+    /// paragraphs cannot.
+    pub response: Response,
+    /// Where the pointer is, turned back into the upright layout.
+    pub pointer: Option<Pos2>,
+}
+
 /// The state a run of blocks is drawn with.
 pub struct Flow<'a> {
     /// The document, for its styles and its pictures.
@@ -246,6 +258,8 @@ pub struct Flow<'a> {
     /// The style of the shape the flow is drawn in, under each paragraph's
     /// own, as [`Properties::in_shape`] lays them.
     pub under: Option<std::rc::Rc<Properties>>,
+    /// Where the flow is laid out upright and drawn turned onto a shape.
+    pub turned: Option<Turned>,
     /// Where the flow is, as a path of child indices from the root, or from
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
@@ -272,6 +286,7 @@ impl<'a> Flow<'a> {
             find: None,
             selectable: true,
             under: None,
+            turned: None,
             path: Vec::new(),
             detached: false,
         }
@@ -642,7 +657,15 @@ impl Flow<'_> {
                 map,
                 origin,
             };
-            page.paragraph(ui, response, &self.path, laid);
+            match &self.turned {
+                Some(turned) => {
+                    let mut moved = turned.response.clone();
+                    moved.rect = response.rect;
+                    moved.interact_rect = response.interact_rect;
+                    page.paragraph_moved(ui, &moved, &self.path, laid, turned.pointer);
+                }
+                None => page.paragraph(ui, response, &self.path, laid),
+            }
         } else {
             LabelSelectionState::label_text_selection(
                 ui,
