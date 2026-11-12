@@ -16,21 +16,21 @@ want to know which kind it is:
 
 ## Why not just open it in LibreOffice
 
-LibreOffice is an office suite and these are lightweight editors. The whole of
-`xodt` starts in well under a second on a document a suite takes several to
-load, and reading a document you were sent, fixing a sentence in it and sending
-it on is most of what anyone does with one. The applications are also built to
+LibreOffice is an office suite and these are lightweight editors. `xodt` has a
+document on screen in a fraction of the time a suite takes to open it, from a
+download a small part of a suite's size, and reading a document you were sent,
+fixing a sentence in it and sending it on is most of what anyone does with one. The applications are also built to
 one standard rather than to compatibility with another program: what they
 implement is the OASIS OpenDocument specification, and a document that is valid
 ODF is a document they are meant to open, whichever application wrote it.
 
-Editing means changing what is there, not authoring. You can type and delete
-text, split a paragraph and join two, enter a value in a cell, move a shape on a
-slide and resize it, make text bold, italic, underlined or struck through, make
-a paragraph a heading or a list item, undo any of that, and save. You cannot
-apply other formatting, insert a table or a picture, or edit a formula. What you
-did
-not touch is written back as it was read, element for element, including the
+Editing covers what is basic to each kind of document and stops there: a
+feature a full suite needs and a quick edit does not stays out. You can type
+and delete text, make it bold, italic, underlined or struck through, make a
+paragraph a heading or a list item and put a table in a text document, enter
+values and formulas in a spreadsheet and format its cells, move and resize the
+shapes on a slide and add or rearrange slides, undo any of that, and save. What
+you did not touch is written back as it was read, element for element, including the
 parts these applications have no opinion about: the document you save is the
 document you opened, with your change in it.
 
@@ -100,22 +100,30 @@ selection bold, italic or underlined, or what you type next when nothing is
 selected; strikethrough is a button. Beside them are buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
-off. The Format menu offers the same commands, and in `xodp` the marks. Undo puts the caret back where the edit
-was.
+off. The Format menu offers the same commands, and in `xodp` the marks. The
+Table button, or Format > Table, puts a table in after the caret's paragraph and
+puts in or takes out its rows and columns; Tab goes to the next cell, and in the
+last one adds a row. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, text wrapped where a cell says so, one tab per sheet, and shows the
 formula behind whichever cell you pick.
 Typing on the picked cell replaces it, Enter or F2 opens it with what it holds,
 Enter commits and moves down, Tab commits and moves right, Escape puts it back,
-and Delete clears it. A number is a number, `true` and `false` are booleans,
-anything else is text. A cell that holds a formula is not edited, and once
-a value has changed every formula's result is drawn faint until a
-spreadsheet application recalculates it. Dragging, or Shift with the arrows,
+and Delete clears it. What is typed is read in the cell's number format, so
+`15%` in a percentage cell is fifteen percent and a date is a date, and what
+begins with `=` is a formula, worked out as soon as it is entered. A change
+works out again every formula that reads it; a formula calling a function
+`xods` does not evaluate keeps its last result, drawn faint, for the next
+spreadsheet application to work out. Sheet > Format cells…, or Ctrl+1, sets a
+number format, bold, italic and underline, a font color, a fill, alignment,
+wrapping and borders. Ctrl+D fills a selection down, and dragging the square
+at its corner carries a series on; Sheet > Sort… sorts a block by one of its
+columns, and Sheet > Comment… writes the picked cell's comment. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
 show it, and as a table for a word processor, Ctrl+V puts such text down from the picked cell, as the values typing
-would make, and Delete empties it. A paste or a delete that reaches a cell it
-cannot write, a formula or one under a merge, changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
+would make, and Delete empties it. A paste that reaches a cell under a merge
+changes nothing. The Sheet menu inserts rows or columns above, below, left or right of the selection, as many as it covers, and deletes the selected rows or columns; the formulas that name moved cells follow them. It says why when it will not: a merged cell it would cut through, a formula it cannot read or that points at a cell about to go, or something it does not move, such as a conditional format, a validation, a chart or a print range.
 The same menu, and a right click on a tab, add, rename, delete and move sheets;
 a double click on a tab renames it, and formulas that name a renamed sheet
 follow it. Dragging the edge of a column's or a row's header resizes it, and a
