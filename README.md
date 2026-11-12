@@ -110,7 +110,9 @@ Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
 last one adds a row. The Picture button, or Format > Insert a picture…, puts a
 PNG or a JPEG in after the caret's paragraph, once you have said what it shows
-or that it is decoration only. Undo puts the caret back where the edit was.
+or that it is decoration only. Format > Page setup… sets the paper, portrait or
+landscape and the margins, which is the width the page is drawn at and the
+pages an export makes. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, text wrapped where a cell says so, one tab per sheet, and shows the

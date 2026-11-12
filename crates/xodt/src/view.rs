@@ -9,9 +9,10 @@ use eframe::egui::scroll_area::ScrollAreaOutput;
 use eframe::egui::{self, Pos2, Rect, Ui};
 use egui_richedit::{Model, Selection};
 use odox_core::Document;
-use odox_core::doc::TextDocument;
+use odox_core::doc::{PageSetup, TextDocument};
 use odox_ui::find::{Match, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
@@ -214,6 +215,10 @@ pub struct TextView {
     picture_question: Option<PictureQuestion>,
     /// The picture the question was answered with, put in on the next frame.
     picture_wanted: Option<odox_ui::Picture>,
+    /// The page's paper, orientation and margins, while the question is up.
+    page_question: Option<PageSetupQuestion>,
+    /// What the question was answered with, made on the next frame.
+    page_wanted: Option<PageSetup>,
     notice: Option<Notice>,
 }
 
@@ -234,6 +239,8 @@ impl Default for TextView {
             table_size: None,
             picture_question: None,
             picture_wanted: None,
+            page_question: None,
+            page_wanted: None,
             table_wanted: None,
             notice: None,
         }
@@ -359,9 +366,13 @@ impl View for TextView {
         }
         // While a question is up the page is drawn as it is and takes no keys;
         // the caret waits for it to be answered.
-        let asked = self.table_size.is_some() || self.picture_question.is_some();
+        let asked = self.table_size.is_some()
+            || self.picture_question.is_some()
+            || self.page_question.is_some();
         self.ask_table_size(ui.ctx());
         self.ask_picture(ui.ctx());
+        self.ask_page_setup(ui.ctx());
+        self.set_page(editing);
         let edit_mode = editing.on && !editing.asking && !self.export.asking() && !asked;
         if !editing.on {
             self.page.clear();
@@ -570,6 +581,10 @@ impl TextView {
             return;
         };
         let text_width = document.text_width();
+        let command = self.command.take();
+        if command == Some(Command::PageSetup) {
+            self.page_question = Some(PageSetupQuestion::new(document.page_setup()));
+        }
         let Document {
             content,
             styles,
@@ -587,7 +602,7 @@ impl TextView {
             ui,
             &mut self.page,
             &mut model,
-            self.command.take(),
+            command,
             self.table_wanted.take(),
             text_width,
         );
@@ -625,6 +640,39 @@ impl TextView {
             }
             Some(false) => self.picture_question = None,
             None => {}
+        }
+    }
+
+    /// Ask about the page's paper, orientation and margins while the
+    /// question is up, and keep the answer for the next frame to make.
+    fn ask_page_setup(&mut self, ctx: &egui::Context) {
+        let Some(question) = &mut self.page_question else {
+            return;
+        };
+        match question.show(ctx) {
+            Some(true) => {
+                self.page_wanted = self.page_question.take().map(|q| q.setup());
+                ctx.request_repaint();
+            }
+            Some(false) => self.page_question = None,
+            None => {}
+        }
+    }
+
+    /// Make the page the question was answered with, as one step to undo.
+    fn set_page(&mut self, editing: &mut Editing) {
+        let (Some(setup), Some(document)) = (self.page_wanted.take(), &mut self.document) else {
+            return;
+        };
+        let content = document.document.content.clone();
+        let styles = document.document.styles_part.clone();
+        match document.set_page_setup(&setup) {
+            Ok(true) => {
+                let caret = self.page.selection().map(|s| s.focus.clone());
+                editing.record_styles(content, styles, caret);
+            }
+            Ok(false) => {}
+            Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
         }
     }
 
