@@ -4,10 +4,67 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::Document;
+use crate::edit::Refused;
 use crate::media_type;
 use crate::style::PageLayout;
-use crate::xml::{Element, Ns};
+use crate::value::Length;
+use crate::xml::{Element, Node, Ns};
 use crate::{Error, Family};
+
+/// What Format > Page setup… changes: the paper, which way round it is
+/// printed, and the margins.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PageSetup {
+    /// The page's width, as it is printed.
+    pub width: Length,
+    /// Its height.
+    pub height: Length,
+    /// Top, right, bottom and left margins.
+    pub margins: [Length; 4],
+}
+
+impl PageSetup {
+    /// Whether the page is wider than it is tall.
+    pub fn landscape(&self) -> bool {
+        self.width.points() > self.height.points()
+    }
+}
+
+/// The attributes of `style:page-layout-properties` a [`PageSetup`] writes,
+/// with the length each takes from it.
+fn page_attributes(setup: &PageSetup) -> [(Ns, &'static str, Length); 6] {
+    let [top, right, bottom, left] = setup.margins;
+    [
+        (Ns::Fo, "page-width", setup.width),
+        (Ns::Fo, "page-height", setup.height),
+        (Ns::Fo, "margin-top", top),
+        (Ns::Fo, "margin-right", right),
+        (Ns::Fo, "margin-bottom", bottom),
+        (Ns::Fo, "margin-left", left),
+    ]
+}
+
+/// A length written in a unit: the one `like` is written in where it names
+/// one, and centimetres otherwise.
+fn written_like(length: Length, like: Option<&str>) -> String {
+    let unit = like
+        .map(str::trim)
+        .and_then(|value| value.get(value.len().saturating_sub(2)..))
+        .filter(|unit| matches!(*unit, "in" | "cm" | "mm" | "pt"))
+        .unwrap_or("cm");
+    let points = length.points();
+    let value = match unit {
+        "in" => points / 72.0,
+        "mm" => points / 72.0 * 25.4,
+        "pt" => points,
+        _ => points / 72.0 * 2.54,
+    };
+    let number = format!("{value:.4}");
+    format!(
+        "{}{unit}",
+        number.trim_end_matches('0').trim_end_matches('.')
+    )
+}
 
 /// An `OpenDocument` text document.
 ///
@@ -69,6 +126,122 @@ impl TextDocument {
             .and_then(|name| self.document.styles.page_layout_of(name))
             .cloned()
             .unwrap_or_default()
+    }
+
+    /// The paper, its orientation and its margins, as the body's page layout
+    /// gives them.
+    pub fn page_setup(&self) -> PageSetup {
+        let layout = self.page_layout();
+        let margin = |side: Option<Length>| side.unwrap_or(Length(0.0));
+        PageSetup {
+            width: layout.width,
+            height: layout.height,
+            margins: [
+                margin(layout.margin.top),
+                margin(layout.margin.right),
+                margin(layout.margin.bottom),
+                margin(layout.margin.left),
+            ],
+        }
+    }
+
+    /// Change the paper, its orientation and its margins, in the page layout
+    /// the body's master page names, where it stands: another master page
+    /// naming the same layout changes with it. Only what differs is written,
+    /// each length in the unit the layout already writes it in. Answers
+    /// whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// The document has no `styles.xml`, no master page, or no page layout
+    /// of the name its master page gives.
+    pub fn set_page_setup(&mut self, setup: &PageSetup) -> Result<bool, Refused> {
+        let name = self
+            .master_page()
+            .and_then(|master| master.attr(&Ns::Style, "page-layout-name"))
+            .map(ToOwned::to_owned)
+            .ok_or(Refused::NotFound)?;
+        let current = self.page_setup();
+        let styles = self
+            .document
+            .styles_part
+            .as_mut()
+            .ok_or(Refused::NotFound)?;
+        let layout = styles
+            .children
+            .iter_mut()
+            .filter_map(|node| match node {
+                Node::Element(container)
+                    if container.is(&Ns::Office, "automatic-styles")
+                        || container.is(&Ns::Office, "styles") =>
+                {
+                    Some(container)
+                }
+                _ => None,
+            })
+            .flat_map(|container| container.children.iter_mut())
+            .find_map(|node| match node {
+                Node::Element(e)
+                    if e.is(&Ns::Style, "page-layout")
+                        && e.attr(&Ns::Style, "name") == Some(name.as_str()) =>
+                {
+                    Some(e)
+                }
+                _ => None,
+            })
+            .ok_or(Refused::NotFound)?;
+        let properties_name = layout.name_for(&Ns::Style, "page-layout-properties");
+        if layout.child(&Ns::Style, "page-layout-properties").is_none() {
+            layout.children.insert(
+                0,
+                Node::Element(Element {
+                    name: properties_name,
+                    attrs: Vec::new(),
+                    children: Vec::new(),
+                    self_closing: true,
+                }),
+            );
+            layout.self_closing = false;
+        }
+        let properties = layout
+            .child_mut(&Ns::Style, "page-layout-properties")
+            .ok_or(Refused::NotFound)?;
+        let mut changed = false;
+        for ((ns, local, wanted), (_, _, had)) in page_attributes(setup)
+            .into_iter()
+            .zip(page_attributes(&current))
+        {
+            if (wanted.points() - had.points()).abs() < 0.01 {
+                continue;
+            }
+            let value = written_like(wanted, properties.attr(&ns, local));
+            let name = properties.name_for(&ns, local);
+            properties.set_attr(name, value);
+            changed = true;
+        }
+        let orientation = if setup.landscape() {
+            "landscape"
+        } else {
+            "portrait"
+        };
+        if setup.landscape() != current.landscape()
+            || properties
+                .attr(&Ns::Style, "print-orientation")
+                .is_some_and(|o| o != orientation)
+        {
+            let name = properties.name_for(&Ns::Style, "print-orientation");
+            properties.set_attr(name, orientation);
+            changed = true;
+        }
+        if changed {
+            let styles = self
+                .document
+                .styles_part
+                .as_ref()
+                .ok_or(Refused::NotFound)?;
+            self.document.styles.reread(styles);
+        }
+        Ok(changed)
     }
 
     /// The document's first master page, which holds the body's page header

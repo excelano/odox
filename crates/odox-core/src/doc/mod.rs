@@ -24,7 +24,7 @@ pub use sheet::{
     DEFAULT_ROW_HEIGHT, Frozen, Merged, NumberFormat, Place, Recalculated, Restructure, Sheet,
     SheetDocument, Value,
 };
-pub use text::TextDocument;
+pub use text::{PageSetup, TextDocument};
 
 use crate::xml::{Element, Name, Ns};
 use crate::{Error, Meta, Package, Styles};

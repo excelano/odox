@@ -107,7 +107,9 @@ third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, and in `xodp` the marks. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
-last one adds a row. Undo puts the caret back where the edit was.
+last one adds a row. Format > Page setup… sets the paper, portrait or landscape
+and the margins, which is the width the page is drawn at and the pages an
+export makes. Undo puts the caret back where the edit was.
 
 `xods` draws the sheet as a grid with the document's own column widths and cell
 styles, text wrapped where a cell says so, one tab per sheet, and shows the
