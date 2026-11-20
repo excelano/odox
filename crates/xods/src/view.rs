@@ -1237,7 +1237,9 @@ impl SheetView {
             return;
         };
         let before = document.document.content.clone();
-        let date = jiff::ZonedDateTime::now().strftime("%Y-%m-%dT%H:%M:%S").to_string();
+        let date = jiff::ZonedDateTime::now()
+            .strftime("%Y-%m-%dT%H:%M:%S")
+            .to_string();
         match document.set_comment(
             self.sheet,
             row,
