@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.18.0"
+version = "0.18.1"
 
 [products.xodt.locales.en-us]
-whats-new = "A picture in a paragraph now stands where the paragraph's alignment puts it: at the left margin, unless the paragraph is centered or right-aligned. A superscript or subscript sits beside the text it belongs to, even on a line with larger text, at the size and height the document gives it, in the window and in an exported PDF, and its highlight moves with it. In the dark theme, highlighted text is drawn in a color that can be read on the highlight."
+whats-new = "A superscript or subscript now stands off the line again where the line also holds Hebrew or Arabic, and where it is the same size as the text around it. Exporting a right-to-left document with an empty paragraph to PDF no longer fails, and a right-to-left paragraph that ends with a line break keeps the empty line after it."
 
 [products.xodt.locales.de-de]
-whats-new = "Ein Bild in einem Absatz steht jetzt dort, wo die Ausrichtung des Absatzes es hinsetzt: am linken Rand, außer der Absatz ist zentriert oder rechtsbündig. Hoch- und tiefgestellter Text steht neben dem Text, zu dem er gehört, auch in einer Zeile mit größerer Schrift, und zwar in der Größe und Höhe, die das Dokument vorgibt, im Fenster wie im exportierten PDF; seine Hervorhebung wandert mit. Im dunklen Design erscheint hervorgehobener Text in einer Farbe, die sich auf der Hervorhebung lesen lässt."
+whats-new = "Hoch- und tiefgestellter Text steht wieder erhöht oder tiefer, auch in einer Zeile mit hebräischem oder arabischem Text und wenn er so groß ist wie der Text daneben. Der PDF-Export eines Dokuments von rechts nach links mit einem leeren Absatz schlägt nicht mehr fehl, und ein Absatz von rechts nach links, der mit einem Zeilenumbruch endet, behält die leere Zeile danach."
 
 [products.xods.locales.en-us]
-whats-new = "Superscript and subscript text in a cell is now drawn at the size the document gives it, in the window and in an exported PDF. In the dark theme, highlighted text is drawn in a color that can be read on the highlight."
+whats-new = "Superscript and subscript text in a cell now stands off the line again where the cell also holds Hebrew or Arabic, and where it is the same size as the text around it."
 
 [products.xods.locales.de-de]
-whats-new = "Hoch- und tiefgestellter Text in einer Zelle erscheint jetzt in der Größe, die das Dokument vorgibt, im Fenster wie im exportierten PDF. Im dunklen Design erscheint hervorgehobener Text in einer Farbe, die sich auf der Hervorhebung lesen lässt."
+whats-new = "Hoch- und tiefgestellter Text in einer Zelle steht wieder erhöht oder tiefer, auch wenn die Zelle hebräischen oder arabischen Text enthält und wenn er so groß ist wie der Text daneben."
 
 [products.xodp.locales.en-us]
-whats-new = "A superscript or subscript on a slide now sits beside the text it belongs to, at the size and height the document gives it, in the window and in an exported PDF, and its highlight moves with it. Highlighted text is drawn in a color that can be read on the highlight."
+whats-new = "A superscript or subscript on a slide now stands off the line again where the line also holds Hebrew or Arabic, and where it is the same size as the text around it."
 
 [products.xodp.locales.de-de]
-whats-new = "Hoch- und tiefgestellter Text auf einer Folie steht jetzt neben dem Text, zu dem er gehört, in der Größe und Höhe, die das Dokument vorgibt, im Fenster wie im exportierten PDF; seine Hervorhebung wandert mit. Hervorgehobener Text erscheint in einer Farbe, die sich auf der Hervorhebung lesen lässt."
+whats-new = "Hoch- und tiefgestellter Text auf einer Folie steht wieder erhöht oder tiefer, auch in einer Zeile mit hebräischem oder arabischem Text und wenn er so groß ist wie der Text daneben."
