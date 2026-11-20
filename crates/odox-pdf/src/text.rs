@@ -382,6 +382,7 @@ mod tests {
             family: String::new(),
             variant: odox_fonts::Variant::default(),
             size: 12.0,
+            base_size: 12.0,
             color: None,
             background: None,
             underline: false,

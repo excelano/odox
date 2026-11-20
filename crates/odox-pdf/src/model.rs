@@ -113,6 +113,9 @@ pub(crate) struct Style {
     pub variant: Variant,
     /// The size its glyphs are drawn at, after any raising.
     pub size: f32,
+    /// The size of the text it sits in, which its underline and its highlight
+    /// are drawn to: its own size where it is not raised.
+    pub base_size: f32,
     pub color: Option<Color>,
     pub background: Option<Color>,
     pub underline: bool,
@@ -677,6 +680,7 @@ pub(crate) fn style(properties: &TextProperties, size: f32, link: Option<usize>)
             italic: properties.italic.unwrap_or(false),
         },
         size: size * scale,
+        base_size: size,
         color: properties.color,
         background: properties.background,
         underline: properties.underline.unwrap_or(false),
