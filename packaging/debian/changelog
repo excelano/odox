@@ -1,3 +1,14 @@
+odox (0.18.0) unstable; urgency=low
+
+  * Highlighted text with no colour of its own is drawn in whichever ink stands out on the highlight
+  * A superscript's or subscript's highlight moves with it in the window, as tall as the text beside it
+  * In a PDF, an underline across a superscript or subscript stays on the line, and its highlight moves with it at the height of the text beside it
+  * A superscript or subscript is drawn at the size and offset its document states, in the window and the PDF
+  * A superscript or subscript stands off the baseline of the text it sits in, on a line with larger text too
+  * A picture in a paragraph stands where the paragraph's alignment puts its text
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 20 Nov 2026 00:11:05 -0600
+
 odox (0.17.0) unstable; urgency=low
 
   * The page's paper, orientation and margins are set from Format > Page setup
