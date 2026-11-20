@@ -92,7 +92,7 @@ winit = { version = "0.30.13", default-features = false, features = ["wayland-dl
 egui = { version = "0.37", default-features = false }
 # Defaults are `xdg-portal` and `wayland`, both pure Rust. The `gtk3` feature
 # links C through gtk-sys and stays off, which is what taking the defaults does.
-rfd = "0.17"
+rfd = "0.18"
 # Which of the machine's fonts a document's named family resolves to. Pure
 # Rust, and it memory-maps rather than reading: only the faces a document asks
 # for are ever loaded. DESIGN.md §6 says what the fallback chain is and why
