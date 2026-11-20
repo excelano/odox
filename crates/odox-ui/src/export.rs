@@ -222,23 +222,17 @@ impl Export {
         document: &D,
         source: Option<&Path>,
     ) {
-        let stem = source.and_then(Path::file_stem).map_or_else(
-            || t("Untitled").to_owned(),
-            |stem| stem.to_string_lossy().into_owned(),
-        );
+        let stem = stem(source);
         let mut dialog = rfd::FileDialog::new()
             .add_filter(t("PDF/UA document"), &["pdf"])
             .set_file_name(format!("{stem}.pdf"));
         if let Some(directory) = source.and_then(Path::parent) {
             dialog = dialog.set_directory(directory);
         }
-        let Some(mut target) = dialog.save_file() else {
+        let Some(target) = dialog.save_file() else {
             return;
         };
-        if target.extension().is_none() {
-            target.set_extension("pdf");
-        }
-        self.start(document, target, stem);
+        self.start(document, as_pdf(target), stem);
     }
 
     /// Make the PDF from a copy of the document and write it, on a thread of
@@ -268,6 +262,24 @@ impl Export {
         });
         self.running = Some(Running { file, worker });
     }
+}
+
+/// What the PDF is called and titled: the name of the file the document was
+/// read from, without its extension, or Untitled.
+fn stem(source: Option<&Path>) -> String {
+    source.and_then(Path::file_stem).map_or_else(
+        || t("Untitled").to_owned(),
+        |stem| stem.to_string_lossy().into_owned(),
+    )
+}
+
+/// The file chosen to write, with `.pdf` added where it was given no
+/// extension.
+fn as_pdf(mut target: PathBuf) -> PathBuf {
+    if target.extension().is_none() {
+        target.set_extension("pdf");
+    }
+    target
 }
 
 /// Where `office:body` is among the content root's children.
@@ -508,5 +520,113 @@ mod tests {
         assert!(describe(&mut document, &answers, &mut editing).is_err());
         assert_eq!(document.document.content, before);
         assert!(!editing.can_undo());
+    }
+
+    #[test]
+    fn the_pdf_is_named_after_the_document_and_given_its_extension() {
+        assert_eq!(
+            stem(Some(Path::new("/home/me/Report.final.odt"))),
+            "Report.final"
+        );
+        assert_eq!(stem(None), "Untitled");
+        assert_eq!(
+            as_pdf(PathBuf::from("/tmp/out")),
+            PathBuf::from("/tmp/out.pdf")
+        );
+        assert_eq!(
+            as_pdf(PathBuf::from("/tmp/out.PDF")),
+            PathBuf::from("/tmp/out.PDF")
+        );
+    }
+
+    #[test]
+    fn a_picture_is_answered_by_words_or_by_marking_it_decoration() {
+        assert!(!answer_with("", false).answered());
+        assert!(!answer_with("   ", false).answered());
+        assert!(answer_with("A chart", false).answered());
+        assert!(answer_with("", true).answered());
+    }
+
+    fn answer_with(text: &str, decorative: bool) -> Answer {
+        Answer {
+            path: Vec::new(),
+            href: None,
+            text: text.to_owned(),
+            decorative,
+        }
+    }
+
+    #[test]
+    fn a_refusal_is_told_in_words_that_say_what_stopped_it() {
+        let told = [
+            refused(&Refusal::Undescribed(vec![vec![0], vec![1]])),
+            refused(&Refusal::Font("Fancy Sans".to_owned())),
+            refused(&Refusal::Glyph('\u{1F600}')),
+            refused(&Refusal::Empty),
+            refused(&Refusal::Writer("no room".to_owned())),
+        ];
+        assert!(told[0].starts_with('2'), "{}", told[0]);
+        assert!(told[1].contains("Fancy Sans"));
+        assert!(told[2].contains('\u{1F600}'));
+        assert!(told[3].contains("nothing"));
+        assert!(told[4].contains("no room"));
+    }
+
+    /// One frame of the export, with the keys given pressed in it.
+    fn frame(export: &mut Export, document: &mut TextDocument, keys: &[Key]) {
+        let ctx = egui::Context::default();
+        let events = keys
+            .iter()
+            .map(|&key| egui::Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            })
+            .collect();
+        let input = egui::RawInput {
+            events,
+            ..egui::RawInput::default()
+        };
+        let mut editing = Editing::default();
+        ctx.run_ui(input, |ui| export.show(ui.ctx(), document, &mut editing))
+            .textures_delta
+            .clear();
+    }
+
+    #[test]
+    fn an_export_of_undescribed_pictures_asks_about_each_and_escape_puts_the_question_away() {
+        let mut document = fixture();
+        let chart = edit::figures(&document.document.content)[0].clone();
+        document
+            .document
+            .content
+            .at_mut(&chart)
+            .expect("the chart")
+            .children
+            .retain(|n| !matches!(n, odox_core::Node::Element(e) if e.is(&Ns::Svg, "title")));
+        let undescribed = document.undescribed().len();
+        assert_eq!(undescribed, 1, "the chart says nothing now");
+        let mut export = Export {
+            requested: Some(Request {
+                source: Some(PathBuf::from("/home/me/export.odt")),
+            }),
+            ..Export::default()
+        };
+        frame(&mut export, &mut document, &[]);
+        assert!(export.asking());
+        let question = export.asking.as_ref().expect("asked");
+        assert_eq!(question.answers.len(), undescribed);
+        assert!(question.answers.iter().all(|answer| answer.href.is_some()));
+        let body = body_index(&document.document.content).expect("a body");
+        for (answer, path) in question.answers.iter().zip(document.undescribed()) {
+            assert_eq!([vec![body], answer.path.clone()].concat(), path);
+        }
+
+        frame(&mut export, &mut document, &[Key::Escape]);
+        assert!(!export.asking());
+        assert!(export.running.is_none(), "nothing was exported");
+        assert_eq!(document.undescribed().len(), undescribed);
     }
 }
