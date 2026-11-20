@@ -1119,8 +1119,6 @@ fn reading_level(above: &mut Vec<u8>, own: u8) -> u8 {
     u8::try_from(above.len()).unwrap_or(u8::MAX)
 }
 
-/// The glyphs of a line in runs that are drawn together: the same run and the
-/// same face.
 /// A line's glyphs in the order they are drawn: the runs the bidirectional
 /// algorithm puts the line in, each run's glyphs turned round where it reads
 /// right to left, which is the order its shaper gave them.
