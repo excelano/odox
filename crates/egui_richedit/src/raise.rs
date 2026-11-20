@@ -28,8 +28,8 @@ struct Shift {
 /// with, or the same galley where nothing is raised. `rises` is
 /// [`crate::ParagraphJob::rises`] for the job the galley was laid out from. A
 /// raised glyph with nothing else on its row stays where egui put it, and so
-/// does every glyph of a galley whose glyphs do not follow its job's text one
-/// character to a glyph.
+/// does every glyph of a galley with a glyph that stands for none of its
+/// job's characters.
 ///
 /// A raised run's highlight is moved with it and made as tall as the
 /// highlight of the text it stands off. A row whose highlights egui did not
@@ -160,27 +160,42 @@ fn highlights(glyphs: &[Glyph], formats: &[&TextFormat]) -> Vec<Range<usize>> {
 }
 
 /// The section each glyph of the galley was laid out from, in the order of its
-/// rows, or nothing where the glyphs do not follow the job's text one
-/// character to a glyph.
+/// rows, or nothing where a glyph stands for no character its job has left to
+/// draw. Each glyph draws the next character it names that a section from
+/// the one before it on has not drawn yet, so that a word shaped right to
+/// left, whose glyphs come last character first, still draws its own. A glyph
+/// that takes no room and is not drawn, where its section has no such
+/// character left, is one of the glyphs egui adds to a cluster it shaped and
+/// belongs to that section too.
+#[allow(clippy::float_cmp)]
 fn glyph_sections(galley: &Galley) -> Option<Vec<usize>> {
     let job = &galley.job;
-    let mut characters = job
-        .text
-        .char_indices()
-        .filter(|&(_, character)| character != '\n');
+    let mut undrawn: Vec<Vec<char>> = job
+        .sections
+        .iter()
+        .map(|section| {
+            job.text[section.byte_range.as_usize()]
+                .chars()
+                .filter(|&character| character != '\n')
+                .collect()
+        })
+        .collect();
+    let mut current = 0;
     let mut sections = Vec::new();
-    for placed in &galley.rows {
-        for glyph in &placed.row.glyphs {
-            let (byte, character) = characters.next()?;
-            if character != glyph.chr {
-                return None;
-            }
-            sections.push(
-                job.sections
-                    .iter()
-                    .position(|section| section.byte_range.as_usize().contains(&byte))?,
-            );
+    for glyph in galley.rows.iter().flat_map(|placed| &placed.row.glyphs) {
+        let takes = |section: &Vec<char>| section.contains(&glyph.chr);
+        let added = glyph.advance_width == 0.0 && glyph.uv_rect.is_nothing();
+        if added && !undrawn.get(current).is_some_and(takes) {
+            sections.push(current);
+            continue;
         }
+        current += undrawn[current..].iter().position(takes)?;
+        let section = &mut undrawn[current];
+        let at = section
+            .iter()
+            .position(|&character| character == glyph.chr)?;
+        section.remove(at);
+        sections.push(current);
     }
-    characters.next().is_none().then_some(sections)
+    Some(sections)
 }
