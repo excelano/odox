@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.17.0"
+version = "0.18.0"
 
 [products.xodt.locales.en-us]
-whats-new = "Text can now be given a font and a size, and paragraphs aligned left, centered, right or justified. Insert a picture puts a PNG or JPEG into the document and asks what it shows, for someone who cannot see it. Format > Page setup sets the paper, portrait or landscape, and the margins."
+whats-new = "A picture in a paragraph now stands where the paragraph's alignment puts it: at the left margin, unless the paragraph is centered or right-aligned. A superscript or subscript sits beside the text it belongs to, even on a line with larger text, at the size and height the document gives it, in the window and in an exported PDF, and its highlight moves with it. In the dark theme, highlighted text is drawn in a color that can be read on the highlight."
 
 [products.xodt.locales.de-de]
-whats-new = "Text erhält jetzt eine Schriftart und eine Schriftgröße, Absätze lassen sich links, zentriert, rechts oder im Blocksatz ausrichten. Bild einfügen setzt ein PNG- oder JPEG-Bild ins Dokument und fragt, was es zeigt, für jemanden, der es nicht sehen kann. Format > Seite einrichten legt Papier, Hoch- oder Querformat und die Ränder fest."
+whats-new = "Ein Bild in einem Absatz steht jetzt dort, wo die Ausrichtung des Absatzes es hinsetzt: am linken Rand, außer der Absatz ist zentriert oder rechtsbündig. Hoch- und tiefgestellter Text steht neben dem Text, zu dem er gehört, auch in einer Zeile mit größerer Schrift, und zwar in der Größe und Höhe, die das Dokument vorgibt, im Fenster wie im exportierten PDF; seine Hervorhebung wandert mit. Im dunklen Design erscheint hervorgehobener Text in einer Farbe, die sich auf der Hervorhebung lesen lässt."
 
 [products.xods.locales.en-us]
-whats-new = "This release changes only Odox Text and Odox Deck. Odox Grid is the same as in 0.16.0."
+whats-new = "Superscript and subscript text in a cell is now drawn at the size the document gives it, in the window and in an exported PDF. In the dark theme, highlighted text is drawn in a color that can be read on the highlight."
 
 [products.xods.locales.de-de]
-whats-new = "Diese Version ändert nur Odox Text und Odox Deck. Odox Grid ist unverändert gegenüber 0.16.0."
+whats-new = "Hoch- und tiefgestellter Text in einer Zelle erscheint jetzt in der Größe, die das Dokument vorgibt, im Fenster wie im exportierten PDF. Im dunklen Design erscheint hervorgehobener Text in einer Farbe, die sich auf der Hervorhebung lesen lässt."
 
 [products.xodp.locales.en-us]
-whats-new = "The text on a slide can now be given a font and a size and aligned left, centered, right or justified. The text in a turned shape can now be edited where it is drawn."
+whats-new = "A superscript or subscript on a slide now sits beside the text it belongs to, at the size and height the document gives it, in the window and in an exported PDF, and its highlight moves with it. Highlighted text is drawn in a color that can be read on the highlight."
 
 [products.xodp.locales.de-de]
-whats-new = "Der Text auf einer Folie erhält jetzt eine Schriftart und eine Schriftgröße und lässt sich links, zentriert, rechts oder im Blocksatz ausrichten. Der Text in einer gedrehten Form lässt sich jetzt dort bearbeiten, wo er steht."
+whats-new = "Hoch- und tiefgestellter Text auf einer Folie steht jetzt neben dem Text, zu dem er gehört, in der Größe und Höhe, die das Dokument vorgibt, im Fenster wie im exportierten PDF; seine Hervorhebung wandert mit. Hervorgehobener Text erscheint in einer Farbe, die sich auf der Hervorhebung lesen lässt."
