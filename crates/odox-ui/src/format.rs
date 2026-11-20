@@ -158,6 +158,7 @@ pub fn text_format(
 
     let scale = properties.position.map_or(1.0, |position| position.scale);
 
+    let palette = highlighted(properties, palette);
     let color = properties
         .color
         .map_or(palette.ink, |color| ink_or(color, palette));
@@ -197,12 +198,19 @@ pub fn link_format(
     palette: Palette,
 ) -> TextFormat {
     let mut format = text_format(properties, inherited, zoom, palette);
-    format.color = palette.link;
+    format.color = highlighted(properties, palette).link;
     // The underline keeps the width the document asked for, if any, but its
     // colour follows the text it underlines rather than whatever colour that
     // text used to be.
     format.underline = Stroke::new(format.underline.width.max(1.0), format.color);
     format
+}
+
+/// The palette for a run over its own highlight, where it has one.
+fn highlighted(properties: &TextProperties, palette: Palette) -> Palette {
+    properties
+        .background
+        .map_or(palette, |fill| palette.on(color32(fill)))
 }
 
 /// The size in points a run is drawn at, for handing to whatever it contains.
@@ -257,6 +265,29 @@ pub fn match_fill(current: bool) -> Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uncoloured_text_on_a_highlight_is_drawn_in_the_ink_that_stands_out_on_it() {
+        let dark = Palette::for_theme(true);
+        let highlighted = TextProperties {
+            background: Some(Color {
+                r: 0xff,
+                g: 0xff,
+                b: 0x00,
+            }),
+            ..TextProperties::default()
+        };
+        let black = Palette::for_theme(false).ink;
+        assert_eq!(text_format(&highlighted, 12.0, 1.0, dark).color, black);
+        assert_eq!(
+            text_format(&TextProperties::default(), 12.0, 1.0, dark).color,
+            dark.ink
+        );
+        assert_eq!(
+            link_format(&highlighted, 12.0, 1.0, dark).color,
+            Palette::for_theme(false).link
+        );
+    }
 
     /// `LibreOffice`'s own "Internet Link" style, which every hyperlink this
     /// file draws is at least as likely to carry as no colour at all.
