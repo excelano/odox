@@ -15,7 +15,8 @@ application keeps both, and the crate asks it for two things:
   `ParagraphJob`. Most text is appended with `text`. Anything drawn differently
   from what your document holds (a tab drawn as spaces, a footnote citation your
   document does not count as text, a field showing its value) is appended with
-  `atom`, and the caret steps over it whole.
+  `atom`, and the caret steps over it whole. A run that stands off the baseline,
+  as a superscript does, is appended after `set_rise`.
 - **An implementation of `Model`** over your document: a paragraph's text, the
   paragraphs before and after it, and applying an `Edit` (replace a range, which
   may span a paragraph break, or split a paragraph). The editor tells the model
@@ -32,7 +33,9 @@ that follows already shows what was typed. Then, for every editable paragraph in
 document order, whether or not it is on screen:
 
 1. Build its `ParagraphJob`.
-2. Lay it out with egui.
+2. Lay it out with egui, and pass the galley and the job's `rises` to `raise`,
+   which moves each raised glyph off the baseline of the text beside it. egui
+   itself places a run only against the top or the bottom of its row.
 3. Allocate a response that senses clicks and drags.
 4. Hand the galley, the job's offset map and where you placed it to
    `RichEdit::paragraph`, which paints the paragraph.

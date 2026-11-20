@@ -21,8 +21,6 @@ use odox_fonts::Variant;
 
 /// The size text is drawn at where a document names none, as in the window.
 pub(crate) const DEFAULT_SIZE: f32 = 12.0;
-/// How large a superscript or subscript is, as a proportion of its run.
-pub(crate) const SCRIPT_SCALE: f32 = 0.58;
 /// How large a footnote's citation is, as a proportion of its run.
 const CITATION_SCALE: f32 = 0.7;
 const TAB_DISTANCE: f32 = 1.25 / 2.54 * 72.0;
@@ -388,7 +386,7 @@ impl Reader<'_> {
                         if let Some(citation) = element.child(&Ns::Text, "note-citation") {
                             let mut raised = current.clone();
                             raised.size = size * CITATION_SCALE;
-                            raised.rise = size * 0.33;
+                            raised.rise = size * Position::SUPER.rise;
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
@@ -669,11 +667,9 @@ pub(crate) fn size_of(properties: &TextProperties, inherited: f32) -> f32 {
 }
 
 pub(crate) fn style(properties: &TextProperties, size: f32, link: Option<usize>) -> Style {
-    let (scale, rise) = match properties.position {
-        Some(Position::Super) => (SCRIPT_SCALE, size * 0.33),
-        Some(Position::Sub) => (SCRIPT_SCALE, -size * 0.08),
-        _ => (1.0, 0.0),
-    };
+    let (scale, rise) = properties.position.map_or((1.0, 0.0), |position| {
+        (position.scale, size * position.rise)
+    });
     Style {
         family: properties.font_family.clone().unwrap_or_default(),
         variant: Variant {

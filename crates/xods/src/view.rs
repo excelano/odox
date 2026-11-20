@@ -314,7 +314,7 @@ impl Paint<'_> {
                 job.halign = align;
             }
             if odox_core::bidi::needed(&job.text, right_to_left) {
-                return odox_ui::flow::in_visual_order(ui, &job, right_to_left);
+                return odox_ui::flow::in_visual_order(ui, &job, &[], right_to_left);
             }
             ui.fonts_mut(|fonts| fonts.layout_job(job))
         };
