@@ -12,6 +12,7 @@
   <text:p text:style-name="Standard">3. English then עברית אחת שתיים then English 123</text:p>
   <text:p text:style-name="RTL">4. שלום עולם, abc def, מה שלומך 2024</text:p>
   <text:p text:style-name="RTL">5. مرحبا <text:span text:style-name="B">بالعالم</text:span> كيف حالك</text:p>
+  <text:p text:style-name="RTL"/>
   <text:p text:style-name="RTL">7. זהו משפט ארוך בעברית שמכיל גם מילים באנגלית like this one ועוד מספרים 12345 ונמשך הלאה כדי לעבור לשורה הבאה ועוד קצת טקסט כדי שהשורה תישבר פעמיים לפחות בתוך העמוד</text:p>
   <text:p text:style-name="Standard">8. Here is a long English paragraph with a Hebrew phrase שלום עולם מה שלומך היום in the middle and it keeps going so that it wraps onto a second line and maybe a third.</text:p>
   <text:p text:style-name="RTL">6. Left to right words in a right to left paragraph.</text:p>
