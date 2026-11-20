@@ -1570,7 +1570,8 @@ pub fn in_visual_order(
 
 /// Where a paragraph's lines break, as the bytes of each: after a space,
 /// where the next word no longer fits the width the paragraph wraps to, and at
-/// each line break written in it. A word wider than the line has one to itself.
+/// each line break written in it, the last of which leaves an empty line where
+/// it ends the paragraph. A word wider than the line has one to itself.
 fn lines(ui: &Ui, written: &LayoutJob) -> Vec<std::ops::Range<usize>> {
     let text = written.text.as_str();
     let width = |range: std::ops::Range<usize>| {
@@ -1614,6 +1615,9 @@ fn lines(ui: &Ui, written: &LayoutJob) -> Vec<std::ops::Range<usize>> {
         }
         lines.push(line..body.end);
         start = end;
+    }
+    if text.ends_with('\n') {
+        lines.push(text.len()..text.len());
     }
     lines
 }
@@ -1694,9 +1698,19 @@ fn section(job: &mut LayoutJob, text: &str, format: TextFormat) {
 mod tests {
     use std::path::Path;
 
-    use super::{Flow, Pictures};
+    use eframe::egui::text::{CCursor, LayoutJob};
+    use eframe::egui::{Color32, ColorImage, Context, RawInput, TextFormat, Ui};
+    use egui_richedit::ParagraphJob;
+    use odox_core::{
+        Document, Element, Family, Length, Offset, ParagraphProperties, TabKind, TabStop, Tiling,
+        edit, media_type,
+    };
+
+    use super::{
+        Flow, Pictures, append, decode, holds_place, in_visual_order, laid, lines, pieces,
+        place_tabs,
+    };
     use crate::format::{self, DEFAULT_SIZE};
-    use odox_core::{Document, Element, Family, edit, media_type};
 
     const ANY: &[&str] = &[
         media_type::TEXT,
@@ -1760,5 +1774,309 @@ mod tests {
             }
         }
         assert!(checked > 0);
+    }
+
+    /// What a closure answers, given a `Ui` in a frame with no window.
+    fn in_frame<R>(body: impl FnOnce(&mut Ui) -> R) -> R {
+        let ctx = Context::default();
+        let mut body = Some(body);
+        let mut answer = None;
+        let mut output = ctx.run_ui(RawInput::default(), |ui| {
+            answer = body.take().map(|body| body(ui));
+        });
+        output.textures_delta.clear();
+        answer.expect("the frame ran")
+    }
+
+    /// A paragraph's text in one format, wrapped at `width`.
+    fn written(text: &str, width: f32) -> LayoutJob {
+        let mut job = LayoutJob::default();
+        job.wrap.max_width = width;
+        job.append(text, 0.0, TextFormat::default());
+        job
+    }
+
+    /// Each row of a galley as it reads on screen, from left to right, without
+    /// the empty glyphs egui adds to a cluster it shaped.
+    fn rows_on_screen(galley: &eframe::egui::Galley) -> Vec<String> {
+        galley
+            .rows
+            .iter()
+            .map(|placed| {
+                let mut glyphs: Vec<_> = placed
+                    .row
+                    .glyphs
+                    .iter()
+                    .filter(|glyph| glyph.advance_width > 0.0 || !glyph.uv_rect.is_nothing())
+                    .collect();
+                glyphs.sort_by(|a, b| a.pos.x.total_cmp(&b.pos.x));
+                glyphs.iter().map(|glyph| glyph.chr).collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_stretch_read_right_to_left_is_cut_into_its_words_and_what_is_between_them() {
+        let text = "שלום, עולם!";
+        let cut: Vec<&str> = pieces(text, 0..text.len())
+            .into_iter()
+            .map(|piece| &text[piece])
+            .collect();
+        assert_eq!(cut, ["שלום", ", ", "עולם", "!"]);
+        let pointed = "שָׁלוֹם עוֹלָם";
+        assert_eq!(pieces(pointed, 0..pointed.len()).len(), 3);
+    }
+
+    #[test]
+    fn what_is_turned_round_is_written_backwards_with_its_brackets_facing_the_other_way() {
+        let mut source = LayoutJob::default();
+        source.append("(ab", 0.0, TextFormat::default());
+        source.append(
+            "c)",
+            0.0,
+            TextFormat {
+                italics: true,
+                ..TextFormat::default()
+            },
+        );
+        let (mut job, mut rises) = (LayoutJob::default(), Vec::new());
+        append(&mut job, &mut rises, &source, &[0.0, 3.0], 0..5, true);
+        assert_eq!(job.text, "(cba)");
+        assert_eq!(rises, [3.0, 0.0]);
+        assert!(job.sections[0].format.italics);
+
+        let hebrew = written("שלום", f32::INFINITY);
+        let (mut job, mut rises) = (LayoutJob::default(), Vec::new());
+        append(
+            &mut job,
+            &mut rises,
+            &hebrew,
+            &[],
+            0..hebrew.text.len(),
+            true,
+        );
+        assert_eq!(job.text, "שלום", "a word is left for the shaper to turn");
+        assert_eq!(rises, [0.0]);
+    }
+
+    #[test]
+    fn a_line_break_starts_a_line_and_one_that_ends_the_paragraph_leaves_an_empty_one() {
+        let lines_of = |text: &str| in_frame(|ui| lines(ui, &written(text, f32::INFINITY)));
+        assert_eq!(lines_of("one\ntwo"), [0..3, 4..7]);
+        assert_eq!(lines_of("one\n"), [0..3, 4..4]);
+        assert_eq!(lines_of("one"), vec![0..3]);
+    }
+
+    #[test]
+    fn a_line_breaks_after_the_last_word_that_fits_without_its_trailing_space() {
+        let text = "aaaa bbbb cccc dddd";
+        let width = in_frame(|ui| {
+            ui.ctx()
+                .fonts_mut(|fonts| fonts.layout_job(written("aaaa bbbb", f32::INFINITY)))
+                .rect
+                .width()
+        });
+        let broken = in_frame(|ui| lines(ui, &written(text, width + 1.0)));
+        assert_eq!(broken, [0..9, 10..19]);
+        let word = in_frame(|ui| lines(ui, &written("aaaaaaaa b", 1.0)));
+        assert_eq!(word, [0..8, 9..10], "a word wider than the line keeps one");
+    }
+
+    #[test]
+    fn a_mixed_line_is_drawn_in_the_order_it_reads() {
+        let galley = in_frame(|ui| in_visual_order(ui, &written("ab שלום cd", 600.0), &[], false));
+        assert_eq!(rows_on_screen(&galley), ["ab םולש cd"]);
+        let galley = in_frame(|ui| in_visual_order(ui, &written("שלום abc def", 600.0), &[], true));
+        assert_eq!(rows_on_screen(&galley), ["abc def םולש"]);
+    }
+
+    #[test]
+    fn a_bracket_in_a_right_to_left_line_still_faces_what_it_holds() {
+        let galley = in_frame(|ui| in_visual_order(ui, &written("א (ב)", 600.0), &[], true));
+        assert_eq!(rows_on_screen(&galley), ["(ב) א"]);
+    }
+
+    #[test]
+    fn a_right_to_left_paragraph_wraps_within_its_width_and_keeps_its_line_breaks() {
+        let text = "שלום עולם מה שלומך היום שלום עולם מה שלומך";
+        let galley = in_frame(|ui| in_visual_order(ui, &written(text, 120.0), &[], true));
+        assert!(galley.rows.len() > 2, "{} rows", galley.rows.len());
+        for placed in &galley.rows {
+            assert!(placed.rect().width() <= 121.0, "{:?}", placed.rect());
+        }
+        let galley = in_frame(|ui| in_visual_order(ui, &written("שלום\n", 600.0), &[], true));
+        assert_eq!(rows_on_screen(&galley), ["םולש", ""]);
+    }
+
+    #[test]
+    fn an_internal_link_finds_a_bookmark_inside_a_paragraph_or_a_heading_by_its_text() {
+        let content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text>
+            <text:h text:outline-level="1"> Results </text:h>
+            <text:p>Results</text:p>
+            <text:p>See <text:span><text:bookmark-start text:name="here"/>this</text:span><text:bookmark-end text:name="here"/></text:p>
+            <text:p><text:bookmark text:name="there"/>That</text:p>
+            </office:text></office:body></office:document-content>"#,
+            "content.xml",
+        )
+        .expect("it parses");
+        let blocks: Vec<&Element> = content.at(&[0, 0]).expect("the text").elements().collect();
+        let holds = |place: &str| -> Vec<bool> {
+            blocks
+                .iter()
+                .map(|block| holds_place(block, place))
+                .collect()
+        };
+        assert_eq!(holds("Results|outline"), [true, false, false, false]);
+        assert_eq!(holds("here"), [false, false, true, false]);
+        assert_eq!(holds("there"), [false, false, false, true]);
+        assert_eq!(holds("nowhere"), [false; 4]);
+    }
+
+    /// A paragraph of `before`, a tab and `after`, its tab placed by the
+    /// stops given: where each character after the tab starts, and the
+    /// leaders the tab leaves.
+    fn tabbed(before: &str, after: &str, stops: Vec<TabStop>) -> (Vec<f32>, Vec<super::Leader>) {
+        in_frame(|ui| {
+            let mut job = ParagraphJob::new(LayoutJob::default());
+            job.text(before, TextFormat::default());
+            job.tab(TextFormat::default());
+            job.text(after, TextFormat::default());
+            let paragraph = ParagraphProperties {
+                tab_stops: (!stops.is_empty()).then_some(stops),
+                ..ParagraphProperties::default()
+            };
+            let leaders = place_tabs(ui, &mut job, &paragraph, 0.0, 1.0);
+            let galley = ui
+                .ctx()
+                .fonts_mut(|fonts| fonts.layout_job(job.layout_job().clone()));
+            let first = before.chars().count() + 1;
+            let edges = (first..=first + after.chars().count())
+                .map(|index| galley.pos_from_cursor(CCursor::new(index)).min.x)
+                .collect();
+            (edges, leaders)
+        })
+    }
+
+    fn stop(at: f32, kind: TabKind, leader: Option<char>) -> TabStop {
+        TabStop {
+            position: Length(at),
+            kind,
+            leader,
+        }
+    }
+
+    fn near(a: f32, b: f32) -> bool {
+        (a - b).abs() < 0.5
+    }
+
+    #[test]
+    fn a_tab_with_no_stops_reaches_the_next_default_one() {
+        let (edges, leaders) = tabbed("a", "b", Vec::new());
+        assert!(near(edges[0], super::TAB_DISTANCE), "{edges:?}");
+        assert!(leaders.is_empty());
+        let (edges, _) = tabbed("a long run of words", "b", Vec::new());
+        let reached = edges[0] / super::TAB_DISTANCE;
+        assert!(near(reached, reached.round()) && reached > 1.5, "{edges:?}");
+    }
+
+    #[test]
+    fn the_text_after_a_tab_starts_ends_or_centres_on_its_stop() {
+        let (left, _) = tabbed("a", "bc", vec![stop(100.0, TabKind::Left, None)]);
+        assert!(near(left[0], 100.0), "{left:?}");
+        let (right, _) = tabbed("a", "bc", vec![stop(100.0, TabKind::Right, None)]);
+        assert!(near(right[2], 100.0), "{right:?}");
+        let (centre, _) = tabbed("a", "bc", vec![stop(100.0, TabKind::Center, None)]);
+        assert!(near(centre[0].midpoint(centre[2]), 100.0), "{centre:?}");
+    }
+
+    #[test]
+    fn a_decimal_tab_puts_the_decimal_mark_on_its_stop() {
+        let (edges, _) = tabbed("a", "123.45", vec![stop(100.0, TabKind::Char('.'), None)]);
+        assert!(near(edges[3], 100.0), "{edges:?}");
+        let (whole, _) = tabbed("a", "12", vec![stop(100.0, TabKind::Char('.'), None)]);
+        assert!(
+            near(whole[2], 100.0),
+            "a number with no mark ends there: {whole:?}"
+        );
+    }
+
+    #[test]
+    fn a_tab_reaches_the_first_stop_past_where_it_stands_and_fills_the_gap_with_its_leader() {
+        let stops = vec![
+            stop(2.0, TabKind::Left, None),
+            stop(120.0, TabKind::Left, Some('.')),
+        ];
+        let (edges, leaders) = tabbed("words", "b", stops);
+        assert!(near(edges[0], 120.0), "{edges:?}");
+        assert_eq!(leaders.len(), 1);
+        assert_eq!(leaders[0].fill, '.');
+        assert!(near(leaders[0].to, 120.0) && leaders[0].from < leaders[0].to);
+    }
+
+    fn picture(width: usize, height: usize) -> ColorImage {
+        let mut image = ColorImage::filled([width, height], Color32::BLACK);
+        for (index, pixel) in image.pixels.iter_mut().enumerate() {
+            #[allow(clippy::cast_possible_truncation)]
+            let shade = (index + 1) as u8;
+            *pixel = Color32::from_rgb(shade, 0, 0);
+        }
+        image
+    }
+
+    fn tiling(repeat: bool, offset: Option<Offset>) -> Tiling {
+        Tiling {
+            repeat,
+            width: None,
+            height: None,
+            anchor: (0.5, 0.5),
+            shift: (0.0, 0.0),
+            offset,
+        }
+    }
+
+    #[test]
+    fn a_picture_placed_once_is_held_inside_a_clear_border() {
+        let (framed, _) = laid(&picture(2, 1), &tiling(false, None));
+        assert_eq!(framed.size, [4, 3]);
+        let clear = framed
+            .pixels
+            .iter()
+            .filter(|&&p| p == Color32::TRANSPARENT)
+            .count();
+        assert_eq!(clear, 10);
+        assert_eq!(framed.pixels[5..7], picture(2, 1).pixels[..]);
+    }
+
+    #[test]
+    fn a_tile_with_moved_rows_or_columns_carries_a_second_one_moved() {
+        let image = picture(4, 1);
+        let (tile, _) = laid(&image, &tiling(true, Some(Offset::Rows(0.25))));
+        assert_eq!(tile.size, [4, 2]);
+        assert_eq!(tile.pixels[..4], image.pixels[..]);
+        let moved: Vec<Color32> = [3, 0, 1, 2].iter().map(|&i| image.pixels[i]).collect();
+        assert_eq!(tile.pixels[4..], moved[..]);
+
+        let image = picture(1, 4);
+        let (tile, _) = laid(&image, &tiling(true, Some(Offset::Columns(-0.25))));
+        assert_eq!(tile.size, [2, 4]);
+        let second: Vec<Color32> = (0..4).map(|y| tile.pixels[y * 2 + 1]).collect();
+        let moved: Vec<Color32> = [1, 2, 3, 0].iter().map(|&i| image.pixels[i]).collect();
+        assert_eq!(second, moved);
+
+        let (plain, _) = laid(&image, &tiling(true, None));
+        assert_eq!(plain, image);
+    }
+
+    #[test]
+    fn a_picture_decodes_from_its_bytes_and_anything_else_does_not() {
+        let mut png = Vec::new();
+        image::RgbaImage::from_pixel(3, 2, image::Rgba([10, 20, 30, 255]))
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .expect("it encodes");
+        let decoded = decode(&png).expect("it decodes");
+        assert_eq!(decoded.size, [3, 2]);
+        assert_eq!(decoded.pixels[0], Color32::from_rgb(10, 20, 30));
+        assert!(decode(b"not a picture").is_none());
     }
 }
