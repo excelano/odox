@@ -554,22 +554,22 @@ impl<'a> Layout<'a> {
                         .or_insert_with(|| self.tree.group(Some(node), Tag::Link)),
                     None => node,
                 };
+                let line_y = baseline - style.rise;
                 if let Some(fill) = style.background {
                     decorations.push(Item::Rect {
                         x: pen,
-                        y: baseline - style.size,
+                        y: line_y - style.base_size,
                         width: advance,
-                        height: style.size * 1.2,
+                        height: style.base_size * 1.2,
                         color: fill,
                     });
                 }
-                let line_y = baseline - style.rise;
-                let stroke = (style.size * 0.06).max(0.5);
                 if style.underline || link.is_some() {
+                    let under = baseline + style.base_size * 0.12;
                     piece.items.push(Item::Rule {
-                        from: (pen, line_y + style.size * 0.12),
-                        to: (pen + advance, line_y + style.size * 0.12),
-                        width: stroke,
+                        from: (pen, under),
+                        to: (pen + advance, under),
+                        width: (style.base_size * 0.06).max(0.5),
                         color,
                     });
                 }
@@ -577,7 +577,7 @@ impl<'a> Layout<'a> {
                     piece.items.push(Item::Rule {
                         from: (pen, line_y - style.size * 0.3),
                         to: (pen + advance, line_y - style.size * 0.3),
-                        width: stroke,
+                        width: (style.size * 0.06).max(0.5),
                         color,
                     });
                 }
