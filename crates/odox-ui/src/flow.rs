@@ -20,8 +20,8 @@ use eframe::egui::emath::TSTransform;
 use eframe::egui::text_selection::accesskit_text::update_accesskit_for_text_widget;
 use eframe::egui::{
     Align, Align2, Color32, ColorImage, Context, CursorIcon, Galley, Pos2, Rect, Response, Role,
-    Sense, Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, Vec2, WidgetInfo,
-    pos2,
+    Sense, Stroke, StrokeKind, TextFormat, TextureHandle, TextureOptions, Ui, UiBuilder, Vec2,
+    WidgetInfo, pos2,
     text::{CCursor, CCursorRange, LayoutJob},
     text_selection::{LabelSelectionState, visuals::paint_text_selection},
     vec2,
@@ -630,12 +630,45 @@ impl Flow<'_> {
         let was_detached = self.detached;
         self.detached = true;
         for frame in frames {
-            self.frame(ui, &frame, body_width);
+            let start = rect.left() + left;
+            self.anchored_frame(ui, &frame, start, body_width, indent, &properties);
         }
         self.detached = was_detached;
         if after > 0.0 {
             ui.add_space(after);
         }
+    }
+
+    /// A frame anchored in a paragraph whose text starts at `start`: as a
+    /// character, where the paragraph's alignment puts its text; otherwise at
+    /// the paragraph's start, which is `LibreOffice`'s `from-left` default, as
+    /// `style:horizontal-pos` is not read.
+    fn anchored_frame(
+        &mut self,
+        ui: &mut Ui,
+        frame: &Element,
+        start: f32,
+        body_width: f32,
+        indent: f32,
+        properties: &Properties,
+    ) {
+        let (x, span, align) = if frame.attr(&Ns::Text, "anchor-type") == Some("as-char") {
+            let first_line = indent.max(0.0);
+            (
+                start + first_line,
+                (body_width - first_line).max(1.0),
+                halign(properties.paragraph.align),
+            )
+        } else {
+            (start, body_width, Align::Min)
+        };
+        let place = Rect::from_min_size(pos2(x, ui.cursor().top()), vec2(span, f32::INFINITY));
+        ui.scope_builder(
+            UiBuilder::new()
+                .max_rect(place)
+                .layout(eframe::egui::Layout::top_down(align)),
+            |ui| self.frame(ui, frame, span),
+        );
     }
 
     /// Draw a paragraph laid out in the order it is written, through the page
@@ -704,11 +737,7 @@ impl Flow<'_> {
                 max_width: wrap,
                 ..Default::default()
             },
-            halign: match properties.paragraph.align.unwrap_or(TextAlign::Start) {
-                TextAlign::Center => Align::Center,
-                TextAlign::End => Align::Max,
-                _ => Align::Min,
-            },
+            halign: halign(properties.paragraph.align),
             justify: properties.paragraph.align == Some(TextAlign::Justify),
             ..LayoutJob::default()
         };
@@ -1174,6 +1203,15 @@ fn rise_of(properties: &TextProperties, size: f32, zoom: f32) -> f32 {
     properties
         .position
         .map_or(0.0, |position| position.rise * size * zoom)
+}
+
+/// Where a paragraph's alignment puts what it holds across a line.
+fn halign(align: Option<TextAlign>) -> Align {
+    match align.unwrap_or(TextAlign::Start) {
+        TextAlign::Center => Align::Center,
+        TextAlign::End => Align::Max,
+        _ => Align::Min,
+    }
 }
 
 /// Which edge of a cell a border belongs to.
