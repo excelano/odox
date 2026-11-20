@@ -31,10 +31,12 @@ verified by looking at it, on X11 here because the capture tool cannot see
 Wayland: `env -u WAYLAND_DISPLAY DISPLAY=:0 cargo run -p xodt -- <file> &`, then
 `import -window <id>`. A window driven with `xdotool` runs on a nested server,
 since keystrokes sent to `:0` have landed in other windows: `Xephyr :7 -screen
-1280x800 -ac &`, then `env -u WAYLAND_DISPLAY -u XDG_CURRENT_DESKTOP DISPLAY=:7
-dbus-run-session -- <binary> <file> &` and `DISPLAY=:7 xdotool` (`windowfocus`,
-find the window by `--pid`). The private bus with the environment set outside
-it keeps rfd's file dialog inside Xephyr instead of on the real desktop; kill
+1280x800 -ac &`, then `env -u WAYLAND_DISPLAY -u XDG_CURRENT_DESKTOP
+GDK_BACKEND=x11 DISPLAY=:7 dbus-run-session -- <binary> <file> &` and
+`DISPLAY=:7 xdotool` (`windowfocus`, find the window by `--pid`). The private
+bus with the environment set outside it keeps rfd's file dialog inside Xephyr
+instead of on the real desktop; `GDK_BACKEND=x11` is part of that, because the
+portal's GTK otherwise finds the default `wayland-0` socket on its own. Kill
 the portal processes it started when done. Xephyr has no window manager, so
 Fullscreen does nothing. A fake `BROWSER=<script>` records what a link click
 opens without opening it. The binary is `~/.cache/cargo-target/debug/<app>`,
