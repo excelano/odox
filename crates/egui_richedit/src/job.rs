@@ -7,7 +7,8 @@
 use std::ops::Range;
 
 use egui::TextFormat;
-use egui::text::LayoutJob;
+use egui::epaint::text::ByteIndex;
+use egui::text::{LayoutJob, LayoutSection};
 
 /// A paragraph's text as it is drawn, built piece by piece so that every
 /// drawn character is known to stand for some part of the model's text.
@@ -60,7 +61,22 @@ impl ParagraphJob {
         &self.rises
     }
 
-    fn appended(&mut self) {
+    /// Append to the job as [`LayoutJob::append`] does, except that text
+    /// raised differently from the section before it starts a section of its
+    /// own even where the two share a format.
+    #[allow(clippy::float_cmp)]
+    fn append(&mut self, text: &str, leading_space: f32, format: TextFormat) {
+        if self.rises.last().is_some_and(|&last| last != self.rise) {
+            let start = ByteIndex(self.job.text.len());
+            self.job.text += text;
+            self.job.sections.push(LayoutSection {
+                leading_space,
+                byte_range: start..ByteIndex(self.job.text.len()),
+                format,
+            });
+        } else {
+            self.job.append(text, leading_space, format);
+        }
         self.rises.resize(self.job.sections.len(), self.rise);
     }
 
@@ -71,8 +87,7 @@ impl ParagraphJob {
         if len == 0 {
             return;
         }
-        self.job.append(text, 0.0, format);
-        self.appended();
+        self.append(text, 0.0, format);
         self.map.push(len, len, false);
     }
 
@@ -86,8 +101,7 @@ impl ParagraphJob {
             return;
         }
         if shown_len > 0 {
-            self.job.append(shown, 0.0, format);
-            self.appended();
+            self.append(shown, 0.0, format);
         }
         self.map.push(shown_len, model_len, true);
     }
@@ -98,9 +112,8 @@ impl ParagraphJob {
     pub fn tab(&mut self, format: TextFormat) {
         let start = self.job.text.chars().count();
         let room = format.font_id.size * 0.75;
-        self.job.append(" ", 0.0, format.clone());
-        self.job.append("", room, format);
-        self.appended();
+        self.append(" ", 0.0, format.clone());
+        self.append("", room, format);
         self.tabs.push((self.job.sections.len() - 1, start));
         self.map.push(1, 1, true);
     }
