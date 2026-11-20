@@ -16,10 +16,16 @@ pub const DEFAULT_SIZE: f32 = 12.0;
 
 /// How a superscript or subscript is drawn, as a proportion of the run's size.
 ///
-/// ODF writes the offset and the scale per run, and honouring them exactly would
-/// mean placing a glyph at a baseline offset egui's text layout does not offer.
+/// ODF writes the offset and the scale per run, and only the direction is read.
 /// This is the proportion every office application uses by default.
 const SCRIPT_SCALE: f32 = 0.58;
+
+/// The `valign` a superscript is laid out with, by which
+/// [`crate::scripts::place`] finds it to move it off its text's baseline.
+pub const SUPERSCRIPT: Align = Align::TOP;
+
+/// The same, for a subscript.
+pub const SUBSCRIPT: Align = Align::Center;
 
 /// The colours a document is drawn in where the document itself does not say.
 ///
@@ -164,8 +170,8 @@ pub fn text_format(
     };
 
     let (scale, valign) = match properties.position {
-        Some(Position::Super) => (SCRIPT_SCALE, Align::TOP),
-        Some(Position::Sub) => (SCRIPT_SCALE, Align::BOTTOM),
+        Some(Position::Super) => (SCRIPT_SCALE, SUPERSCRIPT),
+        Some(Position::Sub) => (SCRIPT_SCALE, SUBSCRIPT),
         _ => (1.0, Align::BOTTOM),
     };
 

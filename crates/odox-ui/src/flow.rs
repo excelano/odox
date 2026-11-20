@@ -40,6 +40,7 @@ use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
 use crate::i18n::t;
 use crate::links;
+use crate::scripts;
 
 /// Pictures already decoded, kept for as long as the document is open.
 ///
@@ -540,7 +541,7 @@ impl Flow<'_> {
 
         let right_to_left = properties.paragraph.right_to_left == Some(true);
         let written = bidi::needed(&job.text, right_to_left).then(|| job.clone());
-        let galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(job));
+        let galley = scripts::place(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)));
         // A paragraph with text that reads right to left is drawn from a
         // second layout, each of its lines in the order it reads, which egui
         // does not do; what is drawn then no longer lines up with what is
@@ -826,7 +827,7 @@ impl Flow<'_> {
                         if let Some(citation) = element.child(&Ns::Text, "note-citation") {
                             let mut raised = format.clone();
                             raised.font_id.size *= 0.7;
-                            raised.valign = Align::TOP;
+                            raised.valign = format::SUPERSCRIPT;
                             job.atom(&citation.plain_text(), 0, raised);
                         }
                     } else if element.is(&Ns::Text, "ruby-text") {
@@ -1495,7 +1496,7 @@ pub fn in_visual_order(ui: &Ui, written: &LayoutJob, right_to_left: bool) -> Arc
     if let (Some(lead), Some(first)) = (written.sections.first(), job.sections.first_mut()) {
         first.leading_space = lead.leading_space;
     }
-    ui.ctx().fonts_mut(|fonts| fonts.layout_job(job))
+    scripts::place(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)))
 }
 
 /// Where a paragraph's lines break, as the bytes of each: after a space,
