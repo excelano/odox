@@ -40,7 +40,6 @@ use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
 use crate::i18n::t;
 use crate::links;
-use crate::scripts;
 
 /// Pictures already decoded, kept for as long as the document is open.
 ///
@@ -355,6 +354,9 @@ struct Run<'a> {
     /// Whether the run's characters are the paragraph's own text, which the
     /// caret moves through, or a field's value, which it steps over.
     counted: bool,
+    /// How far it is raised off the baseline of the text it sits in, in
+    /// screen points.
+    rise: f32,
 }
 
 impl Flow<'_> {
@@ -537,16 +539,18 @@ impl Flow<'_> {
         let ground = self.palette;
         self.palette = palette;
         let leaders = place_tabs(ui, &mut job, &properties.paragraph, indent.max(0.0), zoom);
+        let rises = job.rises().to_vec();
         let (job, map) = job.into_parts();
 
         let right_to_left = properties.paragraph.right_to_left == Some(true);
         let written = bidi::needed(&job.text, right_to_left).then(|| job.clone());
-        let galley = scripts::place(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)));
+        let galley =
+            egui_richedit::raise(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)), &rises);
         // A paragraph with text that reads right to left is drawn from a
         // second layout, each of its lines in the order it reads, which egui
         // does not do; what is drawn then no longer lines up with what is
         // written character for character, so it is read, not edited.
-        let visual = written.map(|written| in_visual_order(ui, &written, right_to_left));
+        let visual = written.map(|written| in_visual_order(ui, &written, &rises, right_to_left));
         let height = visual.as_ref().unwrap_or(&galley).size().y;
         let edited = !self.detached && self.page.is_some() && visual.is_none();
         // Click and drag, and not merely hover: the selection plugin begins a
@@ -716,6 +720,7 @@ impl Flow<'_> {
             format: base,
             palette: self.palette,
             counted: true,
+            rise: rise_of(&properties.text, size, self.zoom),
         };
         self.runs(element, &run, &mut job, &mut frames);
 
@@ -760,6 +765,7 @@ impl Flow<'_> {
             format,
             palette,
             counted,
+            rise,
         } = *run;
         let mut small = format.clone();
         small.font_id.size *= SMALL_CAPS;
@@ -777,6 +783,7 @@ impl Flow<'_> {
             }
         };
         for child in &parent.children {
+            job.set_rise(rise);
             match child {
                 Node::Text(text) | Node::CData(text) => put(job, text, text.chars().count()),
                 Node::Comment(_) | Node::ProcessingInstruction(_) => {}
@@ -803,6 +810,7 @@ impl Flow<'_> {
                             format: &inner,
                             palette,
                             counted,
+                            rise: rise_of(&merged, inner_size, self.zoom),
                         };
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Text, "a") {
@@ -816,6 +824,7 @@ impl Flow<'_> {
                             format: &inner,
                             palette,
                             counted,
+                            rise: rise_of(&merged, inner_size, self.zoom),
                         };
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Draw, "frame") {
@@ -827,7 +836,7 @@ impl Flow<'_> {
                         if let Some(citation) = element.child(&Ns::Text, "note-citation") {
                             let mut raised = format.clone();
                             raised.font_id.size *= 0.7;
-                            raised.valign = format::SUPERSCRIPT;
+                            job.set_rise(odox_core::Position::SUPER.rise * size * self.zoom);
                             job.atom(&citation.plain_text(), 0, raised);
                         }
                     } else if element.is(&Ns::Text, "ruby-text") {
@@ -1159,6 +1168,14 @@ impl Flow<'_> {
     }
 }
 
+/// How far a run with these properties is raised off the baseline of the
+/// text it sits in, whose size is `size`, in screen points.
+fn rise_of(properties: &TextProperties, size: f32, zoom: f32) -> f32 {
+    properties
+        .position
+        .map_or(0.0, |position| position.rise * size * zoom)
+}
+
 /// Which edge of a cell a border belongs to.
 #[derive(Clone, Copy)]
 enum Edge {
@@ -1458,7 +1475,12 @@ fn paint_leaders(ui: &Ui, leaders: &[Leader], origin: Pos2, format: &TextFormat)
 /// the other way. Where the lines break is worked out here too: egui breaks
 /// a line by where its glyphs stand, and a word turned round puts them out of
 /// order.
-pub fn in_visual_order(ui: &Ui, written: &LayoutJob, right_to_left: bool) -> Arc<Galley> {
+pub fn in_visual_order(
+    ui: &Ui,
+    written: &LayoutJob,
+    written_rises: &[f32],
+    right_to_left: bool,
+) -> Arc<Galley> {
     let text = written.text.as_str();
     let paragraph = bidi::Paragraph::new(text, right_to_left);
     let mut job = LayoutJob {
@@ -1479,24 +1501,33 @@ pub fn in_visual_order(ui: &Ui, written: &LayoutJob, right_to_left: bool) -> Arc
             .map(|section| section.format.clone())
             .unwrap_or_default()
     };
+    let mut rises = Vec::new();
     for (index, line) in lines(ui, written).into_iter().enumerate() {
         if index > 0 {
             section(&mut job, "\n", format_at(line.start));
+            rises.push(0.0);
         }
         for run in paragraph.line(line) {
             if run.right_to_left {
                 for piece in pieces(text, run.range).into_iter().rev() {
-                    append(&mut job, written, piece, true);
+                    append(&mut job, &mut rises, written, written_rises, piece, true);
                 }
             } else {
-                append(&mut job, written, run.range, false);
+                append(
+                    &mut job,
+                    &mut rises,
+                    written,
+                    written_rises,
+                    run.range,
+                    false,
+                );
             }
         }
     }
     if let (Some(lead), Some(first)) = (written.sections.first(), job.sections.first_mut()) {
         first.leading_space = lead.leading_space;
     }
-    scripts::place(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)))
+    egui_richedit::raise(ui.ctx().fonts_mut(|fonts| fonts.layout_job(job)), &rises)
 }
 
 /// Where a paragraph's lines break, as the bytes of each: after a space,
@@ -1510,7 +1541,7 @@ fn lines(ui: &Ui, written: &LayoutJob) -> Vec<std::ops::Range<usize>> {
         }
         let mut job = LayoutJob::default();
         for piece in pieces(text, range) {
-            append(&mut job, written, piece, false);
+            append(&mut job, &mut Vec::new(), written, &[], piece, false);
         }
         ui.ctx()
             .fonts_mut(|fonts| fonts.layout_job(job))
@@ -1567,26 +1598,36 @@ fn pieces(text: &str, range: std::ops::Range<usize>) -> Vec<std::ops::Range<usiz
 }
 
 /// Append a stretch of a paragraph's written text to a job, in the formats
-/// its sections give it: in the order it is written, or turned round and its
-/// brackets mirrored where it reads right to left and is not a word the shaper
-/// turns itself.
-fn append(job: &mut LayoutJob, written: &LayoutJob, range: std::ops::Range<usize>, turned: bool) {
+/// its sections give it and at the rises they were given: in the order it is
+/// written, or turned round and its brackets mirrored where it reads right to
+/// left and is not a word the shaper turns itself.
+fn append(
+    job: &mut LayoutJob,
+    rises: &mut Vec<f32>,
+    written: &LayoutJob,
+    written_rises: &[f32],
+    range: std::ops::Range<usize>,
+    turned: bool,
+) {
     let text = written.text.as_str();
-    let mut parts: Vec<(std::ops::Range<usize>, &TextFormat)> = written
+    let mut parts: Vec<(std::ops::Range<usize>, &TextFormat, f32)> = written
         .sections
         .iter()
-        .filter_map(|section| {
+        .enumerate()
+        .filter_map(|(index, section)| {
             let own = section.byte_range.as_usize();
             let start = own.start.max(range.start);
             let end = own.end.min(range.end);
-            (start < end).then_some((start..end, &section.format))
+            let rise = written_rises.get(index).copied().unwrap_or(0.0);
+            (start < end).then_some((start..end, &section.format, rise))
         })
         .collect();
     let word = text[range.clone()].chars().any(bidi::is_right_to_left);
     if turned {
         parts.reverse();
     }
-    for (part, format) in parts {
+    for (part, format, rise) in parts {
+        rises.push(rise);
         let piece = &text[part];
         if turned && !word {
             let mirrored: String = piece.chars().rev().map(bidi::mirrored).collect();

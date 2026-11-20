@@ -106,15 +106,60 @@ pub enum TextAlign {
     Justify,
 }
 
-/// Where a run sits relative to the baseline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Position {
-    /// On it.
-    Baseline,
-    /// Above it, smaller.
-    Super,
-    /// Below it, smaller.
-    Sub,
+/// Where a run sits relative to the text it is in, from `style:text-position`:
+/// an offset and optionally a size, as in `super`, `33% 80%` or `-8% 80%`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Position {
+    /// How far its baseline stands above the text's, as a proportion of the
+    /// text's size: negative below it, zero on it.
+    pub rise: f32,
+    /// Its size, as a proportion of the text's.
+    pub scale: f32,
+}
+
+impl Position {
+    /// The size of a raised or lowered run that states none, as every office
+    /// application draws one.
+    const SCRIPT_SCALE: f32 = 0.58;
+
+    /// `super`, which leaves the offset and the size to the application.
+    pub const SUPER: Self = Self {
+        rise: 0.33,
+        scale: Self::SCRIPT_SCALE,
+    };
+
+    /// `sub`.
+    pub const SUB: Self = Self {
+        rise: -0.08,
+        scale: Self::SCRIPT_SCALE,
+    };
+
+    /// Read the attribute's value. An offset that is not understood is the
+    /// baseline.
+    pub fn parse(value: &str) -> Self {
+        let mut parts = value.split_whitespace();
+        let stated = match parts.next().unwrap_or_default() {
+            "super" => Self::SUPER,
+            "sub" => Self::SUB,
+            other => match Percent::parse(other) {
+                Some(Percent(offset)) if offset != 0.0 => Self {
+                    rise: offset / 100.0,
+                    scale: Self::SCRIPT_SCALE,
+                },
+                _ => Self {
+                    rise: 0.0,
+                    scale: 1.0,
+                },
+            },
+        };
+        Self {
+            scale: parts
+                .next()
+                .and_then(Percent::parse)
+                .map_or(stated.scale, Percent::fraction),
+            ..stated
+        }
+    }
 }
 
 /// Vertical placement inside a cell.
@@ -1559,21 +1604,7 @@ impl TextProperties {
             self.background = Color::parse(color);
         }
         if let Some(position) = p.attr(&Ns::Style, "text-position") {
-            // The attribute is a vertical offset and optionally a size, as in
-            // `super 58%` or `-33% 58%`. Only the direction is read: a renderer
-            // that placed the glyph at the stated offset and scaled it by the
-            // stated amount would be doing typesetting, and what is wanted here
-            // is the distinction between superscript and subscript.
-            let first = position.split_whitespace().next().unwrap_or_default();
-            self.position = Some(match first {
-                "super" => Position::Super,
-                "sub" => Position::Sub,
-                _ => match Percent::parse(first) {
-                    Some(percent) if percent.0 > 0.0 => Position::Super,
-                    Some(percent) if percent.0 < 0.0 => Position::Sub,
-                    _ => Position::Baseline,
-                },
-            });
+            self.position = Some(Position::parse(position));
         }
         if let Some(transform) = p.attr(&Ns::Fo, "text-transform") {
             self.uppercase = Some(transform == "uppercase");
@@ -1784,6 +1815,21 @@ impl GraphicProperties {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_text_position_states_its_offset_and_size_or_takes_the_usual_ones() {
+        let read = |value| {
+            let Position { rise, scale } = Position::parse(value);
+            (rise, scale)
+        };
+        assert_eq!(read("33% 80%"), (0.33, 0.8));
+        assert_eq!(read("-8% 80%"), (-0.08, 0.8));
+        assert_eq!(read("super"), (0.33, 0.58));
+        assert_eq!(read("sub 70%"), (-0.08, 0.7));
+        assert_eq!(read("20%"), (0.2, 0.58));
+        assert_eq!(read("0% 100%"), (0.0, 1.0));
+        assert_eq!(read("sideways"), (0.0, 1.0));
+    }
 
     #[test]
     fn small_caps_draw_lowercase_letters_as_smaller_capitals_and_keep_the_length() {

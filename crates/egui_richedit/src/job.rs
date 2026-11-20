@@ -21,6 +21,10 @@ pub struct ParagraphJob {
     map: OffsetMap,
     /// Each tab: its section in the job and its character in what is drawn.
     tabs: Vec<(usize, usize)>,
+    /// How far each section of the job is raised, in points.
+    rises: Vec<f32>,
+    /// How far what is appended next is raised.
+    rise: f32,
 }
 
 impl ParagraphJob {
@@ -33,10 +37,31 @@ impl ParagraphJob {
             map.push(len, len, false);
         }
         Self {
+            rises: vec![0.0; job.sections.len()],
             job,
             map,
             tabs: Vec::new(),
+            rise: 0.0,
         }
+    }
+
+    /// Draw what is appended from here on `rise` points above the baseline of
+    /// the text beside it, or below it where `rise` is negative. Every job
+    /// starts on the baseline. egui places a run only against the top or the
+    /// bottom of its row, so [`crate::raise`] moves the glyphs of a galley
+    /// laid out from this job to where this says.
+    pub fn set_rise(&mut self, rise: f32) {
+        self.rise = rise;
+    }
+
+    /// How far each section of the job is raised, in the order of its
+    /// sections, for [`crate::raise`].
+    pub fn rises(&self) -> &[f32] {
+        &self.rises
+    }
+
+    fn appended(&mut self) {
+        self.rises.resize(self.job.sections.len(), self.rise);
     }
 
     /// Text drawn as the model holds it: one drawn character for each of the
@@ -47,6 +72,7 @@ impl ParagraphJob {
             return;
         }
         self.job.append(text, 0.0, format);
+        self.appended();
         self.map.push(len, len, false);
     }
 
@@ -61,6 +87,7 @@ impl ParagraphJob {
         }
         if shown_len > 0 {
             self.job.append(shown, 0.0, format);
+            self.appended();
         }
         self.map.push(shown_len, model_len, true);
     }
@@ -73,6 +100,7 @@ impl ParagraphJob {
         let room = format.font_id.size * 0.75;
         self.job.append(" ", 0.0, format.clone());
         self.job.append("", room, format);
+        self.appended();
         self.tabs.push((self.job.sections.len() - 1, start));
         self.map.push(1, 1, true);
     }

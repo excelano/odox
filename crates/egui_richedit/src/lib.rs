@@ -37,9 +37,11 @@
 
 mod editor;
 mod job;
+mod raise;
 
 pub use editor::{Laid, RichEdit};
 pub use job::{OffsetMap, ParagraphJob};
+pub use raise::raise;
 
 use std::any::Any;
 use std::fmt::Debug;

@@ -3,8 +3,8 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use eframe::egui::{Align, Color32, FontFamily, FontId, Stroke, TextFormat};
-use odox_core::{Color, Position, TextProperties};
+use eframe::egui::{Color32, FontFamily, FontId, Stroke, TextFormat};
+use odox_core::{Color, TextProperties};
 
 use crate::fonts::{Variant, family_of};
 
@@ -13,19 +13,6 @@ use crate::fonts::{Variant, family_of};
 /// ODF has no default, and every producer writes one into its default paragraph
 /// style, so this is reached only by a document with no styles at all.
 pub const DEFAULT_SIZE: f32 = 12.0;
-
-/// How a superscript or subscript is drawn, as a proportion of the run's size.
-///
-/// ODF writes the offset and the scale per run, and only the direction is read.
-/// This is the proportion every office application uses by default.
-const SCRIPT_SCALE: f32 = 0.58;
-
-/// The `valign` a superscript is laid out with, by which
-/// [`crate::scripts::place`] finds it to move it off its text's baseline.
-pub const SUPERSCRIPT: Align = Align::TOP;
-
-/// The same, for a subscript.
-pub const SUBSCRIPT: Align = Align::Center;
 
 /// The colours a document is drawn in where the document itself does not say.
 ///
@@ -169,11 +156,7 @@ pub fn text_format(
         _ => FontFamily::Proportional,
     };
 
-    let (scale, valign) = match properties.position {
-        Some(Position::Super) => (SCRIPT_SCALE, SUPERSCRIPT),
-        Some(Position::Sub) => (SCRIPT_SCALE, SUBSCRIPT),
-        _ => (1.0, Align::BOTTOM),
-    };
+    let scale = properties.position.map_or(1.0, |position| position.scale);
 
     let color = properties
         .color
@@ -194,7 +177,6 @@ pub fn text_format(
         } else {
             Stroke::NONE
         },
-        valign,
         // The italic face was asked for by name above. egui's own `italics` skews
         // the regular face, which is a different drawing from the one the font
         // designer made, and setting both would skew an italic face further.
