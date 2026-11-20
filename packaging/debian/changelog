@@ -1,3 +1,12 @@
+odox (0.18.1) unstable; urgency=low
+
+  * A right-to-left paragraph ending in a line break keeps the empty line after it
+  * A superscript on a line with Hebrew or Arabic is raised again
+  * Exporting a right-to-left document with an empty paragraph no longer crashes
+  * Raised text in the same font as the text around it now rises
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 20 Nov 2026 07:52:54 -0600
+
 odox (0.18.0) unstable; urgency=low
 
   * Highlighted text with no colour of its own is drawn in whichever ink stands out on the highlight
