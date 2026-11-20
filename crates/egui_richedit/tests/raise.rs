@@ -144,6 +144,34 @@ fn a_raised_run_in_the_format_of_the_text_around_it_is_raised_alone() {
 }
 
 #[test]
+fn a_raised_run_on_a_line_with_a_word_read_right_to_left_is_raised() {
+    let (_, after) = laid(
+        &[
+            ("x", format(24.0, None), 0.0),
+            ("2", format(12.0, None), RISE),
+            (" שלום", format(24.0, None), 0.0),
+        ],
+        f32::INFINITY,
+    );
+    let glyphs = &after.rows[0].row.glyphs;
+    let at = |chr: char| {
+        glyphs
+            .iter()
+            .find(|glyph| glyph.chr == chr)
+            .expect("drawn")
+            .pos
+            .y
+    };
+    assert!(
+        near(at('2'), at('x') - RISE),
+        "{} for a base of {}",
+        at('2'),
+        at('x')
+    );
+    assert_eq!(at('ש'), at('x'));
+}
+
+#[test]
 fn a_lowered_run_with_nothing_before_it_stands_off_the_text_after_it() {
     let (_, after) = laid(
         &[
