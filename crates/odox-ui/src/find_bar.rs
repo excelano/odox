@@ -160,16 +160,13 @@ impl FindBar {
             memory.has_focus(query_id) || memory.has_focus(egui::Id::unique("odox-replace"))
         });
         if in_bar {
-            // Alt and a letter also arrives as the letter typed, which the
-            // field would take once the shortcut is gone.
-            let alt = |key: Key| {
+            let alt = |key| {
                 ui.input_mut(|input| {
                     let taken = input.consume_shortcut(&KeyboardShortcut::new(Modifiers::ALT, key));
                     if taken {
-                        input.events.retain(|event| {
-                            !matches!(event, egui::Event::Text(text)
-                                if text.eq_ignore_ascii_case(key.name()))
-                        });
+                        input
+                            .events
+                            .retain(|event| !matches!(event, egui::Event::Text(_)));
                     }
                     taken
                 })
@@ -328,6 +325,31 @@ mod tests {
             ],
         );
         assert!(bar.options.whole_words);
+        assert_eq!(bar.query(), "and");
+    }
+
+    #[test]
+    fn alt_c_types_nothing_whatever_character_the_layout_gives_it() {
+        let ctx = Context::default();
+        let mut bar = FindBar::default();
+        bar.open();
+        frame(&ctx, &mut bar, Vec::new());
+        frame(&ctx, &mut bar, vec![Event::Text("and".into())]);
+        frame(
+            &ctx,
+            &mut bar,
+            vec![
+                Event::Key {
+                    key: Key::C,
+                    physical_key: Some(Key::C),
+                    pressed: true,
+                    repeat: false,
+                    modifiers: Modifiers::ALT,
+                },
+                Event::Text("ç".into()),
+            ],
+        );
+        assert!(bar.options.match_case);
         assert_eq!(bar.query(), "and");
     }
 }
