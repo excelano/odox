@@ -5,8 +5,9 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use eframe::egui::{self, Key, Ui, text::CCursor, text::CCursorRange};
+use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui, text::CCursor, text::CCursorRange};
 
+use crate::find::Options;
 use crate::i18n::{fill, t};
 
 /// Which way to move among the matches.
@@ -65,9 +66,11 @@ pub struct FindBar {
     /// The field that is to take the keyboard on the next frame it is drawn,
     /// with what it holds selected.
     focus: Focus,
+    /// How the query is matched, for the window's life.
+    pub(crate) options: Options,
     /// What the view was last asked, so that it is asked again only when the
-    /// query or the document is not what it was.
-    asked: Option<(String, u64)>,
+    /// query, its options or the document are not what they were.
+    asked: Option<(String, Options, u64)>,
     /// What replaces a match, and what the last replace said.
     replacement: String,
     message: Option<String>,
@@ -132,12 +135,15 @@ impl FindBar {
     /// Whether the view has to be asked again, given the document's revision;
     /// answers `Some(query_changed)` if so, and remembers it was asked.
     pub fn due(&mut self, revision: u64) -> Option<bool> {
-        let same_query = self.asked.as_ref().is_some_and(|(q, _)| *q == self.query);
-        let same_revision = self.asked.as_ref().is_some_and(|(_, r)| *r == revision);
+        let same_query = self
+            .asked
+            .as_ref()
+            .is_some_and(|(q, o, _)| *q == self.query && *o == self.options);
+        let same_revision = self.asked.as_ref().is_some_and(|(_, _, r)| *r == revision);
         if same_query && same_revision {
             return None;
         }
-        self.asked = Some((self.query.clone(), revision));
+        self.asked = Some((self.query.clone(), self.options, revision));
         if !same_query {
             self.message = None;
         }
@@ -149,8 +155,31 @@ impl FindBar {
         let (count, current) = (self.count, self.current);
         let mut pressed = Pressed::default();
         let step = &mut pressed.step;
+        let query_id = egui::Id::unique("odox-find");
+        let in_bar = ui.memory(|memory| {
+            memory.has_focus(query_id) || memory.has_focus(egui::Id::unique("odox-replace"))
+        });
+        if in_bar {
+            let alt = |key| {
+                ui.input_mut(|input| {
+                    let taken = input.consume_shortcut(&KeyboardShortcut::new(Modifiers::ALT, key));
+                    if taken {
+                        input
+                            .events
+                            .retain(|event| !matches!(event, egui::Event::Text(_)));
+                    }
+                    taken
+                })
+            };
+            if alt(Key::C) {
+                self.options.match_case = !self.options.match_case;
+            }
+            if alt(Key::W) {
+                self.options.whole_words = !self.options.whole_words;
+            }
+        }
         ui.horizontal(|ui| {
-            let id = egui::Id::unique("odox-find");
+            let id = query_id;
             let mut output = egui::TextEdit::singleline(&mut self.query)
                 .id(id)
                 .hint_text(t("Find"))
@@ -173,6 +202,10 @@ impl FindBar {
                 });
                 output.response.request_focus();
             }
+            ui.toggle_value(&mut self.options.match_case, "Aa")
+                .on_hover_text(t("Match case"));
+            ui.toggle_value(&mut self.options.whole_words, "W")
+                .on_hover_text(t("Whole words"));
             if ui.button(t("Previous")).clicked() {
                 *step = Some(Step::Previous);
             }
@@ -249,5 +282,74 @@ impl FindBar {
         if let Some(message) = &self.message {
             ui.label(message);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::{Context, Event, Pos2, RawInput, Rect, vec2};
+
+    fn frame(ctx: &Context, bar: &mut FindBar, events: Vec<Event>) {
+        let input = RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(800.0, 200.0))),
+            ..RawInput::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            bar.ui(ui, false);
+        });
+        output.textures_delta.clear();
+    }
+
+    #[test]
+    fn alt_w_toggles_whole_words_without_typing_into_the_query() {
+        let ctx = Context::default();
+        let mut bar = FindBar::default();
+        bar.open();
+        frame(&ctx, &mut bar, Vec::new());
+        frame(&ctx, &mut bar, vec![Event::Text("and".into())]);
+        assert_eq!(bar.query(), "and");
+        frame(
+            &ctx,
+            &mut bar,
+            vec![
+                Event::Key {
+                    key: Key::W,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: Modifiers::ALT,
+                },
+                Event::Text("w".into()),
+            ],
+        );
+        assert!(bar.options.whole_words);
+        assert_eq!(bar.query(), "and");
+    }
+
+    #[test]
+    fn alt_c_types_nothing_whatever_character_the_layout_gives_it() {
+        let ctx = Context::default();
+        let mut bar = FindBar::default();
+        bar.open();
+        frame(&ctx, &mut bar, Vec::new());
+        frame(&ctx, &mut bar, vec![Event::Text("and".into())]);
+        frame(
+            &ctx,
+            &mut bar,
+            vec![
+                Event::Key {
+                    key: Key::C,
+                    physical_key: Some(Key::C),
+                    pressed: true,
+                    repeat: false,
+                    modifiers: Modifiers::ALT,
+                },
+                Event::Text("ç".into()),
+            ],
+        );
+        assert!(bar.options.match_case);
+        assert_eq!(bar.query(), "and");
     }
 }

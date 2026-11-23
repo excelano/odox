@@ -5,8 +5,9 @@
 //! [`odox_core::edit::text`] answers and the page editor's offsets count in, so
 //! the same range lights up the same characters whether the paragraph is being
 //! read or edited. What a match is found in is the view's business; this module
-//! knows only how to look in a string and how to keep the results. Case is not
-//! significant, and the query is not a pattern. DESIGN.md §11.
+//! knows only how to look in a string and how to keep the results. The query
+//! is not a pattern; whether case counts and whether a match may sit inside a
+//! word are the person's [`Options`]. DESIGN.md §11.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -15,6 +16,7 @@ use std::ops::Range;
 
 use odox_core::Element;
 use odox_core::edit;
+use odox_core::words::word_ranges;
 
 use crate::flow_model::paragraph_paths;
 
@@ -31,30 +33,50 @@ pub struct Match {
     pub range: Range<usize>,
 }
 
+/// How a query is matched. The default finds it in any case and inside words.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Options {
+    /// Only text in the query's own case matches.
+    pub match_case: bool,
+    /// A match neither starts nor ends inside a word.
+    pub whole_words: bool,
+}
+
 /// A character with its case taken away, one for one, so that a range found in
 /// the folded text is the same range in the original.
 fn fold(c: char) -> char {
     c.to_lowercase().next().unwrap_or(c)
 }
 
-fn folded(text: &str) -> Vec<char> {
-    text.chars().map(fold).collect()
+fn chars(text: &str, options: Options) -> Vec<char> {
+    if options.match_case {
+        text.chars().collect()
+    } else {
+        text.chars().map(fold).collect()
+    }
 }
 
 /// Where a query occurs in a text, as character ranges that do not overlap.
 /// An empty query occurs nowhere.
-pub fn ranges(text: &str, query: &str) -> Vec<Range<usize>> {
-    let needle = folded(query);
+pub fn ranges(text: &str, query: &str, options: Options) -> Vec<Range<usize>> {
+    let needle = chars(query, options);
     if needle.is_empty() {
         return Vec::new();
     }
-    let hay = folded(text);
+    let hay = chars(text, options);
+    let words = if options.whole_words {
+        word_ranges(text)
+    } else {
+        Vec::new()
+    };
+    let inside_word = |at: usize| words.iter().any(|word| word.start < at && at < word.end);
     let mut found = Vec::new();
     let mut at = 0;
     while at + needle.len() <= hay.len() {
-        if hay[at..at + needle.len()] == needle[..] {
-            found.push(at..at + needle.len());
-            at += needle.len();
+        let end = at + needle.len();
+        if hay[at..end] == needle[..] && !inside_word(at) && !inside_word(end) {
+            found.push(at..end);
+            at = end;
         } else {
             at += 1;
         }
@@ -64,7 +86,7 @@ pub fn ranges(text: &str, query: &str) -> Vec<Range<usize>> {
 
 /// Every match of a query in the paragraphs under a root, in the order the
 /// flow draws them, tagged with a scope.
-pub fn in_paragraphs(root: &Element, scope: usize, query: &str) -> Vec<Match> {
+pub fn in_paragraphs(root: &Element, scope: usize, query: &str, options: Options) -> Vec<Match> {
     let mut found = Vec::new();
     if query.is_empty() {
         return found;
@@ -73,7 +95,7 @@ pub fn in_paragraphs(root: &Element, scope: usize, query: &str) -> Vec<Match> {
         let Some(paragraph) = root.at(&path) else {
             continue;
         };
-        for range in ranges(&edit::text(paragraph), query) {
+        for range in ranges(&edit::text(paragraph), query, options) {
             found.push(Match {
                 scope,
                 paragraph: path.clone(),
@@ -236,7 +258,7 @@ mod tests {
         .expect("the corpus document");
         let document = odox_core::doc::TextDocument::read(&bytes).expect("it reads");
         let body = document.body().expect("it has a body");
-        let found = in_paragraphs(body, 0, "AND");
+        let found = in_paragraphs(body, 0, "AND", Options::default());
         assert_eq!(found.len(), 6);
         for hit in &found {
             let paragraph = body.at(&hit.paragraph).expect("a path to a paragraph");
@@ -258,22 +280,80 @@ mod tests {
 
     #[test]
     fn a_query_is_found_whatever_its_case() {
-        assert_eq!(ranges("Odox and ODOX", "odox"), vec![0..4, 9..13]);
+        assert_eq!(
+            ranges("Odox and ODOX", "odox", Options::default()),
+            vec![0..4, 9..13]
+        );
+    }
+
+    const MATCH_CASE: Options = Options {
+        match_case: true,
+        whole_words: false,
+    };
+    const WHOLE_WORDS: Options = Options {
+        match_case: false,
+        whole_words: true,
+    };
+
+    #[test]
+    fn match_case_skips_other_case() {
+        assert_eq!(ranges("and", "And", MATCH_CASE), Vec::<Range<usize>>::new());
+        assert_eq!(ranges("And and", "And", MATCH_CASE), vec![0..3]);
+    }
+
+    #[test]
+    fn whole_words_skips_inside_word() {
+        assert_eq!(ranges("band and", "and", WHOLE_WORDS), vec![5..8]);
+        assert_eq!(
+            ranges("Odox, odox.", "odox", WHOLE_WORDS),
+            vec![0..4, 6..10]
+        );
+        assert_eq!(
+            ranges("can't", "can", WHOLE_WORDS),
+            Vec::<Range<usize>>::new()
+        );
+    }
+
+    #[test]
+    fn default_options_match_as_before() {
+        assert_eq!(
+            ranges("Band AND and", "and", Options::default()),
+            vec![1..4, 5..8, 9..12]
+        );
+    }
+
+    #[test]
+    fn replace_follows_options() {
+        let text = "Band AND and";
+        let only = Options {
+            match_case: true,
+            whole_words: true,
+        };
+        assert_eq!(
+            replace_ranges(text, &ranges(text, "and", only), "or"),
+            "Band AND or"
+        );
     }
 
     #[test]
     fn matches_do_not_overlap() {
-        assert_eq!(ranges("aaaa", "aa"), vec![0..2, 2..4]);
+        assert_eq!(ranges("aaaa", "aa", Options::default()), vec![0..2, 2..4]);
     }
 
     #[test]
     fn an_empty_query_matches_nothing() {
-        assert_eq!(ranges("anything", ""), Vec::<Range<usize>>::new());
+        assert_eq!(
+            ranges("anything", "", Options::default()),
+            Vec::<Range<usize>>::new()
+        );
     }
 
     #[test]
     fn ranges_count_characters_and_not_bytes() {
-        assert_eq!(ranges("ünï ünï", "ünï"), vec![0..3, 4..7]);
+        assert_eq!(
+            ranges("ünï ünï", "ünï", Options::default()),
+            vec![0..3, 4..7]
+        );
     }
 
     fn found_in(paragraph: &[usize], range: Range<usize>) -> Match {

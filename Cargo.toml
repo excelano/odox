@@ -71,6 +71,9 @@ regex = { version = "1.13", default-features = false, features = ["std", "unicod
 # mixed with anything else is drawn in. egui has none, and the PDF export lays
 # its own lines; both take the runs from here.
 unicode-bidi = { version = "0.3.18", default-features = false, features = ["std", "hardcoded-data"] }
+# Word boundaries (UAX #29), the ones egui's caret already moves by, for
+# finding whole words and counting them.
+unicode-segmentation = "1.13"
 
 # The window. The features are eframe's defaults less `system_fonts`, which
 # searches the machine for a character no loaded face has: `odox-ui` does that

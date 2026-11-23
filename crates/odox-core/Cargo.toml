@@ -14,6 +14,7 @@ rust-version.workspace = true
 quick-xml.workspace = true
 regex.workspace = true
 unicode-bidi.workspace = true
+unicode-segmentation.workspace = true
 zip.workspace = true
 
 [dev-dependencies]

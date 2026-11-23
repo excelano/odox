@@ -785,7 +785,10 @@ modified document is thrown away.
 **Find is a view of the text and not an edit.** Ctrl+F opens a bar under the
 menu in any of the three windows, in reading or in edit mode; Enter and F3
 move to the next match, Shift+Enter and Shift+F3 to the one before, and Escape
-closes the bar. Case is not significant and the query is not a pattern. A
+closes the bar. The query is not a pattern. Two toggles on the bar, Alt+C and
+Alt+W while it has the keyboard, make case significant and keep a match from
+starting or ending inside a word, by the Unicode word boundaries the caret
+moves by; they hold for the window's life and Replace follows them. A
 match is a range of characters in a paragraph's flat text, the string the
 segment map reads and the page editor's offsets count in, so the characters
 lit are the ones an edit there would change. The view answers how many there

@@ -2488,6 +2488,7 @@ dependencies = [
  "quick-xml 0.42.0",
  "regex",
  "unicode-bidi",
+ "unicode-segmentation",
  "zip",
 ]
 

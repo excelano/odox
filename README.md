@@ -174,7 +174,8 @@ into the document, so the next export does not ask again.
 
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
-and Escape closes it. Every match is lit, `xodp` searches the notes as well as
+and Escape closes it. The Aa and W toggles on the bar, or Alt+C and Alt+W,
+match case and whole words, and Replace follows them. Every match is lit, `xodp` searches the notes as well as
 the slides, and `xods` searches every sheet. In edit mode, and always in `xods`, Ctrl+H adds a row to replace the
 current match or every match, as one step to undo; `xods` replaces in cells that
 hold text and says how many it left, formulas and numbers among them.

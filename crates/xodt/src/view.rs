@@ -10,7 +10,7 @@ use eframe::egui::{self, Pos2, Rect, Ui};
 use egui_richedit::{Model, Selection};
 use odox_core::Document;
 use odox_core::doc::{PageSetup, TextDocument};
-use odox_ui::find::{Match, Replaced, in_paragraphs};
+use odox_ui::find::{Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::picture_question::PictureQuestion;
@@ -314,12 +314,12 @@ impl View for TextView {
         self.page.select(Selection::caret(caret));
     }
 
-    fn find(&mut self, query: &str) -> usize {
+    fn find(&mut self, query: &str, options: Options) -> usize {
         let matches = self
             .document
             .as_ref()
             .and_then(TextDocument::body)
-            .map(|body| in_paragraphs(body, 0, query))
+            .map(|body| in_paragraphs(body, 0, query, options))
             .unwrap_or_default();
         self.found.set(matches);
         self.found.len()

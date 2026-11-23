@@ -46,6 +46,7 @@ pub mod picture;
 pub mod place;
 mod style;
 mod value;
+pub mod words;
 pub mod xml;
 
 pub use doc::Document;
