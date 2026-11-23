@@ -13,7 +13,7 @@ use odox_core::doc::{Block, Blocked, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
 use odox_core::formula;
 use odox_core::{Document, Refused};
-use odox_ui::find::{Match, Replaced, ranges, replace_ranges};
+use odox_ui::find::{Match, Options, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
 use odox_ui::{Editing, Export, Found, Notice, View, Zoom, fonts};
@@ -544,11 +544,11 @@ impl View for SheetView {
         self.editor = None;
     }
 
-    fn find(&mut self, query: &str) -> usize {
+    fn find(&mut self, query: &str, options: Options) -> usize {
         let matches = self
             .document
             .as_ref()
-            .map(|document| matches_in(document, query))
+            .map(|document| matches_in(document, query, options))
             .unwrap_or_default();
         self.found.set(matches);
         self.found.len()
@@ -3043,7 +3043,7 @@ fn cells_of(text: &str, read: impl Fn(usize, usize, &str) -> Value) -> Vec<Vec<V
 }
 
 /// Every place a query occurs in the cells of the sheets a person can see.
-fn matches_in(document: &SheetDocument, query: &str) -> Vec<Match> {
+fn matches_in(document: &SheetDocument, query: &str, options: Options) -> Vec<Match> {
     let mut found = Vec::new();
     if query.is_empty() {
         return found;
@@ -3057,7 +3057,7 @@ fn matches_in(document: &SheetDocument, query: &str) -> Vec<Match> {
                 let Some(cell) = document.cell(sheet, row, column).filter(|c| !c.covered) else {
                     continue;
                 };
-                for range in ranges(&cell.text(), query) {
+                for range in ranges(&cell.text(), query, options) {
                     found.push(Match {
                         scope,
                         paragraph: vec![row, column],
@@ -3434,7 +3434,7 @@ mod tests {
     #[test]
     fn replace_all_changes_text_cells_in_one_step_and_leaves_the_rest() {
         let (mut view, mut editing) = opened();
-        assert_eq!(view.find("m6"), 2, "Bolt M6 and Nut M6");
+        assert_eq!(view.find("m6", Options::default()), 2, "Bolt M6 and Nut M6");
         let done = view.replace("M8", true, &mut editing);
         assert_eq!(
             done,
@@ -3456,7 +3456,7 @@ mod tests {
     #[test]
     fn replace_leaves_numbers_and_formulas_alone_and_says_so() {
         let (mut view, mut editing) = opened();
-        let found = view.find("1");
+        let found = view.find("1", Options::default());
         assert!(found > 0);
         let done = view.replace("9", true, &mut editing);
         assert_eq!(done.replaced, 0);
@@ -3468,7 +3468,7 @@ mod tests {
     #[test]
     fn replace_one_takes_the_current_match_only() {
         let (mut view, mut editing) = opened();
-        view.find("m6");
+        view.find("m6", Options::default());
         view.show_match(1);
         view.replace("X", false, &mut editing);
         assert_eq!(text_at(&view, 1, 0), "Bolt M6");

@@ -1201,7 +1201,12 @@ mod tests {
         let mut styles = Styles::collect(Some(&content), None);
         let mut editing = Editing::default();
         editing.reset();
-        let matches = crate::find::in_paragraphs(content.at(&[0, 0]).expect("the body"), 0, "t");
+        let matches = crate::find::in_paragraphs(
+            content.at(&[0, 0]).expect("the body"),
+            0,
+            "t",
+            crate::find::Options::default(),
+        );
         assert_eq!(matches.len(), 2, "the two t of Title");
         let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         let done = model.replace_matches(&matches.iter().collect::<Vec<_>>(), "TT", true);

@@ -14,7 +14,7 @@ use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use odox_core::Document;
 
 use crate::edit::{Caret, Editing};
-use crate::find::Replaced;
+use crate::find::{Options, Replaced};
 use crate::find_bar::{FindBar, Replace, Step};
 use crate::i18n::{fill, t};
 use crate::settings::Settings;
@@ -111,7 +111,7 @@ pub trait View {
     /// highlighted; an empty query forgets the search. Answers how many
     /// matches there are. Asked again whenever the query or the text changes,
     /// and the current match is kept if there are still that many.
-    fn find(&mut self, _query: &str) -> usize {
+    fn find(&mut self, _query: &str, _options: Options) -> usize {
         0
     }
 
@@ -853,7 +853,7 @@ impl<V: View> Shell<V> {
             if self.find.searching {
                 self.find.searching = false;
                 self.find.count = 0;
-                self.view.find("");
+                self.view.find("", Options::default());
             }
             return;
         }
@@ -865,7 +865,7 @@ impl<V: View> Shell<V> {
         }
         if let Some(query_changed) = self.find.due(self.editing.revision()) {
             self.find.searching = true;
-            self.find.count = self.view.find(self.find.query());
+            self.find.count = self.view.find(self.find.query(), self.find.options);
             if query_changed {
                 self.find.current = 0;
                 if self.find.count > 0 {
@@ -895,7 +895,8 @@ impl<V: View> Shell<V> {
             .view
             .replace(&with, which == Replace::All, &mut self.editing);
         if which == Replace::One && done.replaced > 0 {
-            self.find.current += crate::find::ranges(&with, self.find.query()).len();
+            self.find.current +=
+                crate::find::ranges(&with, self.find.query(), self.find.options).len();
             self.find.moved = true;
         }
         let replaced = done.replaced.to_string();

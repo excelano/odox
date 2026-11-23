@@ -15,7 +15,7 @@ use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2, p
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
 use odox_core::{Document, Element, Length, Ns, PageLayout};
-use odox_ui::find::{Highlights, Match, Replaced, in_paragraphs};
+use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
@@ -212,16 +212,16 @@ impl View for SlideView {
         ))
     }
 
-    fn find(&mut self, query: &str) -> usize {
+    fn find(&mut self, query: &str, options: Options) -> usize {
         let matches = self.document.as_ref().map(|document| {
             let slides = document.slides();
             let mut found = Vec::new();
             for (index, slide) in slides.iter().enumerate() {
-                found.extend(in_paragraphs(slide.element, index, query));
+                found.extend(in_paragraphs(slide.element, index, query, options));
             }
             for (index, slide) in slides.iter().enumerate() {
                 if let Some(notes) = slide.notes() {
-                    found.extend(in_paragraphs(notes, slides.len() + index, query));
+                    found.extend(in_paragraphs(notes, slides.len() + index, query, options));
                 }
             }
             found

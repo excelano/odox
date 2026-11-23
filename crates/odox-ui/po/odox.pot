@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-11 21:57-0600\n"
+"POT-Creation-Date: 2026-11-23 17:49-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -45,112 +45,120 @@ msgstr ""
 msgid "The export of {file} stopped before it was finished."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:226 crates/odox-ui/src/shell.rs:340
+#: crates/odox-ui/src/export.rs:227
+msgid "PDF/UA document"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:249
+msgid "Slide {number}"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:271 crates/odox-ui/src/shell.rs:340
 #: crates/odox-ui/src/shell.rs:421 crates/odox-ui/src/shell.rs:501
 #: crates/odox-ui/src/shell.rs:517
 msgid "Untitled"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:230
-msgid "PDF/UA document"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:255
-msgid "Slide {number}"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:285
+#: crates/odox-ui/src/export.rs:297
 msgid "{count} pictures still say nothing in place of what they show."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:289
+#: crates/odox-ui/src/export.rs:301
 msgid "No font for {family} on this computer may be embedded in a PDF."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:293
+#: crates/odox-ui/src/export.rs:305
 msgid "No font on this computer has the character {character}."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:297
+#: crates/odox-ui/src/export.rs:309
 msgid "There is nothing to export: nothing in the document is shown."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:300
+#: crates/odox-ui/src/export.rs:312
 msgid "The PDF could not be written: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:316
+#: crates/odox-ui/src/export.rs:328
 msgid "Describe the pictures"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:318
+#: crates/odox-ui/src/export.rs:330
 msgid ""
 "A PDF/UA file says what each picture shows to someone who cannot see it, or "
 "that it is decoration and shows nothing they need. These pictures say "
 "neither yet."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:349 crates/odox-ui/src/picture_question.rs:71
+#: crates/odox-ui/src/export.rs:361 crates/odox-ui/src/picture_question.rs:71
 msgid "What the picture shows"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:352 crates/odox-ui/src/picture_question.rs:78
+#: crates/odox-ui/src/export.rs:364 crates/odox-ui/src/picture_question.rs:78
 msgid "Decoration only"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:363
+#: crates/odox-ui/src/export.rs:375
 msgid "Export"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:368
+#: crates/odox-ui/src/export.rs:380
 msgid "Mark the rest as decoration"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:375 crates/odox-ui/src/page_setup.rs:113
+#: crates/odox-ui/src/export.rs:387 crates/odox-ui/src/page_setup.rs:113
 #: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:531
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1136
-#: crates/xods/src/view.rs:1218 crates/xods/src/view.rs:1435
+#: crates/xods/src/view.rs:1218 crates/xods/src/view.rs:1437
 #: crates/xodt/src/view.rs:549
 msgid "Cancel"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:156
+#: crates/odox-ui/src/find_bar.rs:189
 msgid "Find"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:176
+#: crates/odox-ui/src/find_bar.rs:210
+msgid "Match case"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:212
+msgid "Whole words"
+msgstr ""
+
+#: crates/odox-ui/src/find_bar.rs:213
 msgid "Previous"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:179
+#: crates/odox-ui/src/find_bar.rs:216
 msgid "Next"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:184
+#: crates/odox-ui/src/find_bar.rs:221
 msgid "No matches"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:187
+#: crates/odox-ui/src/find_bar.rs:224
 msgid "{current} of {count}"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:195 crates/odox-ui/src/shell.rs:731
+#: crates/odox-ui/src/find_bar.rs:232 crates/odox-ui/src/shell.rs:731
 msgid "Close"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:226
+#: crates/odox-ui/src/find_bar.rs:263
 msgid "Replace with"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:238
+#: crates/odox-ui/src/find_bar.rs:275
 msgid "Replace"
 msgstr ""
 
-#: crates/odox-ui/src/find_bar.rs:244
+#: crates/odox-ui/src/find_bar.rs:281
 msgid "Replace all"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:605
+#: crates/odox-ui/src/flow.rs:610
 msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 
@@ -354,19 +362,19 @@ msgstr ""
 msgid "The setting could not be saved: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:903
+#: crates/odox-ui/src/shell.rs:904
 msgid "{replaced} replaced"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:906
+#: crates/odox-ui/src/shell.rs:907
 msgid "{replaced} replaced, {skipped} left"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:937
+#: crates/odox-ui/src/shell.rs:938
 msgid "Open a document…"
 msgstr ""
 
-#: crates/odox-ui/src/shell.rs:941
+#: crates/odox-ui/src/shell.rs:942
 msgid "Start a new one"
 msgstr ""
 
@@ -690,7 +698,7 @@ msgstr ""
 msgid "Borders"
 msgstr ""
 
-#: crates/xods/src/view.rs:502 crates/xods/src/view.rs:2870
+#: crates/xods/src/view.rs:502 crates/xods/src/view.rs:2872
 msgid "Sheet{number}"
 msgstr ""
 
@@ -794,125 +802,125 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: crates/xods/src/view.rs:1365
+#: crates/xods/src/view.rs:1367
 msgid "There is only one row here to sort."
 msgstr ""
 
-#: crates/xods/src/view.rs:1402
+#: crates/xods/src/view.rs:1404
 msgid "Column {name}"
 msgstr ""
 
-#: crates/xods/src/view.rs:1407 crates/xods/src/view.rs:1430
+#: crates/xods/src/view.rs:1409 crates/xods/src/view.rs:1432
 msgid "Sort"
 msgstr ""
 
-#: crates/xods/src/view.rs:1411
+#: crates/xods/src/view.rs:1413
 msgid "Sort by"
 msgstr ""
 
-#: crates/xods/src/view.rs:1422
+#: crates/xods/src/view.rs:1424
 msgid "Ascending"
 msgstr ""
 
-#: crates/xods/src/view.rs:1423
+#: crates/xods/src/view.rs:1425
 msgid "Descending"
 msgstr ""
 
-#: crates/xods/src/view.rs:1427
+#: crates/xods/src/view.rs:1429
 msgid "The first row is a header"
 msgstr ""
 
-#: crates/xods/src/view.rs:1590
+#: crates/xods/src/view.rs:1592
 msgid "Sum: {sum}"
 msgstr ""
 
-#: crates/xods/src/view.rs:1592
+#: crates/xods/src/view.rs:1594
 msgid "Average: {average}"
 msgstr ""
 
-#: crates/xods/src/view.rs:1597
+#: crates/xods/src/view.rs:1599
 msgid "Count: {count}"
 msgstr ""
 
-#: crates/xods/src/view.rs:2597
+#: crates/xods/src/view.rs:2599
 msgid ""
 "This formula could not be read. Put it right, or press Escape to leave the "
 "cell as it was."
 msgstr ""
 
-#: crates/xods/src/view.rs:2879
+#: crates/xods/src/view.rs:2881
 msgid "There is nothing there to change."
 msgstr ""
 
-#: crates/xods/src/view.rs:2880
+#: crates/xods/src/view.rs:2882
 msgid "A merged cell is in the way: this would cut through it."
 msgstr ""
 
-#: crates/xods/src/view.rs:2882
+#: crates/xods/src/view.rs:2884
 msgid "A formula holds [{reference}], which this version cannot read."
 msgstr ""
 
-#: crates/xods/src/view.rs:2886
+#: crates/xods/src/view.rs:2888
 msgid "A formula points at [{reference}], which would be deleted."
 msgstr ""
 
-#: crates/xods/src/view.rs:2889
+#: crates/xods/src/view.rs:2891
 msgid "Another sheet already has that name."
 msgstr ""
 
-#: crates/xods/src/view.rs:2891
+#: crates/xods/src/view.rs:2893
 msgid "A sheet's name cannot be empty or hold [ ] * ? : / or \\."
 msgstr ""
 
-#: crates/xods/src/view.rs:2893
+#: crates/xods/src/view.rs:2895
 msgid "A workbook keeps at least one sheet to show."
 msgstr ""
 
-#: crates/xods/src/view.rs:2896
+#: crates/xods/src/view.rs:2898
 msgid "conditional formats"
 msgstr ""
 
-#: crates/xods/src/view.rs:2897
+#: crates/xods/src/view.rs:2899
 msgid "validations"
 msgstr ""
 
-#: crates/xods/src/view.rs:2898
+#: crates/xods/src/view.rs:2900
 msgid "database ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:2899
+#: crates/xods/src/view.rs:2901
 msgid "pivot tables"
 msgstr ""
 
-#: crates/xods/src/view.rs:2900
+#: crates/xods/src/view.rs:2902
 msgid "consolidations"
 msgstr ""
 
-#: crates/xods/src/view.rs:2901
+#: crates/xods/src/view.rs:2903
 msgid "charts and objects"
 msgstr ""
 
-#: crates/xods/src/view.rs:2902
+#: crates/xods/src/view.rs:2904
 msgid "print ranges"
 msgstr ""
 
-#: crates/xods/src/view.rs:2903
+#: crates/xods/src/view.rs:2905
 msgid "shapes anchored to cells"
 msgstr ""
 
-#: crates/xods/src/view.rs:2906
+#: crates/xods/src/view.rs:2908
 msgid "This document has {what}, which this version cannot update to match."
 msgstr ""
 
-#: crates/xods/src/view.rs:2916
+#: crates/xods/src/view.rs:2918
 msgid "This cell is covered by the one that spans it."
 msgstr ""
 
-#: crates/xods/src/view.rs:2920
+#: crates/xods/src/view.rs:2922
 msgid "There is no cell there."
 msgstr ""
 
-#: crates/xods/src/view.rs:2966
+#: crates/xods/src/view.rs:2968
 msgid "{whole}.{fraction}"
 msgstr ""
 
