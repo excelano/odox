@@ -838,7 +838,7 @@ impl<V: View> eframe::App for Shell<V> {
         // document instead of reopening it on every frame after.
         #[cfg(target_os = "macos")]
         if let Some(path) = crate::opened_document::taken() {
-            self.open(&ctx, &path);
+            self.request(&ctx, Pending::Open(path));
         }
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
@@ -926,6 +926,18 @@ impl<V: View> Shell<V> {
                 t("A new window could not be opened: {reason}"),
                 &[("reason", &reason)],
             ));
+        }
+        let speller = crate::spell::Speller::shared();
+        if let Some(message) = speller.failure() {
+            self.error = Some(message);
+        }
+        if ctx.input(|input| {
+            input
+                .events
+                .iter()
+                .any(|event| matches!(event, egui::Event::WindowFocused(true)))
+        }) {
+            speller.refresh();
         }
         match self.view.take_notice() {
             Some(Notice::Done(message)) => {

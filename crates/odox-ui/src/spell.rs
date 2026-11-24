@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
+use std::time::SystemTime;
 
 use std::io::Write as _;
 
@@ -70,6 +71,8 @@ type Checked = (String, String);
 pub struct Speller {
     folders: Vec<PathBuf>,
     words_file: Option<PathBuf>,
+    read_at: Mutex<Option<SystemTime>>,
+    failed: Mutex<Option<String>>,
     loaded: Mutex<HashMap<String, Loaded>>,
     own: RwLock<HashSet<String>>,
     ignored: RwLock<HashSet<String>>,
@@ -81,20 +84,13 @@ impl Speller {
     /// A speller over dictionaries in these folders, with the person's words
     /// kept in a file.
     pub fn new(folders: Vec<PathBuf>, words_file: Option<PathBuf>) -> Self {
-        let own = words_file
-            .as_deref()
-            .and_then(|path| std::fs::read_to_string(path).ok())
-            .map(|text| {
-                text.lines()
-                    .map(str::trim)
-                    .filter(|word| !word.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let read_at = modified(words_file.as_deref());
+        let own = read_words(words_file.as_deref());
         Self {
             folders,
             words_file,
+            read_at: Mutex::new(read_at),
+            failed: Mutex::new(None),
             loaded: Mutex::new(HashMap::new()),
             own: RwLock::new(own),
             ignored: RwLock::new(HashSet::new()),
@@ -111,6 +107,28 @@ impl Speller {
                 crate::settings::path().map(|settings| settings.with_file_name("words.txt"));
             Self::new(folders(), words)
         })
+    }
+
+    /// Read the person's words again if another window has added to them
+    /// since.
+    pub fn refresh(&self) {
+        let now = modified(self.words_file.as_deref());
+        let mut read_at = self.read_at.lock().unwrap_or_else(PoisonError::into_inner);
+        if now == *read_at {
+            return;
+        }
+        *read_at = now;
+        *self.own.write().unwrap_or_else(PoisonError::into_inner) =
+            read_words(self.words_file.as_deref());
+        self.forget();
+    }
+
+    /// Why the last word added could not be kept, once.
+    pub fn failure(&self) -> Option<String> {
+        self.failed
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
     }
 
     /// Wake this context when a dictionary has been read.
@@ -229,8 +247,8 @@ impl Speller {
             .filter(|range| {
                 let word: String = chars[range.clone()].iter().collect();
                 !word.chars().any(char::is_numeric)
-                    && !own.contains(&word)
-                    && !ignored.contains(&word)
+                    && !taken(&own, &word)
+                    && !taken(&ignored, &word)
                     && lexicon.writes(&word)
                     && !lexicon.dictionary.check(&word)
             })
@@ -266,7 +284,9 @@ impl Speller {
             .create(true)
             .append(true)
             .open(path)?;
-        writeln!(file, "{word}")
+        writeln!(file, "{word}")?;
+        *self.read_at.lock().unwrap_or_else(PoisonError::into_inner) = modified(Some(path));
+        Ok(())
     }
 
     /// Take a word as spelled until the application closes.
@@ -284,6 +304,41 @@ impl Speller {
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
     }
+}
+
+/// Whether a word is among the person's words, the way a dictionary takes
+/// them: as written, in capitals, and a word written in small letters also
+/// with a capital first.
+fn taken(words: &HashSet<String>, word: &str) -> bool {
+    if words.contains(word) {
+        return true;
+    }
+    let lower = word.to_lowercase();
+    let mut letters = lower.chars();
+    let capitalized: String = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default();
+    if (word == capitalized || word == word.to_uppercase()) && words.contains(&lower) {
+        return true;
+    }
+    word == word.to_uppercase() && words.iter().any(|own| own.to_uppercase() == word)
+}
+
+fn read_words(path: Option<&Path>) -> HashSet<String> {
+    path.and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| {
+            text.lines()
+                .map(str::trim)
+                .filter(|word| !word.is_empty())
+                .map(ToOwned::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn modified(path: Option<&Path>) -> Option<SystemTime> {
+    std::fs::metadata(path?).ok()?.modified().ok()
 }
 
 /// A drawn text with the characters in `gaps` made spaces, which are
@@ -394,7 +449,16 @@ pub fn mark(
             ui.separator();
         }
         if ui.button(crate::i18n::t("Add to dictionary")).clicked() {
-            let _ = speller.add(&hit.word);
+            if let Err(error) = speller.add(&hit.word) {
+                speller.ignore(&hit.word);
+                *speller
+                    .failed
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner) = Some(crate::i18n::fill(
+                    crate::i18n::t("The word is taken until the application closes, but could not be kept: {reason}"),
+                    &[("reason", &error.to_string())],
+                ));
+            }
             ui.close();
         }
         if ui.button(crate::i18n::t("Ignore")).clicked() {
@@ -746,5 +810,34 @@ mod tests {
             speller.dictionary("de-AT").is_some(),
             "the language's other country"
         );
+    }
+
+    #[test]
+    fn an_added_word_is_taken_in_capitals_too() {
+        let speller = Speller::new(vec![dictionaries()], None);
+        let dictionary = speller.dictionary("en-US").expect("en_US");
+        speller.add("Odox").expect("added");
+        speller.add("zorbing").expect("added");
+        let text = "Odox ODOX odox zorbing Zorbing ZORBING";
+        assert_eq!(words(text, &speller.check(&dictionary, text)), ["odox"]);
+    }
+
+    #[test]
+    fn a_word_another_window_added_is_taken() {
+        let file =
+            std::env::temp_dir().join(format!("odox-shared-words-{}.txt", std::process::id()));
+        let _ = std::fs::remove_file(&file);
+        let this = Speller::new(vec![dictionaries()], Some(file.clone()));
+        let dictionary = this.dictionary("en-US").expect("en_US");
+        let text = "Quuxly";
+        assert_eq!(words(text, &this.check(&dictionary, text)), ["Quuxly"]);
+        let other = Speller::new(vec![dictionaries()], Some(file.clone()));
+        other.add("Quuxly").expect("added");
+        this.refresh();
+        assert_eq!(
+            words(text, &this.check(&dictionary, text)),
+            Vec::<String>::new()
+        );
+        std::fs::remove_file(&file).expect("removed");
     }
 }

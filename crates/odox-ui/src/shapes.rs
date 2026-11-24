@@ -277,7 +277,8 @@ impl Canvas<'_> {
                         &points,
                     );
                     if let Some(stroke) = outline {
-                        self.painter(ui).add(Shape::closed_line(points, stroke));
+                        let filled = properties.graphic.fill() != Fill::None;
+                        self.closed_outline(ui, points, stroke, filled);
                     }
                 } else if let Some(stroke) = outline {
                     self.painter(ui).add(Shape::line(points, stroke));
@@ -328,8 +329,8 @@ impl Canvas<'_> {
             &corners,
         );
         if let Some(stroke) = outline {
-            self.painter(ui)
-                .add(Shape::closed_line(corners.to_vec(), stroke));
+            let filled = properties.graphic.fill() != Fill::None;
+            self.closed_outline(ui, corners.to_vec(), stroke, filled);
         }
         self.text(ui, shape, place);
     }
@@ -366,7 +367,8 @@ impl Canvas<'_> {
         let rect = place.bounds();
         let fill = properties.graphic.fill();
         let meshed = matches!(fill, Fill::Image(_) | Fill::Tiled(..) | Fill::Gradient(_));
-        if place.is_upright() && !meshed {
+        let filled_shadow = self.casting.is_some() && fill != Fill::None;
+        if place.is_upright() && !meshed && !filled_shadow {
             let (centre, radius) = (rect.center(), rect.size() / 2.0);
             if let Some(colour) = self.flat(&fill, properties.graphic.opacity) {
                 self.painter(ui)
@@ -384,7 +386,7 @@ impl Canvas<'_> {
             let points = ellipse(place);
             self.fill(ui, rect, &fill, properties.graphic.opacity, &points);
             if let Some(stroke) = outline {
-                self.painter(ui).add(Shape::closed_line(points, stroke));
+                self.closed_outline(ui, points, stroke, fill != Fill::None);
             }
         }
     }
@@ -598,12 +600,12 @@ impl Canvas<'_> {
             if stroke.stroke
                 && let Some(pen) = outline
             {
-                let shape = if stroke.closed {
-                    Shape::closed_line(points, pen)
+                if stroke.closed {
+                    let filled = stroke.fill && filled == Filled::Yes;
+                    self.closed_outline(ui, points, pen, filled);
                 } else {
-                    Shape::line(points, pen)
-                };
-                self.painter(ui).add(shape);
+                    self.painter(ui).add(Shape::line(points, pen));
+                }
             }
         }
     }
@@ -922,6 +924,25 @@ impl Canvas<'_> {
             None => format::color32(colour),
         };
         Some(Stroke::new(width, colour))
+    }
+
+    /// An outline that comes back to where it began. A shadow's around a fill
+    /// is laid outside the edge at half the width, which covers what the
+    /// shape's own outline covers without its translucent colour lying a
+    /// second time over the fill.
+    fn closed_outline(&self, ui: &Ui, mut points: Vec<Pos2>, stroke: Stroke, filled: bool) {
+        let shape = if self.casting.is_some() && filled {
+            if turning(&points) < 0.0 {
+                points.reverse();
+            }
+            Shape::closed_line(
+                points,
+                eframe::egui::epaint::PathStroke::new(stroke.width / 2.0, stroke.color).outside(),
+            )
+        } else {
+            Shape::closed_line(points, stroke)
+        };
+        self.painter(ui).add(shape);
     }
 
     /// Paint a fill inside an outline.
@@ -1256,6 +1277,16 @@ fn triangulate(points: &[Pos2]) -> Vec<[u32; 3]> {
         ]);
     }
     triangles
+}
+
+/// Twice the area an outline encloses, positive where it runs clockwise on
+/// the screen.
+fn turning(points: &[Pos2]) -> f32 {
+    points
+        .iter()
+        .zip(points.iter().cycle().skip(1))
+        .map(|(a, b)| a.x * b.y - b.x * a.y)
+        .sum()
 }
 
 #[cfg(test)]

@@ -280,6 +280,20 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Whether every paragraph a selection runs over is a heading, which is
+    /// what moving up and down the outline needs.
+    pub fn all_headings(&self, selection: &Selection<Vec<usize>>) -> bool {
+        self.selected_paragraphs(selection)
+            .is_some_and(|paragraphs| {
+                paragraphs.iter().all(|paragraph| {
+                    let path = [self.root.as_slice(), paragraph].concat();
+                    edit::block_state(self.content, &path, self.styles)
+                        .0
+                        .is_some()
+                })
+            })
+    }
+
     /// Move the list items a selection runs over a level in (`delta` above
     /// zero) or out, as one step to undo: with a caret, only where it stands at
     /// the start of an item, and never in a table, where Tab moves between
@@ -1970,6 +1984,23 @@ mod tests {
             "test",
         )
         .expect("a document")
+    }
+
+    #[test]
+    fn only_headings_move_on_the_outline() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let caret =
+            |paragraph: usize| egui_richedit::Selection::caret(Position::new(vec![paragraph], 0));
+        assert!(model.all_headings(&caret(0)));
+        assert!(!model.all_headings(&caret(1)));
+        let over_both = egui_richedit::Selection {
+            anchor: Position::new(vec![0], 1),
+            focus: Position::new(vec![1], 0),
+        };
+        assert!(!model.all_headings(&over_both));
     }
 
     #[test]

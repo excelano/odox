@@ -1162,10 +1162,11 @@ impl SlideView {
 
     /// F5 starts the slideshow at the first slide and Shift+F5 at this one.
     fn start_keys(&mut self, ui: &Ui) {
-        let (from_start, from_here) = ui.input_mut(|input| {
+        let (from_here, from_start) = ui.input_mut(|input| {
+            let from_here = input.consume_key(egui::Modifiers::SHIFT, Key::F5);
             (
-                input.consume_key(egui::Modifiers::NONE, Key::F5),
-                input.consume_key(egui::Modifiers::SHIFT, Key::F5),
+                from_here,
+                !from_here && input.consume_key(egui::Modifiers::NONE, Key::F5),
             )
         });
         if from_start {
@@ -1177,7 +1178,14 @@ impl SlideView {
 
     fn start_show(&mut self, from: usize) {
         self.presenting = true;
-        self.slide = from;
+        let count = self.document.as_ref().map_or(0, |d| d.slides().len());
+        let shown = self.shown_slides(count);
+        self.slide = shown
+            .iter()
+            .copied()
+            .find(|&slide| slide >= from)
+            .or_else(|| shown.last().copied())
+            .unwrap_or(from);
         self.show.step = 0;
         self.picked = None;
         self.drag = None;
@@ -1251,6 +1259,11 @@ impl SlideView {
         for (index, shape) in slide.shapes_indexed() {
             canvas.slide_shape(ui, index, shape);
         }
+        let followed = canvas.followed.take();
+        if let Some(name) = followed {
+            self.go_to_slide_named(&name);
+            ui.ctx().request_repaint();
+        }
 
         self.show.over_link =
             ui.ctx().output(|output| output.cursor_icon) == egui::CursorIcon::PointingHand;
@@ -1280,36 +1293,70 @@ impl SlideView {
                 })
                 .unwrap_or(0)
         };
-        let last = count.saturating_sub(1);
+        let shown = self.shown_slides(count);
+        let after = shown.iter().copied().find(|&slide| slide > self.slide);
+        let before = shown
+            .iter()
+            .rev()
+            .copied()
+            .find(|&slide| slide < self.slide);
         if keys.forward {
             if self.show.step < builds(self, self.slide) {
                 self.show.step += 1;
-            } else if self.slide < last {
-                self.show_slide(self.slide + 1);
+            } else if let Some(next) = after {
+                self.show_slide(next);
             }
         }
         if keys.back {
             if self.show.step > 0 {
                 self.show.step -= 1;
-            } else if self.slide > 0 {
-                self.show_slide(self.slide - 1);
+            } else if let Some(previous) = before {
+                self.show_slide(previous);
                 self.show.step = builds(self, self.slide);
             }
         }
-        if keys.next {
-            self.show_slide((self.slide + 1).min(last));
+        if keys.next
+            && let Some(next) = after
+        {
+            self.show_slide(next);
         }
-        if keys.previous && self.slide > 0 {
-            self.show_slide(self.slide - 1);
+        if keys.previous
+            && let Some(previous) = before
+        {
+            self.show_slide(previous);
             self.show.step = builds(self, self.slide);
         }
-        if keys.first {
-            self.show_slide(0);
+        if keys.first
+            && let Some(&first) = shown.first()
+        {
+            self.show_slide(first);
             self.show.step = 0;
         }
-        if keys.last {
+        if keys.last
+            && let Some(&last) = shown.last()
+        {
             self.show_slide(last);
             self.show.step = 0;
+        }
+    }
+
+    /// The slides a show goes through: all but the ones the deck hides, or
+    /// every slide where it hides them all.
+    fn shown_slides(&self, count: usize) -> Vec<usize> {
+        let Some(document) = &self.document else {
+            return (0..count).collect();
+        };
+        let slides = document.slides();
+        let shown: Vec<usize> = slides
+            .iter()
+            .enumerate()
+            .filter(|(_, slide)| !document.is_hidden(slide))
+            .map(|(index, _)| index)
+            .collect();
+        if shown.is_empty() {
+            (0..slides.len()).collect()
+        } else {
+            shown
         }
     }
 
@@ -1799,5 +1846,41 @@ mod tests {
         view.act(Action::Move(super::pos2(20.0, 10.0)), 1.0, &mut editing);
         view.act(Action::End, 1.0, &mut editing);
         assert_ne!(editing.revision(), begun);
+    }
+
+    #[test]
+    fn a_show_skips_the_slides_it_hides() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/export.odp"),
+        )
+        .expect("the fixture");
+        let mut view = SlideView {
+            document: Some(Presentation::read(&bytes).expect("it reads")),
+            ..SlideView::default()
+        };
+        view.start_show(0);
+        let forward = ShowKeys {
+            forward: true,
+            back: false,
+            next: false,
+            previous: false,
+            first: false,
+            last: false,
+            leave: false,
+        };
+        for _ in 0..10 {
+            view.walk_show(forward, 4);
+        }
+        assert_eq!(view.slide, 2, "the hidden fourth slide is not shown");
+        view.walk_show(
+            ShowKeys {
+                forward: false,
+                last: true,
+                ..forward
+            },
+            4,
+        );
+        assert_eq!(view.slide, 2);
     }
 }

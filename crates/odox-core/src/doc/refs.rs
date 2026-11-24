@@ -131,6 +131,26 @@ pub(super) fn split_addresses(text: &str) -> Vec<&str> {
     parts
 }
 
+/// Split `text` at every space that is not inside single quotes, keeping the
+/// empty pieces, so that joining them with a space gives `text` back.
+fn split_spaces(text: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut quoted = false;
+    let mut start = 0;
+    for (at, c) in text.char_indices() {
+        match c {
+            '\'' => quoted = !quoted,
+            ' ' if !quoted => {
+                parts.push(&text[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&text[start..]);
+    parts
+}
+
 /// Split `text` at the first `:` that is not inside single quotes.
 fn split_range(text: &str) -> Vec<&str> {
     let mut parts = Vec::new();
@@ -527,8 +547,8 @@ pub fn rename_in_formula(formula: &str, from: &str, to: &str) -> Result<String, 
 ///
 /// An address this module cannot read.
 pub fn rename_in_addresses(addresses: &str, from: &str, to: &str) -> Result<String, Refusal> {
-    addresses
-        .split(' ')
+    split_spaces(addresses)
+        .into_iter()
         .map(|address| {
             if address.is_empty() {
                 Ok(String::new())
@@ -555,8 +575,8 @@ pub fn naming_in_formula(formula: &str, sheet: &str) -> Option<String> {
 
 /// The same for addresses that stand alone.
 pub fn naming_in_addresses(addresses: &str, sheet: &str) -> Option<String> {
-    addresses
-        .split(' ')
+    split_spaces(addresses)
+        .into_iter()
         .find(|address| !address.is_empty() && names(address, sheet))
         .map(ToOwned::to_owned)
 }
@@ -603,6 +623,19 @@ mod tests {
         assert_eq!(
             rename_in_addresses("Sheet1.A1:Sheet1.D9 Other.B2", "Sheet1", "Q 1").unwrap(),
             "'Q 1'.A1:'Q 1'.D9 Other.B2"
+        );
+    }
+
+    #[test]
+    fn a_sheet_name_with_a_space_renames_whole() {
+        assert_eq!(
+            rename_in_addresses("'Q1 Sales'.A1:'Q1 Sales'.D9 Other.B2", "Q1 Sales", "Totals")
+                .unwrap(),
+            "Totals.A1:Totals.D9 Other.B2"
+        );
+        assert_eq!(
+            naming_in_addresses("Other.B2 'Q1 Sales'.A1", "Q1 Sales").as_deref(),
+            Some("'Q1 Sales'.A1")
         );
     }
 

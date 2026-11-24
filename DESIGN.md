@@ -238,8 +238,9 @@ repeats. A shape whose style turns its shadow on casts it first: its own outline
 again, moved by the style's offset on the page, so a turned shape's shadow is
 not turned with it, stroked and, where the shape is filled or frames a
 picture, filled in the shadow's colour, at the shadow's opacity times the
-shape's own. A translucent outline over its translucent fill is darker where
-the two overlap. A blur is not drawn, a dimension line
+shape's own. Around a fill, the shadow's outline lies outside the edge at
+half its width, covering what the shape's own outline covers without lying a
+second time over the fill. A blur is not drawn, a dimension line
 and a label cast nothing, and in the PDF the shadow is decoration. A `draw:path`
 states SVG path data, an elliptical arc becoming the straight line to its end. A
 connector is positioned by the two ends it joins, takes the route the producer
@@ -304,6 +305,10 @@ while it is true the shell draws no menu, no panel and no bar, takes none of
 its keys, puts the window full screen and fills the central panel with black,
 and the view draws one slide as large as the screen allows, keeping its shape.
 It is the view's own mode, so the keys that move through a show are the view's.
+A show passes over the slides whose drawing-page style says
+`presentation:visibility="hidden"`, unless every slide does, and Shift+F5 on a
+hidden one starts at the next shown. A link to another slide of the deck goes
+to it.
 
 **A show reveals a slide's builds click by click** (`doc/anim.rs`). The
 slide's main sequence is read into steps: each effect that starts on a click
@@ -464,7 +469,11 @@ and kept. Numbers, words with a digit, and web and mail addresses are not
 words. A word a dictionary does not know has a red wave under it; a right click
 on it offers up to five replacements, each one step to undo, Add to
 dictionary, which keeps it in `words.txt` beside `settings.toml`, and Ignore,
-which takes it as spelled until the application closes.
+which takes it as spelled until the application closes. An added word is taken
+as a dictionary takes its own: as written and in capitals, and one written in
+small letters also with a capital first. A window reads `words.txt` again when
+it is focused and the file has changed, and a word the file could not take is
+ignored until the application closes, with the reason shown.
 
 **A cell is edited in place.** Typing on the picked cell replaces it, Enter or
 F2 opens it with what it holds, Enter commits and moves down, Tab commits and

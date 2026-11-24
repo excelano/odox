@@ -429,6 +429,8 @@ struct Run<'a> {
     /// How far it is raised off the baseline of the text it sits in, in
     /// screen points.
     rise: f32,
+    /// Whether it is inside a link, which every run in it is drawn as.
+    link: bool,
 }
 
 impl Flow<'_> {
@@ -874,6 +876,7 @@ impl Flow<'_> {
             palette: self.palette,
             counted: true,
             rise: rise_of(&properties.text, size, self.zoom),
+            link: false,
         };
         self.runs(element, &run, &mut job, &mut frames);
 
@@ -919,6 +922,7 @@ impl Flow<'_> {
             palette,
             counted,
             rise,
+            link,
         } = *run;
         let mut small = format.clone();
         small.font_id.size *= SMALL_CAPS;
@@ -963,25 +967,16 @@ impl Flow<'_> {
                         }
                     } else if element.is(&Ns::Text, "line-break") {
                         put(job, "\n", 1);
-                    } else if element.is(&Ns::Text, "span") {
+                    } else if element.is(&Ns::Text, "span") || element.is(&Ns::Text, "a") {
+                        let link = link || element.is(&Ns::Text, "a");
                         let style = self.style_of(element, &Family::Text);
                         let merged = style.text.over(inherited);
                         let inner_size = format::size_of(&merged, size);
-                        let inner = format::text_format(&merged, size, self.zoom, palette);
-                        let run = Run {
-                            inherited: &merged,
-                            size: inner_size,
-                            format: &inner,
-                            palette,
-                            counted,
-                            rise: rise_of(&merged, inner_size, self.zoom),
+                        let inner = if link {
+                            format::link_format(&merged, size, self.zoom, palette)
+                        } else {
+                            format::text_format(&merged, size, self.zoom, palette)
                         };
-                        self.runs(element, &run, job, frames);
-                    } else if element.is(&Ns::Text, "a") {
-                        let style = self.style_of(element, &Family::Text);
-                        let merged = style.text.over(inherited);
-                        let inner_size = format::size_of(&merged, size);
-                        let inner = format::link_format(&merged, size, self.zoom, palette);
                         let run = Run {
                             inherited: &merged,
                             size: inner_size,
@@ -989,6 +984,7 @@ impl Flow<'_> {
                             palette,
                             counted,
                             rise: rise_of(&merged, inner_size, self.zoom),
+                            link,
                         };
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Draw, "frame") {
