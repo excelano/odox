@@ -14,7 +14,9 @@ use std::cell::OnceCell;
 use std::ops::Range;
 
 use eframe::egui::Id;
-use egui_richedit::{Edit, Fragment, Mark, Model, Position, Property, RichEdit, Selection, Value};
+use egui_richedit::{
+    Edit, Fragment, Mark, Model, Position, Property, RichEdit, Script, Selection, Value,
+};
 use odox_core::edit::{self, TableEdit, html, is_paragraph};
 use odox_core::{Element, Kept, ListKind, Ns, Package, Refused, Styles, TextAlign};
 
@@ -753,7 +755,22 @@ fn core_setting(value: Value) -> edit::Setting {
         Value::Family(family) => edit::Setting::Family(family),
         #[allow(clippy::cast_precision_loss)]
         Value::Size(twentieths) => edit::Setting::Size(twentieths as f32 / 20.0),
+        Value::Color(color) => edit::Setting::Color(color.map(core_color)),
+        Value::Highlight(color) => edit::Setting::Highlight(color.map(core_color)),
+        Value::Script(script) => edit::Setting::Script(match script {
+            Script::Normal => edit::Script::Normal,
+            Script::Super => edit::Script::Super,
+            Script::Sub => edit::Script::Sub,
+        }),
     }
+}
+
+fn core_color([r, g, b]: [u8; 3]) -> odox_core::Color {
+    odox_core::Color { r, g, b }
+}
+
+fn editor_color(color: odox_core::Color) -> [u8; 3] {
+    [color.r, color.g, color.b]
 }
 
 /// A value the library read, as the editor shows it.
@@ -761,6 +778,13 @@ fn editor_value(setting: edit::Setting) -> Option<Value> {
     match setting {
         edit::Setting::Family(family) => Some(Value::Family(family)),
         edit::Setting::Size(points) => Some(Value::Size(twentieths(points))),
+        edit::Setting::Color(color) => Some(Value::Color(color.map(editor_color))),
+        edit::Setting::Highlight(color) => Some(Value::Highlight(color.map(editor_color))),
+        edit::Setting::Script(script) => Some(Value::Script(match script {
+            edit::Script::Normal => Script::Normal,
+            edit::Script::Super => Script::Super,
+            edit::Script::Sub => Script::Sub,
+        })),
         edit::Setting::Mark(..) => None,
     }
 }
@@ -845,6 +869,9 @@ impl Model for FlowModel<'_> {
         let property = match property {
             Property::Family => edit::TextProperty::Family,
             Property::Size => edit::TextProperty::Size,
+            Property::Color => edit::TextProperty::Color,
+            Property::Highlight => edit::TextProperty::Highlight,
+            Property::Script => edit::TextProperty::Script,
         };
         let ranges: Vec<_> = self
             .covered(from, to)?

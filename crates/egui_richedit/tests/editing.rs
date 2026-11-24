@@ -987,3 +987,17 @@ fn a_caret_put_down_in_the_frame_a_button_is_clicked_keeps_the_keyboard() {
     frame(&mut editor, vec![Event::Text(">".to_owned())]);
     assert_eq!(model.paragraphs, ["Hello", ">world"]);
 }
+
+#[test]
+fn typing_after_setting_color_uses_it() {
+    let mut h = Harness::new(&["ab"]);
+    h.caret(0, 1);
+    let red = Value::Color(Some([0xc0, 0, 0]));
+    assert!(!h.editor.set(&mut h.model, red.clone()));
+    h.typed("x");
+    assert_eq!(
+        h.model.values,
+        [(Position::new(0, 1), Position::new(0, 2), red)]
+    );
+    assert_eq!(h.model.steps, 1, "the typing and its colour are one step");
+}

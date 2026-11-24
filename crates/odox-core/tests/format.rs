@@ -12,8 +12,10 @@
 
 use std::path::{Path, PathBuf};
 
-use odox_core::edit::{Mark, format, marked, text};
-use odox_core::{Element, Family, Node, Ns, Package, Refused, Styles, xml};
+use odox_core::edit::{
+    Mark, Script, Setting, TextProperty, format, marked, set_text, text, text_value,
+};
+use odox_core::{Color, Element, Family, Node, Ns, Package, Refused, Styles, xml};
 
 fn corpus() -> Vec<PathBuf> {
     let mut documents = Vec::new();
@@ -485,4 +487,154 @@ fn a_document_that_does_not_declare_the_namespace_is_refused() {
         Err(Refused::Namespace)
     );
     assert!(content == original);
+}
+
+const RED: Color = Color {
+    r: 0xc0,
+    g: 0x00,
+    b: 0x00,
+};
+const YELLOW: Color = Color {
+    r: 0xff,
+    g: 0xff,
+    b: 0x00,
+};
+
+fn reads(content: &Element, path: &[usize], property: TextProperty) -> Option<Setting> {
+    text_value(
+        content.at(path).expect("the paragraph"),
+        4..7,
+        property,
+        &styles_of(content),
+    )
+}
+
+#[test]
+fn color_on_selection_writes_fo_color() {
+    let (mut content, path) = document("", "one two three");
+    let mut styles = styles_of(&content);
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Color(Some(RED)),
+        &mut styles,
+    )
+    .expect("red");
+    assert_eq!(
+        inside(&content, &path),
+        r#"one <text:span text:style-name="T1">two</text:span> three"#
+    );
+    assert_eq!(
+        text_properties(&content, "T1").attr(&Ns::Fo, "color"),
+        Some("#c00000")
+    );
+    assert_eq!(
+        reads(&content, &path, TextProperty::Color),
+        Some(Setting::Color(Some(RED)))
+    );
+}
+
+#[test]
+fn automatic_color_removes_it() {
+    let (original, path) = document("", "one two three");
+    let mut content = original.clone();
+    let mut styles = styles_of(&content);
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Color(Some(RED)),
+        &mut styles,
+    )
+    .expect("red");
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Color(None),
+        &mut styles,
+    )
+    .expect("automatic");
+    assert!(
+        content.at(&path) == original.at(&path),
+        "{}",
+        inside(&content, &path)
+    );
+    assert_eq!(
+        reads(&content, &path, TextProperty::Color),
+        Some(Setting::Color(None))
+    );
+}
+
+#[test]
+fn highlight_none_removes_background() {
+    let (original, path) = document("", "one two three");
+    let mut content = original.clone();
+    let mut styles = styles_of(&content);
+    let yellow = Setting::Highlight(Some(YELLOW));
+    set_text(&mut content, &path, 4..7, &yellow, &mut styles).expect("highlighted");
+    assert_eq!(
+        text_properties(&content, "T1").attr(&Ns::Fo, "background-color"),
+        Some("#ffff00")
+    );
+    assert_eq!(
+        reads(&content, &path, TextProperty::Highlight),
+        Some(yellow)
+    );
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Highlight(None),
+        &mut styles,
+    )
+    .expect("none");
+    assert!(
+        content.at(&path) == original.at(&path),
+        "{}",
+        inside(&content, &path)
+    );
+}
+
+#[test]
+fn superscript_toggles_off() {
+    let (original, path) = document("", "one two three");
+    let mut content = original.clone();
+    let mut styles = styles_of(&content);
+    let raised = Setting::Script(Script::Super);
+    set_text(&mut content, &path, 4..7, &raised, &mut styles).expect("raised");
+    assert_eq!(
+        text_properties(&content, "T1").attr(&Ns::Style, "text-position"),
+        Some("super 58%")
+    );
+    assert_eq!(reads(&content, &path, TextProperty::Script), Some(raised));
+    let normal = Setting::Script(Script::Normal);
+    set_text(&mut content, &path, 4..7, &normal, &mut styles).expect("on the line");
+    assert!(
+        content.at(&path) == original.at(&path),
+        "{}",
+        inside(&content, &path)
+    );
+}
+
+#[test]
+fn superscript_and_subscript_exclusive() {
+    let (mut content, path) = document("", "one two three");
+    let mut styles = styles_of(&content);
+    let raised = Setting::Script(Script::Super);
+    let lowered = Setting::Script(Script::Sub);
+    set_text(&mut content, &path, 4..7, &raised, &mut styles).expect("raised");
+    set_text(&mut content, &path, 4..7, &lowered, &mut styles).expect("lowered");
+    assert_eq!(reads(&content, &path, TextProperty::Script), Some(lowered));
+    let span = inside(&content, &path);
+    let name = span
+        .split("text:style-name=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("a span");
+    assert_eq!(
+        text_properties(&content, name).attr(&Ns::Style, "text-position"),
+        Some("sub 58%")
+    );
 }

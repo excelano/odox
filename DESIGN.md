@@ -757,14 +757,19 @@ the first time the list opens; a family the window did not load when the
 document opened is loaded when it is picked. The size is typed into the box
 beside it and given with Enter, or picked from the sizes offered beside the
 box, and Ctrl+] and Ctrl+[ or Format > Larger and Smaller step it to the next
-size offered. With a caret and nothing selected, a mark or a value goes to what
+size offered. The font colour and highlight buttons after the marks each give
+the colour they last gave, starting from LibreOffice's dark red and yellow,
+and their arrows open the standard palette's greys, lightest and light tints
+and full colours, with the automatic ink or no highlight above it; Format >
+Superscript and Subscript, Ctrl+Shift+P and Ctrl+Shift+B, raise or lower the
+selection or put it back on the line where it already is. With a caret and nothing selected, a mark or a value goes to what
 is typed next at the caret, and moving the caret forgets it. A button is lit,
 and the family and the size are shown, where the whole selection has them, and
 for a caret where the text typed there would; a selection that differs shows
 the family or the size blank. Each is one undo step, and a mark or a value put
 on with typing is the same step as the typing. `egui_richedit` carries the
-family and the size as `Value`s beside its marks, the vocabulary fixed as the
-marks' is. A spreadsheet cell is formatted whole, as its own paragraph says
+family, the size, the colour, the highlight and the script as `Value`s beside
+its marks, the vocabulary fixed as the marks' is. A spreadsheet cell is formatted whole, as its own paragraph says
 below.
 
 **A mark, a family or a size changes spans and automatic styles and nothing
@@ -782,7 +787,11 @@ A family is written for Western text only, as `style:font-name` naming a
 already there for the family, or one written for it, and a document without
 the container is given one before its automatic styles. A size stated as a
 share of another reads as no size a person asked for, so text in it is given
-the size outright. A span's style is an automatic style in
+the size outright. A colour is `fo:color` and a highlight `fo:background-color`,
+and the automatic ink or no highlight is written by taking the attribute away,
+so a colour the paragraph's own style gives stays. Superscript and subscript
+are `style:text-position` as `super 58%` and `sub 58%`, LibreOffice's values,
+and back on the line is `0% 100%` where something around says otherwise. A span's style is an automatic style in
 `content.xml`, one the document already holds wherever one says the same, and
 otherwise a new one named `T` and the first number no text style has; `Styles`
 learns of each as it is written and forgets none, so an undo never frees a name

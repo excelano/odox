@@ -145,6 +145,34 @@ pub enum Property {
     Family,
     /// The size.
     Size,
+    /// The ink.
+    Color,
+    /// The highlight behind the characters.
+    Highlight,
+    /// On the line, raised or lowered.
+    Script,
+}
+
+impl Property {
+    /// Every property.
+    pub const ALL: [Self; 5] = [
+        Self::Family,
+        Self::Size,
+        Self::Color,
+        Self::Highlight,
+        Self::Script,
+    ];
+}
+
+/// Where a run sits against the line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Script {
+    /// On the baseline.
+    Normal,
+    /// Raised.
+    Super,
+    /// Lowered.
+    Sub,
 }
 
 /// A value of a [`Property`]. Like [`Mark`], the set is fixed.
@@ -155,6 +183,12 @@ pub enum Value {
     /// A size, in twentieths of a point, which holds every size a person
     /// types to a twentieth.
     Size(u32),
+    /// An ink as red, green and blue, or `None` for the automatic one.
+    Color(Option<[u8; 3]>),
+    /// A highlight as red, green and blue, or `None` for none.
+    Highlight(Option<[u8; 3]>),
+    /// Where the run sits against the line.
+    Script(Script),
 }
 
 impl Value {
@@ -163,6 +197,9 @@ impl Value {
         match self {
             Self::Family(_) => Property::Family,
             Self::Size(_) => Property::Size,
+            Self::Color(_) => Property::Color,
+            Self::Highlight(_) => Property::Highlight,
+            Self::Script(_) => Property::Script,
         }
     }
 }

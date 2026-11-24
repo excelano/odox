@@ -24,7 +24,7 @@ use super::{
     text,
 };
 use crate::style::{Family, Styles, TextProperties};
-use crate::value::Measure;
+use crate::value::{Color, Measure};
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
 /// What a range of text is given: a mark on or off, a font family by the name
@@ -37,6 +37,23 @@ pub enum Setting {
     Family(String),
     /// A size, in points.
     Size(f32),
+    /// The ink, or `None` for the automatic colour.
+    Color(Option<Color>),
+    /// The highlight behind the characters, or `None` for none.
+    Highlight(Option<Color>),
+    /// On the baseline, raised or lowered.
+    Script(Script),
+}
+
+/// Where a run sits against the line: on it, raised, or lowered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Script {
+    /// On the baseline, at the text's own size.
+    Normal,
+    /// Superscript.
+    Super,
+    /// Subscript.
+    Sub,
 }
 
 /// A property of text that takes a value: the family or the size.
@@ -46,6 +63,12 @@ pub enum TextProperty {
     Family,
     /// The size.
     Size,
+    /// The ink.
+    Color,
+    /// The highlight.
+    Highlight,
+    /// Superscript or subscript.
+    Script,
 }
 
 /// What a property reads as at some text, compared with what a setting asks
@@ -56,6 +79,12 @@ enum Reading {
     Family(String),
     Hundredths(i64),
     Relative,
+    Color(Option<Color>),
+    Script(Script),
+}
+
+fn hex(color: Color) -> String {
+    format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
 }
 
 /// A size in points, in hundredths, which is as fine as a size is compared.
@@ -75,6 +104,15 @@ impl Setting {
                 Measure::Absolute(length) => Reading::Hundredths(hundredths(length.points())),
                 Measure::Relative(_) => Reading::Relative,
             }),
+            Self::Color(_) => properties.color.map(|c| Reading::Color(Some(c))),
+            Self::Highlight(_) => properties.background.map(|c| Reading::Color(Some(c))),
+            Self::Script(_) => properties.position.map(|position| {
+                Reading::Script(match position.rise {
+                    rise if rise > 0.0 => Script::Super,
+                    rise if rise < 0.0 => Script::Sub,
+                    _ => Script::Normal,
+                })
+            }),
         }
     }
 
@@ -84,6 +122,8 @@ impl Setting {
             Self::Mark(..) => Reading::Flag(false),
             Self::Family(_) => Reading::Family(String::new()),
             Self::Size(_) => Reading::Hundredths(0),
+            Self::Color(_) | Self::Highlight(_) => Reading::Color(None),
+            Self::Script(_) => Reading::Script(Script::Normal),
         }
     }
 
@@ -93,6 +133,8 @@ impl Setting {
             Self::Mark(_, on) => Reading::Flag(*on),
             Self::Family(family) => Reading::Family(family.clone()),
             Self::Size(points) => Reading::Hundredths(hundredths(*points)),
+            Self::Color(color) | Self::Highlight(color) => Reading::Color(*color),
+            Self::Script(script) => Reading::Script(*script),
         }
     }
 
@@ -117,6 +159,9 @@ impl Setting {
                 (Ns::Style, "font-size-rel-asian"),
                 (Ns::Style, "font-size-rel-complex"),
             ],
+            Self::Color(_) => vec![(Ns::Fo, "color"), (Ns::Style, "use-window-font-color")],
+            Self::Highlight(_) => vec![(Ns::Fo, "background-color")],
+            Self::Script(_) => vec![(Ns::Style, "text-position")],
         }
     }
 
@@ -145,14 +190,33 @@ impl Setting {
                     (Ns::Style, "font-size-complex", size),
                 ]
             }
+            Self::Color(color) => color
+                .map(|c| (Ns::Fo, "color", hex(c)))
+                .into_iter()
+                .collect(),
+            Self::Highlight(color) => color
+                .map(|c| (Ns::Fo, "background-color", hex(c)))
+                .into_iter()
+                .collect(),
+            Self::Script(script) => {
+                let position = match script {
+                    Script::Normal => "0% 100%",
+                    Script::Super => "super 58%",
+                    Script::Sub => "sub 58%",
+                };
+                vec![(Ns::Style, "text-position", position.to_owned())]
+            }
         }
     }
 
     /// The namespaces the setting is written in, beside the style namespace.
     fn spaces(&self) -> Vec<Ns> {
         match self {
-            Self::Mark(Mark::Bold | Mark::Italic, _) | Self::Size(_) => vec![Ns::Fo],
-            Self::Mark(..) => Vec::new(),
+            Self::Mark(Mark::Bold | Mark::Italic, _)
+            | Self::Size(_)
+            | Self::Color(_)
+            | Self::Highlight(_) => vec![Ns::Fo],
+            Self::Mark(..) | Self::Script(_) => Vec::new(),
             Self::Family(_) => vec![Ns::Svg],
         }
     }
@@ -281,8 +345,14 @@ pub fn text_value(
     let probe = match property {
         TextProperty::Family => Setting::Family(String::new()),
         TextProperty::Size => Setting::Size(0.0),
+        TextProperty::Color => Setting::Color(None),
+        TextProperty::Highlight => Setting::Highlight(None),
+        TextProperty::Script => Setting::Script(Script::Normal),
     };
     match reading(paragraph, range, &probe, styles)? {
+        Reading::Color(color) if property == TextProperty::Color => Some(Setting::Color(color)),
+        Reading::Color(color) => Some(Setting::Highlight(color)),
+        Reading::Script(script) => Some(Setting::Script(script)),
         Reading::Family(family) if !family.is_empty() => Some(Setting::Family(family)),
         #[allow(clippy::cast_precision_loss)]
         Reading::Hundredths(size) if size > 0 => Some(Setting::Size(size as f32 / 100.0)),
