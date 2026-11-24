@@ -638,3 +638,88 @@ fn superscript_and_subscript_exclusive() {
         Some("sub 58%")
     );
 }
+
+#[test]
+fn automatic_on_part_of_a_red_run_takes_it_back_to_the_ink() {
+    let (mut content, path) = document("", "one two three");
+    let mut styles = styles_of(&content);
+    set_text(
+        &mut content,
+        &path,
+        0..13,
+        &Setting::Color(Some(RED)),
+        &mut styles,
+    )
+    .expect("red");
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Color(None),
+        &mut styles,
+    )
+    .expect("automatic");
+    assert_eq!(
+        reads(&content, &path, TextProperty::Color),
+        Some(Setting::Color(None))
+    );
+    let first = text_value(
+        content.at(&path).expect("the paragraph"),
+        0..3,
+        TextProperty::Color,
+        &styles_of(&content),
+    );
+    assert_eq!(first, Some(Setting::Color(Some(RED))));
+}
+
+#[test]
+fn no_highlight_on_part_of_a_highlighted_run_takes_it_away() {
+    let (mut content, path) = document("", "one two three");
+    let mut styles = styles_of(&content);
+    let yellow = Setting::Highlight(Some(YELLOW));
+    set_text(&mut content, &path, 0..13, &yellow, &mut styles).expect("highlighted");
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Highlight(None),
+        &mut styles,
+    )
+    .expect("none");
+    assert_eq!(
+        reads(&content, &path, TextProperty::Highlight),
+        Some(Setting::Highlight(None))
+    );
+}
+
+#[test]
+fn automatic_in_a_coloured_paragraph_style_overrides_it() {
+    let (mut content, path) = document(
+        r##"<style:style style:name="P1" style:family="paragraph"><style:text-properties fo:color="#2f5496"/></style:style>"##,
+        "one two three",
+    );
+    let mut styles = styles_of(&content);
+    set_text(
+        &mut content,
+        &path,
+        4..7,
+        &Setting::Color(None),
+        &mut styles,
+    )
+    .expect("automatic");
+    assert_eq!(
+        reads(&content, &path, TextProperty::Color),
+        Some(Setting::Color(None))
+    );
+    let resolved = |content: &Element| {
+        let span = inside(content, &path);
+        let name = span
+            .split("text:style-name=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .expect("a span")
+            .to_owned();
+        styles_of(content).resolve(&Family::Text, &name).text.color
+    };
+    assert_eq!(resolved(&content), None, "drawn in the automatic ink");
+}

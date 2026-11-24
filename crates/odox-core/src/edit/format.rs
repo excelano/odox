@@ -83,6 +83,16 @@ enum Reading {
     Script(Script),
 }
 
+/// What a colour reads as: the one stated, none where none is stated, and
+/// nothing said otherwise.
+fn colour_reading(color: Option<Color>, none: Option<bool>) -> Option<Reading> {
+    match (color, none) {
+        (Some(color), _) => Some(Reading::Color(Some(color))),
+        (None, Some(true)) => Some(Reading::Color(None)),
+        (None, _) => None,
+    }
+}
+
 fn hex(color: Color) -> String {
     format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
 }
@@ -104,8 +114,8 @@ impl Setting {
                 Measure::Absolute(length) => Reading::Hundredths(hundredths(length.points())),
                 Measure::Relative(_) => Reading::Relative,
             }),
-            Self::Color(_) => properties.color.map(|c| Reading::Color(Some(c))),
-            Self::Highlight(_) => properties.background.map(|c| Reading::Color(Some(c))),
+            Self::Color(_) => colour_reading(properties.color, properties.automatic_color),
+            Self::Highlight(_) => colour_reading(properties.background, properties.transparent),
             Self::Script(_) => properties.position.map(|position| {
                 Reading::Script(match position.rise {
                     rise if rise > 0.0 => Script::Super,
@@ -190,14 +200,13 @@ impl Setting {
                     (Ns::Style, "font-size-complex", size),
                 ]
             }
-            Self::Color(color) => color
-                .map(|c| (Ns::Fo, "color", hex(c)))
-                .into_iter()
-                .collect(),
-            Self::Highlight(color) => color
-                .map(|c| (Ns::Fo, "background-color", hex(c)))
-                .into_iter()
-                .collect(),
+            Self::Color(Some(color)) => vec![(Ns::Fo, "color", hex(*color))],
+            Self::Color(None) => vec![(Ns::Style, "use-window-font-color", "true".to_owned())],
+            Self::Highlight(color) => vec![(
+                Ns::Fo,
+                "background-color",
+                color.map_or_else(|| "transparent".to_owned(), hex),
+            )],
             Self::Script(script) => {
                 let position = match script {
                     Script::Normal => "0% 100%",

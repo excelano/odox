@@ -270,8 +270,16 @@ pub struct TextProperties {
     pub strike: Option<bool>,
     /// Ink colour.
     pub color: Option<Color>,
+    /// Whether the ink is stated to be the automatic one,
+    /// `style:use-window-font-color="true"`, which a parent's colour does
+    /// not show through.
+    pub automatic_color: Option<bool>,
     /// Highlight behind the characters.
     pub background: Option<Color>,
+    /// Whether the highlight is stated to be none,
+    /// `fo:background-color="transparent"`, which a parent's does not show
+    /// through.
+    pub transparent: Option<bool>,
     /// Superscript or subscript.
     pub position: Option<Position>,
     /// Drawn in capitals whatever the text says.
@@ -282,6 +290,16 @@ pub struct TextProperties {
     /// Hidden, `text:display="none"`: text the author keeps in the document
     /// and out of print.
     pub hidden: Option<bool>,
+}
+
+/// A colour over a parent's: the one stated, none where none is stated, and
+/// otherwise the parent's.
+fn stated(own: Option<Color>, none: Option<bool>, parent: Option<Color>) -> Option<Color> {
+    match (own, none) {
+        (Some(color), _) => Some(color),
+        (None, Some(true)) => None,
+        (None, _) => parent,
+    }
 }
 
 /// The size a small capital is drawn at, as a share of the text's.
@@ -301,8 +319,18 @@ impl TextProperties {
             italic: self.italic.or(parent.italic),
             underline: self.underline.or(parent.underline),
             strike: self.strike.or(parent.strike),
-            color: self.color.or(parent.color),
-            background: self.background.or(parent.background),
+            color: stated(self.color, self.automatic_color, parent.color),
+            automatic_color: self
+                .color
+                .map(|_| false)
+                .or(self.automatic_color)
+                .or(parent.automatic_color),
+            background: stated(self.background, self.transparent, parent.background),
+            transparent: self
+                .background
+                .map(|_| false)
+                .or(self.transparent)
+                .or(parent.transparent),
             position: self.position.or(parent.position),
             uppercase: self.uppercase.or(parent.uppercase),
             small_caps: self.small_caps.or(parent.small_caps),
@@ -1688,9 +1716,15 @@ impl TextProperties {
         }
         if let Some(color) = p.attr(&Ns::Fo, "color") {
             self.color = Color::parse(color);
+            self.automatic_color = Some(false);
+        }
+        if p.attr(&Ns::Style, "use-window-font-color") == Some("true") {
+            self.color = None;
+            self.automatic_color = Some(true);
         }
         if let Some(color) = p.attr(&Ns::Fo, "background-color") {
             self.background = Color::parse(color);
+            self.transparent = Some(color == "transparent");
         }
         if let Some(position) = p.attr(&Ns::Style, "text-position") {
             self.position = Some(Position::parse(position));
