@@ -107,7 +107,10 @@ centered, right and justified, for the paragraphs the selection runs over, in
 `xodt` and on a slide alike, and beside them buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
-off. The Format menu offers the same commands, and in `xodp` the marks. The
+off. The Format menu offers the same commands, a heading of any level from 1
+to 10 under Format > Heading, and in `xodp` the marks. Alt+Shift+Left and
+Alt+Shift+Right move every heading the selection runs over a level up or down,
+as Format > Promote heading and Demote heading do. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
 last one adds a row. The Picture button, or Format > Insert a picture…, puts a

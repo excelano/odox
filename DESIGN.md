@@ -853,7 +853,13 @@ them in, and that ordinal is how the selection is found again afterwards. A
 heading takes the paragraph style the document gives its level, by
 `style:default-outline-level` and then by the name `Heading_20_N`; a document
 with none is given an automatic style in `content.xml` that says size and
-weight, shared by every heading of the level. A heading taken off becomes
+weight, shared by every heading of the level. ODF's ten levels are all
+offered, the toolbar keeping the first three and the Format menu's Heading
+submenu holding every one; `edit::shift_heading` moves a heading a level up
+or down, never past 1 or 10, and leaves body text as it is. Alt+Shift+Left and
+Right are taken for it only when the selection holds a heading, so elsewhere
+they still select by word, and on a Mac, where Alt is Option, they select by
+word everywhere but in a heading. A heading taken off becomes
 a `text:p` in the style most of the body's paragraphs have. A list takes a list
 style the document already has of the kind, bulleted or numbered, and failing
 that one is written, six levels with the usual indents. Paragraphs side by side,

@@ -5,7 +5,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use odox_core::edit::{block_state, heading_level, set_heading, set_list, text};
+use odox_core::edit::{block_state, heading_level, set_heading, set_list, shift_heading, text};
 use odox_core::{Element, ListKind, Ns, Refused, Styles, xml};
 
 const NAMESPACES: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0""#;
@@ -341,4 +341,57 @@ fn a_document_edited_into_headings_and_lists_saves_and_reads_back() {
     let reread = TextDocument::read(&written).expect("it reads again");
     let outline: Vec<_> = reread.outline().iter().map(|h| h.text.clone()).collect();
     assert!(outline.len() >= 5, "{outline:?}");
+}
+
+#[test]
+fn heading_seven_uses_heading_7_style() {
+    let named = styles_part(r#"<style:style style:name="Heading_20_7" style:family="paragraph"/>"#);
+    let mut root = bare("<text:p>Deep</text:p>");
+    let mut styles = Styles::collect(Some(&root), Some(&named));
+    let at = paragraph_path(&root, 0);
+    set_heading(&mut root, &at, Some(7), &mut styles).expect("made");
+    let heading = root.at(&at).expect("still there");
+    assert_eq!(heading.attr(&Ns::Text, "outline-level"), Some("7"));
+    assert_eq!(heading.attr(&Ns::Text, "style-name"), Some("Heading_20_7"));
+
+    let mut root = content("", "<text:p>Deep</text:p>");
+    let mut styles = Styles::collect(Some(&root), None);
+    let at = paragraph_path(&root, 0);
+    set_heading(&mut root, &at, Some(7), &mut styles).expect("made");
+    assert_eq!(heading_level(root.at(&at).expect("there")), Some(7));
+    assert!(serialized(&root).contains(r#"fo:font-size="11pt""#));
+}
+
+#[test]
+fn promote_and_demote_clamp_between_1_and_10() {
+    let mut root = content(
+        "",
+        r#"<text:h text:outline-level="1">Top</text:h><text:h text:outline-level="3">Middle</text:h><text:h text:outline-level="10">Bottom</text:h>"#,
+    );
+    let mut styles = Styles::collect(Some(&root), None);
+    let level = |root: &Element, index| {
+        heading_level(root.at(&paragraph_path(root, index)).expect("there"))
+    };
+    let at = paragraph_path(&root, 0);
+    shift_heading(&mut root, &at, -1, &mut styles).expect("promoted");
+    assert_eq!(level(&root, 0), Some(1));
+    let at = paragraph_path(&root, 1);
+    shift_heading(&mut root, &at, 1, &mut styles).expect("demoted");
+    assert_eq!(level(&root, 1), Some(4));
+    let at = paragraph_path(&root, 1);
+    shift_heading(&mut root, &at, -1, &mut styles).expect("promoted");
+    assert_eq!(level(&root, 1), Some(3));
+    let at = paragraph_path(&root, 2);
+    shift_heading(&mut root, &at, 1, &mut styles).expect("demoted");
+    assert_eq!(level(&root, 2), Some(10));
+}
+
+#[test]
+fn demote_body_text_does_nothing() {
+    let mut root = content("", "<text:p>Body</text:p>");
+    let mut styles = Styles::collect(Some(&root), None);
+    let before = serialized(&root);
+    let at = paragraph_path(&root, 0);
+    shift_heading(&mut root, &at, 1, &mut styles).expect("nothing to do");
+    assert_eq!(serialized(&root), before);
 }

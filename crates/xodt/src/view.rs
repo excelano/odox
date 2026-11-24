@@ -869,6 +869,12 @@ fn toolbar_commands(
     if let Some(block) = block {
         model.apply_block(page, block);
     }
+    if let Some(delta) = pressed.outline.or(match command {
+        Some(Command::Outline(delta)) => Some(delta),
+        _ => None,
+    }) {
+        model.shift_headings(page, delta);
+    }
     let changed = match (command, wanted) {
         (Some(Command::Table(change)), _) => Some(model.edit_table(page, change)),
         (_, Some((rows, columns))) => Some(model.insert_table(page, rows, columns, width)),

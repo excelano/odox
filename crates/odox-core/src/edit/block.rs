@@ -141,6 +141,25 @@ pub fn set_heading(
     Ok(())
 }
 
+/// Move a heading a level up the outline (`delta` below zero) or down it,
+/// staying between 1 and 10. Body text is left as it is.
+///
+/// # Errors
+///
+/// As [`set_heading`].
+pub fn shift_heading(
+    content: &mut Element,
+    path: &[usize],
+    delta: i8,
+    styles: &mut Styles,
+) -> Result<(), Refused> {
+    let Some(level) = content.at(path).and_then(heading_level) else {
+        return Ok(());
+    };
+    let shifted = level.saturating_add_signed(delta).clamp(1, 10);
+    set_heading(content, path, Some(shifted), styles)
+}
+
 /// The style headings of a level take: the document's own, or one written for
 /// the purpose, which is answered too.
 fn heading_style(

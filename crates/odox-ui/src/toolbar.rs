@@ -8,7 +8,7 @@ use egui_richedit::{Mark, Model, Property, Value};
 use odox_core::TextAlign;
 use odox_core::edit::TableEdit;
 
-use crate::i18n::t;
+use crate::i18n::{fill, t};
 use crate::{Block, FlowModel, PageEditor, fonts};
 
 /// What was pressed on the toolbar over a page.
@@ -22,6 +22,8 @@ pub struct Pressed {
     pub align: Option<TextAlign>,
     /// A kind of paragraph's button, for the model to apply.
     pub block: Option<Block>,
+    /// A heading's key to move it up the outline (below zero) or down it.
+    pub outline: Option<i8>,
     /// The table button, which asks how many rows and columns.
     pub table: bool,
     /// The picture button, which asks for a file.
@@ -238,23 +240,34 @@ pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed 
         ui.horizontal(|ui| {
             text_buttons(ui, editor, model, &mut pressed);
             ui.separator();
-            for (block, label, name) in [
-                (Block::Body, "\u{b6}", t("Body text")),
-                (Block::Heading(1), "H1", t("Heading 1")),
-                (Block::Heading(2), "H2", t("Heading 2")),
-                (Block::Heading(3), "H3", t("Heading 3")),
-                (Block::Bullets, "\u{2022}", t("Bulleted list")),
-                (Block::Numbers, "1.", t("Numbered list")),
+            for (block, label) in [
+                (Block::Body, "\u{b6}"),
+                (Block::Heading(1), "H1"),
+                (Block::Heading(2), "H2"),
+                (Block::Heading(3), "H3"),
+                (Block::Bullets, "\u{2022}"),
+                (Block::Numbers, "1."),
             ] {
                 let lit = editor
                     .selection()
                     .is_some_and(|selection| model.is_block(selection, block));
                 if ui
                     .selectable_label(lit, label)
-                    .on_hover_text(name)
+                    .on_hover_text(block_name(block))
                     .clicked()
                 {
                     pressed.block = Some(block);
+                }
+            }
+            if editor.has_focus(ui.ctx())
+                && editor
+                    .selection()
+                    .is_some_and(|selection| model.has_heading(selection))
+            {
+                for (key, delta) in [(Key::ArrowLeft, -1), (Key::ArrowRight, 1)] {
+                    if ui.input_mut(|input| input.consume_key(OUTLINE, key)) {
+                        pressed.outline = Some(delta);
+                    }
                 }
             }
             ui.separator();
@@ -331,6 +344,8 @@ pub enum Command {
     Align(TextAlign),
     /// A kind of paragraph.
     Block(Block),
+    /// Move the headings selected up the outline (below zero) or down it.
+    Outline(i8),
     /// Ask how large a table to put in.
     InsertTable,
     /// Ask for a picture to put in.
@@ -351,24 +366,25 @@ impl Command {
     }
 }
 
-/// The kinds of paragraph, in the order the toolbar and the menu offer them.
-const BLOCKS: [Block; 6] = [
-    Block::Body,
-    Block::Heading(1),
-    Block::Heading(2),
-    Block::Heading(3),
-    Block::Bullets,
-    Block::Numbers,
-];
+/// The keys that, with Left and Right, move a heading up and down the outline.
+const OUTLINE: Modifiers = Modifiers::ALT.plus(Modifiers::SHIFT);
 
-fn block_name(block: Block) -> &'static str {
+/// The levels of heading the Format menu offers, which are all ODF has.
+const LEVELS: std::ops::RangeInclusive<u8> = 1..=10;
+
+/// Every kind of paragraph the menu lights.
+fn every_block() -> impl Iterator<Item = Block> {
+    [Block::Body, Block::Bullets, Block::Numbers]
+        .into_iter()
+        .chain(LEVELS.map(Block::Heading))
+}
+
+fn block_name(block: Block) -> String {
     match block {
-        Block::Body => t("Body text"),
-        Block::Heading(1) => t("Heading 1"),
-        Block::Heading(2) => t("Heading 2"),
-        Block::Heading(_) => t("Heading 3"),
-        Block::Bullets => t("Bulleted list"),
-        Block::Numbers => t("Numbered list"),
+        Block::Body => t("Body text").to_owned(),
+        Block::Heading(level) => fill(t("Heading {level}"), &[("level", &level.to_string())]),
+        Block::Bullets => t("Bulleted list").to_owned(),
+        Block::Numbers => t("Numbered list").to_owned(),
     }
 }
 
@@ -404,8 +420,7 @@ impl MenuState {
                 .collect(),
             align: model.alignment(selection),
             kinds: if blocks {
-                BLOCKS
-                    .into_iter()
+                every_block()
                     .filter(|block| model.is_block(selection, *block))
                     .collect()
             } else {
@@ -422,6 +437,44 @@ impl MenuState {
             ..Self::default()
         }
     }
+}
+
+/// The kinds of paragraph in the Format menu: body text, a heading of any
+/// level, the two lists, and moving headings up and down the outline.
+fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    let mut offer = |ui: &mut Ui, block: Block| {
+        let button = egui::Button::new(block_name(block)).selected(state.kinds.contains(&block));
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Block(block));
+            ui.close();
+        }
+    };
+    offer(ui, Block::Body);
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Heading"), |ui| {
+            for level in LEVELS {
+                offer(ui, Block::Heading(level));
+            }
+        });
+    });
+    offer(ui, Block::Bullets);
+    offer(ui, Block::Numbers);
+    ui.separator();
+    for (delta, name, key) in [
+        (-1, t("Promote heading"), Key::ArrowLeft),
+        (1, t("Demote heading"), Key::ArrowRight),
+    ] {
+        let keys = ui
+            .ctx()
+            .format_shortcut(&KeyboardShortcut::new(OUTLINE, key));
+        let button = egui::Button::new(name).shortcut_text(keys);
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Outline(delta));
+            ui.close();
+        }
+    }
+    chosen
 }
 
 /// The Format menu's entries: the marks, each with its shortcut, a size larger
@@ -462,14 +515,7 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     }
     if state.blocks {
         ui.separator();
-        for block in BLOCKS {
-            let button =
-                egui::Button::new(block_name(block)).selected(state.kinds.contains(&block));
-            if ui.add_enabled(state.enabled, button).clicked() {
-                chosen = Some(Command::Block(block));
-                ui.close();
-            }
-        }
+        chosen = blocks_menu(ui, state).or(chosen);
         ui.separator();
         ui.add_enabled_ui(state.enabled, |ui| {
             ui.menu_button(t("Table"), |ui| {
@@ -517,4 +563,51 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         }
     }
     chosen
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::edit::Editing;
+    use crate::flow_model::{page_editor, page_editor_id};
+    use eframe::egui::{Context, Event, RawInput};
+    use egui_richedit::{Position, Selection};
+    use odox_core::Styles;
+
+    fn outline_pressed(page_has_keyboard: bool) -> Option<i8> {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:h text:outline-level="2">Two</text:h></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let mut editor = page_editor();
+        editor.select(Selection::caret(Position::new(vec![0], 1)));
+        let model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let ctx = Context::default();
+        if page_has_keyboard {
+            ctx.memory_mut(|memory| memory.request_focus(page_editor_id()));
+        }
+        let input = RawInput {
+            events: vec![Event::Key {
+                key: Key::ArrowLeft,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: OUTLINE,
+            }],
+            ..RawInput::default()
+        };
+        let mut pressed = None;
+        let mut output = ctx.run_ui(input, |ui| pressed = text(ui, &editor, &model).outline);
+        output.textures_delta.clear();
+        pressed
+    }
+
+    #[test]
+    fn outline_keys_are_the_pages_only_while_it_has_the_keyboard() {
+        assert_eq!(outline_pressed(true), Some(-1));
+        assert_eq!(outline_pressed(false), None);
+    }
 }

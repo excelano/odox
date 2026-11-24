@@ -252,6 +252,19 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Whether any paragraph a selection runs over is a heading.
+    pub fn has_heading(&self, selection: &Selection<Vec<usize>>) -> bool {
+        self.selected_paragraphs(selection)
+            .is_some_and(|paragraphs| {
+                paragraphs.iter().any(|paragraph| {
+                    let path = [self.root.as_slice(), paragraph].concat();
+                    edit::block_state(self.content, &path, self.styles)
+                        .0
+                        .is_some()
+                })
+            })
+    }
+
     /// Replace each match of a search with a text, last first so that the
     /// offsets of the ones before hold. The first replacement begins an undo
     /// step when `new_step` says so and the rest join it. Answers how many
@@ -296,6 +309,21 @@ impl<'a> FlowModel<'a> {
                 };
                 model.set_lists(paragraphs, (!lit).then_some(kind))
             }
+        })
+    }
+
+    /// Move every heading a selection runs over a level up the outline
+    /// (`delta` below zero) or down it, as one step to undo. Answers whether
+    /// the document changed.
+    pub fn shift_headings(&mut self, editor: &mut PageEditor, delta: i8) -> bool {
+        self.over_paragraphs(editor, |model, paragraphs| {
+            for paragraph in paragraphs {
+                let before = model.content.children.len();
+                let path = [model.root.as_slice(), paragraph].concat();
+                edit::shift_heading(model.content, &path, delta, model.styles).ok()?;
+                model.follow_styles(before);
+            }
+            Some(())
         })
     }
 
@@ -1424,5 +1452,41 @@ mod tests {
             steps += 1;
         }
         assert_eq!(steps, 2, "the typing and the paste");
+    }
+
+    #[test]
+    fn shifting_headings_moves_each_selected_heading_and_undo_restores_tree() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:automatic-styles/><office:body><office:text><text:h text:outline-level="1">One</text:h><text:h text:outline-level="2">Two</text:h><text:p>Body</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let original = content.clone();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection {
+            anchor: Position::new(vec![0], 0),
+            focus: Position::new(vec![2], 2),
+        });
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![1, 0], &mut editing);
+        assert!(model.shift_headings(&mut editor, 1));
+        let level = |content: &Element, index: usize| {
+            content
+                .at(&[1, 0, index])
+                .and_then(odox_core::edit::heading_level)
+        };
+        assert_eq!(
+            (level(&content, 0), level(&content, 1), level(&content, 2)),
+            (Some(2), Some(3), None)
+        );
+        let mut current = holding(&content);
+        let mut undone = 0;
+        while editing.undo(&mut current, None).is_some() {
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
+        assert_eq!(current.content, original);
     }
 }
