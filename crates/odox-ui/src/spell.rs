@@ -15,8 +15,39 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 
 use std::io::Write as _;
 
+mod codepages;
+
 use eframe::egui;
-pub use spellbook::Dictionary;
+/// A dictionary, with the scripts its letters are written in.
+pub struct Lexicon {
+    dictionary: spellbook::Dictionary,
+    /// The scripts of the letters its affix file tries in a suggestion, by
+    /// [`script`]; none where it names none, and every word is then checked.
+    scripts: Vec<u32>,
+}
+
+impl Lexicon {
+    /// Whether a word is in letters this dictionary is written in.
+    fn writes(&self, word: &str) -> bool {
+        self.scripts.is_empty()
+            || word
+                .chars()
+                .filter(|c| c.is_alphabetic())
+                .all(|c| self.scripts.contains(&script(c)))
+    }
+}
+
+/// Which script a letter is in, as the start of its Unicode block, Latin's
+/// several blocks taken as one.
+fn script(c: char) -> u32 {
+    let point = u32::from(c);
+    match point {
+        0..=0x024F | 0x1E00..=0x1EFF => 0,
+        0x0370..=0x03FF | 0x1F00..=0x1FFF => 0x0370,
+        0x0400..=0x052F => 0x0400,
+        _ => point & !0x7F,
+    }
+}
 
 /// The most suggestions offered for a word.
 const SUGGESTIONS: usize = 5;
@@ -28,7 +59,7 @@ const REMEMBERED: usize = 4096;
 #[derive(Clone)]
 enum Loaded {
     Reading,
-    Ready(Arc<Dictionary>),
+    Ready(Arc<Lexicon>),
     Missing,
 }
 
@@ -89,7 +120,7 @@ impl Speller {
 
     /// The dictionary for a language, if it has been read; the first time a
     /// language is asked for, it is read on a thread of its own.
-    pub fn for_language(&'static self, tag: &str) -> Option<Arc<Dictionary>> {
+    pub fn for_language(&'static self, tag: &str) -> Option<Arc<Lexicon>> {
         let mut loaded = self.loaded.lock().unwrap_or_else(PoisonError::into_inner);
         match loaded.get(tag) {
             Some(Loaded::Ready(dictionary)) => return Some(Arc::clone(dictionary)),
@@ -112,7 +143,7 @@ impl Speller {
     }
 
     /// The dictionary for a language, read now where it has not been.
-    pub fn dictionary(&self, tag: &str) -> Option<Arc<Dictionary>> {
+    pub fn dictionary(&self, tag: &str) -> Option<Arc<Lexicon>> {
         let mut loaded = self.loaded.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(Loaded::Ready(dictionary)) = loaded.get(tag) {
             return Some(Arc::clone(dictionary));
@@ -128,13 +159,28 @@ impl Speller {
     fn read(&self, tag: &str) -> Loaded {
         find(&self.folders, tag)
             .and_then(|(aff, dic)| {
-                let aff = decoded(&std::fs::read(aff).ok()?, None)?;
-                let set = aff
+                let aff = std::fs::read(aff).ok()?;
+                let set = encoding_of(&aff);
+                let aff = decoded(&aff, set.as_deref())?;
+                let dic = decoded(&std::fs::read(dic).ok()?, set.as_deref())?;
+                let mut scripts: Vec<u32> = aff
                     .lines()
-                    .find_map(|line| line.strip_prefix("SET "))
-                    .map(str::trim);
-                let dic = decoded(&std::fs::read(dic).ok()?, set)?;
-                Dictionary::new(&aff, &dic).ok()
+                    .find_map(|line| line.strip_prefix("TRY "))
+                    .map(|letters| {
+                        letters
+                            .chars()
+                            .filter(|c| c.is_alphabetic())
+                            .map(script)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                scripts.sort_unstable();
+                scripts.dedup();
+                let dictionary = spellbook::Dictionary::new(&aff, &dic).ok()?;
+                Some(Lexicon {
+                    dictionary,
+                    scripts,
+                })
             })
             .map_or(Loaded::Missing, |dictionary| {
                 Loaded::Ready(Arc::new(dictionary))
@@ -168,7 +214,7 @@ impl Speller {
 
     /// The words of a text a dictionary does not know, leaving out numbers,
     /// addresses and the person's own words.
-    pub fn check(&self, dictionary: &Dictionary, text: &str) -> Vec<Range<usize>> {
+    pub fn check(&self, lexicon: &Lexicon, text: &str) -> Vec<Range<usize>> {
         let skipped = addresses(text);
         let chars: Vec<char> = text.chars().collect();
         let own = self.own.read().unwrap_or_else(PoisonError::into_inner);
@@ -185,15 +231,16 @@ impl Speller {
                 !word.chars().any(char::is_numeric)
                     && !own.contains(&word)
                     && !ignored.contains(&word)
-                    && !dictionary.check(&word)
+                    && lexicon.writes(&word)
+                    && !lexicon.dictionary.check(&word)
             })
             .collect()
     }
 
     /// What a dictionary would put in place of a word, the likeliest first.
-    pub fn suggest(&self, dictionary: &Dictionary, word: &str) -> Vec<String> {
+    pub fn suggest(&self, lexicon: &Lexicon, word: &str) -> Vec<String> {
         let mut found = Vec::new();
-        dictionary.suggest(word, &mut found);
+        lexicon.dictionary.suggest(word, &mut found);
         found.truncate(SUGGESTIONS);
         found
     }
@@ -239,11 +286,32 @@ impl Speller {
     }
 }
 
+/// A drawn text with the characters in `gaps` made spaces, which are
+/// drawn for something that is not the text's own words.
+fn blanked(drawn: &str, gaps: &[Range<usize>]) -> Vec<char> {
+    drawn
+        .chars()
+        .enumerate()
+        .map(|(index, c)| {
+            if gaps.iter().any(|gap| gap.contains(&index)) {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
 /// The words of a drawn text its dictionaries do not know, each with its
-/// language, where each language begins at a drawn character.
-pub fn wrong_in(drawn: &str, spoken: &[(usize, Option<String>)]) -> Vec<(Range<usize>, String)> {
+/// language, where each language begins at a drawn character; what `gaps`
+/// covers is not words.
+pub fn wrong_in(
+    drawn: &str,
+    spoken: &[(usize, Option<String>)],
+    gaps: &[Range<usize>],
+) -> Vec<(Range<usize>, String)> {
     let speller = Speller::shared();
-    let chars: Vec<char> = drawn.chars().collect();
+    let chars = blanked(drawn, gaps);
     let mut wrong = Vec::new();
     for (index, (start, language)) in spoken.iter().enumerate() {
         let end = spoken.get(index + 1).map_or(chars.len(), |next| next.0);
@@ -282,7 +350,6 @@ pub fn mark(
         return None;
     }
     let speller = Speller::shared();
-    speller.wake(ui.ctx());
     if ui.is_rect_visible(response.rect) {
         for (range, _) in wrong {
             wave(ui, galley, origin, range.clone(), zoom);
@@ -443,7 +510,10 @@ fn find(folders: &[PathBuf], tag: &str) -> Option<(PathBuf, PathBuf)> {
                     .then(|| stem.to_owned())
             })
             .collect();
-        others.sort();
+        let own_country = |stem: &String| {
+            country.is_some_and(|country| stem.starts_with(&format!("{language}_{country}")))
+        };
+        others.sort_by_key(|stem| (!own_country(stem), stem.clone()));
         if let Some(found) = others.iter().find_map(|stem| pair(folder, stem)) {
             return Some(found);
         }
@@ -451,15 +521,41 @@ fn find(folders: &[PathBuf], tag: &str) -> Option<(PathBuf, PathBuf)> {
     None
 }
 
+/// The encoding an affix file's `SET` line names, read from its bytes, as
+/// the line itself is ASCII whatever the encoding.
+fn encoding_of(aff: &[u8]) -> Option<String> {
+    aff.split(|&b| b == b'\n').find_map(|line| {
+        let line = String::from_utf8_lossy(line);
+        line.trim().strip_prefix("SET ").map(|set| {
+            set.trim()
+                .to_ascii_uppercase()
+                .replace("ISO-8859", "ISO8859")
+        })
+    })
+}
+
 /// A dictionary file as text, in the encoding its affix file names: UTF-8,
-/// or one byte to a character for the Latin ones.
+/// or one of the single-byte code pages Hunspell reads. Another is not read,
+/// and the dictionary is taken as missing.
 fn decoded(bytes: &[u8], set: Option<&str>) -> Option<String> {
-    match set.map(str::to_ascii_uppercase).as_deref() {
+    match set {
         None | Some("UTF-8") => Some(String::from_utf8_lossy(bytes).into_owned()),
-        Some("ISO8859-1" | "ISO-8859-1" | "ISO8859-15" | "ISO-8859-15") => {
-            Some(bytes.iter().map(|&b| char::from(b)).collect())
+        Some(set) => {
+            let (_, upper) = codepages::PAGES.iter().find(|(name, _)| *name == set)?;
+            let upper: Vec<char> = upper.chars().collect();
+            Some(
+                bytes
+                    .iter()
+                    .map(|&b| {
+                        if b < 0x80 {
+                            char::from(b)
+                        } else {
+                            upper[usize::from(b - 0x80)]
+                        }
+                    })
+                    .collect(),
+            )
         }
-        Some(_) => None,
     }
 }
 
@@ -560,10 +656,64 @@ mod tests {
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../packaging/dictionaries/de_DE");
         let speller = Speller::new(vec![german], None);
         let dictionary = speller.dictionary("de-DE").expect("de_DE");
-        let text = "Die Straße ist naß und die Strase lang.";
+        let text = "Die Straße ist naß und die Strase lang, die Häuser und Bäume alt.";
         assert_eq!(
             words(text, &speller.check(&dictionary, text)),
             ["naß", "Strase"]
         );
+        assert!(
+            speller
+                .suggest(&dictionary, "Strase")
+                .contains(&"Straße".to_owned())
+        );
+    }
+
+    #[test]
+    fn code_pages_decode_their_own_characters() {
+        for (name, upper) in super::codepages::PAGES {
+            assert_eq!(upper.chars().count(), 128, "{name}");
+        }
+        assert_eq!(
+            super::decoded(&[0xA4], Some("ISO8859-15")).as_deref(),
+            Some("€")
+        );
+        assert_eq!(
+            super::decoded(&[0xC4], Some("ISO8859-1")).as_deref(),
+            Some("Ä")
+        );
+        assert_eq!(
+            super::decoded(&[0xC1], Some("KOI8-R")).as_deref(),
+            Some("а")
+        );
+        assert_eq!(super::decoded(&[0x80], Some("ISCII-DEVANAGARI")), None);
+    }
+
+    #[test]
+    fn words_in_another_script_are_not_checked() {
+        let speller = Speller::new(vec![dictionaries()], None);
+        let dictionary = speller.dictionary("en-US").expect("en_US");
+        let text = "Hello 你好世界 and 日本語のテキスト and مرحبا wrold.";
+        assert_eq!(words(text, &speller.check(&dictionary, text)), ["wrold"]);
+    }
+
+    #[test]
+    fn what_stands_for_no_text_is_not_a_word() {
+        let chars = super::blanked("Smtih note1tset", &[0..5, 10..11]);
+        let text: String = chars.iter().collect();
+        assert_eq!(text, "      note tset");
+    }
+
+    #[test]
+    fn a_country_of_its_own_comes_first() {
+        let folder = std::env::temp_dir().join(format!("odox-dicts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).expect("made");
+        for stem in ["de_AT_frami", "de_DE_frami"] {
+            std::fs::write(folder.join(format!("{stem}.aff")), "SET UTF-8\n").expect("written");
+            std::fs::write(folder.join(format!("{stem}.dic")), "1\nHaus\n").expect("written");
+        }
+        let (aff, _) = super::find(std::slice::from_ref(&folder), "de-DE").expect("found");
+        assert!(aff.ends_with("de_DE_frami.aff"));
+        std::fs::remove_dir_all(&folder).expect("removed");
     }
 }

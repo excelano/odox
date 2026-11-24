@@ -741,14 +741,20 @@ impl Flow<'_> {
         (galley, map): (Arc<Galley>, OffsetMap),
         origin: Pos2,
     ) {
+        if !ui.is_rect_visible(response.rect) {
+            return;
+        }
+        crate::spell::Speller::shared().wake(ui.ctx());
         let spoken = self.spoken.borrow().clone();
         let drawn = galley.text();
-        let wrong = crate::spell::wrong_in(drawn, &spoken);
+        let wrong = crate::spell::wrong_in(drawn, &spoken, &map.atoms());
         if let Some((range, word)) =
             crate::spell::mark(ui, response, (&galley, origin), drawn, &wrong, self.zoom)
         {
             let model = map.to_model(range.start)..map.to_model(range.end);
-            self.corrected = Some((self.path.clone(), model, word));
+            if !model.is_empty() {
+                self.corrected = Some((self.path.clone(), model, word));
+            }
         }
     }
 

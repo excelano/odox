@@ -211,6 +211,16 @@ impl OffsetMap {
         });
     }
 
+    /// The drawn characters that stand for no characters of the model's
+    /// one for one: a field, a note's citation, a tab.
+    pub fn atoms(&self) -> Vec<Range<usize>> {
+        self.pieces
+            .iter()
+            .filter(|piece| piece.atom)
+            .map(|piece| piece.shown.clone())
+            .collect()
+    }
+
     /// How many characters the model holds for the paragraph.
     pub fn model_len(&self) -> usize {
         self.pieces.last().map_or(0, |last| last.model.end)

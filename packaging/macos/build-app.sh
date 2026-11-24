@@ -420,8 +420,6 @@ build_bundle() {
         }
         install -m 0644 "$icns" "${bundle}/Contents/Resources/${family}.icns"
     done
-    # The spell check's dictionaries, which the application reads from its
-    # resources.
     cp -R "${root}/packaging/dictionaries" "${bundle}/Contents/Resources/dictionaries"
 
     # `|` as the delimiter because half these values carry a `/` and all of them

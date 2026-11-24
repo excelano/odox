@@ -544,7 +544,8 @@ fn spell_cell(
     if text.starts_with('=') {
         return None;
     }
-    let wrong = odox_ui::spell::wrong_in(text, &[(0, language.map(ToOwned::to_owned))]);
+    odox_ui::spell::Speller::shared().wake(ui.ctx());
+    let wrong = odox_ui::spell::wrong_in(text, &[(0, language.map(ToOwned::to_owned))], &[]);
     odox_ui::spell::mark(
         ui,
         response,

@@ -179,8 +179,6 @@ foreach ($app in $Applications) {
     Copy-Item -LiteralPath $built -Destination (Join-Path $Prefix $app.Exe) -Force
 }
 
-# The spell check's dictionaries, which the applications look for beside
-# themselves.
 $dictionaries = Join-Path $Prefix 'dictionaries'
 if (Test-Path -LiteralPath $dictionaries) { Remove-Item -LiteralPath $dictionaries -Recurse -Force }
 Copy-Item -LiteralPath (Join-Path $here '..\dictionaries') -Destination $dictionaries -Recurse
