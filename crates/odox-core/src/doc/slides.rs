@@ -17,6 +17,8 @@ use std::collections::{HashMap, HashSet};
 
 use super::Presentation;
 use crate::edit::Refused;
+use crate::edit::block::{declares, name_for};
+use crate::edit::format::automatic_styles;
 use crate::value::Length;
 use crate::xml::{Attribute, Element, Node, Ns};
 
@@ -585,6 +587,12 @@ impl Presentation {
         position: usize,
         rect: (f32, f32, f32, f32),
     ) -> Result<Vec<usize>, Refused> {
+        declares(
+            &self.document.content,
+            &[Ns::Draw, Ns::Svg, Ns::Text, Ns::Style, Ns::Fo],
+        )?;
+        self.page_path(position).ok_or(Refused::NotFound)?;
+        let style = self.bare_style(Some(rect.3));
         let content = &self.document.content;
         let name = |ns: Ns, local: &str| content.name_for(&ns, local);
         let mut paragraph = Element::new("", "p", Ns::Text);
@@ -593,16 +601,71 @@ impl Presentation {
         text_box.name = name(Ns::Draw, "text-box");
         text_box.children = vec![Node::Element(paragraph)];
         text_box.self_closing = false;
-        let frame = self.frame(rect, text_box);
+        let frame = self.frame(rect, &style, text_box);
         self.put_on_slide(position, frame)
+    }
+
+    /// The name of an automatic graphic style a new frame is drawn in: no
+    /// fill and no outline, and for a text box, with its height as the least
+    /// it grows from, under `LibreOffice`'s own style for one where the deck
+    /// has it.
+    fn bare_style(&mut self, text_box: Option<f32>) -> String {
+        let parent = if text_box.is_some() {
+            "standard"
+        } else {
+            "Object_20_with_20_no_20_fill_20_and_20_no_20_line"
+        };
+        let has_parent = self
+            .document
+            .styles
+            .style(&crate::Family::Graphic, parent)
+            .is_some();
+        let content = &self.document.content;
+        let name = |ns: Ns, local: &str| content.name_for(&ns, local);
+        let mut properties = Element::new("", "graphic-properties", Ns::Style);
+        properties.name = name(Ns::Style, "graphic-properties");
+        properties.set_attr(name(Ns::Draw, "stroke"), "none");
+        properties.set_attr(name(Ns::Draw, "fill"), "none");
+        if let Some(height) = text_box {
+            properties.set_attr(name(Ns::Draw, "auto-grow-height"), "true");
+            properties.set_attr(name(Ns::Fo, "min-height"), Length(height).write("cm"));
+            properties.set_attr(name(Ns::Draw, "textarea-vertical-align"), "top");
+        }
+        let mut style = Element::new("", "style", Ns::Style);
+        style.name = name(Ns::Style, "style");
+        style.set_attr(name(Ns::Style, "family"), "graphic");
+        if has_parent {
+            style.set_attr(name(Ns::Style, "parent-style-name"), parent);
+        }
+        style.children = vec![Node::Element(properties)];
+        style.self_closing = false;
+        let (named, fresh) = name_for(
+            &self.document.content,
+            &mut self.document.styles,
+            style,
+            &crate::Family::Graphic,
+            "gr",
+        );
+        let container = automatic_styles(&mut self.document.content);
+        if let Some(fresh) = fresh {
+            container.children.push(Node::Element(fresh));
+            container.self_closing = false;
+        }
+        named
     }
 
     /// A `draw:frame` on the layout layer at a place and size in points,
     /// holding one element.
-    fn frame(&self, (x, y, width, height): (f32, f32, f32, f32), inside: Element) -> Element {
+    fn frame(
+        &self,
+        (x, y, width, height): (f32, f32, f32, f32),
+        style: &str,
+        inside: Element,
+    ) -> Element {
         let content = &self.document.content;
         let mut frame = Element::new("", "frame", Ns::Draw);
         frame.name = content.name_for(&Ns::Draw, "frame");
+        frame.set_attr(content.name_for(&Ns::Draw, "style-name"), style);
         frame.set_attr(content.name_for(&Ns::Draw, "layer"), "layout");
         for (local, points) in [("width", width), ("height", height), ("x", x), ("y", y)] {
             frame.set_attr(
@@ -649,6 +712,10 @@ impl Presentation {
         position: usize,
         picture: &SlidePicture<'_>,
     ) -> Result<Vec<usize>, Refused> {
+        declares(
+            &self.document.content,
+            &[Ns::Draw, Ns::Svg, Ns::Xlink, Ns::Style],
+        )?;
         let slide = self
             .slides()
             .into_iter()
@@ -665,6 +732,7 @@ impl Presentation {
             width,
             height,
         );
+        let style = self.bare_style(None);
         let href =
             self.document
                 .package
@@ -681,7 +749,7 @@ impl Presentation {
         ] {
             image.set_attr(content.name_for(&ns, local), value);
         }
-        let frame = self.frame(rect, image);
+        let frame = self.frame(rect, &style, image);
         let path = self.put_on_slide(position, frame)?;
         match picture.description {
             Some(text) if !text.trim().is_empty() => {

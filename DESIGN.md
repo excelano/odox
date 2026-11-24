@@ -1108,9 +1108,14 @@ Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 
 **A text box or a picture is put on a slide** (`doc/slides.rs`) from the
 Slide menu, as a `draw:frame` on the layout layer after the slide's shapes
-and before its notes and animations. Slide > Text box draws the next drag on
-the slide as the box, or puts one of ten centimetres by two at a click, with
-an empty paragraph the caret goes into. Slide > Picture… asks for the file and
+and before its notes and animations, in an automatic graphic style of its own
+with no fill and no outline, under `LibreOffice`'s `standard` for a text box,
+which grows from its height, or its style for a picture with no fill and no
+line, where the deck has them. Slide > Text box draws the next drag on the
+slide as the box, or puts one of ten centimetres by two at a click, kept on
+the slide, with an empty paragraph the caret goes into; the pointer is a
+crosshair meanwhile, a label does not take the click, and Escape, another
+slide or document, or leaving edit mode lets it go. Slide > Picture… asks for the file and
 what it shows, as a text document's picture question does, keeps the picture
 in the package, and puts it at its own size, or smaller to fit the slide, in
 the slide's middle. Each is one step to undo, the picture's package entry with

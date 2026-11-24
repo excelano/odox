@@ -112,3 +112,80 @@ fn picture_fitted_inside_slide() {
     assert!((w / h - width / height).abs() < 0.01, "keeps its shape");
     assert!((x + w / 2.0 - width / 2.0).abs() < 0.5 && (y + h / 2.0 - height / 2.0).abs() < 0.5);
 }
+
+/// Whether a frame's style draws it with no fill and no outline.
+fn bare(deck: &Presentation, frame: &Element) -> bool {
+    let Some(name) = frame.attr(&Ns::Draw, "style-name") else {
+        return false;
+    };
+    let style = deck
+        .document
+        .styles
+        .resolve(&odox_core::Family::Graphic, name);
+    style.graphic.fill() == odox_core::Fill::None && style.graphic.stroke.is_none()
+}
+
+fn blank() -> Presentation {
+    Presentation::read(&odox_core::blank::presentation("en-US")).expect("a blank deck")
+}
+
+#[test]
+fn a_text_box_and_a_picture_have_no_fill_and_no_outline() {
+    for mut deck in [deck(), blank()] {
+        let position = deck.slides()[0].position;
+        let path = deck
+            .insert_text_box(position, (72.0, 72.0, 200.0, 50.0))
+            .expect("put in");
+        let frame = deck.document.content.at(&path).expect("the box").clone();
+        assert!(
+            bare(&deck, &frame),
+            "{:?}",
+            frame.attr(&Ns::Draw, "style-name")
+        );
+        let bytes = png();
+        let path = deck
+            .insert_picture(
+                position,
+                &SlidePicture {
+                    bytes: &bytes,
+                    media_type: "image/png",
+                    extension: "png",
+                    size: (50.0, 50.0),
+                    description: None,
+                },
+            )
+            .expect("put in");
+        let frame = deck
+            .document
+            .content
+            .at(&path)
+            .expect("the picture")
+            .clone();
+        assert!(frame.is(&Ns::Draw, "frame"), "the path names the frame");
+        assert!(bare(&deck, &frame));
+    }
+}
+
+#[test]
+fn a_deck_that_does_not_declare_xlink_is_refused_a_picture() {
+    let mut deck = blank();
+    deck.document
+        .content
+        .attrs
+        .retain(|attribute| attribute.value != "http://www.w3.org/1999/xlink");
+    let before = deck.document.content.clone();
+    let position = deck.slides()[0].position;
+    let bytes = png();
+    let placed = deck.insert_picture(
+        position,
+        &SlidePicture {
+            bytes: &bytes,
+            media_type: "image/png",
+            extension: "png",
+            size: (50.0, 50.0),
+            description: Some("x"),
+        },
+    );
+    assert_eq!(placed, Err(odox_core::Refused::Namespace));
+    assert!(deck.document.content == before);
+}

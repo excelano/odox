@@ -243,6 +243,7 @@ impl View for SlideView {
 
         self.pictures.clear();
         self.document = Some(document);
+        self.stop_placing();
         self.slide = 0;
         self.picked = None;
         self.drag = None;
@@ -275,6 +276,7 @@ impl View for SlideView {
 
     fn close(&mut self) {
         self.document = None;
+        self.stop_placing();
         self.pictures.clear();
         self.picked = None;
         self.drag = None;
@@ -589,7 +591,7 @@ impl View for SlideView {
                 ui.painter().rect_filled(page, 2.0, palette.paper);
 
                 let mut canvas = Canvas::new(&document.document, pictures, page, scale, palette);
-                canvas.page_editor = page_editor;
+                canvas.page_editor = page_editor.filter(|_| !placing);
                 canvas.find = self.found.highlights(slide_index);
                 canvas.marks = marks::shown(ui.ctx());
                 // Back to front: the ground, then what the master page draws on
@@ -857,9 +859,16 @@ impl SlideView {
                     return;
                 };
                 let before = document.document.content.clone();
+                let caret = self
+                    .page_editor
+                    .selection()
+                    .map(|selection| selection.focus.clone())
+                    .map(|focus| {
+                        Caret::new([vec![self.slide], focus.paragraph].concat(), focus.offset)
+                    });
                 match document.insert_text_box(position, rect) {
                     Ok(path) => {
-                        editing.record_snapshot(before, None);
+                        editing.record_snapshot(before, caret);
                         let shape = path.last().copied();
                         self.picked = shape;
                         if let Some(shape) = shape {
@@ -963,9 +972,11 @@ impl SlideView {
             self.picked = None;
             self.drag = None;
             self.page_editor.clear();
+            self.stop_placing();
         }
         if !editing.on {
             self.page_editor.clear();
+            self.stop_placing();
         }
         false
     }
@@ -1227,7 +1238,15 @@ impl SlideView {
             self.picked = None;
             self.drag = None;
             self.page_editor.clear();
+            self.stop_placing();
         }
+    }
+
+    /// Leave the placing of a text box, which Escape, another slide, another
+    /// document and leaving edit mode each do.
+    fn stop_placing(&mut self) {
+        self.placing = false;
+        self.place_from = None;
     }
 }
 
@@ -1336,7 +1355,22 @@ fn place(
     scale: f32,
     from: &mut Option<Pos2>,
 ) -> Option<Action> {
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
+    }
+    let inside = |at: Pos2| at.clamp(page.min, page.max);
     let to_slide = |at: Pos2| ((at.x - page.min.x) / scale, (at.y - page.min.y) / scale);
+    let (slide_width, slide_height) = (page.width() / scale, page.height() / scale);
+    let click = |at: Pos2| {
+        let (width, height) = ((CM * 10.0).min(slide_width), (CM * 2.0).min(slide_height));
+        let (x, y) = to_slide(inside(at));
+        Action::Place((
+            x.min(slide_width - width).max(0.0),
+            y.min(slide_height - height).max(0.0),
+            width,
+            height,
+        ))
+    };
     if response.drag_started() {
         *from = ui
             .input(|input| input.pointer.press_origin())
@@ -1346,7 +1380,7 @@ fn place(
         && response.dragged()
     {
         ui.painter().rect_stroke(
-            Rect::from_two_pos(start, now),
+            Rect::from_two_pos(inside(start), inside(now)),
             0.0,
             Stroke::new(1.0, ui.visuals().selection.stroke.color),
             StrokeKind::Inside,
@@ -1355,18 +1389,18 @@ fn place(
     if response.drag_stopped()
         && let (Some(start), Some(end)) = (from.take(), response.interact_pointer_pos())
     {
-        let (a, b) = (to_slide(start), to_slide(end));
+        let (a, b) = (to_slide(inside(start)), to_slide(inside(end)));
         let (x, y) = (a.0.min(b.0), a.1.min(b.1));
         let (width, height) = ((a.0 - b.0).abs(), (a.1 - b.1).abs());
         if width > 4.0 && height > 4.0 {
             return Some(Action::Place((x, y, width, height)));
         }
+        return Some(click(start));
     }
     if response.clicked()
         && let Some(at) = response.interact_pointer_pos()
     {
-        let (x, y) = to_slide(at);
-        return Some(Action::Place((x, y, CM * 10.0, CM * 2.0)));
+        return Some(click(at));
     }
     None
 }
@@ -1503,5 +1537,63 @@ mod tests {
         let document = view.document.as_mut().expect("open");
         editing.undo(&mut document.document, None).expect("a step");
         assert_eq!(shapes(&view), before);
+    }
+
+    fn open_deck() -> SlideView {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/deck.odp"),
+        )
+        .expect("the deck");
+        SlideView {
+            document: Some(Presentation::read(&bytes).expect("it reads")),
+            ..SlideView::default()
+        }
+    }
+
+    #[test]
+    fn placing_stops_on_another_slide() {
+        let mut view = open_deck();
+        view.placing = true;
+        view.show_slide(1);
+        assert!(!view.placing);
+    }
+
+    #[test]
+    fn undo_removes_an_inserted_picture_and_its_part() {
+        let mut view = open_deck();
+        let mut editing = Editing::default();
+        editing.reset();
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../packaging/icons/xodt-rounded-512.png"),
+        )
+        .expect("a picture");
+        let document = view.document.as_mut().expect("open");
+        let position = document.slides()[0].position;
+        let before = document.document.content.clone();
+        let name = document.document.package.picture_name(&bytes, "png");
+        let parts = document
+            .document
+            .package
+            .keep(&[name.as_str(), "META-INF/manifest.xml"]);
+        document
+            .insert_picture(
+                position,
+                &odox_core::doc::SlidePicture {
+                    bytes: &bytes,
+                    media_type: "image/png",
+                    extension: "png",
+                    size: (50.0, 50.0),
+                    description: Some("An icon"),
+                },
+            )
+            .expect("put in");
+        editing.record_step(before, parts, None);
+        assert!(document.document.package.part(&name).is_some());
+        editing.undo(&mut document.document, None).expect("a step");
+        assert!(document.document.package.part(&name).is_none());
+        editing.redo(&mut document.document, None).expect("a step");
+        assert!(document.document.package.part(&name).is_some());
     }
 }

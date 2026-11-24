@@ -19,7 +19,7 @@
 
 mod align;
 mod annotation;
-mod block;
+pub(crate) mod block;
 mod cells;
 mod changes;
 mod field;
