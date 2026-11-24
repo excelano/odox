@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:meta><dc:title>Shadows</dc:title><dc:language>en-US</dc:language></office:meta>
+ <office:styles>
+  <style:style style:name="shadowed" style:family="graphic"><style:graphic-properties draw:shadow="visible" draw:shadow-offset-x="0.4cm" draw:shadow-offset-y="0.3cm" draw:shadow-color="#1f3864" draw:shadow-opacity="60%" loext:shadow-blur="0.2cm" draw:stroke="solid" svg:stroke-color="#000000"/><style:text-properties fo:font-size="20pt" fo:color="#000000"/></style:style>
+  <style:style style:name="box" style:family="graphic" style:parent-style-name="shadowed"><style:graphic-properties draw:fill="solid" draw:fill-color="#ffe680" draw:textarea-vertical-align="middle"/><style:paragraph-properties fo:text-align="center"/></style:style>
+  <style:style style:name="outline" style:family="graphic" style:parent-style-name="shadowed"><style:graphic-properties draw:fill="none" svg:stroke-width="0.1cm"/></style:style>
+  <style:style style:name="hidden" style:family="graphic" style:parent-style-name="box"><style:graphic-properties draw:shadow="hidden"/></style:style>
+  <style:style style:name="plain" style:family="graphic"><style:graphic-properties draw:fill="none" draw:stroke="none" draw:textarea-vertical-align="top"/><style:text-properties fo:font-size="18pt" fo:color="#000000"/></style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="Page"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm"/></style:page-layout>
+  <style:style style:name="dp" style:family="drawing-page"><style:drawing-page-properties draw:fill="solid" draw:fill-color="#ffffff"/></style:style>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Plain" style:page-layout-name="Page" draw:style-name="dp"/></office:master-styles>
+ <office:body>
+  <office:presentation>
+   <draw:page draw:name="Shadows" draw:master-page-name="Plain">
+    <draw:frame presentation:class="title" draw:style-name="plain" svg:x="1cm" svg:y="0.5cm" svg:width="26cm" svg:height="2cm"><draw:text-box><text:p>Shadows</text:p></draw:text-box></draw:frame>
+    <draw:custom-shape draw:style-name="box" svg:x="1.5cm" svg:y="3.5cm" svg:width="7cm" svg:height="4cm"><text:p>A filled box</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/></draw:custom-shape>
+    <draw:custom-shape draw:style-name="outline" svg:x="11cm" svg:y="3.5cm" svg:width="6cm" svg:height="4cm"><text:p>Only an outline</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="ellipse" draw:enhanced-path="U 10800 10800 10800 10800 0 360 Z N"/></draw:custom-shape>
+    <draw:custom-shape draw:style-name="hidden" svg:x="19.5cm" svg:y="3.5cm" svg:width="7cm" svg:height="4cm"><text:p>No shadow</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/></draw:custom-shape>
+    <draw:custom-shape draw:style-name="box" svg:width="8cm" svg:height="3cm" draw:transform="rotate (0.523598775598299) translate (4cm 13cm)"><text:p>Turned thirty degrees</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/></draw:custom-shape>
+   </draw:page>
+  </office:presentation>
+ </office:body>
+</office:document>

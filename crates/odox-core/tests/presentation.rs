@@ -510,3 +510,73 @@ fn a_gradient_from_a_point_runs_as_libreoffice_draws_it() {
         "white at half its intensity"
     );
 }
+
+fn shadow_of(deck: &Presentation, style: &str) -> Option<odox_core::Shadow> {
+    deck.document
+        .styles
+        .resolve(&Family::Graphic, style)
+        .graphic
+        .shadow()
+}
+
+#[test]
+fn shadow_resolves_from_style_chain() {
+    let Some(deck) = fixture("shadows.odp") else {
+        return;
+    };
+    let shadow = shadow_of(&deck, "box").expect("the parent style's shadow");
+    assert_eq!(
+        shadow.offset,
+        (
+            Length::parse("0.4cm").expect("a length"),
+            Length::parse("0.3cm").expect("a length")
+        )
+    );
+    assert_eq!(
+        shadow.color,
+        Color {
+            r: 0x1f,
+            g: 0x38,
+            b: 0x64
+        }
+    );
+    assert!((shadow.opacity - 0.6).abs() < 1e-6);
+    assert_eq!(shadow_of(&deck, "outline"), Some(shadow));
+}
+
+#[test]
+fn no_shadow_when_hidden() {
+    let Some(deck) = fixture("shadows.odp") else {
+        return;
+    };
+    assert_eq!(shadow_of(&deck, "hidden"), None);
+    assert_eq!(shadow_of(&deck, "plain"), None);
+    let standard = shadow_of(&deck, "standard");
+    assert_eq!(
+        standard, None,
+        "LibreOffice's default style hides its shadow"
+    );
+}
+
+#[test]
+fn a_shadow_is_drawn_as_the_outline_in_its_colour() {
+    let Some(deck) = fixture("shadows.odp") else {
+        return;
+    };
+    let colour = Color {
+        r: 0x1f,
+        g: 0x38,
+        b: 0x64,
+    };
+    let filled = deck.document.styles.resolve(&Family::Graphic, "box");
+    let (cast, _) = filled.graphic.cast_shadow().expect("a shadow");
+    assert_eq!(cast.fill(), Fill::Solid(colour));
+    assert_eq!(cast.stroke, Some(colour));
+    assert_eq!(cast.opacity, Some(0.6));
+    assert_eq!(cast.shadow(), None);
+    let outline = deck.document.styles.resolve(&Family::Graphic, "outline");
+    let (cast, _) = outline.graphic.cast_shadow().expect("a shadow");
+    assert_eq!(cast.fill(), Fill::None, "an outline casts no filled shadow");
+    assert_eq!(cast.stroke, Some(colour));
+    assert_eq!(cast.stroke_width, outline.graphic.stroke_width);
+}

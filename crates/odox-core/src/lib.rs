@@ -58,8 +58,8 @@ pub use place::Transform;
 pub use style::{
     Anchor, Band, Border, Break, CellProperties, Edges, Extent, Family, Fill, Fit, Gradient,
     GradientStyle, GraphicProperties, ListKind, Offset, PageLayout, ParagraphProperties, Position,
-    Properties, SMALL_CAPS, Style, Styles, TabKind, TabStop, TextAlign, TextProperties, Tiling,
-    VerticalAlign,
+    Properties, SMALL_CAPS, Shadow, Style, Styles, TabKind, TabStop, TextAlign, TextProperties,
+    Tiling, VerticalAlign,
 };
 pub use value::{Color, Length, Measure, Percent, date_of};
 pub use xml::{Element, Name, Node, Ns};

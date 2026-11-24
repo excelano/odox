@@ -60,6 +60,9 @@ pub struct Canvas<'a> {
     /// is one of the slide's own; a master page's decoration has none and
     /// nothing in it is edited.
     at: Option<usize>,
+    /// The shadow being drawn, while a shape's is: how far it lies from the
+    /// shape on screen, and the properties it is drawn with.
+    casting: Option<(Vec2, std::rc::Rc<Properties>)>,
 }
 
 /// What is drawn inside a shape: its text, or the frame of a picture, and the
@@ -157,6 +160,7 @@ impl<'a> Canvas<'a> {
             find: None,
             followed: None,
             at: None,
+            casting: None,
         }
     }
 
@@ -208,7 +212,7 @@ impl Canvas<'_> {
             return;
         }
 
-        let properties = self.style_of(shape);
+        let properties = self.after_shadow(ui, shape);
         let outline = self.stroke(&properties);
 
         // A line is the one shape positioned by its two ends rather than by a
@@ -228,6 +232,9 @@ impl Canvas<'_> {
         }
 
         if shape.is(&Ns::Draw, "measure") {
+            if self.casting.is_some() {
+                return;
+            }
             self.measure(ui, shape, &properties, outline);
             return;
         }
@@ -304,6 +311,24 @@ impl Canvas<'_> {
                 .add(Shape::closed_line(corners.to_vec(), stroke));
         }
         self.text(ui, shape, place);
+    }
+
+    /// The properties a shape is drawn with, once its shadow, where its style
+    /// casts one, has been drawn under it; or the shadow's own, while it is.
+    fn after_shadow(&mut self, ui: &mut Ui, shape: &Element) -> std::rc::Rc<Properties> {
+        if let Some((_, shadowed)) = &self.casting {
+            return shadowed.clone();
+        }
+        let properties = self.style_of(shape);
+        if let Some((cast, shadow)) = properties.graphic.cast_shadow() {
+            let offset = vec2(shadow.offset.0.points(), shadow.offset.1.points()) * self.scale;
+            let mut shadowed = (*properties).clone();
+            shadowed.graphic = cast;
+            self.casting = Some((offset, std::rc::Rc::new(shadowed)));
+            self.shape(ui, shape);
+            self.casting = None;
+        }
+        properties
     }
 
     /// An ellipse, however its box is placed.
@@ -561,6 +586,9 @@ impl Canvas<'_> {
 
     /// The paragraphs a shape holds, or the picture it frames.
     fn text(&mut self, ui: &mut Ui, shape: &Element, place: Placement) {
+        if self.casting.is_some() {
+            return;
+        }
         // A frame around a picture is handed over whole, because the renderer
         // finds a frame among a parent's children and here the shape is the
         // frame itself.
@@ -801,11 +829,15 @@ impl Canvas<'_> {
         let at = |local: &str| shape.attr(&Ns::Svg, local).and_then(Length::parse);
         let width = at("width").map_or(0.0, Length::points);
         let height = at("height").map_or(0.0, Length::points);
+        let shift = self
+            .casting
+            .as_ref()
+            .map_or(Vec2::ZERO, |(offset, _)| *offset);
         let on_page = |x: f32, y: f32| {
             pos2(
                 self.page.left() + x * self.scale,
                 self.page.top() + y * self.scale,
-            )
+            ) + shift
         };
 
         if let Some(transform) = shape
@@ -837,10 +869,16 @@ impl Canvas<'_> {
 
     fn point(&self, shape: &Element, x: &str, y: &str) -> Option<Pos2> {
         let at = |local: &str| shape.attr(&Ns::Svg, local).and_then(Length::parse);
-        Some(pos2(
-            self.page.left() + at(x)?.points() * self.scale,
-            self.page.top() + at(y)?.points() * self.scale,
-        ))
+        let shift = self
+            .casting
+            .as_ref()
+            .map_or(Vec2::ZERO, |(offset, _)| *offset);
+        Some(
+            pos2(
+                self.page.left() + at(x)?.points() * self.scale,
+                self.page.top() + at(y)?.points() * self.scale,
+            ) + shift,
+        )
     }
 
     fn stroke(&self, properties: &Properties) -> Option<Stroke> {
@@ -850,7 +888,11 @@ impl Canvas<'_> {
             .stroke_width
             .map_or(1.0, |w| w.points() * self.scale)
             .max(1.0);
-        Some(Stroke::new(width, format::color32(colour)))
+        let colour = match self.casting {
+            Some(_) => alpha(format::color32(colour), properties.graphic.opacity),
+            None => format::color32(colour),
+        };
+        Some(Stroke::new(width, colour))
     }
 
     /// Paint a fill inside an outline.

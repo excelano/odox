@@ -758,6 +758,7 @@ pub struct GraphicProperties {
     gradient: Option<String>,
     image: Option<String>,
     picture: PictureFill,
+    shadow: ShadowParts,
     /// Outline colour, absent when the stroke is `none`.
     pub stroke: Option<Color>,
     /// Outline width.
@@ -815,7 +816,94 @@ impl Anchor {
     }
 }
 
+/// A shadow's properties, each inheriting on its own as a fill's do.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct ShadowParts {
+    visible: Option<bool>,
+    x: Option<Length>,
+    y: Option<Length>,
+    color: Option<Color>,
+    opacity: Option<f32>,
+}
+
+impl ShadowParts {
+    fn apply(&mut self, p: &Element) {
+        if let Some(shadow) = p.attr(&Ns::Draw, "shadow") {
+            self.visible = Some(shadow == "visible");
+        }
+        let length = |local: &str| p.attr(&Ns::Draw, local).and_then(Length::parse);
+        if let Some(x) = length("shadow-offset-x") {
+            self.x = Some(x);
+        }
+        if let Some(y) = length("shadow-offset-y") {
+            self.y = Some(y);
+        }
+        if let Some(color) = p.attr(&Ns::Draw, "shadow-color").and_then(Color::parse) {
+            self.color = Some(color);
+        }
+        if let Some(opacity) = p.attr(&Ns::Draw, "shadow-opacity").and_then(Percent::parse) {
+            self.opacity = Some(opacity.fraction().clamp(0.0, 1.0));
+        }
+    }
+}
+
+/// The shadow a shape casts: its outline again, moved by the offset and
+/// filled in the colour at the opacity, under the shape. A blur is not drawn.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Shadow {
+    /// How far the shadow lies to the right of and below the shape, on the page.
+    pub offset: (Length, Length),
+    /// Its colour.
+    pub color: Color,
+    /// How opaque it is, from zero to one.
+    pub opacity: f32,
+}
+
 impl GraphicProperties {
+    /// The shadow, where the style turns it on. What the styles leave unsaid
+    /// is what `LibreOffice`'s default graphic style says: 0.2 cm down and to
+    /// the right, in grey, opaque.
+    pub fn shadow(&self) -> Option<Shadow> {
+        let parts = &self.shadow;
+        if parts.visible != Some(true) {
+            return None;
+        }
+        let usual = Length(0.2 / 2.54 * 72.0);
+        Some(Shadow {
+            offset: (parts.x.unwrap_or(usual), parts.y.unwrap_or(usual)),
+            color: parts.color.unwrap_or(Color {
+                r: 0x80,
+                g: 0x80,
+                b: 0x80,
+            }),
+            opacity: parts.opacity.unwrap_or(1.0),
+        })
+    }
+
+    /// What the shape's shadow is drawn with, beside the shadow itself: the
+    /// same outline at the same width, filled in the shadow's colour where the
+    /// shape is filled at all, at the shadow's opacity.
+    pub fn cast_shadow(&self) -> Option<(Self, Shadow)> {
+        let shadow = self.shadow()?;
+        let filled = self.fill() != Fill::None;
+        let cast = Self {
+            kind: Some(if filled {
+                FillKind::Solid
+            } else {
+                FillKind::None
+            }),
+            color: Some(shadow.color),
+            gradient: None,
+            image: None,
+            picture: PictureFill::default(),
+            shadow: ShadowParts::default(),
+            stroke: self.stroke.map(|_| shadow.color),
+            opacity: Some(shadow.opacity),
+            ..self.clone()
+        };
+        Some((cast, shadow))
+    }
+
     /// What actually fills the shape, once the kind and its value are put
     /// together.
     ///
@@ -1756,6 +1844,7 @@ impl GraphicProperties {
             self.image = Some(name.to_owned());
         }
         self.picture.apply(p);
+        self.shadow.apply(p);
 
         match p.attr(&Ns::Draw, "stroke") {
             Some("none") => self.stroke = None,

@@ -52,6 +52,16 @@ const LINK: Color = Color {
     b: 0xb4,
 };
 
+/// How an outline is stroked.
+#[derive(Clone, Copy)]
+pub(crate) struct Pen {
+    pub(crate) color: Color,
+    /// The width, in points.
+    pub(crate) width: f32,
+    /// How opaque it is, from zero to one.
+    pub(crate) opacity: f32,
+}
+
 /// Something drawn, placed relative to the top of its piece.
 #[derive(Clone)]
 pub(crate) enum Item {
@@ -100,7 +110,7 @@ pub(crate) enum Item {
         /// The top and bottom of the outline.
         span: (f32, f32),
         ground: Option<Ground>,
-        stroke: Option<(Color, f32)>,
+        stroke: Option<Pen>,
         leaf: Option<LeafId>,
     },
     /// A picture stretched over a box that may be turned or leaned: where the
