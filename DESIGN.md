@@ -277,6 +277,14 @@ while no caret is taking them, and Home and End, with or without Ctrl, go to
 the top and the bottom of the document; with a caret they move it, as §11
 says.
 
+Beside the buttons the bar counts the document's words and characters, and a
+selection's out of them. A word is a stretch between the Unicode word
+boundaries the caret moves by that holds a letter or a digit, counted one
+paragraph at a time; characters include spaces. That is not LibreOffice's
+rule, which counts what lies between spaces and adds list labels, so its
+figures differ wherever a hyphen, a lone symbol or a list appears. The counts
+are taken again when the text or the selection changes, not every frame.
+
 A view can take the whole window. `View::presenting` is the slideshow's flag:
 while it is true the shell draws no menu, no panel and no bar, takes none of
 its keys, puts the window full screen and fills the central panel with black,

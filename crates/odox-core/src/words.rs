@@ -1,5 +1,5 @@
 //! Words in a text, by the Unicode word boundaries (UAX #29) the editor's caret
-//! moves by.
+//! moves by, and how many there are.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -24,6 +24,23 @@ pub fn word_ranges(text: &str) -> Vec<Range<usize>> {
     found
 }
 
+/// How much text there is: words, and characters with the spaces among them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Count {
+    /// Words, as [`word_ranges`] finds them.
+    pub words: usize,
+    /// Characters, spaces included.
+    pub characters: usize,
+}
+
+/// How many words and characters a text has.
+pub fn count(text: &str) -> Count {
+    Count {
+        words: word_ranges(text).len(),
+        characters: text.chars().count(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36,5 +53,21 @@ mod tests {
     #[test]
     fn an_apostrophe_and_a_decimal_point_stay_inside_their_word() {
         assert_eq!(word_ranges("can't 3.5"), vec![0..5, 6..9]);
+    }
+
+    #[test]
+    fn count_of_plain_sentence() {
+        assert_eq!(
+            count("The quick brown fox, jumping."),
+            Count {
+                words: 5,
+                characters: 29
+            }
+        );
+    }
+
+    #[test]
+    fn a_hyphenated_word_is_two_and_a_lone_symbol_is_none() {
+        assert_eq!(count("right-aligned & red").words, 3);
     }
 }

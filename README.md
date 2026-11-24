@@ -88,7 +88,9 @@ the window, and a difference refuses the save rather than writing a document
 that would not come back the same.
 
 `xodt` shows the document as one continuous page at the width its page layout
-asks for, with the headings listed beside it; clicking one scrolls to it. In
+asks for, with the headings listed beside it; clicking one scrolls to it. The
+bar under the page counts the document's words and characters, and the
+selection's against them when there is one. In
 edit mode a click puts the caret where you clicked and you type into the page
 as it is drawn, formatting and all. Enter starts a new paragraph, Shift+Enter
 breaks the line, Backspace at the start of a paragraph joins it to the one

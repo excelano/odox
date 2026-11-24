@@ -24,6 +24,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod clipboard;
+pub mod count;
 pub mod edit;
 pub mod export;
 pub mod find;
