@@ -453,7 +453,13 @@ and is not checked, and neither is a formula. A language tag finds `de_AT`, then
 system has, under `/usr/share/hunspell` and `/usr/share/myspell`, and the
 person's own under `~/.local/share/hunspell`; Windows reads them from a
 `dictionaries` folder beside the executable and macOS from the bundle's
-resources, where the packages put en_US and de_DE with their licenses. A
+resources, where the packages put en_US and de_DE with their licenses. The
+German one is igerman98's Hunspell edition of 2013-12-06, the last release
+under the OASIS distribution license as well as the GPL: a program whose
+primary format is OpenDocument may ship it, in every store, so long as its
+files are unchanged and travel with its license and copyright files. It is
+built by that release's own Makefile and kept byte for byte; a newer German
+dictionary is GPL alone. A
 dictionary is read on a thread of its own the first time its language is asked
 for, UTF-8 or ISO 8859, and a paragraph is checked once for each text it holds
 and kept. Numbers, words with a digit, and web and mail addresses are not
