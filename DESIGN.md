@@ -234,7 +234,13 @@ resolution its header gives or 96 to the inch, against the center unless the
 style names a corner or an edge, and repeated across the shape or placed once,
 as `LibreOffice` lays it (`Tiling` in `odox-core`, measured on
 `corpus/libreoffice/fills.odp`); a fill that says nothing of repeating
-repeats. A `draw:path`
+repeats. A shape whose style turns its shadow on casts it first: its own outline
+again, moved by the style's offset on the page, so a turned shape's shadow is
+not turned with it, stroked and, where the shape is filled or frames a
+picture, filled in the shadow's colour, at the shadow's opacity times the
+shape's own. A translucent outline over its translucent fill is darker where
+the two overlap. A blur is not drawn, a dimension line
+and a label cast nothing, and in the PDF the shadow is decoration. A `draw:path`
 states SVG path data, an elliptical arc becoming the straight line to its end. A
 connector is positioned by the two ends it joins, takes the route the producer
 wrote beside them or the straight line, and has no area whatever its style says,

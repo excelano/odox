@@ -138,6 +138,11 @@ convert odp:impress8 turned.odp "OpenDocument Presentation Flat XML" turned.fodp
 # placed below, and drawn right to left.
 convert odp:impress8 measures.odp "OpenDocument Presentation Flat XML" measures.fodp
 
+# Shadows from a parent style: a filled box, an ellipse that is only an
+# outline, a box whose own style hides the shadow, and a box turned thirty
+# degrees, whose shadow is still offset on the page.
+convert odp:impress8 shadows.odp "OpenDocument Presentation Flat XML" shadows.fodp
+
 # A spreadsheet for the PDF export: a sheet wider and longer than a page with
 # a marked header row, a hidden row and column and a merged cell; a sheet with
 # a print range fitted to one page; a hidden sheet and an empty one. Flat ODF

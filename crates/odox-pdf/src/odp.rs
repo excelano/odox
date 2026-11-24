@@ -24,7 +24,7 @@ use odox_core::{
 };
 
 use crate::fonts::Faces;
-use crate::layout::{Ground, Item, Layout, Segment};
+use crate::layout::{Ground, Item, Layout, Pen, Segment};
 use crate::model::{self, Block};
 use crate::tags::NodeId;
 use crate::{Exported, Laid, Options, Page, Refusal};
@@ -123,6 +123,7 @@ fn lay_out(
         let mut slides = Slides {
             layout: &mut layout,
             document,
+            casting: None,
         };
 
         let whole = Placement {
@@ -323,6 +324,8 @@ fn style_of(document: &Document, shape: &Element) -> std::rc::Rc<Properties> {
 struct Slides<'l, 'f, 'd> {
     layout: &'l mut Layout<'f>,
     document: &'d Document,
+    /// What a shadow is drawn with, while a shape's shadow is being drawn.
+    casting: Option<std::rc::Rc<Properties>>,
 }
 
 impl Slides<'_, '_, '_> {
@@ -344,14 +347,32 @@ impl Slides<'_, '_, '_> {
             return Ok(items);
         }
 
-        let properties = style_of(self.document, shape);
-        let stroke = properties.graphic.stroke.map(|color| {
-            let width = properties
+        let properties = match &self.casting {
+            Some(shadowed) => shadowed.clone(),
+            None => style_of(self.document, shape),
+        };
+        if self.casting.is_none()
+            && let Some((cast, shadow)) = properties.graphic.cast_shadow(edit::is_figure(shape))
+        {
+            let mut shadowed = (*properties).clone();
+            shadowed.graphic = cast;
+            self.casting = Some(std::rc::Rc::new(shadowed));
+            let cast = self.shape(shape, parent, false);
+            self.casting = None;
+            let (dx, dy) = (shadow.offset.0.points(), shadow.offset.1.points());
+            items.extend(cast?.into_iter().map(|item| item.shifted(dx, dy)));
+        }
+        let stroke = properties.graphic.stroke.map(|color| Pen {
+            color,
+            width: properties
                 .graphic
                 .stroke_width
                 .map_or(1.0, Length::points)
-                .max(0.5);
-            (color, width)
+                .max(0.5),
+            opacity: match self.casting {
+                Some(_) => properties.graphic.opacity.unwrap_or(1.0),
+                None => 1.0,
+            },
         });
         let fill = properties.graphic.fill();
         let opacity = properties.graphic.opacity;
@@ -361,7 +382,8 @@ impl Slides<'_, '_, '_> {
         // into every shape.
         let figure = match edit::description(shape, &self.document.styles) {
             Description::Text(alt)
-                if !edit::is_figure(shape)
+                if self.casting.is_none()
+                    && !edit::is_figure(shape)
                     && label_text(self.document, shape).is_none_or(|text| text.is_empty()) =>
             {
                 Some(self.layout.tree.group(Some(parent), Tag::Figure(Some(alt))))
@@ -377,6 +399,9 @@ impl Slides<'_, '_, '_> {
         }
 
         if shape.is(&Ns::Draw, "measure") {
+            if self.casting.is_some() {
+                return Ok(items);
+            }
             let (Some(from), Some(to)) = (point(shape, "x1", "y1"), point(shape, "x2", "y2"))
             else {
                 return Ok(items);
@@ -400,7 +425,7 @@ impl Slides<'_, '_, '_> {
                     };
                     let width = width.map_or(MARKER_WIDTH, Length::points);
                     for outline in dimension.marker(marker, at_start, width) {
-                        let ground = Ground::Paint(crate::rgb(stroke.0).into(), 1.0);
+                        let ground = Ground::Paint(crate::rgb(stroke.color).into(), 1.0);
                         items.extend(self.outline(&outline, true, Some(ground), None, figure));
                     }
                 }
@@ -493,6 +518,9 @@ impl Slides<'_, '_, '_> {
         parent: NodeId,
         role: Role,
     ) -> Result<Vec<Item>, Refusal> {
+        if self.casting.is_some() {
+            return Ok(Vec::new());
+        }
         let (x, y, width, height) = place.bounds();
         if edit::is_figure(shape) {
             let Some(image) = picture(self.document, shape) else {
@@ -602,7 +630,7 @@ impl Slides<'_, '_, '_> {
         geometry: &Geometry,
         place: Placement,
         ground: Option<Ground>,
-        stroke: Option<(Color, f32)>,
+        stroke: Option<Pen>,
         figure: Option<NodeId>,
         into: &mut Vec<Item>,
     ) {
@@ -629,7 +657,7 @@ impl Slides<'_, '_, '_> {
         outline: Vec<Segment>,
         span: (f32, f32),
         ground: Option<Ground>,
-        stroke: Option<(Color, f32)>,
+        stroke: Option<Pen>,
         figure: Option<NodeId>,
     ) -> Option<Item> {
         if ground.is_none() && stroke.is_none() {
@@ -651,7 +679,7 @@ impl Slides<'_, '_, '_> {
         points: &[(f32, f32)],
         closed: bool,
         ground: Option<Ground>,
-        stroke: Option<(Color, f32)>,
+        stroke: Option<Pen>,
         figure: Option<NodeId>,
     ) -> Option<Item> {
         let (&(x, y), rest) = points.split_first()?;
@@ -1034,5 +1062,57 @@ mod tests {
             lay_out(&presentation, &options(), &mut faces),
             Err(Refusal::Empty)
         ));
+    }
+
+    #[test]
+    fn a_shadow_is_drawn_under_its_shape_offset_on_the_page() {
+        let bytes = std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/libreoffice/shadows.odp"),
+        )
+        .expect("the shadows fixture");
+        let presentation = Presentation::read(&bytes).expect("it reads");
+        let mut faces = Faces::new();
+        let laid = lay_out(&presentation, &options(), &mut faces).expect("laid out");
+        let start = |item: &Item| match item {
+            Item::Shape { outline, .. } => match outline.first() {
+                Some(Segment::Move(x, y)) => Some((*x, *y)),
+                _ => None,
+            },
+            _ => None,
+        };
+        let is_shadow = |item: &Item| match item {
+            Item::Shape {
+                ground,
+                stroke,
+                leaf: None,
+                ..
+            } => {
+                matches!(ground, Some(Ground::Paint(_, opacity)) if *opacity < 1.0)
+                    || stroke.is_some_and(|pen| pen.opacity < 1.0)
+            }
+            _ => false,
+        };
+        let items: Vec<&Item> = laid.pages[0].items.iter().map(|(_, item)| item).collect();
+        let shadows: Vec<usize> = (0..items.len()).filter(|&i| is_shadow(items[i])).collect();
+        assert_eq!(
+            shadows.len(),
+            4,
+            "the box, the outline, the turned box and the picture"
+        );
+        let cm = |cm: f32| cm / 2.54 * 72.0;
+        for &at in &shadows[..3] {
+            let (shadow, shape) = (start(items[at]), start(items[at + 1]));
+            let ((sx, sy), (x, y)) = (shadow.expect("an outline"), shape.expect("an outline"));
+            assert!((sx - x - cm(0.4)).abs() < 0.01 && (sy - y - cm(0.3)).abs() < 0.01);
+        }
+        let (x, y) = start(items[shadows[3]]).expect("the picture's shadow");
+        assert!((x - cm(19.9)).abs() < 0.01 && (y - cm(10.3)).abs() < 0.01);
+        let Item::Shape { ground, stroke, .. } = items[shadows[1]] else {
+            unreachable!()
+        };
+        assert!(
+            ground.is_none() && stroke.is_some(),
+            "an outline casts only its outline"
+        );
     }
 }

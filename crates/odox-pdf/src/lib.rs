@@ -456,11 +456,12 @@ fn draw(
                 }
                 None => {}
             }
-            if let Some((color, width)) = stroke {
+            if let Some(pen) = stroke {
                 surface.set_fill(None);
                 surface.set_stroke(Some(Stroke {
-                    paint: rgb(*color).into(),
-                    width: *width,
+                    paint: rgb(pen.color).into(),
+                    width: pen.width,
+                    opacity: NormalizedF32::new(pen.opacity).unwrap_or(NormalizedF32::ONE),
                     ..Stroke::default()
                 }));
                 surface.draw_path(&path);
