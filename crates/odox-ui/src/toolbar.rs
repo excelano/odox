@@ -423,6 +423,12 @@ pub enum Command {
     LineSpacing(LineSpacing),
     /// Begin a page at the caret, or take the break off its paragraph.
     PageBreak(bool),
+    /// Merge the cells the selection runs over.
+    MergeCells,
+    /// Split the merged cell the caret is in.
+    SplitCell,
+    /// Make the table's columns the same width.
+    EqualWidths,
     /// Start a numbered list again at the item, or carry it on from the list
     /// before when not.
     Numbering(bool),
@@ -647,6 +653,20 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
                 (TableEdit::DeleteTable, t("Delete table")),
             ] {
                 if matches!(edit, TableEdit::DeleteRow) {
+                    ui.separator();
+                    for (command, name) in [
+                        (Command::MergeCells, t("Merge cells")),
+                        (Command::SplitCell, t("Split cell")),
+                        (Command::EqualWidths, t("Equal column widths")),
+                    ] {
+                        if ui
+                            .add_enabled(state.here.table, egui::Button::new(name))
+                            .clicked()
+                        {
+                            chosen = Some(command);
+                            ui.close();
+                        }
+                    }
                     ui.separator();
                 }
                 if ui

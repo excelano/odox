@@ -124,8 +124,10 @@ Ctrl+Enter begins a page at the caret, drawn as a dashed rule in the window and
 taking effect in the PDF; Backspace at its start, or Format > Remove page break,
 takes it out. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
-puts in or takes out its rows and columns; Tab goes to the next cell, and in the
-last one adds a row. The Picture button, or Format > Insert a picture…, puts a
+puts in or takes out its rows and columns, merges the selected cells or splits
+a merged one, and evens out the column widths; in edit mode, drag the edge
+between two columns to resize them. Tab goes to the next cell, and in the last
+one adds a row. The Picture button, or Format > Insert a picture…, puts a
 PNG or a JPEG in after the caret's paragraph, once you have said what it shows
 or that it is decoration only. Format > Page setup… sets the paper, portrait or
 landscape and the margins, which is the width the page is drawn at and the

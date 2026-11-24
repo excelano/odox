@@ -286,6 +286,8 @@ pub struct TextView {
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
     table_wanted: Option<(usize, usize)>,
+    /// A column edge dragged to a width, given it on the next frame.
+    column_wanted: Option<(Vec<usize>, usize, f32)>,
     /// What a chosen picture shows, while the question is up.
     picture_question: Option<PictureQuestion>,
     /// The picture the question was answered with, put in on the next frame.
@@ -318,6 +320,7 @@ impl Default for TextView {
             page_question: None,
             page_wanted: None,
             table_wanted: None,
+            column_wanted: None,
             notice: None,
         }
     }
@@ -495,6 +498,13 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
+                if let Some((table, column, width)) = self.column_wanted.take()
+                    && model.set_column_width(&table, column, width).is_err()
+                {
+                    self.notice = Some(Notice::Problem(
+                        t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
+                    ));
+                }
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 break_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
@@ -524,6 +534,10 @@ impl View for TextView {
                         flow.find = self.found.highlights(0);
                         flow.marks = marks::shown(ui.ctx());
                         flow.blocks(ui, body, width);
+                        if let Some(resized) = flow.resized.take() {
+                            self.column_wanted = Some(resized);
+                            ui.ctx().request_repaint();
+                        }
                         if flow.followed.is_some() {
                             self.place = flow.followed.take();
                             ui.ctx().request_repaint();
@@ -943,6 +957,35 @@ fn toolbar_commands(
         _ => None,
     }) {
         model.shift_headings(page, delta);
+    }
+    let reshaped = match command {
+        Some(Command::MergeCells) => Some(model.merge_cells(page).map_err(|refused| {
+            if refused == odox_core::Refused::NotFound {
+                t("Select the cells to merge, from one cell of a table to another.")
+            } else {
+                t("These cells cannot be merged: the table has repeated rows or cells.")
+            }
+        })),
+        Some(Command::SplitCell) => Some(model.split_cell(page).map_err(|refused| {
+            if refused == odox_core::Refused::NotFound {
+                t("The caret is not in a table cell.")
+            } else {
+                t("This cell cannot be split: the table has repeated rows or cells.")
+            }
+        })),
+        Some(Command::EqualWidths) => Some(
+            model
+                .equal_widths(page)
+                .map_err(|_| t("This table does not say how wide its columns are.")),
+        ),
+        _ => None,
+    };
+    if let Some(Err(message)) = reshaped {
+        return Asked {
+            size: false,
+            picture: false,
+            notice: Some(Notice::Problem(message.to_owned())),
+        };
     }
     let changed = match (command, wanted) {
         (Some(Command::Table(change)), _) => Some(model.edit_table(page, change)),

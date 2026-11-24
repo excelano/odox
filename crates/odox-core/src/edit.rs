@@ -19,6 +19,7 @@
 
 mod align;
 mod block;
+mod cells;
 mod figure;
 pub(crate) mod format;
 pub mod html;
@@ -37,6 +38,7 @@ use crate::xml::{Attribute, Element, Name, Node, Ns};
 pub use align::{alignment, set_alignment};
 pub(crate) use block::name_for;
 pub use block::{block_state, heading_level, set_heading, set_list, shift_heading};
+pub use cells::{equal_widths, merge_cells, merge_rectangle, set_column_width, split_cell};
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };

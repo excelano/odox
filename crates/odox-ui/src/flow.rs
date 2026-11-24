@@ -245,6 +245,10 @@ pub struct Flow<'a> {
     /// A place in the document that a link just followed asked for, for the
     /// view to set `scroll_to_place` to on the next frame.
     pub followed: Option<String>,
+    /// A column edge dragged in edit mode and let go: the table's path, the
+    /// column left of the edge, and the width it was dragged to, in points,
+    /// for the view to give it.
+    pub resized: Option<(Vec<usize>, usize, f32)>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
     /// The page editor, which puts a caret in every paragraph under the root
@@ -283,6 +287,7 @@ impl<'a> Flow<'a> {
             scroll_to_heading: None,
             scroll_to_place: None,
             followed: None,
+            resized: None,
             headings_seen: 0,
             page: None,
             find: None,
@@ -993,8 +998,45 @@ impl Flow<'_> {
             return;
         }
         ui.add_space(4.0 * self.zoom);
+        let (left, top) = (ui.cursor().left(), ui.cursor().top());
         self.rows(ui, table, &columns);
+        if self.page.is_some() && !self.detached {
+            self.column_edges(ui, &columns, left, top, ui.cursor().top());
+        }
         ui.add_space(4.0 * self.zoom);
+    }
+
+    /// The edges between a table's columns, which a drag moves: a guide while
+    /// the pointer is down, and the width asked for in `resized` once it is
+    /// let go.
+    fn column_edges(&mut self, ui: &Ui, columns: &[f32], left: f32, top: f32, bottom: f32) {
+        let mut x = left;
+        for (column, width) in columns
+            .iter()
+            .enumerate()
+            .take(columns.len().saturating_sub(1))
+        {
+            let start = x;
+            x += width;
+            let edge = Rect::from_x_y_ranges(x - 3.0..=x + 3.0, top..=bottom);
+            let id = ui
+                .scope_id()
+                .with(("column-edge", self.path.clone(), column));
+            let response = ui.interact(edge, id, Sense::drag());
+            if response.hovered() || response.dragged() {
+                ui.ctx().set_cursor_icon(CursorIcon::ResizeHorizontal);
+            }
+            let Some(pointer) = ui.input(|input| input.pointer.interact_pos()) else {
+                continue;
+            };
+            if response.dragged() {
+                let stroke = Stroke::new(1.0, self.palette.ink.gamma_multiply(0.6));
+                ui.painter().vline(pointer.x, top..=bottom, stroke);
+            }
+            if response.drag_stopped() {
+                self.resized = Some((self.path.clone(), column, (pointer.x - start) / self.zoom));
+            }
+        }
     }
 
     fn rows(&mut self, ui: &mut Ui, parent: &Element, columns: &[f32]) {

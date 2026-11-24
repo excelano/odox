@@ -294,7 +294,7 @@ fn enclosing(content: &Element, paragraph: &[usize]) -> Option<(Vec<usize>, Vec<
 }
 
 /// The paths of a table's rows under it, through header rows and row groups.
-fn rows(table: &Element) -> Vec<Vec<usize>> {
+pub(super) fn rows(table: &Element) -> Vec<Vec<usize>> {
     fn walk(parent: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
         for (index, child) in parent.elements_indexed() {
             path.push(index);
@@ -315,7 +315,7 @@ fn rows(table: &Element) -> Vec<Vec<usize>> {
 }
 
 /// The paths of a table's `table:table-column` elements under it.
-fn column_elements(table: &Element) -> Vec<Vec<usize>> {
+pub(super) fn column_elements(table: &Element) -> Vec<Vec<usize>> {
     fn walk(parent: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
         for (index, child) in parent.elements_indexed() {
             path.push(index);
@@ -413,7 +413,7 @@ fn cell_paragraph(
 
 /// A cell like another but empty: one paragraph in the style of the other's
 /// first, and none of its value.
-fn emptied(cell: &Element) -> Element {
+pub(super) fn emptied(cell: &Element) -> Element {
     let mut fresh = cell.clone();
     for local in [
         "value-type",
@@ -587,7 +587,10 @@ fn delete_column(
 
 /// Write a table's columns one element to a column, so that one can be told
 /// from its neighbours, and answer their paths under the table.
-fn spread_columns(content: &mut Element, table: &[usize]) -> Result<Vec<Vec<usize>>, Refused> {
+pub(super) fn spread_columns(
+    content: &mut Element,
+    table: &[usize],
+) -> Result<Vec<Vec<usize>>, Refused> {
     let element = content.at(table).ok_or(Refused::NotFound)?;
     for path in column_elements(element).into_iter().rev() {
         let column = content
@@ -617,7 +620,7 @@ fn spread_columns(content: &mut Element, table: &[usize]) -> Result<Vec<Vec<usiz
 }
 
 /// A column's width in points, where its style gives one.
-fn column_width(
+pub(super) fn column_width(
     content: &Element,
     table: &[usize],
     column: &[usize],
@@ -633,11 +636,19 @@ fn column_width(
 }
 
 /// A column style of a width in points: one the document has, or one to write.
-fn column_style(content: &Element, styles: &mut Styles, width: f32) -> (String, Option<Element>) {
+pub(super) fn column_style(
+    content: &Element,
+    styles: &mut Styles,
+    width: f32,
+) -> (String, Option<Element>) {
     let mut style = element(content.name_for(&Ns::Style, "style"));
     style.set_attr(content.name_for(&Ns::Style, "family"), "table-column");
     let mut properties = element(content.name_for(&Ns::Style, "table-column-properties"));
     properties.set_attr(content.name_for(&Ns::Style, "column-width"), length(width));
+    properties.set_attr(
+        content.name_for(&Ns::Style, "rel-column-width"),
+        relative(width),
+    );
     style.children.push(Node::Element(properties));
     style.self_closing = false;
     name_for(content, styles, style, &Family::TableColumn, "TableColumn")
@@ -711,6 +722,15 @@ pub(super) fn outside_lists(content: &Element, paragraph: &[usize]) -> Vec<usize
 fn has_table_named(content: &Element, name: &str) -> bool {
     (content.is(&Ns::Table, "table") && content.attr(&Ns::Table, "name") == Some(name))
         || content.elements().any(|child| has_table_named(child, name))
+}
+
+/// A column's share of its table, as `style:rel-column-width` writes it: in
+/// twentieths of a point, so that the shares of columns written here add up
+/// as their widths do.
+fn relative(points: f32) -> String {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let twips = (points * 20.0).round().max(1.0) as u32;
+    format!("{twips}*")
 }
 
 /// A length in points as ODF writes it, in centimetres.
