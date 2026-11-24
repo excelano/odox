@@ -549,7 +549,7 @@ fn spell_cell(
     let wrong = odox_ui::spell::wrong_in(text, &[(0, language.map(ToOwned::to_owned))], &[]);
     odox_ui::spell::mark(
         ui,
-        response,
+        (response, response.interact_pointer_pos()),
         (&output.galley, output.galley_pos),
         text,
         &wrong,
