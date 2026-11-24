@@ -785,6 +785,71 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
+    /// Put an empty footnote or endnote at the caret, as one step to undo,
+    /// the caret staying at it so its box opens to be written in.
+    ///
+    /// # Errors
+    ///
+    /// As [`edit::insert_note`].
+    pub fn insert_note(
+        &mut self,
+        editor: &mut PageEditor,
+        class: edit::NoteClass,
+    ) -> Result<(), Refused> {
+        let caret = editor
+            .selection()
+            .map(|s| s.focus.clone())
+            .ok_or(Refused::NotFound)?;
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), &caret.paragraph].concat();
+        if let Err(refused) =
+            edit::insert_note(self.content, &path, caret.offset, class, self.styles)
+        {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &caret.paragraph].concat(),
+                caret.offset,
+            )),
+        );
+        editor.select(Selection::caret(caret));
+        Ok(())
+    }
+
+    /// Do what was done in a note's box, the note by its path under the root
+    /// the flow draws: its new text, or its removal, as one step to undo.
+    ///
+    /// # Errors
+    ///
+    /// There is no note there.
+    pub fn note_body(
+        &mut self,
+        note: &[usize],
+        done: &crate::note_popup::NoteResponse,
+    ) -> Result<(), Refused> {
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), note].concat();
+        let changed = match done {
+            crate::note_popup::NoteResponse::Saved(text) => {
+                edit::set_note_text(self.content, &path, text)
+            }
+            crate::note_popup::NoteResponse::Deleted => edit::remove_note(self.content, &path),
+        };
+        if let Err(refused) = changed {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(before, None);
+        Ok(())
+    }
+
     /// Do what was done in a comment's box: its new text, signed and dated
     /// now, or its removal, as one step to undo.
     ///

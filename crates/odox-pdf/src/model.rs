@@ -30,6 +30,7 @@ const LIST_STEP: f32 = 18.0;
 const LIST_GUTTER: f32 = 20.0;
 
 /// One thing in the flow.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Block {
     Paragraph(Paragraph),
     List(List),
@@ -68,6 +69,8 @@ pub(crate) struct Paragraph {
     pub tab_distance: f32,
     /// Whether it reads right to left as a whole, as its style says.
     pub right_to_left: bool,
+    /// The footnotes cited in it, for the foot of the page it is on.
+    pub footnotes: Vec<Note>,
 }
 
 impl Paragraph {
@@ -96,6 +99,7 @@ impl Paragraph {
             tabs: Vec::new(),
             tab_distance: TAB_DISTANCE,
             right_to_left: false,
+            footnotes: Vec::new(),
         }
     }
 }
@@ -182,25 +186,44 @@ pub(crate) struct TextBox {
 pub(crate) struct Note {
     pub citation: String,
     pub blocks: Vec<Block>,
+    /// Whether it goes at the foot of the page its citation is on, rather
+    /// than at the end of the document.
+    pub foot: bool,
 }
 
 /// Read the blocks under an element, with its path from the content root, and
-/// the notes cited in them after the rest, in the order they are cited.
-///
-/// A PDF has pages and could hold a footnote at the foot of one, but laying
-/// one out there means taking room from the page the line citing it is on;
-/// the notes are gathered at the end of the document instead.
+/// the endnotes cited in them after the rest, in the order they are cited. A
+/// footnote goes with the paragraph that cites it, for the foot of its page.
 pub(crate) fn read(
     document: &Document,
     root: &Element,
     path: Vec<usize>,
     shape: Option<std::rc::Rc<Properties>>,
 ) -> Vec<Block> {
+    read_notes(document, root, path, shape, false)
+}
+
+/// [`read`] for a text document's body, whose footnotes go with the
+/// paragraphs that cite them, for the foot of their pages. Anywhere else, a
+/// slide's text, a header, a footnote is read as an endnote, since there is no
+/// page foot for it there.
+pub(crate) fn read_text(document: &Document, root: &Element, path: Vec<usize>) -> Vec<Block> {
+    read_notes(document, root, path, None, true)
+}
+
+fn read_notes(
+    document: &Document,
+    root: &Element,
+    path: Vec<usize>,
+    shape: Option<std::rc::Rc<Properties>>,
+    at_foot: bool,
+) -> Vec<Block> {
     let mut reader = Reader {
         document,
         path,
         shape,
         notes: Vec::new(),
+        at_foot,
     };
     let mut blocks = Vec::new();
     reader.blocks(root, &mut blocks, &mut ListCounters::default());
@@ -215,6 +238,9 @@ struct Reader<'a> {
     shape: Option<std::rc::Rc<Properties>>,
     /// The notes cited so far.
     notes: Vec<Note>,
+    /// Whether a footnote goes with the paragraph citing it, rather than to
+    /// the end with the endnotes.
+    at_foot: bool,
 }
 
 impl Reader<'_> {
@@ -281,6 +307,22 @@ impl Reader<'_> {
             &mut anchored,
             &mut self.path.clone(),
         );
+        let mut footnotes = Vec::new();
+        let mut frames = Vec::new();
+        for (element, path) in anchored {
+            if element.is(&Ns::Text, "note") {
+                let outer = std::mem::replace(&mut self.path, path);
+                let note = self.note(&element);
+                self.path = outer;
+                match note {
+                    Some(note) if note.foot && self.at_foot => footnotes.push(note),
+                    Some(note) => self.notes.push(note),
+                    None => {}
+                }
+            } else {
+                frames.push((element, path));
+            }
+        }
         let points = |length: Option<Length>| length.map_or(0.0, Length::points);
         let p = &properties.paragraph;
         into.push(Block::Paragraph(Paragraph {
@@ -303,35 +345,33 @@ impl Reader<'_> {
             tabs: p.tab_stops.clone().unwrap_or_default(),
             tab_distance: p.tab_distance.map_or(TAB_DISTANCE, Length::points),
             right_to_left: p.right_to_left == Some(true),
+            footnotes,
         }));
-        for (element, path) in anchored {
+        for (element, path) in frames {
             let outer = std::mem::replace(&mut self.path, path);
-            if element.is(&Ns::Text, "note") {
-                self.note(&element);
-            } else {
-                self.frame(&element, into);
-            }
+            self.frame(&element, into);
             self.path = outer;
         }
     }
 
-    /// A note's body, read into the notes for the end of the document.
-    fn note(&mut self, note: &Element) {
+    /// A note's body and its citation.
+    fn note(&mut self, note: &Element) -> Option<Note> {
         let citation = note
             .child(&Ns::Text, "note-citation")
             .map(Element::plain_text)
             .unwrap_or_default();
-        let Some((index, body)) = note
+        let (index, body) = note
             .elements_indexed()
-            .find(|(_, e)| e.is(&Ns::Text, "note-body"))
-        else {
-            return;
-        };
+            .find(|(_, e)| e.is(&Ns::Text, "note-body"))?;
         self.path.push(index);
         let mut blocks = Vec::new();
         self.blocks(body, &mut blocks, &mut ListCounters::default());
         self.path.pop();
-        self.notes.push(Note { citation, blocks });
+        Some(Note {
+            citation,
+            blocks,
+            foot: note.attr(&Ns::Text, "note-class") != Some("endnote"),
+        })
     }
 
     /// Append the text of a paragraph's children, collecting the frames
@@ -760,6 +800,11 @@ pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
             }
             Block::TextBox(text_box) => undescribed(&text_box.blocks, into),
             Block::Note(note) => undescribed(&note.blocks, into),
+            Block::Paragraph(paragraph) => {
+                for note in &paragraph.footnotes {
+                    undescribed(&note.blocks, into);
+                }
+            }
             _ => {}
         }
     }

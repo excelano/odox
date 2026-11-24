@@ -120,6 +120,10 @@ Alt+Shift+Right move every heading the selection runs over a level up or down,
 as Format > Promote heading and Demote heading do. Tab and Shift+Tab at the
 start of a list item move it a level in or out, and Format > Lists restarts a
 numbered list at the caret's item or continues it from the list before.
+A footnote's or an endnote's text shows beside its citation under the pointer
+or when the caret reaches it, and is edited there in edit mode; Ctrl+Alt+F, or
+Format > Footnote and Endnote, puts a new one at the caret, and the PDF puts
+footnotes at the foot of their page and endnotes at the end.
 A comment is marked in the margin, and its author, date and text show beside the
 mark under the pointer or when the caret reaches it; in edit mode its text is
 edited or deleted there, and Ctrl+Alt+C, or Format > Comment, puts a new one on

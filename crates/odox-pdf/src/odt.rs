@@ -31,7 +31,7 @@ pub fn undescribed(document: &TextDocument) -> Vec<Vec<usize>> {
 
 fn blocks(document: &TextDocument) -> Vec<Block> {
     match (document.body(), document.body_path()) {
-        (Some(body), Some(path)) => model::read(&document.document, body, path, None),
+        (Some(body), Some(path)) => model::read_text(&document.document, body, path),
         _ => Vec::new(),
     }
 }
@@ -102,7 +102,7 @@ fn lay_out(
     layout.blocks(&blocks, left, body_width, None, &mut pieces)?;
 
     let mut headings = Vec::new();
-    let placed = paginate(pieces, body_height);
+    let placed = paginate(pieces, body_height, &layout::foot_rule(left, body_width));
     let count = placed.len();
     let mut pages = Vec::with_capacity(count);
     for (index, placed) in placed.into_iter().enumerate() {
@@ -133,48 +133,154 @@ fn lay_out(
 /// that does not fit, and one that has to stay with the piece after it where
 /// the two do not fit together, begins the next page, below the header rows
 /// of the table it is a row of. Only a piece taller than a whole page is cut.
-fn paginate(pieces: Vec<Piece>, body: f32) -> Vec<Vec<(f32, Piece)>> {
+fn paginate(pieces: Vec<Piece>, body: f32, rule: &Piece) -> Vec<Vec<(f32, Piece)>> {
     let mut pages = Vec::new();
-    let mut page: Vec<(f32, Piece)> = Vec::new();
-    let mut y = 0.0;
+    let mut page = Filling::default();
     let mut queue: VecDeque<Piece> = pieces.into();
-    while let Some(piece) = queue.pop_front() {
-        if !page.is_empty() {
-            let fits = y + piece.before + piece.height <= body;
+    while let Some(mut piece) = queue.pop_front() {
+        let notes: f32 = piece.footnotes.iter().map(|note| note.height).sum();
+        let ruled = if notes > 0.0 && page.foot.is_empty() {
+            rule.height
+        } else {
+            0.0
+        };
+        if !page.pieces.is_empty() {
+            let room = body - page.foot_height() - notes - ruled;
+            let fits = page.y + piece.before + piece.height <= room;
             let together = match queue.front().filter(|_| piece.keep_with_next) {
                 Some(next) => piece.before + piece.height + piece.after + next.before + next.height,
                 None => 0.0,
             };
             // A run that has to stay together and is taller than a page is
             // let go, since no page could hold it.
-            let kept = together > body || y + together <= body;
+            let kept = together > body || page.y + together <= room;
             if piece.page_before || !fits || !kept {
-                pages.push(std::mem::take(&mut page));
-                y = 0.0;
-                for row in piece.repeat.iter().flat_map(|header| header.iter()) {
-                    page.push((y, row.clone()));
-                    y += row.height;
-                }
+                let carried = page.finish(&mut pages, body, rule);
+                page.start(carried, piece.repeat.as_deref(), body, rule);
             }
         }
-        let gap = if page.is_empty() { 0.0 } else { piece.before };
-        if y + gap + piece.height > body {
+        let gap = if page.pieces.is_empty() {
+            0.0
+        } else {
+            piece.before
+        };
+        let room = body - page.foot_height();
+        if page.y + gap + piece.height > room {
             // Taller than what an empty page has room for: cut it there and
             // carry the rest on.
-            let (above, below) = layout::split(piece, (body - y - gap).max(1.0));
-            page.push((y + gap, above));
-            pages.push(std::mem::take(&mut page));
-            y = 0.0;
+            let (above, below) = layout::split(piece, (room - page.y - gap).max(1.0));
             queue.push_front(below);
-            continue;
+            piece = above;
         }
-        y += gap;
-        let next = y + piece.height + piece.after;
-        page.push((y, piece));
-        y = next;
+        page.y += gap;
+        let next = page.y + piece.height + piece.after;
+        let footnotes = std::mem::take(&mut piece.footnotes);
+        page.pieces.push((page.y, piece));
+        page.y = next;
+        for note in footnotes {
+            page.add_note(note, body, rule);
+        }
+        if page.y > body - page.foot_height() && !queue.is_empty() {
+            let carried = page.finish(&mut pages, body, rule);
+            page.start(carried, None, body, rule);
+        }
     }
-    pages.push(page);
+    let mut carried = page.finish(&mut pages, body, rule);
+    while !carried.is_empty() {
+        let mut page = Filling::default();
+        page.start(carried, None, body, rule);
+        carried = page.finish(&mut pages, body, rule);
+    }
     pages
+}
+
+/// A page being filled: the pieces placed down it, how far they reach, the
+/// footnotes gathered at its foot, and those that did not fit there.
+#[derive(Default)]
+struct Filling {
+    pieces: Vec<(f32, Piece)>,
+    y: f32,
+    foot: Vec<Piece>,
+    carried: VecDeque<Piece>,
+    /// The rule's height, once there are footnotes for it to stand over.
+    ruled: f32,
+}
+
+impl Filling {
+    /// How much of the page's foot its footnotes take, the rule above them
+    /// included.
+    fn foot_height(&self) -> f32 {
+        if self.foot.is_empty() {
+            return 0.0;
+        }
+        self.foot.iter().map(|note| note.height).sum::<f32>() + self.ruled
+    }
+
+    /// Take a footnote into the foot where there is room for it under what is
+    /// on the page, and carry it on otherwise.
+    fn add_note(&mut self, note: Piece, body: f32, rule: &Piece) {
+        let ruled = if self.foot.is_empty() {
+            rule.height
+        } else {
+            0.0
+        };
+        let room = body - self.y - self.foot_height() - ruled;
+        if self.carried.is_empty() && note.height <= room {
+            self.ruled = rule.height;
+            self.foot.push(note);
+        } else if self.carried.is_empty() && self.foot.is_empty() && self.pieces.is_empty() {
+            // Taller than the foot of an empty page: what fits stays and the
+            // rest goes on to the next.
+            let (above, below) = layout::split(note, room.max(1.0));
+            self.ruled = rule.height;
+            self.foot.push(above);
+            self.carried.push_back(below);
+        } else {
+            self.carried.push_back(note);
+        }
+    }
+
+    /// Begin a page: a table's header rows to repeat, and the footnotes
+    /// carried on from the page before at its foot, as far as they fit.
+    fn start(
+        &mut self,
+        carried: VecDeque<Piece>,
+        repeat: Option<&Vec<Piece>>,
+        body: f32,
+        rule: &Piece,
+    ) {
+        *self = Self::default();
+        for row in repeat.into_iter().flatten() {
+            self.pieces.push((self.y, row.clone()));
+            self.y += row.height;
+        }
+        for note in carried {
+            self.add_note(note, body, rule);
+        }
+    }
+
+    /// Put the page's footnotes at its foot, below the rule, add the page to
+    /// the pages, and answer the footnotes still to come.
+    fn finish(
+        &mut self,
+        pages: &mut Vec<Vec<(f32, Piece)>>,
+        body: f32,
+        rule: &Piece,
+    ) -> VecDeque<Piece> {
+        let mut page = std::mem::take(self);
+        if !page.foot.is_empty() {
+            let mut y = body - page.foot_height();
+            page.pieces.push((y, rule.clone()));
+            y += rule.height;
+            for note in page.foot.drain(..) {
+                let height = note.height;
+                page.pieces.push((y, note));
+                y += height;
+            }
+        }
+        pages.push(page.pieces);
+        page.carried
+    }
 }
 
 #[cfg(test)]
@@ -199,9 +305,71 @@ mod tests {
             .collect()
     }
 
+    const RULE: f32 = 10.0;
+
+    fn rule() -> Piece {
+        piece(RULE)
+    }
+
+    fn cited(height: f32, notes: &[f32]) -> Piece {
+        Piece {
+            height,
+            footnotes: notes.iter().map(|&h| piece(h)).collect(),
+            ..Piece::default()
+        }
+    }
+
+    /// Each page's pieces as (top, height).
+    fn placed(pages: &[Vec<(f32, Piece)>]) -> Vec<Vec<(f32, f32)>> {
+        pages
+            .iter()
+            .map(|page| page.iter().map(|(y, p)| (*y, p.height)).collect())
+            .collect()
+    }
+
+    #[test]
+    fn pdf_footnote_on_same_page_as_citation() {
+        let pages = paginate(vec![cited(40.0, &[15.0]), piece(20.0)], 100.0, &rule());
+        assert_eq!(
+            placed(&pages),
+            [vec![(0.0, 40.0), (40.0, 20.0), (75.0, RULE), (85.0, 15.0)]]
+        );
+    }
+
+    #[test]
+    fn a_footnote_takes_its_room_from_the_page() {
+        let pages = paginate(vec![piece(60.0), cited(20.0, &[15.0])], 100.0, &rule());
+        assert_eq!(heights(&pages), [vec![60.0], vec![20.0, RULE, 15.0]]);
+    }
+
+    #[test]
+    fn a_footnote_taller_than_the_foot_is_cut_and_never_carried_for_ever() {
+        let pages = paginate(vec![cited(10.0, &[95.0])], 100.0, &rule());
+        let notes: f32 = pages
+            .iter()
+            .flatten()
+            .filter(|(_, p)| p.height != RULE && p.height != 10.0)
+            .map(|(_, p)| p.height)
+            .sum();
+        assert!(pages.len() <= 3, "{} pages", pages.len());
+        assert!(
+            (notes - 95.0).abs() < 0.01,
+            "all of the note is placed: {notes}"
+        );
+    }
+
+    #[test]
+    fn pdf_long_footnote_continues_on_next_page() {
+        let pages = paginate(vec![cited(40.0, &[30.0, 30.0, 30.0])], 100.0, &rule());
+        assert_eq!(
+            heights(&pages),
+            [vec![40.0, RULE, 30.0], vec![RULE, 30.0, 30.0]]
+        );
+    }
+
     #[test]
     fn pieces_fill_a_page_and_the_next_begins_where_one_does_not_fit() {
-        let pages = paginate(vec![piece(40.0), piece(40.0), piece(30.0)], 100.0);
+        let pages = paginate(vec![piece(40.0), piece(40.0), piece(30.0)], 100.0, &rule());
         assert_eq!(heights(&pages), [vec![40.0, 40.0], vec![30.0]]);
     }
 
@@ -211,7 +379,7 @@ mod tests {
             before: 50.0,
             ..piece(60.0)
         };
-        let pages = paginate(vec![piece(60.0), spaced], 100.0);
+        let pages = paginate(vec![piece(60.0), spaced], 100.0, &rule());
         assert_eq!(pages[1][0].0, 0.0);
     }
 
@@ -221,7 +389,7 @@ mod tests {
             keep_with_next: true,
             ..piece(20.0)
         };
-        let pages = paginate(vec![piece(70.0), heading, piece(20.0)], 100.0);
+        let pages = paginate(vec![piece(70.0), heading, piece(20.0)], 100.0, &rule());
         assert_eq!(heights(&pages), [vec![70.0], vec![20.0, 20.0]]);
     }
 
@@ -231,7 +399,11 @@ mod tests {
             page_before: true,
             ..piece(10.0)
         };
-        let pages = paginate(vec![breaking.clone(), piece(10.0), breaking], 100.0);
+        let pages = paginate(
+            vec![breaking.clone(), piece(10.0), breaking],
+            100.0,
+            &rule(),
+        );
         assert_eq!(heights(&pages), [vec![10.0, 10.0], vec![10.0]]);
     }
 
@@ -242,13 +414,17 @@ mod tests {
             repeat: Some(Rc::clone(&header)),
             ..piece(30.0)
         };
-        let pages = paginate(vec![piece(5.0), row.clone(), row.clone(), row], 70.0);
+        let pages = paginate(
+            vec![piece(5.0), row.clone(), row.clone(), row],
+            70.0,
+            &rule(),
+        );
         assert_eq!(heights(&pages), [vec![5.0, 30.0, 30.0], vec![5.0, 30.0]]);
     }
 
     #[test]
     fn a_piece_taller_than_a_page_is_cut_across_pages() {
-        let pages = paginate(vec![piece(250.0)], 100.0);
+        let pages = paginate(vec![piece(250.0)], 100.0, &rule());
         let total: f32 = heights(&pages).iter().flatten().sum();
         assert_eq!(pages.len(), 3);
         assert!((total - 250.0).abs() < 0.01);
@@ -290,5 +466,125 @@ mod tests {
         } = &mut document.document;
         odox_core::edit::insert_page_break(content, &path, 0, styles).expect("broken");
         assert_eq!(pages(&document), 2);
+    }
+
+    #[test]
+    fn pdf_endnotes_after_body_and_footnotes_at_the_foot() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/text.odt"),
+        )
+        .expect("the text fixture");
+        let mut document = TextDocument::read(&bytes).expect("it reads");
+        let body = document.body_path().expect("a body");
+        let first = document
+            .body()
+            .expect("a body")
+            .elements_indexed()
+            .find(|(_, e)| e.is(&odox_core::Ns::Text, "p"))
+            .map(|(index, _)| index)
+            .expect("a paragraph");
+        let path = [body.as_slice(), &[first]].concat();
+        let odox_core::Document {
+            content, styles, ..
+        } = &mut document.document;
+        for (class, said) in [
+            (odox_core::edit::NoteClass::Footnote, "At the foot"),
+            (odox_core::edit::NoteClass::Endnote, "At the end"),
+        ] {
+            let at = odox_core::edit::insert_note(content, &path, 1, class, styles).expect("in");
+            let note = at[..at.len() - 2].to_vec();
+            odox_core::edit::set_note_text(content, &note, said).expect("written");
+        }
+        let options = Options {
+            title: "Untitled".to_owned(),
+            language: "en-US".to_owned(),
+            untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
+        };
+        let laid = lay_out(&document, &options, &mut Faces::new()).expect("laid out");
+        let found = |said: &str| {
+            laid.pages.iter().enumerate().find_map(|(page, items)| {
+                items.items.iter().find_map(|(y, item)| match item {
+                    layout::Item::Text { text, .. } if text.contains(said) => Some((page, *y)),
+                    _ => None,
+                })
+            })
+        };
+        let (foot_page, foot_y) = found("At the foot").expect("the footnote");
+        let (end_page, end_y) = found("At the end").expect("the endnote");
+        let (body_page, body_y) = found("Whitespace").expect("the body's last heading");
+        assert_eq!(foot_page, 0);
+        assert!(
+            foot_y > body_y,
+            "the footnote is below the body on its page"
+        );
+        assert!(
+            (end_page, end_y) > (body_page, body_y),
+            "the endnote is after the body"
+        );
+    }
+
+    fn with_note_in(holder: &str) -> TextDocument {
+        let note = r#"<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>Said in the note</text:p></text:note-body></text:note>"#;
+        let body = holder.replace("NOTE", note);
+        let wrapped = format!(
+            r#"<w xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{body}</w>"#
+        );
+        let parsed = odox_core::xml::parse(wrapped.as_bytes(), "test").expect("well formed");
+        let mut document =
+            TextDocument::read(&odox_core::blank::text("en-US")).expect("a blank document");
+        let path = document.body_path().expect("a body");
+        let body = document.document.content.at_mut(&path).expect("the body");
+        body.children = parsed.children;
+        document
+    }
+
+    fn laid_text(document: &TextDocument) -> String {
+        let options = Options {
+            title: "Untitled".to_owned(),
+            language: "en-US".to_owned(),
+            untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
+        };
+        let laid = lay_out(document, &options, &mut Faces::new()).expect("laid out");
+        fn texts(item: &layout::Item, into: &mut String) {
+            match item {
+                layout::Item::Text { text, .. } => into.push_str(text),
+                layout::Item::Clipped { item, .. } => texts(item, into),
+                _ => {}
+            }
+        }
+        let mut into = String::new();
+        for page in &laid.pages {
+            for (_, item) in &page.items {
+                texts(item, &mut into);
+            }
+        }
+        into
+    }
+
+    #[test]
+    fn footnotes_in_a_list_item_and_a_table_cell_are_printed() {
+        for holder in [
+            "<text:list><text:list-item><text:p>Item NOTE</text:p></text:list-item></text:list>",
+            "<table:table><table:table-column/><table:table-row><table:table-cell><text:p>Cell NOTE</text:p></table:table-cell></table:table-row></table:table>",
+        ] {
+            let text = laid_text(&with_note_in(holder));
+            assert!(text.contains("note"), "{holder}: {text}");
+        }
+    }
+
+    #[test]
+    fn a_figure_in_a_footnote_is_asked_about() {
+        let holder = r#"<text:p>Text<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p><draw:frame xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" svg:width="2cm" svg:height="2cm"><draw:image xlink:href="Pictures/none.png"/></draw:frame></text:p></text:note-body></text:note></text:p>"#;
+        let mut document = with_note_in(holder);
+        let png = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../packaging/icons/xodt-rounded-512.png"),
+        )
+        .expect("a picture");
+        document.document.package.set_part("Pictures/none.png", png);
+        assert_eq!(undescribed(&document).len(), 1);
     }
 }

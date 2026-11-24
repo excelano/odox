@@ -38,7 +38,7 @@ use eframe::egui::epaint::text::ByteRangeExt as _;
 use crate::find::Highlights;
 use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
-use crate::i18n::t;
+use crate::i18n::{fill, t};
 use crate::links;
 use crate::note_popup::{self, NoteContent, NoteResponse};
 
@@ -254,6 +254,9 @@ pub struct Flow<'a> {
     /// among the paragraph's comments, and what was done, for the view to
     /// do.
     pub noted: Option<(Vec<usize>, usize, NoteResponse)>,
+    /// A footnote's or an endnote's box was used: the note's path, and what
+    /// was done, for the view to do.
+    pub note_done: Option<(Vec<usize>, NoteResponse)>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
     /// The page editor, which puts a caret in every paragraph under the root
@@ -294,6 +297,7 @@ impl<'a> Flow<'a> {
             followed: None,
             resized: None,
             noted: None,
+            note_done: None,
             headings_seen: 0,
             page: None,
             find: None,
@@ -627,7 +631,9 @@ impl Flow<'_> {
                 response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
             }
         } else {
-            let over = self.marks || element.descendant(&Ns::Office, "annotation").is_some();
+            let over = self.marks
+                || element.descendant(&Ns::Office, "annotation").is_some()
+                || element.descendant(&Ns::Text, "note").is_some();
             let kept =
                 (over && ui.is_rect_visible(rect)).then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
@@ -1319,6 +1325,65 @@ impl Flow<'_> {
         }
         if element.descendant(&Ns::Office, "annotation").is_some() {
             self.comments(ui, element, rect, (&galley, &map), origin);
+        }
+        if element.descendant(&Ns::Text, "note").is_some() {
+            self.notes(ui, element, (&galley, &map), origin);
+        }
+    }
+
+    /// A paragraph's footnotes and endnotes: each one's text in a box beside
+    /// its citation while the citation is under the pointer or the caret is
+    /// at it, editable where the page is.
+    fn notes(
+        &mut self,
+        ui: &Ui,
+        paragraph: &Element,
+        (galley, map): (&Galley, &OffsetMap),
+        origin: Pos2,
+    ) {
+        let caret = self
+            .page
+            .as_ref()
+            .and_then(|page| page.selection())
+            .filter(|selection| selection.focus.paragraph == self.path)
+            .map(|selection| selection.focus.offset);
+        let mut before = (usize::MAX, 0);
+        for (at, path) in edit::notes_in(paragraph) {
+            let Some(note) = paragraph.at(&path) else {
+                continue;
+            };
+            let citation = note
+                .child(&Ns::Text, "note-citation")
+                .map(Element::plain_text)
+                .unwrap_or_default();
+            // Citations at one place are drawn one after another there.
+            let shown_before = if before.0 == at { before.1 } else { 0 };
+            before = (at, shown_before + citation.chars().count());
+            let start = map.to_galley(at.min(map.model_len())) + shown_before;
+            let place = |index: usize| {
+                galley
+                    .pos_from_cursor(CCursor::new(index))
+                    .translate(origin.to_vec2())
+            };
+            let anchor = place(start).union(place(start + citation.chars().count()));
+            let header = if note.attr(&Ns::Text, "note-class") == Some("endnote") {
+                fill(t("Endnote {number}"), &[("number", &citation)])
+            } else {
+                fill(t("Footnote {number}"), &[("number", &citation)])
+            };
+            let content = NoteContent {
+                header,
+                text: edit::note_text(note),
+            };
+            let at_caret = caret == Some(at);
+            let editable = self.page.is_some() && !self.detached;
+            let opened = editable && at_caret && content.text.is_empty();
+            let wanted = ui.rect_contains_pointer(anchor) || at_caret;
+            let id = eframe::egui::Id::unique(("odox-note", self.path.clone(), path.clone()));
+            if let Some(done) = note_popup::show(ui, anchor, id, &content, wanted, opened, editable)
+            {
+                self.note_done = Some(([self.path.as_slice(), &path].concat(), done));
+            }
         }
     }
 

@@ -320,6 +320,8 @@ pub(crate) struct Piece {
     pub repeat: Option<Rc<Vec<Piece>>>,
     /// The heading it is the first line of, for the outline.
     pub heading: Option<(u8, String)>,
+    /// The footnotes cited in it, laid out for the foot of its page.
+    pub footnotes: Vec<Piece>,
 }
 
 /// Lays blocks out and builds the structure tree as it goes.
@@ -391,6 +393,30 @@ impl<'a> Layout<'a> {
     /// first one where it has one.
     #[allow(clippy::too_many_lines)]
     fn paragraph(
+        &mut self,
+        paragraph: &Paragraph,
+        x: f32,
+        width: f32,
+        parent: Option<NodeId>,
+        label: Option<(&str, NodeId)>,
+        out: &mut Vec<Piece>,
+    ) -> Result<(), Refusal> {
+        let first = out.len();
+        self.paragraph_lines(paragraph, x, width, parent, label, out)?;
+        if !paragraph.footnotes.is_empty() {
+            let mut foot = Vec::new();
+            for note in &paragraph.footnotes {
+                self.note_body(note, x, width, parent, &mut foot)?;
+            }
+            if let Some(piece) = out.get_mut(first) {
+                piece.footnotes.extend(foot);
+            }
+        }
+        Ok(())
+    }
+
+    /// A paragraph's lines, without its footnotes.
+    fn paragraph_lines(
         &mut self,
         paragraph: &Paragraph,
         x: f32,
@@ -841,6 +867,18 @@ impl<'a> Layout<'a> {
                 ..Piece::default()
             });
         }
+        self.note_body(note, x, width, parent, out)
+    }
+
+    /// A note's citation in the margin and its text beside it.
+    pub(crate) fn note_body(
+        &mut self,
+        note: &Note,
+        x: f32,
+        width: f32,
+        parent: Option<NodeId>,
+        out: &mut Vec<Piece>,
+    ) -> Result<(), Refusal> {
         let node = self.tree.group(parent, Tag::Note);
         let label = self.tree.group(Some(node), Tag::Lbl);
         let inner_x = x + NOTE_INDENT;
@@ -1029,6 +1067,7 @@ impl<'a> Layout<'a> {
         node: NodeId,
     ) -> Result<Piece, Refusal> {
         let mut laid: Vec<(f32, f32, &Cell, Vec<Item>, f32)> = Vec::new();
+        let mut footnotes = Vec::new();
         for cell in row {
             let left = x + columns.iter().take(cell.column).sum::<f32>();
             let width: f32 = columns
@@ -1078,6 +1117,7 @@ impl<'a> Layout<'a> {
                     y += piece.before;
                 }
                 items.extend(piece.items.into_iter().map(|item| item.shifted(0.0, y)));
+                footnotes.extend(piece.footnotes);
                 y += piece.height + piece.after;
             }
             laid.push((left, width, cell, items, y + cell.padding));
@@ -1091,6 +1131,7 @@ impl<'a> Layout<'a> {
             height,
             ..Piece::default()
         };
+        piece.footnotes = footnotes;
         for (left, width, cell, ..) in &laid {
             if let Some(fill) = cell.background {
                 piece.items.push(Item::Rect {
@@ -1221,6 +1262,21 @@ fn column_widths(declared: &[Option<f32>], width: f32) -> Vec<f32> {
         .collect()
 }
 
+/// The short rule that sets the footnotes at the foot of a page off from the
+/// text above them.
+pub(crate) fn foot_rule(x: f32, width: f32) -> Piece {
+    Piece {
+        height: NOTES_GAP,
+        items: vec![Item::Rule {
+            from: (x, NOTES_GAP / 2.0),
+            to: (x + width / 3.0, NOTES_GAP / 2.0),
+            width: 0.5,
+            color: INK,
+        }],
+        ..Piece::default()
+    }
+}
+
 /// Cut a piece taller than a page at a height: what lies wholly above stays,
 /// what does not moves to a second piece, and what crosses the cut — a
 /// border, a background — is cut with it.
@@ -1232,6 +1288,7 @@ pub(crate) fn split(piece: Piece, at: f32) -> (Piece, Piece) {
         heading: piece.heading,
         repeat: piece.repeat.clone(),
         page_before: piece.page_before,
+        footnotes: piece.footnotes,
         ..Piece::default()
     };
     let mut below = Piece {

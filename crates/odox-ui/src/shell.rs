@@ -1019,8 +1019,12 @@ impl<V: View> Shell<V> {
         if !self.view.is_open() {
             return;
         }
+        // Ctrl+Alt+F is a footnote's and not Find's, and a shortcut would
+        // take it as Ctrl+F.
+        let alt = ctx.input(|input| input.modifiers.alt);
         let pressed = |modifiers, key| {
-            ctx.input_mut(|input| input.consume_shortcut(&KeyboardShortcut::new(modifiers, key)))
+            !alt && ctx
+                .input_mut(|input| input.consume_shortcut(&KeyboardShortcut::new(modifiers, key)))
         };
         if self.find.is_engaged() && pressed(Modifiers::NONE, Key::Escape) {
             self.find.close();
