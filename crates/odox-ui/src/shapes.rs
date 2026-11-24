@@ -320,7 +320,10 @@ impl Canvas<'_> {
             return shadowed.clone();
         }
         let properties = self.style_of(shape);
-        if let Some((cast, shadow)) = properties.graphic.cast_shadow() {
+        if let Some((cast, shadow)) = properties
+            .graphic
+            .cast_shadow(odox_core::edit::is_figure(shape))
+        {
             let offset = vec2(shadow.offset.0.points(), shadow.offset.1.points()) * self.scale;
             let mut shadowed = (*properties).clone();
             shadowed.graphic = cast;

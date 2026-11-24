@@ -352,7 +352,7 @@ impl Slides<'_, '_, '_> {
             None => style_of(self.document, shape),
         };
         if self.casting.is_none()
-            && let Some((cast, shadow)) = properties.graphic.cast_shadow()
+            && let Some((cast, shadow)) = properties.graphic.cast_shadow(edit::is_figure(shape))
         {
             let mut shadowed = (*properties).clone();
             shadowed.graphic = cast;
@@ -1073,46 +1073,46 @@ mod tests {
         let presentation = Presentation::read(&bytes).expect("it reads");
         let mut faces = Faces::new();
         let laid = lay_out(&presentation, &options(), &mut faces).expect("laid out");
-        let shapes: Vec<(f32, Option<f32>, Option<f32>, bool)> = laid.pages[0]
-            .items
-            .iter()
-            .filter_map(|(_, item)| match item {
-                Item::Shape {
-                    outline,
-                    ground,
-                    stroke,
-                    leaf,
-                    ..
-                } => {
-                    let Some(Segment::Move(x, _)) = outline.first() else {
-                        return None;
-                    };
-                    let ground = match ground {
-                        Some(Ground::Paint(_, opacity)) => Some(*opacity),
-                        _ => None,
-                    };
-                    Some((*x, ground, stroke.map(|pen| pen.opacity), leaf.is_some()))
-                }
+        let start = |item: &Item| match item {
+            Item::Shape { outline, .. } => match outline.first() {
+                Some(Segment::Move(x, y)) => Some((*x, *y)),
                 _ => None,
-            })
-            .collect();
-        let cast: Vec<_> = shapes
-            .iter()
-            .filter(|(_, _, pen, _)| pen.is_some_and(|opacity| opacity < 1.0))
-            .collect();
-        assert_eq!(cast.len(), 3, "{shapes:?}");
-        assert!(
-            cast.iter().all(|(_, _, _, read)| !read),
-            "a shadow is decoration"
+            },
+            _ => None,
+        };
+        let is_shadow = |item: &Item| match item {
+            Item::Shape {
+                ground,
+                stroke,
+                leaf: None,
+                ..
+            } => {
+                matches!(ground, Some(Ground::Paint(_, opacity)) if *opacity < 1.0)
+                    || stroke.is_some_and(|pen| pen.opacity < 1.0)
+            }
+            _ => false,
+        };
+        let items: Vec<&Item> = laid.pages[0].items.iter().map(|(_, item)| item).collect();
+        let shadows: Vec<usize> = (0..items.len()).filter(|&i| is_shadow(items[i])).collect();
+        assert_eq!(
+            shadows.len(),
+            4,
+            "the box, the outline, the turned box and the picture"
         );
-        let box_shadow = shapes[1];
-        let box_itself = shapes[2];
-        assert!((box_shadow.1.expect("a filled shadow") - 0.6).abs() < 1e-6);
-        let across = 0.4 / 2.54 * 72.0;
+        let cm = |cm: f32| cm / 2.54 * 72.0;
+        for &at in &shadows[..3] {
+            let (shadow, shape) = (start(items[at]), start(items[at + 1]));
+            let ((sx, sy), (x, y)) = (shadow.expect("an outline"), shape.expect("an outline"));
+            assert!((sx - x - cm(0.4)).abs() < 0.01 && (sy - y - cm(0.3)).abs() < 0.01);
+        }
+        let (x, y) = start(items[shadows[3]]).expect("the picture's shadow");
+        assert!((x - cm(19.9)).abs() < 0.01 && (y - cm(10.3)).abs() < 0.01);
+        let Item::Shape { ground, stroke, .. } = items[shadows[1]] else {
+            unreachable!()
+        };
         assert!(
-            (box_shadow.0 - box_itself.0 - across).abs() < 0.01,
-            "{shapes:?}"
+            ground.is_none() && stroke.is_some(),
+            "an outline casts only its outline"
         );
-        assert_eq!(cast[1].1, None, "an outline casts only its outline");
     }
 }

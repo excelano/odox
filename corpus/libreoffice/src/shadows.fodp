@@ -6,6 +6,8 @@
   <style:style style:name="box" style:family="graphic" style:parent-style-name="shadowed"><style:graphic-properties draw:fill="solid" draw:fill-color="#ffe680" draw:textarea-vertical-align="middle"/><style:paragraph-properties fo:text-align="center"/></style:style>
   <style:style style:name="outline" style:family="graphic" style:parent-style-name="shadowed"><style:graphic-properties draw:fill="none" svg:stroke-width="0.1cm"/></style:style>
   <style:style style:name="hidden" style:family="graphic" style:parent-style-name="box"><style:graphic-properties draw:shadow="hidden"/></style:style>
+  <style:style style:name="faded" style:family="graphic" style:parent-style-name="box"><style:graphic-properties draw:opacity="50%"/></style:style>
+  <style:style style:name="picture" style:family="graphic" style:parent-style-name="shadowed"><style:graphic-properties draw:fill="none" draw:stroke="none"/></style:style>
   <style:style style:name="plain" style:family="graphic"><style:graphic-properties draw:fill="none" draw:stroke="none" draw:textarea-vertical-align="top"/><style:text-properties fo:font-size="18pt" fo:color="#000000"/></style:style>
  </office:styles>
  <office:automatic-styles>
@@ -21,6 +23,7 @@
     <draw:custom-shape draw:style-name="outline" svg:x="11cm" svg:y="3.5cm" svg:width="6cm" svg:height="4cm"><text:p>Only an outline</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="ellipse" draw:enhanced-path="U 10800 10800 10800 10800 0 360 Z N"/></draw:custom-shape>
     <draw:custom-shape draw:style-name="hidden" svg:x="19.5cm" svg:y="3.5cm" svg:width="7cm" svg:height="4cm"><text:p>No shadow</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/></draw:custom-shape>
     <draw:custom-shape draw:style-name="box" svg:width="8cm" svg:height="3cm" draw:transform="rotate (0.523598775598299) translate (4cm 13cm)"><text:p>Turned thirty degrees</text:p><draw:enhanced-geometry svg:viewBox="0 0 21600 21600" draw:type="rectangle" draw:enhanced-path="M 0 0 L 21600 0 21600 21600 0 21600 0 0 Z N"/></draw:custom-shape>
+    <draw:frame draw:style-name="picture" draw:name="Picture" svg:x="19.5cm" svg:y="10cm" svg:width="4cm" svg:height="4cm"><draw:image><office:binary-data>iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGUExURS6LV////wiTTQMAAAABYktHRAH/Ai3eAAAAB3RJTUUH6gsYABY2SlT8awAAAAtJREFUCNdjYEAFAAAQAAGhxSHBAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTExLTI0VDAwOjIyOjU0KzAwOjAwLNMYpwAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMS0yNFQwMDoyMjo1NCswMDowMF2OoBsAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTEtMjRUMDA6MjI6NTQrMDA6MDAKm4HEAAAAAElFTkSuQmCC</office:binary-data></draw:image><svg:title>A green square</svg:title></draw:frame>
    </draw:page>
   </office:presentation>
  </office:body>

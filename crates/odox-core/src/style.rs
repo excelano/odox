@@ -882,10 +882,11 @@ impl GraphicProperties {
 
     /// What the shape's shadow is drawn with, beside the shadow itself: the
     /// same outline at the same width, filled in the shadow's colour where the
-    /// shape is filled at all, at the shadow's opacity.
-    pub fn cast_shadow(&self) -> Option<(Self, Shadow)> {
+    /// shape is filled or `pictured` says it frames a picture, at the shadow's
+    /// opacity times the shape's own.
+    pub fn cast_shadow(&self, pictured: bool) -> Option<(Self, Shadow)> {
         let shadow = self.shadow()?;
-        let filled = self.fill() != Fill::None;
+        let filled = pictured || self.fill() != Fill::None;
         let cast = Self {
             kind: Some(if filled {
                 FillKind::Solid
@@ -898,7 +899,7 @@ impl GraphicProperties {
             picture: PictureFill::default(),
             shadow: ShadowParts::default(),
             stroke: self.stroke.map(|_| shadow.color),
-            opacity: Some(shadow.opacity),
+            opacity: Some(shadow.opacity * self.opacity.unwrap_or(1.0)),
             ..self.clone()
         };
         Some((cast, shadow))

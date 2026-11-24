@@ -569,14 +569,25 @@ fn a_shadow_is_drawn_as_the_outline_in_its_colour() {
         b: 0x64,
     };
     let filled = deck.document.styles.resolve(&Family::Graphic, "box");
-    let (cast, _) = filled.graphic.cast_shadow().expect("a shadow");
+    let (cast, _) = filled.graphic.cast_shadow(false).expect("a shadow");
     assert_eq!(cast.fill(), Fill::Solid(colour));
     assert_eq!(cast.stroke, Some(colour));
     assert_eq!(cast.opacity, Some(0.6));
     assert_eq!(cast.shadow(), None);
     let outline = deck.document.styles.resolve(&Family::Graphic, "outline");
-    let (cast, _) = outline.graphic.cast_shadow().expect("a shadow");
+    let (cast, _) = outline.graphic.cast_shadow(false).expect("a shadow");
     assert_eq!(cast.fill(), Fill::None, "an outline casts no filled shadow");
     assert_eq!(cast.stroke, Some(colour));
     assert_eq!(cast.stroke_width, outline.graphic.stroke_width);
+}
+
+#[test]
+fn a_translucent_shape_casts_a_shadow_as_translucent() {
+    let Some(deck) = fixture("shadows.odp") else {
+        return;
+    };
+    let faded = deck.document.styles.resolve(&Family::Graphic, "faded");
+    let (cast, _) = faded.graphic.cast_shadow(false).expect("a shadow");
+    let opacity = cast.opacity.expect("an opacity");
+    assert!((opacity - 0.3).abs() < 1e-6, "{opacity}");
 }
