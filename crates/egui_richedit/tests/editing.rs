@@ -411,6 +411,14 @@ fn an_object_in_the_text_goes_on_the_clipboard_as_nothing() {
 }
 
 #[test]
+fn a_pasted_object_character_is_left_out() {
+    let mut h = Harness::new(&["XY"]);
+    h.caret(0, 1);
+    h.frame(vec![Event::Paste("a\u{fffc}b\nc".to_owned())]);
+    assert_eq!(h.model.paragraphs, ["Xab", "cY"]);
+}
+
+#[test]
 fn a_paste_of_several_lines_is_several_paragraphs_in_one_step() {
     let mut h = Harness::new(&["ab"]);
     h.caret(0, 1);

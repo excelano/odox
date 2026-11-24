@@ -223,3 +223,26 @@ fn a_bookmark_still_takes_no_room() {
         "ac"
     );
 }
+
+#[test]
+fn a_field_cut_and_pasted_goes_with_the_text() {
+    let root = content(
+        r#"<text:p>Page <text:sequence text:ref-name="r1" text:name="Figure">3</text:sequence> end</text:p>"#,
+    );
+    let paragraph = root.at(&FIRST).expect("the paragraph");
+    let carried = odox_core::edit::slice(paragraph, 0..6);
+    let out = String::from_utf8(xml::serialize(&carried)).expect("UTF-8");
+    assert!(
+        out.contains(r#"<text:sequence text:name="Figure">3</text:sequence>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_rewrite_holding_the_field_character_keeps_its_lines() {
+    let root = content("<text:p>a<text:page-count>4</text:page-count>b</text:p>");
+    let paragraph = root.at(&FIRST).expect("the paragraph");
+    let lines = odox_core::edit::rewrite(paragraph, "Xa\u{fffc}b\nY");
+    let texts: Vec<String> = lines.iter().map(odox_core::edit::text).collect();
+    assert_eq!(texts, ["Xab", "Y"]);
+}

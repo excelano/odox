@@ -201,13 +201,6 @@ pub fn is_paragraph(element: &Element) -> bool {
     element.is(&Ns::Text, "p") || element.is(&Ns::Text, "h")
 }
 
-/// Whether an element inside a paragraph holds characters of the paragraph's
-/// text, as a span or a link does, rather than being a mark or a field that
-/// contributes none of its own.
-pub fn holds_text(element: &Element) -> bool {
-    is_inline_container_name(element)
-}
-
 /// What a `text:ruby-text` is drawn as after the text it annotates: itself
 /// in parentheses, `漢字(かんじ)`, as HTML writes ruby where it cannot set it
 /// above the line. Empty where it says nothing.
@@ -428,7 +421,7 @@ fn write_text(parent: &Element, out: &mut String) {
 
 /// A paragraph cut down to a range of its text, as it is carried to be put
 /// back elsewhere: the paragraph's own style and kind, the text in the range
-/// with its spans and links, and nothing that names one place in a document
+/// with its spans, links and fields, and nothing that names one place in a document
 /// (an id, a bookmark, a frame, a note), which would then be there twice.
 pub fn slice(paragraph: &Element, range: Range<usize>) -> Element {
     let len = text(paragraph).chars().count();
@@ -445,11 +438,17 @@ fn is_id(attribute: &Attribute) -> bool {
         || attribute.name.local.as_ref() == "id" && attribute.name.prefix.as_deref() == Some("xml")
 }
 
-/// Drop from a paragraph's contents everything that is not text or whitespace
-/// or a span or link holding some, and the ids of those that stay.
+/// Drop from a paragraph's contents everything that is not text or whitespace,
+/// a field, or a span or link holding some, and the ids and names of those
+/// that stay.
 fn keep_text_only(element: &mut Element) {
     element.children.retain_mut(|child| match child {
         Node::Text(_) | Node::CData(_) => true,
+        Node::Element(e) if is_field(e) => {
+            e.attrs
+                .retain(|a| !is_id(a) && !a.name.is(&Ns::Text, "ref-name"));
+            true
+        }
         Node::Element(e)
             if e.is(&Ns::Text, "s") || e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") =>
         {
@@ -711,6 +710,7 @@ pub fn join(first: &mut Element, second: Element) {
 /// it is a `text:line-break` the editor was shown and left alone.
 pub fn rewrite(paragraph: &Element, edited: &str) -> Vec<Element> {
     let before = text(paragraph);
+    let edited = &edited.replace(FIELD, "");
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = edited.chars().collect();
     let prefix = old.iter().zip(&new).take_while(|(a, b)| a == b).count();

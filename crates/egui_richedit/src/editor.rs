@@ -832,11 +832,15 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
     }
 
     /// Paste what the clipboard holds, as [`Self::paste_copy`] reads it where
-    /// it can, and otherwise as text, each of its lines after the first a
+    /// it can, and otherwise as text without its [`OBJECT`] characters, each
+    /// of its lines after the first a
     /// paragraph of its own, in one undo step. It stops at the first part the
     /// model refuses, so a selection that cannot be replaced is left as it was.
     fn paste<M: Model<Paragraph = P>>(&mut self, model: &mut M, text: &str) -> bool {
-        let text = text.replace("\r\n", "\n").replace('\r', "\n");
+        let text = text
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
+            .replace(OBJECT, "");
         self.group = None;
         if let Some(changed) = self.paste_copy(model, &text) {
             self.group = None;

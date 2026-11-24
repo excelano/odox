@@ -992,8 +992,9 @@ characters, a field one character, U+FFFC, whatever value it shows, and
 everything else in the paragraph — a bookmark, a frame, a note — contributes
 nothing and stays where it was. A field goes when a deletion covers its
 character, and text typed beside it goes on the side the caret is; the
-character itself is never written as text, a copy's text leaves it out, and
-the word count counts it as neither a word nor a character. Replacing a range
+character itself is never written as text, a copy carries the field but its
+plain text leaves the character out, and the word count counts it as neither
+a word nor a character, and ends a word at it. Replacing a range
 deletes the characters from the nodes that hold them, puts the new text into
 the text node at the start of the range, then writes whitespace the way ODF
 requires. A split carries a zero-length element at the split point to the

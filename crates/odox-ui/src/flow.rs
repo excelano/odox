@@ -423,9 +423,6 @@ struct Run<'a> {
     format: &'a TextFormat,
     /// The colours to use where the document names none.
     palette: format::Palette,
-    /// Whether the run's characters are the paragraph's own text, which the
-    /// caret moves through, or a field's value, which it steps over.
-    counted: bool,
     /// How far it is raised off the baseline of the text it sits in, in
     /// screen points.
     rise: f32,
@@ -874,7 +871,6 @@ impl Flow<'_> {
             size,
             format: base,
             palette: self.palette,
-            counted: true,
             rise: rise_of(&properties.text, size, self.zoom),
             link: false,
         };
@@ -920,7 +916,6 @@ impl Flow<'_> {
             size,
             format,
             palette,
-            counted,
             rise,
             link,
         } = *run;
@@ -941,9 +936,7 @@ impl Flow<'_> {
                     .as_ref()
                     .map(|(_, ink)| inserted(plain, *ink));
                 let format = tinted.as_ref().unwrap_or(plain);
-                if !counted {
-                    job.atom(&piece, 0, format.clone());
-                } else if same_length {
+                if same_length {
                     job.text(&piece, format.clone());
                 } else {
                     job.atom(&piece, model_len, format.clone());
@@ -960,11 +953,7 @@ impl Flow<'_> {
                         let count = element.attr_usize(&Ns::Text, "c").unwrap_or(1);
                         put(job, &" ".repeat(count.min(256)), count);
                     } else if element.is(&Ns::Text, "tab") {
-                        if counted {
-                            job.tab(format.clone());
-                        } else {
-                            job.atom("    ", 0, format.clone());
-                        }
+                        job.tab(format.clone());
                     } else if element.is(&Ns::Text, "line-break") {
                         put(job, "\n", 1);
                     } else if element.is(&Ns::Text, "span") || element.is(&Ns::Text, "a") {
@@ -982,7 +971,6 @@ impl Flow<'_> {
                             size: inner_size,
                             format: &inner,
                             palette,
-                            counted,
                             rise: rise_of(&merged, inner_size, self.zoom),
                             link,
                         };
@@ -1445,8 +1433,9 @@ impl Flow<'_> {
     }
 
     /// Draw a mark or a field. A mark's contents are the paragraph's text; a
-    /// field is one character of it drawn as its value, shaded faintly, and
-    /// a date that follows the day shows today's.
+    /// field is one character of it drawn as its value, in the case its span
+    /// asks for, shaded faintly, and a date that follows the day shows
+    /// today's.
     fn passthrough(
         &self,
         element: &Element,
@@ -1458,11 +1447,21 @@ impl Flow<'_> {
             self.runs(element, run, job, frames);
             return;
         }
-        let mut shaded = run.format.clone();
+        let mut shaded = self
+            .inserting
+            .borrow()
+            .as_ref()
+            .map_or_else(|| run.format.clone(), |(_, ink)| inserted(run.format, *ink));
         shaded.background = run.palette.ink.gamma_multiply(0.12);
-        let shown = odox_core::doc::date_shown(element, self.today, &self.document.styles)
+        let value = odox_core::doc::date_shown(element, self.today, &self.document.styles)
             .unwrap_or_else(|| element.plain_text());
-        job.atom(&shown, usize::from(run.counted), shaded);
+        let shown: String = run
+            .inherited
+            .cased(&value)
+            .into_iter()
+            .map(|(piece, _)| piece)
+            .collect();
+        job.atom(&shown, 1, shaded);
     }
 
     /// Draw a tracked change's mark, answering whether the element was one:
