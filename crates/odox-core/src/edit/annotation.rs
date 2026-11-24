@@ -278,7 +278,7 @@ fn find(root: &Element, test: &dyn Fn(&Element) -> bool) -> Option<Vec<usize>> {
 }
 
 /// Take out the element at a path, joining the text either side of it again.
-fn take_out(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
+pub(super) fn take_out(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
     let (&last, parent) = path.split_last().ok_or(Refused::NotFound)?;
     let parent = content.at_mut(parent).ok_or(Refused::NotFound)?;
     if last >= parent.children.len() {
@@ -302,24 +302,22 @@ fn take_out(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
 
 /// Put an element in a paragraph at a place in its text, splitting the text
 /// node it falls in and nothing else, so taking it out again gives back the
-/// paragraph it was.
-fn insert_mark(paragraph: &mut Element, at: usize, mark: Element) {
+/// paragraph it was. Answers where it went, from the paragraph.
+pub(super) fn insert_mark(paragraph: &mut Element, at: usize, mark: Element) -> Vec<usize> {
     let found = segments(paragraph)
         .into_iter()
         .find(|segment| segment.start + segment.kind.len() > at || segment.start >= at);
     let Some(segment) = found else {
         paragraph.children.push(Node::Element(mark));
         paragraph.self_closing = false;
-        return;
+        return vec![paragraph.children.len() - 1];
     };
-    let Some((&index, parent)) = segment.path.split_last() else {
-        return;
-    };
-    let Some(parent) = paragraph.at_mut(parent) else {
-        return;
+    let (&index, above) = segment.path.split_last().unwrap_or((&0, &[]));
+    let Some(parent) = paragraph.at_mut(above) else {
+        return Vec::new();
     };
     let offset = at.saturating_sub(segment.start);
-    match &mut parent.children[index] {
+    let placed = match &mut parent.children[index] {
         Node::Text(text) if offset > 0 => {
             let byte = text
                 .char_indices()
@@ -328,20 +326,26 @@ fn insert_mark(paragraph: &mut Element, at: usize, mark: Element) {
             let rest = text.split_off(byte);
             parent.children.insert(index + 1, Node::Element(mark));
             parent.children.insert(index + 2, Node::Text(rest));
+            index + 1
         }
-        Node::Element(spaces) if offset > 0 => {
-            let Kind::Spaces(count) = segment.kind else {
-                parent.children.insert(index, Node::Element(mark));
-                return;
+        Node::Element(spaces) if offset > 0 && matches!(segment.kind, Kind::Spaces(_)) => {
+            let count = match segment.kind {
+                Kind::Spaces(count) => count,
+                _ => 0,
             };
             let mut rest = spaces.clone();
             set_count(spaces, offset);
             set_count(&mut rest, count - offset);
             parent.children.insert(index + 1, Node::Element(mark));
             parent.children.insert(index + 2, Node::Element(rest));
+            index + 1
         }
-        _ => parent.children.insert(index, Node::Element(mark)),
-    }
+        _ => {
+            parent.children.insert(index, Node::Element(mark));
+            index
+        }
+    };
+    [above, &[placed]].concat()
 }
 
 /// The comments on a slide: each one's place among the page's children,

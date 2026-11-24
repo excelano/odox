@@ -431,6 +431,8 @@ pub enum Command {
     EqualWidths,
     /// Put a comment on the selection, or at the caret.
     Comment,
+    /// Put a footnote or an endnote at the caret.
+    Note(odox_core::edit::NoteClass),
     /// Start a numbered list again at the item, or carry it on from the list
     /// before when not.
     Numbering(bool),
@@ -696,6 +698,22 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
     if ui.add_enabled(state.enabled, comment).clicked() {
         chosen = Some(Command::Comment);
+        ui.close();
+    }
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::F,
+    ));
+    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
+    if ui.add_enabled(state.enabled, footnote).clicked() {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
+        ui.close();
+    }
+    if ui
+        .add_enabled(state.enabled, egui::Button::new(t("Endnote")))
+        .clicked()
+    {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
         ui.close();
     }
     let remove = egui::Button::new(t("Remove page break"));

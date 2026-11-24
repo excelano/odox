@@ -320,6 +320,8 @@ pub(crate) struct Piece {
     pub repeat: Option<Rc<Vec<Piece>>>,
     /// The heading it is the first line of, for the outline.
     pub heading: Option<(u8, String)>,
+    /// The footnotes cited in it, laid out for the foot of its page.
+    pub footnotes: Vec<Piece>,
 }
 
 /// Lays blocks out and builds the structure tree as it goes.
@@ -363,6 +365,13 @@ impl<'a> Layout<'a> {
             match block {
                 Block::Paragraph(paragraph) => {
                     self.paragraph(paragraph, x, width, parent, None, out)?;
+                    let mut foot = Vec::new();
+                    for note in &paragraph.footnotes {
+                        self.note_body(note, x, width, parent, &mut foot)?;
+                    }
+                    if let Some(piece) = out.get_mut(first) {
+                        piece.footnotes = foot;
+                    }
                 }
                 Block::List(list) => self.list(list, x, width, parent, out)?,
                 Block::Table(table) => self.table(table, x, width, parent, out)?,
@@ -841,6 +850,18 @@ impl<'a> Layout<'a> {
                 ..Piece::default()
             });
         }
+        self.note_body(note, x, width, parent, out)
+    }
+
+    /// A note's citation in the margin and its text beside it.
+    pub(crate) fn note_body(
+        &mut self,
+        note: &Note,
+        x: f32,
+        width: f32,
+        parent: Option<NodeId>,
+        out: &mut Vec<Piece>,
+    ) -> Result<(), Refusal> {
         let node = self.tree.group(parent, Tag::Note);
         let label = self.tree.group(Some(node), Tag::Lbl);
         let inner_x = x + NOTE_INDENT;
@@ -1224,6 +1245,21 @@ fn column_widths(declared: &[Option<f32>], width: f32) -> Vec<f32> {
 /// Cut a piece taller than a page at a height: what lies wholly above stays,
 /// what does not moves to a second piece, and what crosses the cut — a
 /// border, a background — is cut with it.
+/// The short rule that sets the footnotes at the foot of a page off from the
+/// text above them.
+pub(crate) fn foot_rule(x: f32, width: f32) -> Piece {
+    Piece {
+        height: NOTES_GAP,
+        items: vec![Item::Rule {
+            from: (x, NOTES_GAP / 2.0),
+            to: (x + width / 3.0, NOTES_GAP / 2.0),
+            width: 0.5,
+            color: INK,
+        }],
+        ..Piece::default()
+    }
+}
+
 pub(crate) fn split(piece: Piece, at: f32) -> (Piece, Piece) {
     let mut above = Piece {
         height: at,
@@ -1232,6 +1268,7 @@ pub(crate) fn split(piece: Piece, at: f32) -> (Piece, Piece) {
         heading: piece.heading,
         repeat: piece.repeat.clone(),
         page_before: piece.page_before,
+        footnotes: piece.footnotes,
         ..Piece::default()
     };
     let mut below = Piece {

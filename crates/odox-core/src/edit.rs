@@ -26,6 +26,7 @@ pub(crate) mod format;
 pub mod html;
 mod indent;
 mod list;
+mod note;
 mod numbering;
 mod page_break;
 mod picture;
@@ -51,6 +52,9 @@ pub use format::{Mark, Script, Setting, TextProperty, format, marked, set_text, 
 pub(crate) use format::{automatic_styles, element};
 pub use indent::{LineSpacing, line_spacing, set_indent, set_line_spacing};
 pub use list::{continue_numbering, list_level, restart_numbering};
+pub use note::{
+    NoteClass, insert_note, note_text, notes_in, remove_note, renumber_notes, set_note_text,
+};
 pub use numbering::ListCounters;
 pub use page_break::{insert_page_break, page_break, remove_page_break};
 pub use picture::{NewPicture, insert_picture};

@@ -287,10 +287,8 @@ pub struct TextView {
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
     table_wanted: Option<(usize, usize)>,
-    /// A column edge dragged to a width, given it on the next frame.
-    column_wanted: Option<(Vec<usize>, usize, f32)>,
-    /// What was done in a comment's box, done on the next frame.
-    note_wanted: Option<(Vec<usize>, usize, NoteResponse)>,
+    /// What the page asked for as it was drawn, done on the next frame.
+    wanted: Wanted,
     /// What a chosen picture shows, while the question is up.
     picture_question: Option<PictureQuestion>,
     /// The picture the question was answered with, put in on the next frame.
@@ -323,8 +321,7 @@ impl Default for TextView {
             page_question: None,
             page_wanted: None,
             table_wanted: None,
-            column_wanted: None,
-            note_wanted: None,
+            wanted: Wanted::default(),
             notice: None,
         }
     }
@@ -502,16 +499,7 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
-                if let Some((table, column, width)) = self.column_wanted.take()
-                    && model.set_column_width(&table, column, width).is_err()
-                {
-                    self.notice = Some(Notice::Problem(
-                        t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
-                    ));
-                }
-                if let Some((paragraph, index, done)) = self.note_wanted.take() {
-                    let _ = model.note(&paragraph, index, &done);
-                }
+                self.wanted.apply(&mut model, &mut self.notice);
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 break_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
@@ -541,12 +529,7 @@ impl View for TextView {
                         flow.find = self.found.highlights(0);
                         flow.marks = marks::shown(ui.ctx());
                         flow.blocks(ui, body, width);
-                        if let Some(noted) = flow.noted.take() {
-                            self.note_wanted = Some(noted);
-                            ui.ctx().request_repaint();
-                        }
-                        if let Some(resized) = flow.resized.take() {
-                            self.column_wanted = Some(resized);
+                        if self.wanted.take(&mut flow) {
                             ui.ctx().request_repaint();
                         }
                         if flow.followed.is_some() {
@@ -826,13 +809,16 @@ fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
     if ui.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)) {
         model.insert_page_break(page);
     }
-    if ui.input_mut(|input| {
-        input.consume_key(
-            egui::Modifiers::COMMAND | egui::Modifiers::ALT,
-            egui::Key::C,
-        )
-    }) {
+    let alt = |key| {
+        ui.input_mut(|input| {
+            input.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::ALT, key)
+        })
+    };
+    if alt(egui::Key::C) {
         let _ = model.add_comment(page);
+    }
+    if alt(egui::Key::F) {
+        let _ = model.insert_note(page, odox_core::edit::NoteClass::Footnote);
     }
     for (key, backspace) in [(egui::Key::Backspace, true), (egui::Key::Delete, false)] {
         if ui.input(|input| input.key_pressed(key) && input.modifiers.is_none())
@@ -909,6 +895,42 @@ struct Asked {
     notice: Option<Notice>,
 }
 
+/// What the page asked for while it was drawn, which the model, not there
+/// then, does on the next frame: a column dragged to a width, and what was
+/// done in a comment's or a note's box.
+#[derive(Default)]
+struct Wanted {
+    column: Option<(Vec<usize>, usize, f32)>,
+    comment: Option<(Vec<usize>, usize, NoteResponse)>,
+    note: Option<(Vec<usize>, NoteResponse)>,
+}
+
+impl Wanted {
+    /// Take what a flow asked for, answering whether it asked anything.
+    fn take(&mut self, flow: &mut Flow<'_>) -> bool {
+        self.column = flow.resized.take().or(self.column.take());
+        self.comment = flow.noted.take().or(self.comment.take());
+        self.note = flow.note_done.take().or(self.note.take());
+        self.column.is_some() || self.comment.is_some() || self.note.is_some()
+    }
+
+    fn apply(&mut self, model: &mut FlowModel<'_>, notice: &mut Option<Notice>) {
+        if let Some((table, column, width)) = self.column.take()
+            && model.set_column_width(&table, column, width).is_err()
+        {
+            *notice = Some(Notice::Problem(
+                t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
+            ));
+        }
+        if let Some((paragraph, index, done)) = self.comment.take() {
+            let _ = model.note(&paragraph, index, &done);
+        }
+        if let Some((note, done)) = self.note.take() {
+            let _ = model.note_body(&note, &done);
+        }
+    }
+}
+
 /// What the Format menu asked for at the caret: a restart or a continuation
 /// of a list's numbering, a comment, or a page break put in or taken out.
 fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Option<Command>) {
@@ -918,6 +940,9 @@ fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Opti
         }
         Some(Command::Comment) => {
             let _ = model.add_comment(page);
+        }
+        Some(Command::Note(class)) => {
+            let _ = model.insert_note(page, class);
         }
         Some(Command::PageBreak(true)) => {
             model.insert_page_break(page);

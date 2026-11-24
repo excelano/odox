@@ -980,6 +980,17 @@ one the selection has where it is one of those; spacing stated those other ways
 shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
+**A footnote or an endnote is a `text:note` where it is cited**
+(`edit/note.rs`), with its citation and its body, as `LibreOffice` writes one.
+Format > Footnote (Ctrl+Alt+F) and Endnote put an empty one at the caret, with
+its box open, and every note's citation is then numbered again by its place
+among the notes of its class in document order, a citation with a `text:label`
+of its own keeping it. The window draws the citation raised, and shows the
+note's text in the box a comment uses beside it while it is under the pointer
+or the caret is at it; in edit mode the box edits the text, a line to a
+paragraph of the body in the style of its first, or deletes the note. Find's
+Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
+
 **A comment is an `office:annotation` where it is anchored** (`edit/annotation.rs`),
 with `dc:creator`, `dc:date` and its paragraphs, and one over a range closes
 at an `office:annotation-end` of the same `office:name`, as `LibreOffice`
@@ -1135,11 +1146,14 @@ picture anchored in a paragraph after it. An object with no picture of its own,
 which the window shows as an empty box, is left out. So is text the document
 hides, which the window shows to the person editing it: a run or a paragraph
 styled `text:display="none"`, a section displayed `none`, and a `hidden-text` or
-`hidden-paragraph` field whose condition hides it now. A note in a text document
-is the one thing the PDF holds that the window does not show: its citation stays
-in the text, and its own text goes to the end of the document with the other
-notes, in the order they are cited, below a short rule, each tagged as a Note
-with its citation as its label. A sheet's name above its cells is the other.
+`hidden-paragraph` field whose condition hides it now. A note's citation stays
+in the text, and its own text, each tagged as a Note with its citation as its
+label, goes where its class says: a footnote at the foot of the page the
+paragraph citing it begins on, below a short rule, the room it takes held back
+from that page's text, and one that does not fit carried on to the foot of the
+next page; an endnote at the end of the document with the other endnotes, in
+the order they are cited, below the same rule. A sheet's name above its cells
+is the one thing the PDF holds that the window does not show.
 Every page is white with black ink where the document names no color, whatever
 the window's theme.
 
