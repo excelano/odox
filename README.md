@@ -120,6 +120,11 @@ Alt+Shift+Right move every heading the selection runs over a level up or down,
 as Format > Promote heading and Demote heading do. Tab and Shift+Tab at the
 start of a list item move it a level in or out, and Format > Lists restarts a
 numbered list at the caret's item or continues it from the list before.
+A comment is marked in the margin, and its author, date and text show beside the
+mark under the pointer or when the caret reaches it; in edit mode its text is
+edited or deleted there, and Ctrl+Alt+C, or Format > Comment, puts a new one on
+the selection. In `xodp` a slide's comments are marked where they sit, and
+Slide > Comment adds one.
 Ctrl+Enter begins a page at the caret, drawn as a dashed rule in the window and
 taking effect in the PDF; Backspace at its start, or Format > Remove page break,
 takes it out. The

@@ -62,6 +62,9 @@ pub enum Ns {
     Loext,
     /// `urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0`
     Calcext,
+    /// `http://openoffice.org/2009/office`, where `LibreOffice` writes a
+    /// slide's comments.
+    Officeooo,
     /// A namespace declaration: `xmlns:foo="..."`. Held as an attribute so that
     /// writing a tree re-declares exactly what reading it found.
     Xmlns,
@@ -94,6 +97,7 @@ impl Ns {
             "http://purl.org/dc/elements/1.1/" => Self::Dc,
             "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" => Self::Loext,
             "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" => Self::Calcext,
+            "http://openoffice.org/2009/office" => Self::Officeooo,
             other => Self::Other(other.into()),
         }
     }
@@ -121,6 +125,7 @@ impl Ns {
             Self::Dc => "http://purl.org/dc/elements/1.1/",
             Self::Loext => "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0",
             Self::Calcext => "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0",
+            Self::Officeooo => "http://openoffice.org/2009/office",
             Self::Xmlns | Self::Other(_) | Self::None => return None,
         })
     }
@@ -147,6 +152,7 @@ impl Ns {
             Self::Dc => "dc",
             Self::Loext => "loext",
             Self::Calcext => "calcext",
+            Self::Officeooo => "officeooo",
             Self::Xmlns => "xmlns",
             Self::Other(_) | Self::None => "",
         }
@@ -422,9 +428,10 @@ impl Element {
                 }
                 Node::Element(e) if e.is(&Ns::Text, "tab") => out.push('\t'),
                 Node::Element(e) if e.is(&Ns::Text, "line-break") => out.push('\n'),
-                // A note's body is not part of the text it hangs off, and
-                // neither is the deleted half of a tracked change.
-                Node::Element(e) if e.is(&Ns::Text, "note") => {}
+                // A note's body is not part of the text it hangs off, nor is
+                // a comment's, and neither is the deleted half of a tracked
+                // change.
+                Node::Element(e) if e.is(&Ns::Text, "note") || e.is(&Ns::Office, "annotation") => {}
                 Node::Element(e) => e.write_plain_text(out),
                 Node::Comment(_) | Node::ProcessingInstruction(_) => {}
             }

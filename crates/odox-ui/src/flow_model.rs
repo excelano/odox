@@ -743,6 +743,84 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
+    /// Put an empty comment on what is selected in the paragraph the
+    /// selection ends in, or at the caret, signed and dated now, as one step
+    /// to undo, the caret going to it so its box opens to be written in.
+    ///
+    /// # Errors
+    ///
+    /// As [`edit::add_annotation`].
+    pub fn add_comment(&mut self, editor: &mut PageEditor) -> Result<(), Refused> {
+        let selection = editor.selection().cloned().ok_or(Refused::NotFound)?;
+        let paragraph = selection.focus.paragraph.clone();
+        let range = if selection.anchor.paragraph == paragraph {
+            let (a, b) = (selection.anchor.offset, selection.focus.offset);
+            a.min(b)..a.max(b)
+        } else {
+            selection.focus.offset..selection.focus.offset
+        };
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), &paragraph].concat();
+        if let Err(refused) = edit::add_annotation(
+            self.content,
+            &path,
+            range.clone(),
+            "",
+            crate::comments::author().as_deref(),
+            &crate::comments::now(),
+        ) {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &paragraph].concat(),
+                range.start,
+            )),
+        );
+        editor.select(Selection::caret(Position::new(paragraph, range.start)));
+        Ok(())
+    }
+
+    /// Do what was done in a comment's box: its new text, signed and dated
+    /// now, or its removal, as one step to undo.
+    ///
+    /// # Errors
+    ///
+    /// There is no such comment.
+    pub fn note(
+        &mut self,
+        paragraph: &[usize],
+        index: usize,
+        done: &crate::note_popup::NoteResponse,
+    ) -> Result<(), Refused> {
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), paragraph].concat();
+        let changed = match done {
+            crate::note_popup::NoteResponse::Saved(text) => edit::set_annotation_text(
+                self.content,
+                &path,
+                index,
+                text,
+                crate::comments::author().as_deref(),
+                &crate::comments::now(),
+            ),
+            crate::note_popup::NoteResponse::Deleted => {
+                edit::remove_annotation(self.content, &path, index)
+            }
+        };
+        if let Err(refused) = changed {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.editing.touch();
+        self.editing.record_snapshot(before, None);
+        Ok(())
+    }
+
     /// Tab and Shift+Tab in a table: select what the next cell or the one
     /// before holds, and past the last cell put in a row and go to its first.
     /// Answers whether the caret was in a table, and so whether the key was

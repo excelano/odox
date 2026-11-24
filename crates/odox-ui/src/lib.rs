@@ -25,6 +25,7 @@
 
 pub mod clipboard;
 pub mod color_picker;
+pub mod comments;
 pub mod count;
 pub mod edit;
 pub mod export;
@@ -38,6 +39,7 @@ pub mod i18n;
 pub mod instance;
 pub mod links;
 pub mod marks;
+pub mod note_popup;
 /// Receiving a document from macOS, which does not arrive as an argument.
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]

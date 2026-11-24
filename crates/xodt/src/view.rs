@@ -13,6 +13,7 @@ use odox_core::doc::{PageSetup, TextDocument};
 use odox_core::words::Count;
 use odox_ui::find::{Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::note_popup::NoteResponse;
 use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
@@ -288,6 +289,8 @@ pub struct TextView {
     table_wanted: Option<(usize, usize)>,
     /// A column edge dragged to a width, given it on the next frame.
     column_wanted: Option<(Vec<usize>, usize, f32)>,
+    /// What was done in a comment's box, done on the next frame.
+    note_wanted: Option<(Vec<usize>, usize, NoteResponse)>,
     /// What a chosen picture shows, while the question is up.
     picture_question: Option<PictureQuestion>,
     /// The picture the question was answered with, put in on the next frame.
@@ -321,6 +324,7 @@ impl Default for TextView {
             page_wanted: None,
             table_wanted: None,
             column_wanted: None,
+            note_wanted: None,
             notice: None,
         }
     }
@@ -505,6 +509,9 @@ impl View for TextView {
                         t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
                     ));
                 }
+                if let Some((paragraph, index, done)) = self.note_wanted.take() {
+                    let _ = model.note(&paragraph, index, &done);
+                }
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 break_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
@@ -534,6 +541,10 @@ impl View for TextView {
                         flow.find = self.found.highlights(0);
                         flow.marks = marks::shown(ui.ctx());
                         flow.blocks(ui, body, width);
+                        if let Some(noted) = flow.noted.take() {
+                            self.note_wanted = Some(noted);
+                            ui.ctx().request_repaint();
+                        }
                         if let Some(resized) = flow.resized.take() {
                             self.column_wanted = Some(resized);
                             ui.ctx().request_repaint();
@@ -815,6 +826,14 @@ fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
     if ui.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)) {
         model.insert_page_break(page);
     }
+    if ui.input_mut(|input| {
+        input.consume_key(
+            egui::Modifiers::COMMAND | egui::Modifiers::ALT,
+            egui::Key::C,
+        )
+    }) {
+        let _ = model.add_comment(page);
+    }
     for (key, backspace) in [(egui::Key::Backspace, true), (egui::Key::Delete, false)] {
         if ui.input(|input| input.key_pressed(key) && input.modifiers.is_none())
             && model.remove_break_by_key(page, backspace)
@@ -890,6 +909,26 @@ struct Asked {
     notice: Option<Notice>,
 }
 
+/// What the Format menu asked for at the caret: a restart or a continuation
+/// of a list's numbering, a comment, or a page break put in or taken out.
+fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Option<Command>) {
+    match command {
+        Some(Command::Numbering(restart)) => {
+            model.numbering(page, restart);
+        }
+        Some(Command::Comment) => {
+            let _ = model.add_comment(page);
+        }
+        Some(Command::PageBreak(true)) => {
+            model.insert_page_break(page);
+        }
+        Some(Command::PageBreak(false)) => {
+            model.remove_page_break(page);
+        }
+        _ => {}
+    }
+}
+
 /// The toolbar over the page, and what it or the Format menu asked for: a
 /// mark, a kind of paragraph, a table or a change to the one the caret is in.
 /// A table the size question was answered with goes in here too.
@@ -940,18 +979,7 @@ fn toolbar_commands(
     }) {
         model.apply_line_spacing(page, spacing);
     }
-    if let Some(Command::Numbering(restart)) = command {
-        model.numbering(page, restart);
-    }
-    match command {
-        Some(Command::PageBreak(true)) => {
-            model.insert_page_break(page);
-        }
-        Some(Command::PageBreak(false)) => {
-            model.remove_page_break(page);
-        }
-        _ => {}
-    }
+    caret_command(page, model, command);
     if let Some(delta) = pressed.outline.or(match command {
         Some(Command::Outline(delta)) => Some(delta),
         _ => None,

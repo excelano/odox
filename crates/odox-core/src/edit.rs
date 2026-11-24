@@ -18,6 +18,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod align;
+mod annotation;
 mod block;
 mod cells;
 mod figure;
@@ -36,6 +37,10 @@ use std::ops::Range;
 use crate::xml::{Attribute, Element, Name, Node, Ns};
 
 pub use align::{alignment, set_alignment};
+pub use annotation::{
+    Annotation, add_annotation, add_slide_annotation, annotations_in, remove_annotation,
+    remove_slide_annotation, set_annotation_text, set_slide_annotation_text, slide_annotations,
+};
 pub(crate) use block::name_for;
 pub use block::{block_state, heading_level, set_heading, set_list, shift_heading};
 pub use cells::{equal_widths, merge_cells, merge_rectangle, set_column_width, split_cell};

@@ -165,6 +165,10 @@ convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt
 # that starts again at one, and a list that carries on from the one before.
 convert odt:writer8 lists.odt "OpenDocument Text Flat XML" lists.fodt
 
+# Comments: one at a point, and one over a range that ends at its end mark.
+convert odt:writer8 comments.odt "OpenDocument Text Flat XML" comments.fodt
+convert odp:impress8 comments.odp "OpenDocument Presentation Flat XML" comments.fodp
+
 # Text that reads right to left: Hebrew and Arabic in paragraphs that read
 # left to right, the same in paragraphs whose style says they read right to
 # left, with Latin words and numbers among them, and long enough to wrap.

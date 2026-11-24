@@ -1237,15 +1237,13 @@ impl SheetView {
             return;
         };
         let before = document.document.content.clone();
-        let date = jiff::ZonedDateTime::now()
-            .strftime("%Y-%m-%dT%H:%M:%S")
-            .to_string();
+        let date = odox_ui::comments::now();
         match document.set_comment(
             self.sheet,
             row,
             column,
             text.as_deref(),
-            author().as_deref(),
+            odox_ui::comments::author().as_deref(),
             &date,
         ) {
             Ok(()) => editing.record_snapshot(before, None),
@@ -3068,34 +3066,6 @@ fn matches_in(document: &SheetDocument, query: &str, options: Options) -> Vec<Ma
         }
     }
     found
-}
-
-/// The name a new comment is signed with: the user's full name where the
-/// system keeps one, and otherwise their login.
-fn author() -> Option<String> {
-    let login = std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .ok()
-        .filter(|login| !login.is_empty())?;
-    let full = std::fs::read_to_string("/etc/passwd")
-        .ok()
-        .and_then(|passwd| {
-            passwd.lines().find_map(|line| {
-                let fields: Vec<&str> = line.split(':').collect();
-                (fields.first() == Some(&login.as_str()))
-                    .then(|| {
-                        fields
-                            .get(4)?
-                            .split(',')
-                            .next()
-                            .map(str::trim)
-                            .map(ToOwned::to_owned)
-                    })
-                    .flatten()
-                    .filter(|name| !name.is_empty())
-            })
-        });
-    Some(full.unwrap_or(login))
 }
 
 #[cfg(test)]
