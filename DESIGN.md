@@ -980,6 +980,31 @@ one the selection has where it is one of those; spacing stated those other ways
 shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
+**A tracked change is a `text:changed-region`** in the body's
+`text:tracked-changes` (`edit/changes.rs`), with its author and date, and the
+marks in the text that name it: an insertion and a format change run from a
+`text:change-start` to a `text:change-end`, and a deletion is a `text:change`
+where the text was, the paragraphs it took out kept in the region. The window
+draws an insertion underlined and a deletion struck through at its mark, both
+in an ink per author from a fixed set legible on either paper; the deleted text
+is drawn as an atom, so it is not edited and adds nothing to the paragraph's
+text. A bar over the page says the document has changes, and that edits made
+here are not tracked when the document asks for tracking: its
+`text:tracked-changes` has no `text:track-changes="false"`, true being the
+attribute's default, and `LibreOffice` leaving it out either way. Accepting a
+change takes its marks and region out, and the emptied list of regions too
+unless it carries attributes. Rejecting an insertion takes out its text too,
+with the records of any change marked inside it; rejecting a deletion puts
+what it took out back at its mark: one paragraph's text there, or else the
+paragraph split there, a first deleted paragraph's text ending the first half,
+a last one, in its own kind and style, beginning the second, and lists and
+tables between them, or the blocks themselves where the mark stands between
+blocks. An insertion without both its ends in paragraphs, or a deletion
+without its one mark, is refused with nothing changed. Rejecting a format
+change keeps the formatting, since ODF records no former one to go back to.
+Each is one step to undo, and lets go of the caret. The PDF prints the accepted
+state: inserted text, and no deleted text.
+
 **A footnote or an endnote is a `text:note` where it is cited**
 (`edit/note.rs`), with its citation and its body, as `LibreOffice` writes one.
 Format > Footnote (Ctrl+Alt+F) and Endnote put an empty one at the caret, with

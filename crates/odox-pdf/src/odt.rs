@@ -587,4 +587,17 @@ mod tests {
         document.document.package.set_part("Pictures/none.png", png);
         assert_eq!(undescribed(&document).len(), 1);
     }
+
+    #[test]
+    fn tracked_changes_are_printed_accepted() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/tracked.odt"),
+        )
+        .expect("the fixture");
+        let text = laid_text(&TextDocument::read(&bytes).expect("it reads"));
+        assert!(text.contains("newly added"), "{text}");
+        assert!(!text.contains("very"), "{text}");
+        assert!(!text.contains("once stood"), "{text}");
+    }
 }

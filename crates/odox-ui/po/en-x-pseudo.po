@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 20:33-0600\n"
+"POT-Creation-Date: 2026-11-23 21:13-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: none\n"
@@ -143,7 +143,7 @@ msgstr "[Märk thé réšt äš décörätíöñ ···········]"
 #: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:590
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1136
 #: crates/xods/src/view.rs:1218 crates/xods/src/view.rs:1435
-#: crates/xodt/src/view.rs:645
+#: crates/xodt/src/view.rs:647
 msgid "Cancel"
 msgstr "[Cäñcél ···]"
 
@@ -191,20 +191,32 @@ msgstr "[Répläcé ···]"
 msgid "Replace all"
 msgstr "[Répläcé äll ·····]"
 
-#: crates/odox-ui/src/flow.rs:631
+#: crates/odox-ui/src/flow.rs:642
 msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 "[Téxt thät réädš ríght tö léft cäññöt bé édítéd yét. ·····················]"
 
-#: crates/odox-ui/src/flow.rs:1366
+#: crates/odox-ui/src/flow.rs:1456
+msgid "Inserted"
+msgstr "[Îñšértéd ····]"
+
+#: crates/odox-ui/src/flow.rs:1457
+msgid "Deleted"
+msgstr "[Délétéd ···]"
+
+#: crates/odox-ui/src/flow.rs:1458
+msgid "Formatted"
+msgstr "[Förmättéd ····]"
+
+#: crates/odox-ui/src/flow.rs:1543
 msgid "Endnote {number}"
 msgstr "[Éñdñöté {number} ·······]"
 
-#: crates/odox-ui/src/flow.rs:1368
+#: crates/odox-ui/src/flow.rs:1545
 msgid "Footnote {number}"
 msgstr "[Föötñöté {number} ·······]"
 
-#: crates/odox-ui/src/flow.rs:1466
+#: crates/odox-ui/src/flow.rs:1658
 msgid "Page break"
 msgstr "[Pägé bréäk ·····]"
 
@@ -231,6 +243,14 @@ msgstr "[Sävé ··]"
 #: crates/odox-ui/src/note_popup.rs:81 crates/xods/src/view.rs:1215
 msgid "Delete"
 msgstr "[Délété ···]"
+
+#: crates/odox-ui/src/note_popup.rs:145
+msgid "Accept"
+msgstr "[Åccépt ···]"
+
+#: crates/odox-ui/src/note_popup.rs:148
+msgid "Reject"
+msgstr "[Réjéct ···]"
 
 #: crates/odox-ui/src/page_setup.rs:86
 msgid "Page setup"
@@ -296,7 +316,7 @@ msgstr "[Thät fílé íš ñöt ä PNG ör ä JPÉG píctüré. ·······�
 msgid "Insert a picture"
 msgstr "[Îñšért ä píctüré ·······]"
 
-#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:640
+#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:642
 msgid "Insert"
 msgstr "[Îñšért ···]"
 
@@ -484,7 +504,7 @@ msgstr "[Jüštífy ···]"
 msgid "Table"
 msgstr "[Täblé ···]"
 
-#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:628
+#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:630
 msgid "Insert a table"
 msgstr "[Îñšért ä täblé ······]"
 
@@ -1083,27 +1103,27 @@ msgstr "[Chäräctérš: {characters} ··········]"
 msgid "This document has no text in it."
 msgstr "[Thíš döcüméñt häš ñö téxt íñ ít. ·············]"
 
-#: crates/xodt/src/view.rs:569
+#: crates/xodt/src/view.rs:571
 msgid "Outline"
 msgstr "[Öütlíñé ···]"
 
-#: crates/xodt/src/view.rs:578
+#: crates/xodt/src/view.rs:580
 msgid "(untitled)"
 msgstr "[(üñtítléd) ·····]"
 
-#: crates/xodt/src/view.rs:610
+#: crates/xodt/src/view.rs:612
 msgid "Copy the document as text"
 msgstr "[Cöpy thé döcüméñt äš téxt ···········]"
 
-#: crates/xodt/src/view.rs:631
+#: crates/xodt/src/view.rs:633
 msgid "Rows"
 msgstr "[Röwš ··]"
 
-#: crates/xodt/src/view.rs:634
+#: crates/xodt/src/view.rs:636
 msgid "Columns"
 msgstr "[Cölümñš ···]"
 
-#: crates/xodt/src/view.rs:795
+#: crates/xodt/src/view.rs:797
 msgid ""
 "This table has merged or repeated cells, so its rows and columns are left as "
 "they are."
@@ -1111,17 +1131,31 @@ msgstr ""
 "[Thíš täblé häš mérgéd ör répéätéd céllš, šö ítš röwš äñd cölümñš äré léft "
 "äš théy äré. ···································]"
 
-#: crates/xodt/src/view.rs:798
+#: crates/xodt/src/view.rs:800
 msgid "The table could not be changed here."
 msgstr "[Thé täblé cöüld ñöt bé chäñgéd héré. ···············]"
 
-#: crates/xodt/src/view.rs:875
+#: crates/xodt/src/view.rs:877
 msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
 "[Thíš ítém cäññöt mövé öüt: thé ítém ít íš íñ göéš öñ äftér ítš líšt. "
 "····························]"
 
-#: crates/xodt/src/view.rs:922
+#: crates/xodt/src/view.rs:937
+msgid "This change cannot be accepted: it is no longer in the document."
+msgstr ""
+"[Thíš chäñgé cäññöt bé äccéptéd: ít íš ñö löñgér íñ thé döcüméñt. "
+"··························]"
+
+#: crates/xodt/src/view.rs:939
+msgid ""
+"This change cannot be rejected: its marks in the text are missing or stand "
+"where its text cannot go back."
+msgstr ""
+"[Thíš chäñgé cäññöt bé réjéctéd: ítš märkš íñ thé téxt äré míššíñg ör štäñd "
+"whéré ítš téxt cäññöt gö bäck. ···········································]"
+
+#: crates/xodt/src/view.rs:947
 msgid ""
 "These columns cannot be resized: their widths are not stated, or together "
 "they are under a centimetre."
@@ -1129,29 +1163,45 @@ msgstr ""
 "[Théšé cölümñš cäññöt bé réšízéd: théír wídthš äré ñöt štätéd, ör tögéthér "
 "théy äré üñdér ä céñtímétré. ·········································]"
 
-#: crates/xodt/src/view.rs:1017
+#: crates/xodt/src/view.rs:966
+msgid "This document has tracked changes."
+msgstr "[Thíš döcüméñt häš träckéd chäñgéš. ··············]"
+
+#: crates/xodt/src/view.rs:968
+msgid "Edits made here are not tracked."
+msgstr "[Édítš mädé héré äré ñöt träckéd. ·············]"
+
+#: crates/xodt/src/view.rs:971
+msgid "Accept all"
+msgstr "[Åccépt äll ·····]"
+
+#: crates/xodt/src/view.rs:974
+msgid "Reject all"
+msgstr "[Réjéct äll ·····]"
+
+#: crates/xodt/src/view.rs:1065
 msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 "[Séléct thé céllš tö mérgé, fröm öñé céll öf ä täblé tö äñöthér. "
 "··························]"
 
-#: crates/xodt/src/view.rs:1019
+#: crates/xodt/src/view.rs:1067
 msgid "These cells cannot be merged: the table has repeated rows or cells."
 msgstr ""
 "[Théšé céllš cäññöt bé mérgéd: thé täblé häš répéätéd röwš ör céllš. "
 "···························]"
 
-#: crates/xodt/src/view.rs:1024
+#: crates/xodt/src/view.rs:1072
 msgid "The caret is not in a table cell."
 msgstr "[Thé cärét íš ñöt íñ ä täblé céll. ··············]"
 
-#: crates/xodt/src/view.rs:1026
+#: crates/xodt/src/view.rs:1074
 msgid "This cell cannot be split: the table has repeated rows or cells."
 msgstr ""
 "[Thíš céll cäññöt bé šplít: thé täblé häš répéätéd röwš ör céllš. "
 "··························]"
 
-#: crates/xodt/src/view.rs:1032
+#: crates/xodt/src/view.rs:1080
 msgid "This table does not say how wide its columns are."
 msgstr ""
 "[Thíš täblé döéš ñöt šäy höw wídé ítš cölümñš äré. ····················]"

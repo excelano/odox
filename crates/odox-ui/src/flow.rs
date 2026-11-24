@@ -274,6 +274,14 @@ pub struct Flow<'a> {
     pub turned: Option<Turned>,
     /// Whether formatting marks are drawn over the text ([`crate::marks`]).
     pub marks: bool,
+    /// A tracked change's box was used: the change, and whether it is to be
+    /// accepted, for the view to do.
+    pub decided: Option<(String, bool)>,
+    /// The document's tracked changes, each with its author's ink, read the
+    /// first time a paragraph asks.
+    tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
+    /// The insertion the text being laid out is in, and its ink.
+    inserting: std::cell::RefCell<Option<(String, Color32)>>,
     /// Where the flow is, as a path of child indices from the root, or from
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
@@ -305,6 +313,9 @@ impl<'a> Flow<'a> {
             under: None,
             turned: None,
             marks: false,
+            decided: None,
+            tracked: std::cell::OnceCell::new(),
+            inserting: std::cell::RefCell::new(None),
             path: Vec::new(),
             detached: false,
         }
@@ -632,6 +643,7 @@ impl Flow<'_> {
             }
         } else {
             let over = self.marks
+                || holds_change_mark(element)
                 || element.descendant(&Ns::Office, "annotation").is_some()
                 || element.descendant(&Ns::Text, "note").is_some();
             let kept =
@@ -830,7 +842,13 @@ impl Flow<'_> {
         let put = |job: &mut ParagraphJob, shown: &str, model_len: usize| {
             let same_length = shown.chars().count() == model_len;
             for (piece, drawn_small) in inherited.cased(shown) {
-                let format = if drawn_small { &small } else { format };
+                let plain = if drawn_small { &small } else { format };
+                let tinted = self
+                    .inserting
+                    .borrow()
+                    .as_ref()
+                    .map(|(_, ink)| inserted(plain, *ink));
+                let format = tinted.as_ref().unwrap_or(plain);
                 if !counted {
                     job.atom(&piece, 0, format.clone());
                 } else if same_length {
@@ -887,6 +905,7 @@ impl Flow<'_> {
                         self.runs(element, &run, job, frames);
                     } else if element.is(&Ns::Draw, "frame") {
                         frames.push(element.clone());
+                    } else if self.change_mark(element, format, job) {
                     } else if element.is(&Ns::Text, "note") {
                         // The citation is part of the text; the body is a
                         // footnote and belongs at the foot of a page this view
@@ -1308,6 +1327,158 @@ fn edge_of(borders: &odox_core::Edges<Border>, edge: Edge) -> Option<Border> {
 }
 
 impl Flow<'_> {
+    /// The document's tracked changes by id, each with an ink for its author:
+    /// one of a fixed set, by the order the authors first appear in.
+    fn tracked(&self) -> &HashMap<String, (edit::Change, Color32)> {
+        self.tracked.get_or_init(|| {
+            let dark = self.palette.paper.intensity() < 0.5;
+            let inks: [[u8; 3]; 5] = if dark {
+                [
+                    [0x72, 0x9f, 0xcf],
+                    [0xff, 0x80, 0x80],
+                    [0x8a, 0xe2, 0x34],
+                    [0xd6, 0x9e, 0xf0],
+                    [0xff, 0xbf, 0x60],
+                ]
+            } else {
+                [
+                    [0x2a, 0x60, 0x99],
+                    [0xc9, 0x21, 0x1e],
+                    [0x15, 0x84, 0x66],
+                    [0x80, 0x00, 0x80],
+                    [0xb8, 0x5c, 0x00],
+                ]
+            };
+            let mut authors: Vec<Option<String>> = Vec::new();
+            edit::changes(&self.document.content)
+                .into_iter()
+                .map(|change| {
+                    let index = authors
+                        .iter()
+                        .position(|a| *a == change.author)
+                        .unwrap_or_else(|| {
+                            authors.push(change.author.clone());
+                            authors.len() - 1
+                        });
+                    let [r, g, b] = inks[index % inks.len()];
+                    (change.id.clone(), (change, Color32::from_rgb(r, g, b)))
+                })
+                .collect()
+        })
+    }
+
+    /// Draw a tracked change's mark, answering whether the element was one:
+    /// the start or end of an insertion sets or clears the ink the text
+    /// between is drawn in, and a deletion's text is drawn struck through,
+    /// adding nothing to the paragraph's.
+    fn change_mark(&self, element: &Element, format: &TextFormat, job: &mut ParagraphJob) -> bool {
+        let change = || {
+            element
+                .attr(&Ns::Text, "change-id")
+                .and_then(|id| self.tracked().get(id))
+        };
+        if element.is(&Ns::Text, "change-start") {
+            if let Some((change, ink)) = change()
+                && change.kind == edit::ChangeKind::Insertion
+            {
+                *self.inserting.borrow_mut() = Some((change.id.clone(), *ink));
+            }
+        } else if element.is(&Ns::Text, "change-end") {
+            let mut inserting = self.inserting.borrow_mut();
+            if inserting.as_ref().map(|(id, _)| id.as_str()) == element.attr(&Ns::Text, "change-id")
+            {
+                *inserting = None;
+            }
+        } else if element.is(&Ns::Text, "change") {
+            if let Some((change, ink)) = change()
+                && let Some(deleted) = &change.deleted
+            {
+                let mut struck = format.clone();
+                struck.color = *ink;
+                struck.strikethrough = Stroke::new(1.0 * self.zoom, *ink);
+                job.atom(&deleted.replace('\n', " \u{b6} "), 0, struck);
+            }
+        } else {
+            return false;
+        }
+        true
+    }
+
+    /// A paragraph's tracked changes: a box beside each, under the pointer,
+    /// with who made it and when, and in edit mode Accept and Reject.
+    fn changes(
+        &mut self,
+        ui: &Ui,
+        paragraph: &Element,
+        (galley, map): (&Galley, &OffsetMap),
+        origin: Pos2,
+    ) {
+        let place = |offset: usize| {
+            galley
+                .pos_from_cursor(CCursor::new(map.to_galley(offset.min(map.model_len()))))
+                .translate(origin.to_vec2())
+        };
+        let mut starts: HashMap<String, usize> = HashMap::new();
+        let mut found: Vec<(String, Rect)> = Vec::new();
+        for (at, kind, id) in edit::change_marks(paragraph) {
+            match kind {
+                "start" => {
+                    starts.insert(id, at);
+                }
+                "end" => {
+                    let from = starts.remove(&id).unwrap_or(0);
+                    found.push((id, place(from).union(place(at))));
+                }
+                _ => {
+                    let shown = self
+                        .tracked()
+                        .get(&id)
+                        .and_then(|(c, _)| c.deleted.as_ref())
+                        .map_or(0, |d| d.chars().count() + 2);
+                    let start = map.to_galley(at.min(map.model_len()));
+                    let rect = galley
+                        .pos_from_cursor(CCursor::new(start))
+                        .union(galley.pos_from_cursor(CCursor::new(start + shown)))
+                        .translate(origin.to_vec2());
+                    found.push((id, rect));
+                }
+            }
+        }
+        let end = edit::text(paragraph).chars().count();
+        for (id, from) in starts {
+            found.push((id, place(from).union(place(end))));
+        }
+        let editable = self.page.is_some() && !self.detached;
+        for (id, rect) in found {
+            let Some((change, _)) = self.tracked().get(&id).cloned() else {
+                continue;
+            };
+            let what = match change.kind {
+                edit::ChangeKind::Insertion => t("Inserted"),
+                edit::ChangeKind::Deletion => t("Deleted"),
+                edit::ChangeKind::Format => t("Formatted"),
+            };
+            let header = [
+                what.to_owned(),
+                change.author.unwrap_or_default(),
+                change.date.unwrap_or_default().replace('T', " "),
+            ]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" \u{b7} ");
+            let content = NoteContent {
+                header,
+                text: String::new(),
+            };
+            let key = eframe::egui::Id::unique(("odox-change", self.path.clone(), id.clone()));
+            let wanted = ui.rect_contains_pointer(rect);
+            if let Some(accept) = note_popup::change(ui, rect, key, &content, wanted, editable) {
+                self.decided = Some((id, accept));
+            }
+        }
+    }
+
     /// What is drawn over a paragraph's text once it is laid out: the
     /// formatting marks where they are shown, and its comments.
     fn over_text(
@@ -1328,6 +1499,9 @@ impl Flow<'_> {
         }
         if element.descendant(&Ns::Text, "note").is_some() {
             self.notes(ui, element, (&galley, &map), origin);
+        }
+        if holds_change_mark(element) {
+            self.changes(ui, element, (&galley, &map), origin);
         }
     }
 
@@ -1457,6 +1631,21 @@ impl Flow<'_> {
             }
         }
     }
+}
+
+/// Whether a paragraph holds a tracked change's mark.
+fn holds_change_mark(paragraph: &Element) -> bool {
+    ["change", "change-start", "change-end"]
+        .into_iter()
+        .any(|local| paragraph.descendant(&Ns::Text, local).is_some())
+}
+
+/// A format tinted as inserted text: in its author's ink, underlined.
+fn inserted(format: &TextFormat, ink: Color32) -> TextFormat {
+    let mut tinted = format.clone();
+    tinted.color = ink;
+    tinted.underline = Stroke::new(1.0, ink);
+    tinted
 }
 
 /// Where a page break begins the next paragraph: the window does not

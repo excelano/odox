@@ -850,6 +850,37 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
+    /// Accept or reject a tracked change, or every one when `id` is none, as
+    /// one step to undo. The caret is let go, since the paragraphs it was
+    /// counted among may have moved.
+    ///
+    /// # Errors
+    ///
+    /// There is no such change, or a deletion cannot be put back.
+    pub fn decide(
+        &mut self,
+        editor: &mut PageEditor,
+        id: Option<&str>,
+        accept: bool,
+    ) -> Result<(), Refused> {
+        let before = self.content.clone();
+        let changed = match (id, accept) {
+            (Some(id), true) => edit::accept(self.content, id),
+            (Some(id), false) => edit::reject(self.content, id),
+            (None, true) => edit::accept_all(self.content),
+            (None, false) => edit::reject_all(self.content),
+        };
+        if let Err(refused) = changed {
+            *self.content = before;
+            return Err(refused);
+        }
+        editor.clear();
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(before, None);
+        Ok(())
+    }
+
     /// Do what was done in a comment's box: its new text, signed and dated
     /// now, or its removal, as one step to undo.
     ///
