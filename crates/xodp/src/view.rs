@@ -13,7 +13,7 @@ use std::path::Path;
 
 use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2, pos2, vec2};
 use egui_richedit::Selection;
-use odox_core::doc::Presentation;
+use odox_core::doc::{Presentation, Steps};
 use odox_core::edit;
 use odox_core::{Document, Element, Length, Ns, PageLayout};
 use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
@@ -67,6 +67,8 @@ pub struct SlideView {
     found: Found,
     /// The slideshow is on: one slide, filling the screen, and nothing else.
     presenting: bool,
+    /// Where the show is on the slide in view.
+    show: Show,
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
@@ -104,6 +106,7 @@ impl Default for SlideView {
             page_editor: page_editor(),
             found: Found::default(),
             presenting: false,
+            show: Show::default(),
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
@@ -198,6 +201,29 @@ struct Drag {
     from: Pos2,
     grab: Grab,
     start: Box,
+}
+
+/// Where a show is on the slide in view.
+#[derive(Default)]
+struct Show {
+    /// How many of the slide's builds have been clicked through.
+    step: usize,
+    /// The pointer was over a link when the show was last drawn: a click
+    /// there follows the link and does not move the show on.
+    over_link: bool,
+}
+
+/// The keys and clicks that move through a show, taken in one frame.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Clone, Copy)]
+struct ShowKeys {
+    forward: bool,
+    back: bool,
+    next: bool,
+    previous: bool,
+    first: bool,
+    last: bool,
+    leave: bool,
 }
 
 /// What the Slide menu asked for, done on the next frame.
@@ -1123,6 +1149,7 @@ impl SlideView {
     fn start_show(&mut self, from: usize) {
         self.presenting = true;
         self.slide = from;
+        self.show.step = 0;
         self.picked = None;
         self.drag = None;
         self.page_editor.clear();
@@ -1132,29 +1159,44 @@ impl SlideView {
     /// and the keys and the mouse that move through it. Escape ends it.
     fn present(&mut self, ui: &mut Ui, count: usize) {
         let area = ui.max_rect();
-        let response = ui.allocate_rect(area, Sense::click());
-        let (forward, back, leave) = ui.input_mut(|input| {
-            let none = egui::Modifiers::NONE;
+        ui.allocate_rect(area, Sense::click());
+        let (clicked, right_clicked) = ui.input(|input| {
+            let inside = input
+                .pointer
+                .interact_pos()
+                .is_some_and(|at| area.contains(at));
             (
-                input.consume_key(none, Key::Space)
-                    || input.consume_key(none, Key::Enter)
-                    || response.clicked(),
-                input.consume_key(none, Key::Backspace) || response.secondary_clicked(),
-                input.consume_key(none, Key::Escape),
+                inside && input.pointer.primary_clicked() && !self.show.over_link,
+                inside && input.pointer.secondary_clicked(),
             )
         });
-        self.step_keys(ui, count);
-        let last = count.saturating_sub(1);
-        if forward {
-            self.slide = (self.slide + 1).min(last);
-        }
-        if back {
-            self.slide = self.slide.saturating_sub(1);
-        }
-        if leave {
+        let keys = ui.input_mut(|input| {
+            let none = egui::Modifiers::NONE;
+            let forward = [Key::Space, Key::Enter, Key::ArrowRight, Key::ArrowDown]
+                .into_iter()
+                .filter(|&key| input.consume_key(none, key))
+                .count()
+                > 0;
+            let back = [Key::Backspace, Key::ArrowLeft, Key::ArrowUp]
+                .into_iter()
+                .filter(|&key| input.consume_key(none, key))
+                .count()
+                > 0;
+            ShowKeys {
+                forward: forward || clicked,
+                back: back || right_clicked,
+                next: input.consume_key(none, Key::PageDown),
+                previous: input.consume_key(none, Key::PageUp),
+                first: input.consume_key(none, Key::Home),
+                last: input.consume_key(none, Key::End),
+                leave: input.consume_key(none, Key::Escape),
+            }
+        });
+        if keys.leave {
             self.presenting = false;
             return;
         }
+        self.walk_show(keys, count);
         let Some(document) = &self.document else {
             return;
         };
@@ -1162,6 +1204,7 @@ impl SlideView {
         let Some(slide) = slides.get(self.slide) else {
             return;
         };
+        let steps = Steps::read(slide.element);
         let layout = document.page_layout(slide);
         let fit = fit(area.size(), &layout);
         let page = Rect::from_center_size(
@@ -1171,6 +1214,7 @@ impl SlideView {
         let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
         ui.painter().rect_filled(page, 0.0, palette.paper);
         let mut canvas = Canvas::new(&document.document, &mut self.pictures, page, fit, palette);
+        canvas.build = Some((&steps, self.show.step));
         canvas.background(ui, &document.background(slide));
         for shape in &document.background_objects(slide) {
             canvas.shape(ui, shape);
@@ -1179,6 +1223,8 @@ impl SlideView {
             canvas.slide_shape(ui, index, shape);
         }
 
+        self.show.over_link =
+            ui.ctx().output(|output| output.cursor_icon) == egui::CursorIcon::PointingHand;
         // The pointer is in the way of a slide, and is put away when it has
         // been still for a moment.
         let idle = ui.input(|input| input.pointer.time_since_last_movement());
@@ -1187,6 +1233,54 @@ impl SlideView {
         } else {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs(2));
+        }
+    }
+
+    /// Move through a show: forward takes the slide's next build and then
+    /// the next slide, back undoes a build and then goes to the slide before
+    /// at its last; page up and down, Home and End go from slide to slide.
+    fn walk_show(&mut self, keys: ShowKeys, count: usize) {
+        let builds = |view: &Self, slide: usize| {
+            view.document
+                .as_ref()
+                .and_then(|document| {
+                    document
+                        .slides()
+                        .get(slide)
+                        .map(|slide| Steps::read(slide.element).len())
+                })
+                .unwrap_or(0)
+        };
+        let last = count.saturating_sub(1);
+        if keys.forward {
+            if self.show.step < builds(self, self.slide) {
+                self.show.step += 1;
+            } else if self.slide < last {
+                self.show_slide(self.slide + 1);
+            }
+        }
+        if keys.back {
+            if self.show.step > 0 {
+                self.show.step -= 1;
+            } else if self.slide > 0 {
+                self.show_slide(self.slide - 1);
+                self.show.step = builds(self, self.slide);
+            }
+        }
+        if keys.next {
+            self.show_slide((self.slide + 1).min(last));
+        }
+        if keys.previous && self.slide > 0 {
+            self.show_slide(self.slide - 1);
+            self.show.step = builds(self, self.slide);
+        }
+        if keys.first {
+            self.show_slide(0);
+            self.show.step = 0;
+        }
+        if keys.last {
+            self.show_slide(last);
+            self.show.step = 0;
         }
     }
 
@@ -1235,6 +1329,7 @@ impl SlideView {
     fn show_slide(&mut self, slide: usize) {
         if slide != self.slide {
             self.slide = slide;
+            self.show.step = 0;
             self.picked = None;
             self.drag = None;
             self.page_editor.clear();
@@ -1497,7 +1592,7 @@ fn first_line(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, CM, Editing, Presentation, SlideView};
+    use super::{Action, CM, Editing, Presentation, ShowKeys, SlideView};
 
     fn shapes(view: &SlideView) -> usize {
         view.document
@@ -1595,5 +1690,56 @@ mod tests {
         assert!(document.document.package.part(&name).is_none());
         editing.redo(&mut document.document, None).expect("a step");
         assert!(document.document.package.part(&name).is_some());
+    }
+
+    #[test]
+    fn a_show_clicks_through_builds_before_the_next_slide() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/builds.odp"),
+        )
+        .expect("the fixture");
+        let mut view = SlideView {
+            document: Some(Presentation::read(&bytes).expect("it reads")),
+            ..SlideView::default()
+        };
+        view.start_show(0);
+        let forward = ShowKeys {
+            forward: true,
+            back: false,
+            next: false,
+            previous: false,
+            first: false,
+            last: false,
+            leave: false,
+        };
+        let back = ShowKeys {
+            forward: false,
+            back: true,
+            ..forward
+        };
+        for step in 1..=5 {
+            view.walk_show(forward, 2);
+            assert_eq!((view.slide, view.show.step), (0, step));
+        }
+        view.walk_show(forward, 2);
+        assert_eq!((view.slide, view.show.step), (1, 0));
+        view.walk_show(back, 2);
+        assert_eq!((view.slide, view.show.step), (0, 5));
+        view.walk_show(back, 2);
+        assert_eq!((view.slide, view.show.step), (0, 4));
+        let home = ShowKeys {
+            first: true,
+            back: false,
+            ..forward
+        };
+        view.walk_show(
+            ShowKeys {
+                forward: false,
+                ..home
+            },
+            2,
+        );
+        assert_eq!((view.slide, view.show.step), (0, 0));
     }
 }
