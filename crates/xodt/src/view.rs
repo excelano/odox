@@ -18,7 +18,7 @@ use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
-    count, fonts, page_editor,
+    count, fonts, marks, page_editor,
 };
 
 const MARGIN: f32 = 24.0;
@@ -521,6 +521,7 @@ impl View for TextView {
                         flow.scroll_to_place = self.place.take();
                         flow.page = edit_mode.then_some(&mut self.page);
                         flow.find = self.found.highlights(0);
+                        flow.marks = marks::shown(ui.ctx());
                         flow.blocks(ui, body, width);
                         if flow.followed.is_some() {
                             self.place = flow.followed.take();
@@ -538,6 +539,10 @@ impl View for TextView {
     }
 
     fn fits(&self) -> bool {
+        true
+    }
+
+    fn has_formatting_marks(&self) -> bool {
         true
     }
 

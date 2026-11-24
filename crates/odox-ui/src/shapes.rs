@@ -63,6 +63,8 @@ pub struct Canvas<'a> {
     /// The shadow being drawn, while a shape's is: how far it lies from the
     /// shape on screen, and the properties it is drawn with.
     casting: Option<(Vec2, std::rc::Rc<Properties>)>,
+    /// Whether formatting marks are drawn over the shapes' text.
+    pub marks: bool,
 }
 
 /// What is drawn inside a shape: its text, or the frame of a picture, and the
@@ -161,6 +163,7 @@ impl<'a> Canvas<'a> {
             followed: None,
             at: None,
             casting: None,
+            marks: false,
         }
     }
 
@@ -782,6 +785,7 @@ impl Canvas<'_> {
             flow.selectable = !edit_mode;
             flow.page = page_editor;
             flow.turned = turned;
+            flow.marks = self.marks && !measuring;
             flow.find = self.find.clone().filter(|_| prefix.is_some() && !measuring);
             if let Some(prefix) = prefix {
                 flow.start_at(prefix.clone());

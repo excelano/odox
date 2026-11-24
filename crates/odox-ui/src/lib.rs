@@ -36,6 +36,7 @@ pub mod format;
 pub mod i18n;
 pub mod instance;
 pub mod links;
+pub mod marks;
 /// Receiving a document from macOS, which does not arrive as an argument.
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]

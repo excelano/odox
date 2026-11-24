@@ -20,7 +20,7 @@ use odox_ui::i18n::{fill, t};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
-    Zoom, fonts, page_editor,
+    Zoom, fonts, marks, page_editor,
 };
 
 /// A presentation, open or not.
@@ -359,6 +359,7 @@ impl View for SlideView {
         self.presenting
     }
 
+    #[allow(clippy::too_many_lines)]
     fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing) {
         let count = self
             .document
@@ -450,6 +451,7 @@ impl View for SlideView {
                 let mut canvas = Canvas::new(&document.document, pictures, page, scale, palette);
                 canvas.page_editor = page_editor;
                 canvas.find = self.found.highlights(slide_index);
+                canvas.marks = marks::shown(ui.ctx());
                 // Back to front: the ground, then what the master page draws on
                 // every slide, then the slide's own.
                 canvas.background(ui, &background);
@@ -483,6 +485,10 @@ impl View for SlideView {
         if let Some(action) = action {
             self.act(action, scale, editing);
         }
+    }
+
+    fn has_formatting_marks(&self) -> bool {
+        true
     }
 
     fn has_side(&self) -> bool {
@@ -1024,6 +1030,7 @@ fn notes_panel(
                     let width = ui.available_width();
                     let mut flow = Flow::new(document, pictures, zoom);
                     flow.find = find;
+                    flow.marks = marks::shown(ui.ctx());
                     flow.blocks(ui, notes, width);
                 }
                 None => {
