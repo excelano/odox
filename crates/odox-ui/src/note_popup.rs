@@ -25,21 +25,37 @@ pub enum NoteResponse {
     Deleted,
 }
 
-/// Show the box beside `anchor`, editable where `editable` says. Answers
-/// what was done in it, and whether the pointer is over it, which keeps it
-/// open.
+/// Show the box beside its mark, `anchor`, while it is wanted: while `wanted`
+/// says so (the mark is under the pointer, the caret is at it), while the
+/// pointer is over the box or its text has the keyboard, and, from when
+/// `opened` asks for it, until it is saved, deleted or the pointer is pressed
+/// outside it. Editable where `editable` says. Answers what was done in it.
 pub fn show(
     ui: &Ui,
     anchor: Rect,
     id: Id,
     content: &NoteContent,
+    wanted: bool,
+    opened: bool,
     editable: bool,
-) -> (Option<NoteResponse>, bool) {
+) -> Option<NoteResponse> {
+    let (open, pinned) = (id.with("open"), id.with("pinned"));
+    let memory = |key| {
+        ui.ctx()
+            .data(|data| data.get_temp::<bool>(key))
+            .unwrap_or(false)
+    };
+    if opened {
+        ui.ctx().data_mut(|data| data.insert_temp(pinned, true));
+    }
+    if !(wanted || memory(open) || memory(pinned)) {
+        return None;
+    }
     let mut done = None;
-    let buffer = id.with("text");
+    let buffer = id.with(("text", content.text.as_str()));
     let area = egui::Area::new(id)
         .order(egui::Order::Foreground)
-        .fixed_pos(anchor.right_top() + egui::vec2(6.0, 0.0))
+        .fixed_pos(anchor.right_top())
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_max_width(260.0);
@@ -76,12 +92,18 @@ pub fn show(
                 }
             });
         });
-    let hovered = area.response.rect.contains(
-        ui.input(|input| input.pointer.hover_pos())
-            .unwrap_or(egui::Pos2::new(f32::NAN, f32::NAN)),
-    );
+    let over = area.response.rect.union(anchor);
+    let pointer = ui.input(|input| input.pointer.hover_pos());
+    let hovered = pointer.is_some_and(|at| over.contains(at));
     let focused = ui.memory(|memory| memory.has_focus(field(id)));
-    (done, hovered || focused)
+    let pressed_outside = ui.input(|input| input.pointer.any_pressed()) && !hovered;
+    ui.ctx().data_mut(|data| {
+        data.insert_temp(open, done.is_none() && (hovered || focused));
+        if done.is_some() || (pressed_outside && !opened) {
+            data.insert_temp(pinned, false);
+        }
+    });
+    done
 }
 
 fn field(id: Id) -> Id {

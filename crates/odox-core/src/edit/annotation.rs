@@ -10,7 +10,7 @@
 
 use std::ops::Range;
 
-use super::{Kind, Refused, is_paragraph, segments};
+use super::{Kind, Refused, is_paragraph, segments, set_count};
 use crate::value::Length;
 use crate::xml::{Element, Node, Ns};
 
@@ -83,8 +83,26 @@ fn read(note: &Element, end: Option<usize>) -> Annotation {
     }
 }
 
+/// The names a comment's author, date and paragraphs are written with, in
+/// the prefixes the document declares.
+struct Names {
+    creator: crate::xml::Name,
+    date: crate::xml::Name,
+    paragraph: crate::xml::Name,
+}
+
+impl Names {
+    fn of(content: &Element) -> Self {
+        Self {
+            creator: content.name_for(&Ns::Dc, "creator"),
+            date: content.name_for(&Ns::Dc, "date"),
+            paragraph: content.name_for(&Ns::Text, "p"),
+        }
+    }
+}
+
 /// Give a comment its author, date and text, keeping anything else it holds.
-fn write(note: &mut Element, text: &str, author: Option<&str>, date: &str) {
+fn write(note: &mut Element, names: &Names, text: &str, author: Option<&str>, date: &str) {
     note.children.retain(|n| {
         !matches!(n, Node::Element(e)
             if e.is(&Ns::Dc, "creator") || e.is(&Ns::Dc, "date") || e.is(&Ns::Text, "p"))
@@ -103,12 +121,12 @@ fn write(note: &mut Element, text: &str, author: Option<&str>, date: &str) {
     };
     let mut head = Vec::new();
     if let Some(author) = author.filter(|a| !a.trim().is_empty()) {
-        head.push(leaf(note.name_for(&Ns::Dc, "creator"), author));
+        head.push(leaf(names.creator.clone(), author));
     }
-    head.push(leaf(note.name_for(&Ns::Dc, "date"), date));
+    head.push(leaf(names.date.clone(), date));
     note.children.splice(0..0, head);
     for line in text.split('\n') {
-        let mut written = leaf(note.name_for(&Ns::Text, "p"), "");
+        let mut written = leaf(names.paragraph.clone(), "");
         if let Node::Element(p) = &mut written {
             super::replace(p, 0..0, line);
         }
@@ -158,8 +176,7 @@ pub fn add_annotation(
     if let Some(name) = &named {
         note.set_attr(content.name_for(&Ns::Office, "name"), name.as_str());
     }
-    note.children.clear();
-    write(&mut note, text, author, date);
+    write(&mut note, &Names::of(content), text, author, date);
     let end = named.map(|name| {
         let mut end = Element {
             name: content.name_for(&Ns::Office, "annotation-end"),
@@ -181,7 +198,8 @@ pub fn add_annotation(
 /// A name for a comment's range that no comment in the document has.
 fn fresh_name(content: &Element) -> String {
     fn taken(element: &Element, name: &str) -> bool {
-        (element.is(&Ns::Office, "annotation") && element.attr(&Ns::Office, "name") == Some(name))
+        ((element.is(&Ns::Office, "annotation") || element.is(&Ns::Office, "annotation-end"))
+            && element.attr(&Ns::Office, "name") == Some(name))
             || element.elements().any(|child| taken(child, name))
     }
     let mut number = 1;
@@ -207,10 +225,11 @@ pub fn set_annotation_text(
 ) -> Result<(), Refused> {
     let paragraph = content.at(path).ok_or(Refused::NotFound)?;
     let within = nth(paragraph, index).ok_or(Refused::NotFound)?;
+    let names = Names::of(content);
     let note = content
         .at_mut(&[path, within.as_slice()].concat())
         .ok_or(Refused::NotFound)?;
-    write(note, text, author, date);
+    write(note, &names, text, author, date);
     Ok(())
 }
 
@@ -232,34 +251,52 @@ pub fn remove_annotation(
         .and_then(|note| note.attr(&Ns::Office, "name"))
         .map(ToOwned::to_owned);
     let end = name.and_then(|name| {
-        marks(paragraph)
-            .into_iter()
-            .find(|(_, _, e)| {
-                e.is(&Ns::Office, "annotation-end") && e.attr(&Ns::Office, "name") == Some(&name)
-            })
-            .map(|(_, path, _)| path)
+        find(content, &|e: &Element| {
+            e.is(&Ns::Office, "annotation-end") && e.attr(&Ns::Office, "name") == Some(&name)
+        })
     });
-    let paragraph = content.at_mut(path).ok_or(Refused::NotFound)?;
-    let mut gone = vec![within];
+    let mut gone = vec![[path, within.as_slice()].concat()];
     gone.extend(end);
     gone.sort();
     for removed in gone.iter().rev() {
-        let (&last, parent) = removed.split_last().ok_or(Refused::NotFound)?;
-        let parent = paragraph.at_mut(parent).ok_or(Refused::NotFound)?;
-        parent.children.remove(last);
-        if last > 0
-            && let (Some(Node::Text(_)), Some(Node::Text(after))) = (
-                parent.children.get(last - 1),
-                parent.children.get(last).cloned(),
-            )
-        {
-            parent.children.remove(last);
-            if let Some(Node::Text(before)) = parent.children.get_mut(last - 1) {
-                before.push_str(&after);
-            }
-        }
-        parent.self_closing = parent.children.is_empty();
+        take_out(content, removed)?;
     }
+    Ok(())
+}
+
+/// The path of the first element under a root that answers to a test.
+fn find(root: &Element, test: &dyn Fn(&Element) -> bool) -> Option<Vec<usize>> {
+    for (index, child) in root.elements_indexed() {
+        if test(child) {
+            return Some(vec![index]);
+        }
+        if let Some(rest) = find(child, test) {
+            return Some([vec![index], rest].concat());
+        }
+    }
+    None
+}
+
+/// Take out the element at a path, joining the text either side of it again.
+fn take_out(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
+    let (&last, parent) = path.split_last().ok_or(Refused::NotFound)?;
+    let parent = content.at_mut(parent).ok_or(Refused::NotFound)?;
+    if last >= parent.children.len() {
+        return Err(Refused::NotFound);
+    }
+    parent.children.remove(last);
+    if last > 0
+        && let (Some(Node::Text(_)), Some(Node::Text(after))) = (
+            parent.children.get(last - 1),
+            parent.children.get(last).cloned(),
+        )
+    {
+        parent.children.remove(last);
+        if let Some(Node::Text(before)) = parent.children.get_mut(last - 1) {
+            before.push_str(&after);
+        }
+    }
+    parent.self_closing = parent.children.is_empty();
     Ok(())
 }
 
@@ -291,6 +328,17 @@ fn insert_mark(paragraph: &mut Element, at: usize, mark: Element) {
             let rest = text.split_off(byte);
             parent.children.insert(index + 1, Node::Element(mark));
             parent.children.insert(index + 2, Node::Text(rest));
+        }
+        Node::Element(spaces) if offset > 0 => {
+            let Kind::Spaces(count) = segment.kind else {
+                parent.children.insert(index, Node::Element(mark));
+                return;
+            };
+            let mut rest = spaces.clone();
+            set_count(spaces, offset);
+            set_count(&mut rest, count - offset);
+            parent.children.insert(index + 1, Node::Element(mark));
+            parent.children.insert(index + 2, Node::Element(rest));
         }
         _ => parent.children.insert(index, Node::Element(mark)),
     }
@@ -344,7 +392,7 @@ pub fn add_slide_annotation(
     for (local, value) in [("x", cm(at.0)), ("y", cm(at.1))] {
         note.set_attr(content.name_for(&Ns::Svg, local), value);
     }
-    write(&mut note, text, author, date);
+    write(&mut note, &Names::of(content), text, author, date);
     let element = content.at_mut(page).ok_or(Refused::NotFound)?;
     element.children.push(Node::Element(note));
     element.self_closing = false;
@@ -377,7 +425,14 @@ pub fn set_slide_annotation_text(
     author: Option<&str>,
     date: &str,
 ) -> Result<(), Refused> {
-    write(slide_note(content, page, child)?, text, author, date);
+    let names = Names::of(content);
+    write(
+        slide_note(content, page, child)?,
+        &names,
+        text,
+        author,
+        date,
+    );
     Ok(())
 }
 

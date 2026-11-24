@@ -428,9 +428,10 @@ impl Element {
                 }
                 Node::Element(e) if e.is(&Ns::Text, "tab") => out.push('\t'),
                 Node::Element(e) if e.is(&Ns::Text, "line-break") => out.push('\n'),
-                // A note's body is not part of the text it hangs off, and
-                // neither is the deleted half of a tracked change.
-                Node::Element(e) if e.is(&Ns::Text, "note") => {}
+                // A note's body is not part of the text it hangs off, nor is
+                // a comment's, and neither is the deleted half of a tracked
+                // change.
+                Node::Element(e) if e.is(&Ns::Text, "note") || e.is(&Ns::Office, "annotation") => {}
                 Node::Element(e) => e.write_plain_text(out),
                 Node::Comment(_) | Node::ProcessingInstruction(_) => {}
             }

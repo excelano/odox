@@ -627,9 +627,9 @@ impl Flow<'_> {
                 response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
             }
         } else {
-            let kept = ui
-                .is_rect_visible(rect)
-                .then(|| (Arc::clone(&galley), map.clone()));
+            let over = self.marks || element.descendant(&Ns::Office, "annotation").is_some();
+            let kept =
+                (over && ui.is_rect_visible(rect)).then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
             if let Some(laid) = kept {
                 self.over_text(ui, element, rect, laid, origin, ground.ink);
@@ -1368,17 +1368,9 @@ impl Flow<'_> {
             );
             ui.painter().rect_filled(mark, 2.0, amber);
             let id = eframe::egui::Id::unique(("odox-comment", self.path.clone(), index));
-            let open = id.with("open");
-            let was_open = ui
-                .ctx()
-                .data(|data| data.get_temp::<bool>(open))
-                .unwrap_or(false);
-            let hovered = ui.rect_contains_pointer(mark.expand(2.0));
+            let hovered = ui.rect_contains_pointer(mark);
             let at_caret =
                 caret.is_some_and(|c| c == at || note.end.is_some_and(|e| at <= c && c <= e));
-            if !(hovered || at_caret || was_open) {
-                continue;
-            }
             let header = [
                 note.author.clone().unwrap_or_default(),
                 note.date.clone().unwrap_or_default().replace('T', " "),
@@ -1392,9 +1384,9 @@ impl Flow<'_> {
                 text: note.text,
             };
             let editable = self.page.is_some() && !self.detached;
-            let (done, keep) = note_popup::show(ui, mark, id, &content, editable);
-            ui.ctx()
-                .data_mut(|data| data.insert_temp(open, keep && done.is_none()));
+            let opened = editable && at_caret && content.text.is_empty();
+            let wanted = hovered || at_caret;
+            let done = note_popup::show(ui, mark, id, &content, wanted, opened, editable);
             if let Some(done) = done {
                 self.noted = Some((self.path.clone(), index, done));
             }

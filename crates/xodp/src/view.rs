@@ -98,6 +98,7 @@ fn slide_comments(
     ui: &Ui,
     page: Rect,
     scale: f32,
+    index: usize,
     slide: &Element,
     editable: bool,
     opened: Option<usize>,
@@ -110,18 +111,7 @@ fn slide_comments(
         );
         ui.painter()
             .rect_filled(mark, 2.0, egui::Color32::from_rgb(0xf2, 0xb7, 0x05));
-        let id = egui::Id::unique(("odox-slide-comment", slide.attr(&Ns::Draw, "name"), child));
-        let open = id.with("open");
-        if opened == Some(child) {
-            ui.ctx().data_mut(|data| data.insert_temp(open, true));
-        }
-        let was_open = ui
-            .ctx()
-            .data(|data| data.get_temp::<bool>(open))
-            .unwrap_or(false);
-        if !(ui.rect_contains_pointer(mark.expand(2.0)) || was_open) {
-            continue;
-        }
+        let id = egui::Id::unique(("odox-slide-comment", index, child));
         let header = [
             note.author.unwrap_or_default(),
             note.date.unwrap_or_default().replace('T', " "),
@@ -134,9 +124,9 @@ fn slide_comments(
             header,
             text: note.text,
         };
-        let (done, keep) = note_popup::show(ui, mark, id, &content, editable);
-        ui.ctx()
-            .data_mut(|data| data.insert_temp(open, keep && done.is_none()));
+        let wanted = ui.rect_contains_pointer(mark);
+        let opened = opened == Some(child);
+        let done = note_popup::show(ui, mark, id, &content, wanted, opened, editable);
         if let Some(done) = done {
             noted = Some((child, done));
         }
@@ -543,7 +533,15 @@ impl View for SlideView {
                     canvas.slide_shape(ui, index, shape);
                 }
                 followed = canvas.followed.take();
-                noted = slide_comments(ui, page, scale, slide.element, edit_mode, opened);
+                noted = slide_comments(
+                    ui,
+                    page,
+                    scale,
+                    slide_index,
+                    slide.element,
+                    edit_mode,
+                    opened,
+                );
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.

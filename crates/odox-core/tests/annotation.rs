@@ -195,3 +195,68 @@ fn a_slides_comment_is_added_changed_and_removed() {
     remove_slide_annotation(&mut root, &page, child).expect("removed");
     assert!(root.at(&page) == original.at(&page));
 }
+
+#[test]
+fn removing_a_comment_takes_its_end_mark_from_a_later_paragraph() {
+    let mut root = content(
+        r#"<text:p>one<office:annotation office:name="n1"><text:p>x</text:p></office:annotation> two</text:p><text:p>three<office:annotation-end office:name="n1"/> four</text:p>"#,
+    );
+    remove_annotation(&mut root, &PATH, 0).expect("removed");
+    let written = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    assert!(!written.contains("annotation"), "{written}");
+}
+
+#[test]
+fn a_new_range_never_takes_a_name_an_end_mark_has() {
+    let mut root = content(
+        r#"<text:p>One two three<office:annotation-end office:name="__Annotation__1"/></text:p>"#,
+    );
+    add_annotation(&mut root, &PATH, 0..3, "x", None, "2026-11-23T10:00:00").expect("added");
+    let written = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    assert!(
+        written.contains(r#"office:name="__Annotation__2""#),
+        "{written}"
+    );
+}
+
+#[test]
+fn a_comment_inside_a_run_of_spaces_stays_where_it_was_put() {
+    let mut root = content(r#"<text:p>a<text:s text:c="4"/>b</text:p>"#);
+    add_annotation(&mut root, &PATH, 2..4, "x", None, "2026-11-23T10:00:00").expect("added");
+    let paragraph = root.at(&PATH).expect("the paragraph");
+    assert_eq!(text(paragraph), "a    b");
+    let found = annotations_in(paragraph);
+    assert_eq!((found[0].0, found[0].1.end), (2, Some(4)));
+}
+
+#[test]
+fn a_comment_is_written_in_the_prefixes_the_document_declares() {
+    let source = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:purl="http://purl.org/dc/elements/1.1/"><office:body><office:text><text:p>One</text:p></office:text></office:body></office:document-content>"#;
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    add_annotation(
+        &mut root,
+        &PATH,
+        0..0,
+        "x",
+        Some("Cy"),
+        "2026-11-23T10:00:00",
+    )
+    .expect("added");
+    let written = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    assert!(
+        written.contains("<purl:creator>Cy</purl:creator>"),
+        "{written}"
+    );
+    xml::parse(written.as_bytes(), "again").expect("well formed");
+}
+
+#[test]
+fn a_heading_with_a_comment_reads_as_its_own_words() {
+    let root = content(
+        r#"<text:h>Intro<office:annotation><dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">Cy</dc:creator><text:p>rewrite</text:p></office:annotation>duction</text:h>"#,
+    );
+    assert_eq!(
+        root.at(&PATH).expect("the heading").plain_text(),
+        "Introduction"
+    );
+}
