@@ -48,6 +48,7 @@ pub mod opened_document;
 pub mod page_setup;
 pub mod picture_question;
 pub mod recent;
+pub mod recovery;
 pub mod settings;
 pub mod shapes;
 pub mod shell;

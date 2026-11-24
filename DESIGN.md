@@ -325,6 +325,21 @@ except on a link, which is followed instead.
 Forward takes the next step and then the next slide, back undoes one and then
 enters the slide before at its last step.
 
+**Unsaved changes are kept against a crash** (`recovery.rs`). Each window
+takes an exclusive lock, `File::try_lock`, on a file of its own in
+`odox/recovery` under the platform's data directory, and the operating system
+lets that lock go when the process ends however it ends. While the document has
+changes no file holds, it is written as Save writes it, at most once a minute
+and only when it changed, on the window's thread, and the bytes go to disk on a
+worker, beside their note of the file they were made to and when. A save, a
+close or undoing back to the saved state takes them away, and a window that
+closes as it should takes its lock away too; a panic does not, because nothing
+removes them but that close. A window that starts looks for the files of its
+own application whose lock no running window holds and offers them one at a
+time; opened, they are the original's path with changes unsaved, written at once
+as this window's own, and the others wait for the next window. A lock with no
+bytes beside it is tidied away unasked.
+
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
 one in a window of its own: a window holds one document, as it does for Open.

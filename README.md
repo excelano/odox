@@ -88,7 +88,11 @@ takes an edit back and Ctrl+Shift+Z puts it back. Closing, opening another
 document or quitting with changes unsaved asks first. Before a document is
 saved, what is about to be written is read back and compared with what is in
 the window, and a difference refuses the save rather than writing a document
-that would not come back the same.
+that would not come back the same. While a document has unsaved changes, a copy
+of them is kept every minute in `odox/recovery` under the data directory
+(`~/.local/share` on Linux, `Library/Application Support` on macOS,
+`%LOCALAPPDATA%` on Windows); if the window stops without closing, the next one
+of that application offers to open them, as the file they were made to, unsaved.
 
 `xodt` shows the document as one continuous page at the width its page layout
 asks for, with the headings listed beside it; clicking one scrolls to it. The
