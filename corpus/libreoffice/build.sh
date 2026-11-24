@@ -167,6 +167,10 @@ convert odt:writer8 lists.odt "OpenDocument Text Flat XML" lists.fodt
 
 # Comments: one at a point, and one over a range that ends at its end mark.
 convert odt:writer8 comments.odt "OpenDocument Text Flat XML" comments.fodt
+
+# Tracked changes: an insertion, a deletion, a deletion spanning two
+# paragraphs, and a format change, with changes recorded from here on.
+convert odt:writer8 tracked.odt "OpenDocument Text Flat XML" tracked.fodt
 convert odp:impress8 comments.odp "OpenDocument Presentation Flat XML" comments.fodp
 
 # Text that reads right to left: Hebrew and Arabic in paragraphs that read

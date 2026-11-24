@@ -21,6 +21,7 @@ mod align;
 mod annotation;
 mod block;
 mod cells;
+mod changes;
 mod figure;
 pub(crate) mod format;
 pub mod html;
@@ -45,6 +46,9 @@ pub use annotation::{
 pub(crate) use block::name_for;
 pub use block::{block_state, heading_level, set_heading, set_list, shift_heading};
 pub use cells::{equal_widths, merge_cells, merge_rectangle, set_column_width, split_cell};
+pub use changes::{
+    Change, ChangeKind, accept, accept_all, change_marks, changes, reject, reject_all, tracking,
+};
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };

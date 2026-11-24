@@ -124,6 +124,10 @@ A footnote's or an endnote's text shows beside its citation under the pointer
 or when the caret reaches it, and is edited there in edit mode; Ctrl+Alt+F, or
 Format > Footnote and Endnote, puts a new one at the caret, and the PDF puts
 footnotes at the foot of their page and endnotes at the end.
+Tracked changes are drawn in their authors' colours, insertions underlined and
+deletions struck through, and each one's author and date show beside it under
+the pointer; in edit mode it is accepted or rejected there, or all of them at
+once from the bar over the page. Edits made here are not tracked.
 A comment is marked in the margin, and its author, date and text show beside the
 mark under the pointer or when the caret reaches it; in edit mode its text is
 edited or deleted there, and Ctrl+Alt+C, or Format > Comment, puts a new one on

@@ -980,6 +980,23 @@ one the selection has where it is one of those; spacing stated those other ways
 shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
+**A tracked change is a `text:changed-region`** in the body's
+`text:tracked-changes` (`edit/changes.rs`), with its author and date, and the
+marks in the text that name it: an insertion and a format change run from a
+`text:change-start` to a `text:change-end`, and a deletion is a `text:change`
+where the text was, the paragraphs it took out kept in the region. The window
+draws an insertion underlined and a deletion struck through at its mark, both
+in an ink per author from a fixed set legible on either paper; the deleted text
+is drawn as an atom, so it is not edited and adds nothing to the paragraph's
+text. A bar over the page says the document has changes, and that edits made
+here are not tracked when the body asks for tracking. Accepting a change takes
+its marks and region out; rejecting an insertion takes out its text too, and
+rejecting a deletion puts its paragraphs back at the mark, the first's text
+there and, where there were more, the paragraph split around the rest.
+Rejecting a format change keeps the formatting, since ODF records no former
+one to go back to. Each is one step to undo. The PDF prints the accepted
+state: inserted text, and no deleted text.
+
 **A footnote or an endnote is a `text:note` where it is cited**
 (`edit/note.rs`), with its citation and its body, as `LibreOffice` writes one.
 Format > Footnote (Ctrl+Alt+F) and Endnote put an empty one at the caret, with

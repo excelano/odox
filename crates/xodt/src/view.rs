@@ -490,6 +490,7 @@ impl View for TextView {
         }
         self.scroll.paging(ui, keys, &self.counted);
 
+        changes_bar(ui, &document.document.content, edit_mode, &mut self.wanted);
         let (area, anchor) = self.scroll.area(ui, scale);
         let output = area.show(ui, |ui| {
             // What was typed goes into the tree before it is laid out, so
@@ -499,7 +500,8 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
-                self.wanted.apply(&mut model, &mut self.notice);
+                self.wanted
+                    .apply(&mut self.page, &mut model, &mut self.notice);
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 break_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
@@ -903,6 +905,8 @@ struct Wanted {
     column: Option<(Vec<usize>, usize, f32)>,
     comment: Option<(Vec<usize>, usize, NoteResponse)>,
     note: Option<(Vec<usize>, NoteResponse)>,
+    /// A tracked change to accept or reject, or every one when the id is none.
+    decision: Option<(Option<String>, bool)>,
 }
 
 impl Wanted {
@@ -911,10 +915,28 @@ impl Wanted {
         self.column = flow.resized.take().or(self.column.take());
         self.comment = flow.noted.take().or(self.comment.take());
         self.note = flow.note_done.take().or(self.note.take());
-        self.column.is_some() || self.comment.is_some() || self.note.is_some()
+        if let Some((id, accept)) = flow.decided.take() {
+            self.decision = Some((Some(id), accept));
+        }
+        self.column.is_some()
+            || self.comment.is_some()
+            || self.note.is_some()
+            || self.decision.is_some()
     }
 
-    fn apply(&mut self, model: &mut FlowModel<'_>, notice: &mut Option<Notice>) {
+    fn apply(
+        &mut self,
+        page: &mut PageEditor,
+        model: &mut FlowModel<'_>,
+        notice: &mut Option<Notice>,
+    ) {
+        if let Some((id, accept)) = self.decision.take()
+            && model.decide(page, id.as_deref(), accept).is_err()
+        {
+            *notice = Some(Notice::Problem(
+                t("This change cannot be rejected: the text it took out has nowhere to go back to.").to_owned(),
+            ));
+        }
         if let Some((table, column, width)) = self.column.take()
             && model.set_column_width(&table, column, width).is_err()
         {
@@ -929,6 +951,29 @@ impl Wanted {
             let _ = model.note_body(&note, &done);
         }
     }
+}
+
+/// The bar over a page with tracked changes, saying so, and in edit mode
+/// offering to accept or reject them all.
+fn changes_bar(ui: &mut Ui, content: &odox_core::Element, edit_mode: bool, wanted: &mut Wanted) {
+    if odox_core::edit::changes(content).is_empty() {
+        return;
+    }
+    ui.horizontal_wrapped(|ui| {
+        ui.label(t("This document has tracked changes."));
+        if odox_core::edit::tracking(content) {
+            ui.weak(t("Edits made here are not tracked."));
+        }
+        if edit_mode {
+            if ui.button(t("Accept all")).clicked() {
+                wanted.decision = Some((None, true));
+            }
+            if ui.button(t("Reject all")).clicked() {
+                wanted.decision = Some((None, false));
+            }
+        }
+    });
+    ui.separator();
 }
 
 /// What the Format menu asked for at the caret: a restart or a continuation

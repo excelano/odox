@@ -109,3 +109,54 @@ pub fn show(
 fn field(id: Id) -> Id {
     id.with("field")
 }
+
+/// Show a tracked change's box beside it while `wanted` says so or the
+/// pointer is over the box: who made it and when, and in edit mode Accept
+/// and Reject. Answers `Some(true)` for Accept and `Some(false)` for Reject.
+pub fn change(
+    ui: &Ui,
+    anchor: Rect,
+    id: Id,
+    content: &NoteContent,
+    wanted: bool,
+    editable: bool,
+) -> Option<bool> {
+    let open = id.with("open");
+    let was_open = ui
+        .ctx()
+        .data(|data| data.get_temp::<bool>(open))
+        .unwrap_or(false);
+    if !(wanted || was_open) {
+        return None;
+    }
+    let mut decided = None;
+    let area = egui::Area::new(id)
+        .order(egui::Order::Foreground)
+        .fixed_pos(anchor.left_bottom())
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.set_max_width(260.0);
+                ui.weak(&content.header);
+                if !content.text.is_empty() {
+                    ui.label(&content.text);
+                }
+                if editable {
+                    ui.horizontal(|ui| {
+                        if ui.button(t("Accept")).clicked() {
+                            decided = Some(true);
+                        }
+                        if ui.button(t("Reject")).clicked() {
+                            decided = Some(false);
+                        }
+                    });
+                }
+            });
+        });
+    let over = area.response.rect.union(anchor);
+    let hovered = ui
+        .input(|input| input.pointer.hover_pos())
+        .is_some_and(|at| over.contains(at));
+    ui.ctx()
+        .data_mut(|data| data.insert_temp(open, decided.is_none() && hovered));
+    decided
+}
