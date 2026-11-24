@@ -450,6 +450,10 @@ impl Cells for Standing<'_> {
         self.document.this_year
     }
 
+    fn now(&self) -> Option<f64> {
+        self.document.now
+    }
+
     fn value(
         &self,
         sheet: usize,

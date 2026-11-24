@@ -62,6 +62,10 @@ pub struct SheetDocument {
     /// its year in, `"5/1"`. This crate keeps no clock: where nobody sets it,
     /// such a date is not a number.
     pub this_year: Option<i64>,
+    /// The moment it is, as a serial day and the fraction of it gone, in
+    /// local time, which `TODAY` and `NOW` read. Where nobody sets it, they
+    /// cannot be worked out.
+    pub now: Option<f64>,
 }
 
 /// One sheet, indexed for lookup by row and column.
@@ -385,6 +389,7 @@ impl From<Document> for SheetDocument {
             sheets,
             batch: false,
             this_year: None,
+            now: None,
         }
     }
 }

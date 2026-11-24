@@ -571,7 +571,21 @@ stores it: numbers, text, booleans, errors, references and ranges, the
 operators, and SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, COUNTBLANK, PRODUCT, IF,
 IFERROR, AND, OR, NOT, TRUE, FALSE, ROUND, ROUNDUP, ROUNDDOWN, ABS, INT, MOD,
 POWER, SQRT, CONCATENATE, CONCAT, LEFT, RIGHT, MID, LEN, UPPER, LOWER, TRIM,
-DATE, YEAR, MONTH, DAY, VLOOKUP, SUMIF, COUNTIF and AVERAGEIF. What they answer
+DATE, YEAR, MONTH, DAY, VLOOKUP, SUMIF, COUNTIF and AVERAGEIF, and in
+`formula/eval/` by family SUMIFS, COUNTIFS, AVERAGEIFS, INDEX, MATCH, HLOOKUP,
+XLOOKUP, SUMPRODUCT, OFFSET and INDIRECT (`lookup.rs`), TEXT, VALUE, FIND,
+SEARCH, SUBSTITUTE and REPLACE (`text.rs`), IFS, SWITCH, ISBLANK, ISNUMBER,
+ISTEXT and ISERROR (`logic.rs`), TODAY, NOW, EDATE, EOMONTH, WEEKDAY,
+NETWORKDAYS and DATEDIF (`date.rs`), MEDIAN, STDEV and RANK (`stats.rs`), and
+PMT, NPV and IRR (`finance.rs`), the ones Excel added under the
+`COM.MICROSOFT.` names ODF gives them. TODAY, NOW, OFFSET and INDIRECT are
+worked out again on every change, whatever it touched, and never on opening;
+the window reads the local clock before each change. IRR guesses by Newton's
+method from 0.1, as `LibreOffice` does, and answers `Err:523` where twenty
+guesses do not settle within 1e-7. TEXT shows a number in a format code of one
+section, digits, grouping, decimals, a percentage, dates and times, read into
+a data style and shown as a cell in that style would be; another code is
+outside the core. What they answer
 is `LibreOffice`'s, measured on `corpus/libreoffice/formulas.ods`: a boolean is
 one or zero, `=` compares text with its case while a criterion ignores it, a
 date is days from 30 December 1899, a range where one value is wanted is its

@@ -279,6 +279,109 @@ impl DataStyle {
         })
     }
 
+    /// A style from a format code as a spreadsheet writes one, `#,##0.00`,
+    /// `0.0%` or `YYYY-MM-DD`, in one section: digits with grouping and
+    /// decimals, a percentage, dates and times, and quoted or other literal
+    /// text. `None` for anything else: several sections, an exponent, a
+    /// fraction or a colour.
+    pub fn from_code(code: &str) -> Option<Self> {
+        let mut parts: Vec<Part> = Vec::new();
+        let mut kind = Kind::Number;
+        let mut timed = false;
+        let mut dated = false;
+        let chars: Vec<char> = code.chars().collect();
+        let literal = |parts: &mut Vec<Part>, text: &str| match parts.last_mut() {
+            Some(Part::Text(before)) => before.push_str(text),
+            _ => parts.push(Part::Text(text.to_owned())),
+        };
+        let mut at = 0;
+        while at < chars.len() {
+            let c = chars[at];
+            let run = chars[at..]
+                .iter()
+                .take_while(|d| d.eq_ignore_ascii_case(&c))
+                .count();
+            let upper = c.to_ascii_uppercase();
+            match upper {
+                '"' => {
+                    let end = chars[at + 1..].iter().position(|&d| d == '"')? + at + 1;
+                    literal(&mut parts, &chars[at + 1..end].iter().collect::<String>());
+                    at = end + 1;
+                    continue;
+                }
+                '\\' => {
+                    literal(&mut parts, &chars.get(at + 1)?.to_string());
+                    at += 2;
+                    continue;
+                }
+                ';' | 'E' | '[' | '?' => return None,
+                '0' | '#' => {
+                    let end = chars[at..]
+                        .iter()
+                        .position(|d| !matches!(d, '0' | '#' | ',' | '.'))
+                        .map_or(chars.len(), |n| at + n);
+                    parts.push(digits_of(&chars[at..end].iter().collect::<String>()));
+                    at = end;
+                    continue;
+                }
+                '%' => {
+                    kind = Kind::Percentage;
+                    literal(&mut parts, "%");
+                }
+                'Y' | 'D' | 'N' | 'H' | 'S' => {
+                    let part = date_letter(upper, run);
+                    if matches!(part, Part::Hours { .. } | Part::Seconds { .. }) {
+                        timed = true;
+                    } else {
+                        dated = true;
+                    }
+                    parts.push(part);
+                }
+                'M' => {
+                    let part = month_or_minutes(&parts, &chars[at + run..], run);
+                    if matches!(part, Part::Minutes { .. }) {
+                        timed = true;
+                    } else {
+                        dated = true;
+                    }
+                    parts.push(part);
+                }
+                'A' if chars[at..]
+                    .iter()
+                    .take(5)
+                    .collect::<String>()
+                    .eq_ignore_ascii_case("AM/PM") =>
+                {
+                    timed = true;
+                    parts.push(Part::AmPm);
+                    at += 5;
+                    continue;
+                }
+                _ if c.is_ascii_alphabetic() => return None,
+                _ => literal(&mut parts, &c.to_string()),
+            }
+            at += if matches!(upper, 'Y' | 'D' | 'N' | 'H' | 'S' | 'M') {
+                run
+            } else {
+                1
+            };
+        }
+        if dated {
+            kind = Kind::Date;
+        } else if timed {
+            kind = Kind::Time;
+        }
+        Some(Self {
+            kind,
+            parts,
+            conditions: Vec::new(),
+            language: None,
+            country: None,
+            colour: None,
+            elapsed: false,
+        })
+    }
+
     /// The colour this style gives a value's text, from the section its
     /// conditions choose; `None` where the style gives none, or does not show
     /// the value.
@@ -1267,5 +1370,56 @@ impl DataStyles {
     /// The colour the named style gives a value's text, where it gives one.
     pub fn colour(&self, name: &str, value: &Value) -> Option<Color> {
         self.get(name)?.colour(value, |other| self.get(other))
+    }
+}
+
+/// The digits of a format code, `#,##0.00`, as a number part.
+fn digits_of(written: &str) -> Part {
+    let (whole, fraction) = written.split_once('.').unwrap_or((written, ""));
+    Part::Number(
+        Digits {
+            decimals: Some(fraction.chars().filter(|d| matches!(d, '0' | '#')).count()),
+            min_decimals: fraction.chars().filter(|&d| d == '0').count(),
+            min_integer: whole.chars().filter(|&d| d == '0').count(),
+            grouping: whole.contains(','),
+        },
+        Vec::new(),
+    )
+}
+
+/// What `M` or `MM` in a format code is: minutes after hours or before
+/// seconds, and a month anywhere else, as `MMM` and `MMMM` always are.
+fn month_or_minutes(before: &[Part], after: &[char], run: usize) -> Part {
+    let after_hours = before
+        .iter()
+        .rev()
+        .find(|part| !matches!(part, Part::Text(_)))
+        .is_some_and(|part| matches!(part, Part::Hours { .. }));
+    let before_seconds = after
+        .iter()
+        .find(|d| d.is_ascii_alphabetic())
+        .is_some_and(|d| d.eq_ignore_ascii_case(&'s'));
+    if run <= 2 && (after_hours || before_seconds) {
+        Part::Minutes { long: run == 2 }
+    } else {
+        Part::Month {
+            long: run == 2 || run > 3,
+            textual: run > 2,
+        }
+    }
+}
+
+/// What a run of `Y`, `D`, `N`, `H` or `S` in a format code is.
+fn date_letter(letter: char, run: usize) -> Part {
+    match letter {
+        'Y' => Part::Year { long: run > 2 },
+        'D' if run > 2 => Part::DayOfWeek { long: run > 3 },
+        'D' => Part::Day { long: run == 2 },
+        'N' => Part::DayOfWeek { long: run > 2 },
+        'H' => Part::Hours { long: run > 1 },
+        _ => Part::Seconds {
+            long: run > 1,
+            decimals: 0,
+        },
     }
 }

@@ -21,7 +21,8 @@ mod typed;
 
 pub use eval::{Cells, evaluate};
 pub(crate) use eval::{
-    GREGORIAN, approx, civil as eval_civil, iso_day, julian, read_iso_day, serial as eval_serial,
+    GREGORIAN, approx, civil as eval_civil, is_volatile, iso_day, julian, read_iso_day,
+    serial as eval_serial,
 };
 pub use parse::parse;
 pub use shift::shifted;
@@ -149,11 +150,13 @@ pub enum Error {
     ArgumentMissing,
     /// `Err:522`, a formula that comes back round to itself.
     Circular,
+    /// `Err:523`, a calculation that does not settle on an answer.
+    Convergence,
 }
 
 impl Error {
     /// Every error, longest code first where one begins another.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::DivisionByZero,
         Self::Value,
         Self::NotAvailable,
@@ -164,6 +167,7 @@ impl Error {
         Self::ArgumentKind,
         Self::ArgumentMissing,
         Self::Circular,
+        Self::Convergence,
     ];
 
     /// How a cell shows the error.
@@ -179,6 +183,7 @@ impl Error {
             Self::ArgumentKind => "Err:504",
             Self::ArgumentMissing => "Err:511",
             Self::Circular => "Err:522",
+            Self::Convergence => "Err:523",
         }
     }
 }

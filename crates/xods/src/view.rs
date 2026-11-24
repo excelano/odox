@@ -9,7 +9,7 @@ use std::path::Path;
 use eframe::egui::{
     self, Align, Event, FontId, Key, Modifiers, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use odox_core::doc::{Block, Blocked, Restructure, Sheet, SheetDocument, Value};
+use odox_core::doc::{Block, Blocked, Recalculated, Restructure, Sheet, SheetDocument, Value};
 use odox_core::edit::html;
 use odox_core::formula;
 use odox_core::{Document, Refused};
@@ -127,6 +127,18 @@ impl Place {
     fn at(self, metrics: &Metrics, row: usize, column: usize) -> egui::Pos2 {
         pos2(self.x(metrics, column), self.y(metrics, row))
     }
+}
+
+/// Work formulas out again after cells changed, at the moment it is now.
+fn recalculate(document: &mut SheetDocument, changed: &[odox_core::doc::Place]) -> Recalculated {
+    document.now = Some(odox_ui::now());
+    document.recalculate(changed)
+}
+
+/// Work every formula out again, at the moment it is now.
+fn recalculate_all(document: &mut SheetDocument) -> Recalculated {
+    document.now = Some(odox_ui::now());
+    document.recalculate_all()
 }
 
 /// A sheet as it is drawn this frame, for its drawings to be placed over it.
@@ -726,7 +738,7 @@ impl View for SheetView {
                     changed.push((*sheet, *row, *column));
                 }
             }
-            let done = document.recalculate(&changed);
+            let done = recalculate(document, &changed);
             self.recalculated(done);
             self.metrics = None;
         }
@@ -867,7 +879,7 @@ impl SheetView {
             return;
         }
         editing.record_snapshot(before, None);
-        let done = document.recalculate_all();
+        let done = recalculate_all(document);
         self.stale.clear();
         self.recalculated(done);
         self.metrics = None;
@@ -1522,7 +1534,7 @@ impl SheetView {
             Ok(written) => {
                 if !written.is_empty() {
                     editing.record_snapshot(before, None);
-                    let done = document.recalculate(&written);
+                    let done = recalculate(document, &written);
                     self.recalculated(done);
                 }
                 self.metrics = None;
@@ -2383,7 +2395,7 @@ impl SheetView {
         match document.fill(self.sheet, source, down, count, series) {
             Ok(written) => {
                 editing.record_snapshot(before, None);
-                let done = document.recalculate(&written);
+                let done = recalculate(document, &written);
                 self.recalculated(done);
                 self.metrics = None;
                 true
@@ -2620,7 +2632,7 @@ impl SheetView {
             }
             changed.push((sheet, r, c));
         }
-        let done = document.recalculate(&changed);
+        let done = recalculate(document, &changed);
         self.recalculated(done);
         self.metrics = None;
         self.notice = refusal;
@@ -2640,7 +2652,7 @@ impl SheetView {
         editing.record(&document.document.content);
         match document.set_cell(self.sheet, row, column, value) {
             Ok(()) => {
-                let done = document.recalculate(&[(self.sheet, row, column)]);
+                let done = recalculate(document, &[(self.sheet, row, column)]);
                 self.recalculated(done);
                 self.metrics = None;
             }
@@ -2675,7 +2687,7 @@ impl SheetView {
         editing.record(&document.document.content);
         match document.set_formula(self.sheet, row, column, &stored) {
             Ok(()) => {
-                let done = document.recalculate(&[(self.sheet, row, column)]);
+                let done = recalculate(document, &[(self.sheet, row, column)]);
                 self.recalculated(done);
                 self.metrics = None;
             }
