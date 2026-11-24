@@ -10,6 +10,7 @@ use eframe::egui::{self, Pos2, Rect, Ui};
 use egui_richedit::{Model, Selection};
 use odox_core::Document;
 use odox_core::doc::{PageSetup, TextDocument};
+use odox_core::words::Count;
 use odox_ui::find::{Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::page_setup::PageSetupQuestion;
@@ -17,7 +18,7 @@ use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View, Zoom,
-    fonts, page_editor,
+    count, fonts, page_editor,
 };
 
 const MARGIN: f32 = 24.0;
@@ -95,9 +96,10 @@ impl Scroll {
         });
     }
 
-    /// The Page up and Page down buttons under the page, and the keys when
-    /// `keys` says the caret is not the one taking them.
-    fn paging(&mut self, ui: &mut Ui, keys: bool) {
+    /// The Page up and Page down buttons under the page, beside how much text
+    /// there is, and the keys when `keys` says the caret is not the one taking
+    /// them.
+    fn paging(&mut self, ui: &mut Ui, keys: bool, counted: &Counted) {
         let (up, down) = self.room();
         let mut moved = None;
         if keys {
@@ -132,6 +134,9 @@ impl Scroll {
                 {
                     moved = Some(Move::Page { down: true });
                 }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    counted.show(ui);
+                });
             });
         });
         if let Some(moved) = moved {
@@ -160,6 +165,75 @@ impl Scroll {
         };
         self.settle = Some(offset.clamp(0.0, shown.bottom()));
         ctx.request_repaint();
+    }
+}
+
+/// How much text the document holds, and the selection when there is one,
+/// counted again only when the text or the selection changes.
+#[derive(Default)]
+struct Counted {
+    of: Option<(u64, Option<Selection<Vec<usize>>>)>,
+    whole: Count,
+    selected: Option<Count>,
+}
+
+impl Counted {
+    fn update(
+        &mut self,
+        body: &odox_core::Element,
+        revision: u64,
+        selection: Option<&Selection<Vec<usize>>>,
+    ) {
+        let selection = selection.filter(|s| s.anchor != s.focus).cloned();
+        let of = Some((revision, selection));
+        if self.of == of {
+            return;
+        }
+        let selection = of.as_ref().and_then(|(_, s)| s.as_ref());
+        if self.of.as_ref().is_none_or(|(r, _)| *r != revision) {
+            self.whole = count::in_paragraphs(body);
+        }
+        self.selected = selection.map(|s| {
+            count::between(
+                body,
+                (&s.anchor.paragraph, s.anchor.offset),
+                (&s.focus.paragraph, s.focus.offset),
+            )
+        });
+        self.of = of;
+    }
+
+    fn show(&self, ui: &mut Ui) {
+        let (words, characters) = match self.selected {
+            Some(selected) => (
+                fill(
+                    t("Words: {selected} of {total}"),
+                    &[
+                        ("selected", &selected.words.to_string()),
+                        ("total", &self.whole.words.to_string()),
+                    ],
+                ),
+                fill(
+                    t("Characters: {selected} of {total}"),
+                    &[
+                        ("selected", &selected.characters.to_string()),
+                        ("total", &self.whole.characters.to_string()),
+                    ],
+                ),
+            ),
+            None => (
+                fill(
+                    t("Words: {words}"),
+                    &[("words", &self.whole.words.to_string())],
+                ),
+                fill(
+                    t("Characters: {characters}"),
+                    &[("characters", &self.whole.characters.to_string())],
+                ),
+            ),
+        };
+        ui.label(characters);
+        ui.label(words);
     }
 }
 
@@ -207,6 +281,7 @@ pub struct TextView {
     begin: bool,
     export: Export,
     scroll: Scroll,
+    counted: Counted,
     /// The size asked of a table to put in, while the question is up.
     table_size: Option<(usize, usize)>,
     /// The size the question was answered with, put in on the next frame.
@@ -236,6 +311,7 @@ impl Default for TextView {
             begin: false,
             export: Export::default(),
             scroll: Scroll::default(),
+            counted: Counted::default(),
             table_size: None,
             picture_question: None,
             picture_wanted: None,
@@ -267,6 +343,7 @@ impl View for TextView {
         self.place = None;
         self.page.clear();
         self.found.clear();
+        self.counted = Counted::default();
         self.load_fonts(ctx);
         Ok(())
     }
@@ -286,6 +363,7 @@ impl View for TextView {
         self.page.clear();
         self.found.clear();
         self.scroll = Scroll::default();
+        self.counted = Counted::default();
     }
 
     fn is_open(&self) -> bool {
@@ -402,7 +480,11 @@ impl View for TextView {
         let keys = !editing.asking
             && !self.export.asking()
             && (!edit_mode || self.page.selection().is_none());
-        self.scroll.paging(ui, keys);
+        if let Some(body) = document.body() {
+            self.counted
+                .update(body, editing.revision(), self.page.selection());
+        }
+        self.scroll.paging(ui, keys, &self.counted);
 
         let (area, anchor) = self.scroll.area(ui, scale);
         let output = area.show(ui, |ui| {
