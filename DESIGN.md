@@ -276,6 +276,16 @@ view says whether it has one for the document open, and the View menu offers
 the panel only then, so a spreadsheet, whose sheets are tabs along the bottom,
 or a text document with no headings, has no checkbox that does nothing.
 
+Formatting marks are the same arrangement: `View::has_formatting_marks` is true
+for a text document and a deck, and only there does the View menu offer them
+and Ctrl+F10 turn them on, for the window's life and stored nowhere. A flow
+draws them after a paragraph's text, at the places the laid-out galley gave
+its characters, in the document's ink at less than half its strength: a dot
+in a space, a degree sign in a no-break space, an arrow across a tab, a return
+arrow at a line break and a pilcrow after the last character, so nothing is
+laid out differently and the PDF, which lays out its own lines, never sees
+them. A slideshow and text read right to left in its visual order draw none.
+
 **A text document pages with buttons under it.** Page up and Page down move the
 view nine tenths of the window, so the line read last is still in sight, and
 gray out at the top and the bottom. The Page Up and Page Down keys do the same

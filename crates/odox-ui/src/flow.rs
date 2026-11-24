@@ -260,6 +260,8 @@ pub struct Flow<'a> {
     pub under: Option<std::rc::Rc<Properties>>,
     /// Where the flow is laid out upright and drawn turned onto a shape.
     pub turned: Option<Turned>,
+    /// Whether formatting marks are drawn over the text ([`crate::marks`]).
+    pub marks: bool,
     /// Where the flow is, as a path of child indices from the root, or from
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
@@ -287,6 +289,7 @@ impl<'a> Flow<'a> {
             selectable: true,
             under: None,
             turned: None,
+            marks: false,
             path: Vec::new(),
             detached: false,
         }
@@ -610,7 +613,13 @@ impl Flow<'_> {
                 response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
             }
         } else {
+            let marked = (self.marks && ui.is_rect_visible(rect))
+                .then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
+            if let Some((galley, map)) = marked {
+                let flat = odox_core::edit::text(element);
+                crate::marks::paint(ui, &galley, &map, origin, &flat, ground.ink);
+            }
         }
 
         if let Some(label) = label {

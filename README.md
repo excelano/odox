@@ -76,7 +76,10 @@ Ctrl+0 and Ctrl with the mouse wheel change the zoom, where 100% is the
 document's printed size. A text document opens fitted to the width of the
 window and a presentation to the whole window, and each keeps fitting it until
 the zoom is changed by hand; Fit to the window in the View menu turns that back
-on.
+on. View > Formatting marks, or Ctrl+F10, shows in `xodt` and on a slide in
+`xodp` where each paragraph ends and where its spaces, no-break spaces, tabs
+and hand-made line breaks are, without moving anything; they are never
+exported.
 
 A window opens reading. Ctrl+E, or Edit mode in the Edit menu, turns editing
 on, and a preference in the same menu opens every document that way. Ctrl+S

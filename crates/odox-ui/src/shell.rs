@@ -142,6 +142,12 @@ pub trait View {
         false
     }
 
+    /// Whether the document has text to draw formatting marks over. Only
+    /// then does the View menu offer them and Ctrl+F10 turn them on.
+    fn has_formatting_marks(&self) -> bool {
+        false
+    }
+
     /// Draw the panel beside the document, when `has_side` says there is one.
     fn side(&mut self, _ui: &mut Ui) {}
 
@@ -640,6 +646,9 @@ impl<V: View> eframe::App for Shell<V> {
         }
         if self.pending.is_none() && !field_focused && !presenting {
             self.keys(&ctx);
+            if self.view.has_formatting_marks() {
+                crate::marks::keys(&ctx);
+            }
         }
 
         // A document macOS asked for, which reaches here rather than through
@@ -833,6 +842,10 @@ impl<V: View> Shell<V> {
                 if self.view.has_side() {
                     ui.separator();
                     ui.checkbox(&mut self.show_side, t("Show the side panel"));
+                }
+                if self.view.has_formatting_marks() {
+                    ui.separator();
+                    crate::marks::menu_item(ui);
                 }
                 self.view.view_menu(ui);
             });
