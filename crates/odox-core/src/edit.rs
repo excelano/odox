@@ -26,6 +26,7 @@ mod figure;
 pub(crate) mod format;
 pub mod html;
 mod indent;
+mod link;
 mod list;
 mod note;
 mod numbering;
@@ -55,6 +56,7 @@ pub use figure::{
 pub use format::{Mark, Script, Setting, TextProperty, format, marked, set_text, text_value};
 pub(crate) use format::{automatic_styles, element};
 pub use indent::{LineSpacing, line_spacing, set_indent, set_line_spacing};
+pub use link::{followable, link_at, make_link, remove_link, set_link};
 pub use list::{continue_numbering, list_level, restart_numbering};
 pub use note::{
     NoteClass, insert_note, note_text, notes_in, remove_note, renumber_notes, set_note_text,
@@ -80,6 +82,8 @@ pub enum Refused {
     Structure,
     /// It is the only slide, and a deck keeps one.
     LastOne,
+    /// A link's address is not one a window here follows.
+    Address,
 }
 
 impl fmt::Display for Refused {
@@ -90,6 +94,10 @@ impl fmt::Display for Refused {
             Self::NotFound => write!(f, "nothing is there to edit"),
             Self::Structure => write!(f, "the range crosses a table or a frame"),
             Self::LastOne => write!(f, "it is the only one"),
+            Self::Address => write!(
+                f,
+                "the address is not a web page, a mail address or a place in the document"
+            ),
         }
     }
 }

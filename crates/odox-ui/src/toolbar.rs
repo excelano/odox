@@ -431,6 +431,8 @@ pub enum Command {
     EqualWidths,
     /// Put a comment on the selection, or at the caret.
     Comment,
+    /// Make a link of the selection, or change the one at the caret.
+    Link,
     /// Put a footnote or an endnote at the caret.
     Note(odox_core::edit::NoteClass),
     /// Start a numbered list again at the item, or carry it on from the list
@@ -785,6 +787,14 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     }
     ui.separator();
     chosen = paragraph_menu(ui, state).or(chosen);
+    let keys = ui
+        .ctx()
+        .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::K));
+    let link = egui::Button::new(t("Link…")).shortcut_text(keys);
+    if ui.add_enabled(state.enabled, link).clicked() {
+        chosen = Some(Command::Link);
+        ui.close();
+    }
     if state.blocks {
         ui.separator();
         chosen = blocks_menu(ui, state).or(chosen);

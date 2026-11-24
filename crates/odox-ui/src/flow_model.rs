@@ -785,6 +785,163 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
+    /// The places in the document a link may go to: each heading, as
+    /// `#Heading|outline`, and each bookmark, as `#name`, with what a person
+    /// reads for it.
+    pub fn places(&self) -> Vec<(String, String)> {
+        fn walk(element: &Element, into: &mut Vec<(String, String)>) {
+            for child in element.elements() {
+                if child.is(&Ns::Text, "h") {
+                    let heading = edit::text(child);
+                    if !heading.trim().is_empty() {
+                        into.push((heading.clone(), format!("#{heading}|outline")));
+                    }
+                }
+                if (child.is(&Ns::Text, "bookmark") || child.is(&Ns::Text, "bookmark-start"))
+                    && let Some(name) = child.attr(&Ns::Text, "name")
+                {
+                    into.push((name.to_owned(), format!("#{name}")));
+                }
+                walk(child, into);
+            }
+        }
+        let mut places = Vec::new();
+        if let Some(body) = self.content.at(&self.root) {
+            walk(body, &mut places);
+        }
+        places
+    }
+
+    /// What a link question starts from at the caret: the link the caret is
+    /// in, or the text selected within one paragraph, or nothing at the
+    /// caret. `None` where the selection runs across paragraphs.
+    pub fn link_here(&self, editor: &PageEditor) -> Option<LinkHere> {
+        let selection = editor.selection()?;
+        if selection.anchor.paragraph != selection.focus.paragraph {
+            return None;
+        }
+        let paragraph = selection.focus.paragraph.clone();
+        let element = self
+            .content
+            .at(&[self.root.as_slice(), &paragraph].concat())?;
+        let (a, b) = (selection.anchor.offset, selection.focus.offset);
+        if let Some((link, range, href)) = edit::link_at(element, b) {
+            let text = edit::text(element)
+                .chars()
+                .skip(range.start)
+                .take(range.len())
+                .collect();
+            return Some(LinkHere {
+                paragraph,
+                range,
+                link: Some(link),
+                text,
+                href,
+            });
+        }
+        let range = a.min(b)..a.max(b);
+        let text = edit::text(element)
+            .chars()
+            .skip(range.start)
+            .take(range.len())
+            .collect();
+        Some(LinkHere {
+            paragraph,
+            range,
+            link: None,
+            text,
+            href: String::new(),
+        })
+    }
+
+    /// Make or change the link a question started from, with its text and
+    /// address, as one step to undo; text that differs from what was there
+    /// takes its place.
+    ///
+    /// # Errors
+    ///
+    /// As [`edit::make_link`] and [`edit::set_link`], and no text at all is
+    /// refused.
+    pub fn put_link(
+        &mut self,
+        editor: &mut PageEditor,
+        here: &LinkHere,
+        text: &str,
+        href: &str,
+    ) -> Result<(), Refused> {
+        if !edit::followable(href) {
+            return Err(Refused::Address);
+        }
+        if text.is_empty() {
+            return Err(Refused::Structure);
+        }
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), &here.paragraph].concat();
+        let done = match &here.link {
+            Some(link) => {
+                edit::set_link(self.content, &[path.as_slice(), link].concat(), href, text)
+            }
+            None => self.wrap_link(&path, here, text, href).map(|_| ()),
+        };
+        if let Err(refused) = done {
+            *self.content = before;
+            return Err(refused);
+        }
+        let end = here.range.start + text.chars().count();
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &here.paragraph].concat(),
+                end,
+            )),
+        );
+        editor.select(Selection::caret(Position::new(here.paragraph.clone(), end)));
+        Ok(())
+    }
+
+    fn wrap_link(
+        &mut self,
+        path: &[usize],
+        here: &LinkHere,
+        text: &str,
+        href: &str,
+    ) -> Result<Vec<usize>, Refused> {
+        if text != here.text {
+            let paragraph = self.content.at_mut(path).ok_or(Refused::NotFound)?;
+            edit::replace(paragraph, here.range.clone(), text);
+        }
+        let end = here.range.start + text.chars().count();
+        edit::make_link(self.content, (path, here.range.start), (path, end), href)
+    }
+
+    /// Take off the link a question started from, its text staying, as one
+    /// step to undo.
+    ///
+    /// # Errors
+    ///
+    /// There is no link there.
+    pub fn take_link(&mut self, here: &LinkHere) -> Result<(), Refused> {
+        let link = here.link.as_ref().ok_or(Refused::NotFound)?;
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), &here.paragraph, link].concat();
+        if let Err(refused) = edit::remove_link(self.content, &path) {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &here.paragraph].concat(),
+                here.range.start,
+            )),
+        );
+        Ok(())
+    }
+
     /// Put an empty footnote or endnote at the caret, as one step to undo,
     /// the caret staying at it so its box opens to be written in.
     ///
@@ -1533,6 +1690,23 @@ fn block(element: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
     }
 }
 
+/// Where a link question starts: a paragraph, the characters of the link or
+/// the selection there, the link's path from the paragraph where there is
+/// one, and its text and address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkHere {
+    /// The paragraph, as the page editor names it.
+    pub paragraph: Vec<usize>,
+    /// The characters the link covers, or the selection.
+    pub range: std::ops::Range<usize>,
+    /// The link's path from the paragraph, where the caret is in one.
+    pub link: Option<Vec<usize>>,
+    /// Its text.
+    pub text: String,
+    /// Its address, empty for a new one.
+    pub href: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FlowModel, html};
@@ -2199,5 +2373,40 @@ mod tests {
         let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
         model.split_cell(&mut editor).expect("nothing to split");
         assert!(!editing.modified());
+    }
+    #[test]
+    fn a_selection_becomes_a_link_that_is_found_again_and_taken_off() {
+        let mut content = content();
+        for (prefix, uri) in [
+            ("text", "urn:oasis:names:tc:opendocument:xmlns:text:1.0"),
+            ("xlink", "http://www.w3.org/1999/xlink"),
+        ] {
+            content.set_attr(odox_core::xml::Name::new("xmlns", prefix, Ns::Xmlns), uri);
+        }
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection {
+            anchor: Position::new(vec![0], 0),
+            focus: Position::new(vec![0], 3),
+        });
+        let here = model.link_here(&editor).expect("a selection");
+        assert_eq!((here.text.as_str(), here.link.is_none()), ("one", true));
+        model
+            .put_link(&mut editor, &here, "one", "https://example.com")
+            .expect("made");
+        let here = model.link_here(&editor).expect("the caret");
+        assert_eq!(here.href, "https://example.com");
+        assert!(here.link.is_some());
+        model.take_link(&here).expect("taken off");
+        assert!(model.link_here(&editor).expect("the caret").link.is_none());
+        assert_eq!(model.text(&vec![0]).as_deref(), Some("one"));
+        assert!(
+            model
+                .put_link(&mut editor, &here, "one", "file:///etc")
+                .is_err()
+        );
     }
 }

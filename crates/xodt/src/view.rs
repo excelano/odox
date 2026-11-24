@@ -13,6 +13,7 @@ use odox_core::doc::{PageSetup, TextDocument};
 use odox_core::words::Count;
 use odox_ui::find::{Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::link_dialog::LinkQuestion;
 use odox_ui::note_popup::NoteResponse;
 use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::picture_question::PictureQuestion;
@@ -297,6 +298,8 @@ pub struct TextView {
     page_question: Option<PageSetupQuestion>,
     /// What the question was answered with, made on the next frame.
     page_wanted: Option<PageSetup>,
+    /// The link question.
+    link: LinkQuestion,
     notice: Option<Notice>,
 }
 
@@ -318,6 +321,7 @@ impl Default for TextView {
             table_size: None,
             picture_question: None,
             picture_wanted: None,
+            link: LinkQuestion::default(),
             page_question: None,
             page_wanted: None,
             table_wanted: None,
@@ -450,7 +454,9 @@ impl View for TextView {
         // the caret waits for it to be answered.
         let asked = self.table_size.is_some()
             || self.picture_question.is_some()
-            || self.page_question.is_some();
+            || self.page_question.is_some()
+            || self.link.is_up();
+        self.link.ask(ui.ctx());
         self.ask_table_size(ui.ctx());
         self.ask_picture(ui.ctx());
         self.ask_page_setup(ui.ctx());
@@ -717,6 +723,15 @@ impl TextView {
             && let Err(refused) = model.insert_picture(&mut self.page, package, &picture)
         {
             self.notice = Some(Notice::Problem(refused.to_string()));
+        }
+        if let Some(problem) = self.link.act(
+            ui,
+            &mut model,
+            &mut self.page,
+            command == Some(Command::Link),
+            FlowModel::places,
+        ) {
+            self.notice = Some(Notice::Problem(problem));
         }
         if asked.notice.is_some() {
             self.notice = asked.notice;

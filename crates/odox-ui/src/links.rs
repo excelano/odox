@@ -20,16 +20,16 @@ pub enum Target<'a> {
 }
 
 /// What a link's `xlink:href` means here, or `None` for one that is not
-/// followed.
+/// followed. The addresses followed are those `odox_core::edit::followable` takes, which
+/// are also the only ones a link made here may have.
 pub fn target(href: &str) -> Option<Target<'_>> {
-    if let Some(place) = href.strip_prefix('#') {
-        return (!place.is_empty()).then_some(Target::Within(place));
+    if !odox_core::edit::followable(href) {
+        return None;
     }
-    let scheme = href.split_once(':')?.0;
-    ["http", "https", "mailto"]
-        .iter()
-        .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
-        .then_some(Target::External(href))
+    Some(match href.strip_prefix('#') {
+        Some(place) => Target::Within(place),
+        None => Target::External(href),
+    })
 }
 
 /// Hand an address to the desktop.

@@ -1106,6 +1106,20 @@ or the caret is at it; in edit mode the box edits the text, a line to a
 paragraph of the body in the style of its first, or deletes the note. Find's
 Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 
+**A link is a `text:a`** with `xlink:type="simple"` and `xlink:href`
+(`edit/link.rs`), made over a range of one paragraph by cutting the paragraph
+at both ends of it, so a span the range begins or ends in is cut there and
+its parts keep their formatting inside and outside the link. A range across
+paragraphs, an empty one, or one that reaches into a link is refused. A link's
+address is one a window here follows, `followable`: a web page, a mail
+address, or a place in the document as `#name` or `#Heading|outline`; the
+links the windows follow are the same ones (`odox_ui::links`). Ctrl+K, or
+Format > Link…, asks for the text and the address, offering the document's
+headings and bookmarks in `xodt` and its slides in `xodp`; with the caret in a
+link the question changes it, new text taking the place of the old and text
+left as it was keeping its formatting, or takes it off, its text and
+formatting staying. Each is one step to undo.
+
 **A comment is an `office:annotation` where it is anchored** (`edit/annotation.rs`),
 with `dc:creator`, `dc:date` and its paragraphs, and one over a range closes
 at an `office:annotation-end` of the same `office:name`, as `LibreOffice`
