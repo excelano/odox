@@ -492,10 +492,15 @@ or a reference, makes the rule let anything in. What the rule does with a
 value it does not allow is its error message's: stop refuses it, warning asks
 whether to write it anyway, information writes it and says so, and a message
 not displayed, or none, lets it in. Typing a refused value keeps the editor
-open and says the message; a warning waits for OK or Cancel. A paste or a fill
-is checked cell by cell before anything stands: a refusal anywhere refuses all
-of it and names the first cell, and a warning asks once. Typing a formula,
-deleting and undo are not checked, as in `LibreOffice`.
+open and says the message, or `This value is not allowed here.` where the rule
+has none; a warning waits for OK or Cancel. A paste or a fill is checked cell
+by cell before anything stands: a refusal anywhere refuses all of it and names
+the first cell, and a warning asks once. A formula, typed or filled, an empty
+cell, pasted or deleted, and undo are not checked. A list compares with its
+case only where `table:case-sensitive` says so, and a number matches an item
+written as that number in quotes, as the Validity dialog writes every item.
+Text in a date or time cell is read as a date or a time, and let in where it
+cannot be read, since what was typed then stays text.
 
 **Pictures and shapes on a sheet are drawn** (`sheet/drawing.rs`): those in
 `table:shapes`, anchored to the sheet, and those in a cell, anchored to it and,

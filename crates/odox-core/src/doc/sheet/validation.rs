@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 
 use super::recalc::{date_serial, duration_days};
 use super::{SheetDocument, Value};
+use crate::formula::text_number;
 use crate::xml::{Element, Ns};
 
 /// What a rule says to a person about a value it does not take.
@@ -81,6 +82,8 @@ pub struct Validation {
     kind: Kind,
     test: Test,
     empty: bool,
+    /// Whether a list item and text compare with their case.
+    case: bool,
     answer: Option<(Answer, Message)>,
 }
 
@@ -111,6 +114,7 @@ impl Validation {
             kind,
             test,
             empty: element.attr(&Ns::Table, "allow-empty-cell") != Some("false"),
+            case: element.attr(&Ns::Table, "case-sensitive") == Some("true"),
             answer,
         }
     }
@@ -133,10 +137,16 @@ impl Validation {
         if matches!(value, Value::Empty) || matches!(value, Value::Text(text) if text.is_empty()) {
             return self.empty;
         }
-        let number = number_of(value);
+        let number = match (self.kind, value) {
+            (Kind::Date | Kind::Time, Value::Text(text)) => match text_number(text, None) {
+                Some(n) => Some(n),
+                None => return true,
+            },
+            _ => number_of(value),
+        };
         let fits = match self.kind {
             Kind::Any => true,
-            Kind::Whole => number.is_some_and(|n| n.fract() == 0.0),
+            Kind::Whole => number.is_some_and(|n| (n - n.round()).abs() <= 1e-9 * n.abs().max(1.0)),
             Kind::Decimal | Kind::Date | Kind::Time => number.is_some(),
         };
         if !fits {
@@ -149,27 +159,28 @@ impl Validation {
         };
         match &self.test {
             Test::None | Test::Unread => true,
-            Test::Compare(measure, op, bound) => {
-                order(&measured(*measure), bound).is_some_and(|order| match *op {
+            Test::Compare(measure, op, bound) => order(&measured(*measure), bound, self.case)
+                .is_some_and(|order| match *op {
                     "=" => order.is_eq(),
                     "!=" => order.is_ne(),
                     "<" => order.is_lt(),
                     ">" => order.is_gt(),
                     "<=" => order.is_le(),
                     _ => order.is_ge(),
-                })
-            }
+                }),
             Test::Between(measure, low, high, outside) => {
                 let value = measured(*measure);
-                let within = order(&value, low).is_some_and(Ordering::is_ge)
-                    && order(&value, high).is_some_and(Ordering::is_le);
+                let within = order(&value, low, self.case).is_some_and(Ordering::is_ge)
+                    && order(&value, high, self.case).is_some_and(Ordering::is_le);
                 within != *outside
             }
             Test::List(items) => {
                 let value = measured(Measure::Value);
-                items
-                    .iter()
-                    .any(|item| order(&value, item) == Some(Ordering::Equal))
+                items.iter().any(|item| {
+                    order(&value, item, self.case) == Some(Ordering::Equal)
+                        || matches!((&value, item), (Bound::Number(n), Bound::Text(t))
+                            if t.trim().parse::<f64>().is_ok_and(|item| (item - *n).abs() < f64::EPSILON))
+                })
             }
         }
     }
@@ -187,11 +198,12 @@ fn number_of(value: &Value) -> Option<f64> {
     }
 }
 
-/// Two bounds in order: numbers by number, text without regard to case; a
-/// number and text have none.
-fn order(a: &Bound, b: &Bound) -> Option<Ordering> {
+/// Two bounds in order: numbers by number, text with or without regard to
+/// case; a number and text have none.
+fn order(a: &Bound, b: &Bound, case: bool) -> Option<Ordering> {
     match (a, b) {
         (Bound::Number(a), Bound::Number(b)) => a.partial_cmp(b),
+        (Bound::Text(a), Bound::Text(b)) if case => Some(a.cmp(b)),
         (Bound::Text(a), Bound::Text(b)) => Some(a.to_lowercase().cmp(&b.to_lowercase())),
         _ => None,
     }

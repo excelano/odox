@@ -161,3 +161,89 @@ fn document_is_unchanged_after_open() {
         .expect("it reads");
     assert!(document.document.content == plain.content);
 }
+
+/// The fixture with one of its rules' attributes set.
+fn with_rule(rule: &str, attributes: &[(&str, &str)]) -> SheetDocument {
+    let mut document = fixture();
+    fn find<'a>(
+        element: &'a mut odox_core::Element,
+        rule: &str,
+    ) -> Option<&'a mut odox_core::Element> {
+        if element.is(&odox_core::Ns::Table, "content-validation")
+            && element.attr(&odox_core::Ns::Table, "name") == Some(rule)
+        {
+            return Some(element);
+        }
+        element.children.iter_mut().find_map(|child| match child {
+            odox_core::xml::Node::Element(child) => find(child, rule),
+            _ => None,
+        })
+    }
+    let element = find(&mut document.document.content, rule).expect("the rule");
+    for (local, value) in attributes {
+        let name = element.name_for(&odox_core::Ns::Table, local);
+        element.set_attr(name, *value);
+    }
+    document
+}
+
+#[test]
+fn a_list_of_quoted_numbers_takes_the_numbers() {
+    let document = with_rule(
+        "val3",
+        &[("condition", r#"of:cell-content-is-in-list("1";"2";"3")"#)],
+    );
+    assert!(allowed(&verdict(&document, 2, &Value::Number(2.0))));
+    assert!(!allowed(&verdict(&document, 2, &Value::Number(4.0))));
+}
+
+#[test]
+fn a_list_can_care_about_case() {
+    let document = with_rule("val3", &[("case-sensitive", "true")]);
+    assert!(allowed(&verdict(
+        &document,
+        2,
+        &Value::Text("red".to_owned())
+    )));
+    assert!(!allowed(&verdict(
+        &document,
+        2,
+        &Value::Text("RED".to_owned())
+    )));
+}
+
+#[test]
+fn a_date_typed_as_text_is_read_as_a_date_or_let_in() {
+    let document = fixture();
+    assert!(allowed(&verdict(
+        &document,
+        4,
+        &Value::Text("2026-03-01".to_owned())
+    )));
+    assert!(allowed(&verdict(
+        &document,
+        4,
+        &Value::Text("3/1/2026".to_owned())
+    )));
+    assert!(!allowed(&verdict(
+        &document,
+        4,
+        &Value::Text("2027-03-01".to_owned())
+    )));
+    assert!(allowed(&verdict(
+        &document,
+        4,
+        &Value::Text("no date".to_owned())
+    )));
+    assert!(allowed(&verdict(
+        &document,
+        5,
+        &Value::Text("10:30".to_owned())
+    )));
+}
+
+#[test]
+fn a_whole_number_is_whole_within_rounding() {
+    let document = fixture();
+    assert!(allowed(&verdict(&document, 0, &Value::Number(5.0 + 1e-15))));
+}

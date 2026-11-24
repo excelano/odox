@@ -82,6 +82,8 @@ pub struct SheetView {
 struct Warning {
     message: Message,
     then: Pending,
+    /// Where the pick goes once a typed value is written.
+    step: Step,
 }
 
 /// A write held back for a warning.
@@ -147,7 +149,8 @@ fn refused_at(row: usize, column: usize, message: &Message) -> String {
 /// its text.
 fn said(message: &Message) -> String {
     match (message.title.is_empty(), message.text.is_empty()) {
-        (true, _) => message.text.clone(),
+        (true, true) => t("This value is not allowed here.").to_owned(),
+        (true, false) => message.text.clone(),
         (false, true) => message.title.clone(),
         (false, false) => format!("{}: {}", message.title, message.text),
     }
@@ -522,7 +525,8 @@ struct CellEditor {
     /// What the cell held when the editor opened, so that leaving it as it was
     /// is not an edit and does not retype a currency as a number.
     original: String,
-    /// The editor was opened this frame and has yet to take the focus.
+    /// The editor has yet to take the focus, which it does once no question
+    /// is up over it.
     opened: bool,
 }
 
@@ -593,12 +597,14 @@ struct Renaming {
 }
 
 /// What the editor asked for when it closed.
+#[derive(Clone, Copy)]
 enum Outcome {
     Commit(Step),
     Cancel,
 }
 
 /// Where the pick goes after a commit.
+#[derive(Clone, Copy)]
 enum Step {
     Stay,
     Down,
@@ -640,6 +646,7 @@ impl View for SheetView {
         self.metrics = None;
         self.editor = None;
         self.notice = None;
+        self.warning = None;
         self.found.clear();
         self.export = Export::default();
         Ok(())
@@ -653,6 +660,7 @@ impl View for SheetView {
         self.document = None;
         self.metrics = None;
         self.editor = None;
+        self.warning = None;
         self.notice = None;
         self.found.clear();
         self.export = Export::default();
@@ -671,6 +679,7 @@ impl View for SheetView {
     }
 
     fn reindex(&mut self) {
+        self.warning = None;
         if let Some(document) = &mut self.document {
             document.reindex();
             // An undo can take away the sheet being looked at.
@@ -1267,7 +1276,11 @@ impl SheetView {
             if !warning.message.title.is_empty() {
                 ui.heading(&warning.message.title);
             }
-            ui.label(&warning.message.text);
+            if warning.message.text.is_empty() {
+                ui.label(t("This value is not allowed here."));
+            } else {
+                ui.label(&warning.message.text);
+            }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if ui.button(t("OK")).clicked() {
@@ -1289,6 +1302,11 @@ impl SheetView {
                     Pending::Typed(row, column, value) => {
                         self.write(row, column, &value, editing);
                         self.editor = None;
+                        self.pick(match warning.step {
+                            Step::Stay => (row, column),
+                            Step::Down => (row + 1, column),
+                            Step::Right => (row, column + 1),
+                        });
                     }
                     Pending::Pasted(at, block) => self.put_block(at, &block, editing),
                     Pending::Filled(source, down, count, series) => {
@@ -1296,7 +1314,12 @@ impl SheetView {
                     }
                 }
             }
-            Some(false) => self.warning = None,
+            Some(false) => {
+                self.warning = None;
+                if let Some(editor) = &mut self.editor {
+                    editor.opened = true;
+                }
+            }
             None => {}
         }
     }
@@ -2081,7 +2104,11 @@ impl SheetView {
                         let style = document.cell_style(sheet, cell.as_ref(), editor.column);
                         let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
                         let id = egui::Id::unique("cell-editor");
-                        let opened = std::mem::take(&mut editor.opened);
+                        let unblocked = ui.memory(|memory| memory.top_modal_layer().is_none());
+                        let opened = editor.opened && unblocked;
+                        if opened {
+                            editor.opened = false;
+                        }
                         if opened {
                             ui.memory_mut(|memory| memory.request_focus(id));
                             let mut state =
@@ -2528,8 +2555,10 @@ impl SheetView {
                         .iter()
                         .filter_map(|&(sheet, row, column)| {
                             let index = document.sheets().get(sheet)?;
-                            let value = document.cell(index, row, column)?.value();
-                            Some((row, column, value))
+                            let cell = document.cell(index, row, column)?;
+                            cell.formula()
+                                .is_none()
+                                .then(|| (row, column, cell.value()))
                         })
                         .collect();
                     let verdict = check(
@@ -2552,6 +2581,7 @@ impl SheetView {
                             self.warning = Some(Warning {
                                 message,
                                 then: Pending::Filled(source, down, count, series),
+                                step: Step::Stay,
                             });
                             return false;
                         }
@@ -2669,6 +2699,9 @@ impl SheetView {
                 opened: true,
                 ..editor
             });
+            if let Some(warning) = &mut self.warning {
+                warning.step = step;
+            }
             return;
         }
         self.pick(match step {
@@ -2742,6 +2775,7 @@ impl SheetView {
         let cells = block.iter().enumerate().flat_map(|(down, row)| {
             row.iter()
                 .enumerate()
+                .filter(|(_, value)| !matches!(value, Value::Empty))
                 .map(move |(across, value)| (top + down, left + across, value))
         });
         match check(document, self.sheet, cells) {
@@ -2752,6 +2786,7 @@ impl SheetView {
                 self.warning = Some(Warning {
                     message,
                     then: Pending::Pasted((top, left), block),
+                    step: Step::Stay,
                 });
             }
             Checked::Informed(message) => {
@@ -2874,6 +2909,7 @@ impl SheetView {
                     self.warning = Some(Warning {
                         message,
                         then: Pending::Typed(row, column, value),
+                        step: Step::Stay,
                     });
                     return false;
                 }
@@ -3898,5 +3934,62 @@ mod tests {
         );
         view.paste("3\t2.5\tgreen", &mut editing);
         assert_eq!(text_at(&view, 1, 2), "green");
+    }
+
+    #[test]
+    fn a_fill_a_rule_refuses_leaves_the_sheet_as_it_was() {
+        let (mut view, mut editing) = ruled();
+        view.write(0, 0, &Value::Number(2.5), &mut editing);
+        let before = view
+            .document
+            .as_ref()
+            .expect("open")
+            .document
+            .content
+            .clone();
+        let one = Block {
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: 0,
+        };
+        let filled = view.fill_from(one, true, 1, true, true, &mut editing);
+        assert!(!filled, "A2 {:?}", text_at(&view, 1, 0));
+        assert_eq!(
+            view.document.as_ref().expect("open").document.content,
+            before
+        );
+        assert!(
+            view.notice
+                .as_deref()
+                .is_some_and(|said| said.contains("A2")),
+            "{:?}",
+            view.notice
+        );
+    }
+
+    #[test]
+    fn a_filled_formula_is_not_checked() {
+        let (mut view, mut editing) = ruled();
+        assert!(view.commit(0, 2, "=\"pink\"", &mut editing));
+        let one = Block {
+            top: 0,
+            left: 2,
+            bottom: 0,
+            right: 2,
+        };
+        assert!(
+            view.fill_from(one, true, 1, false, true, &mut editing),
+            "{:?}",
+            view.notice
+        );
+    }
+
+    #[test]
+    fn an_empty_cell_in_a_paste_is_not_checked() {
+        let (mut view, mut editing) = ruled();
+        view.pick((1, 1));
+        view.paste("1\t\t", &mut editing);
+        assert_eq!(text_at(&view, 1, 1), "1", "{:?}", view.notice);
     }
 }

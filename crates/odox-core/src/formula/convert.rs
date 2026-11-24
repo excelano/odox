@@ -28,7 +28,7 @@ const MONTHS: [&str; 12] = [
 /// fraction, `1 1/2`; a date, `5/1/2024`, `2024-05-01`, `May 1, 2024`, a time,
 /// `12:30`, or both. A date written without its year falls in `year`, and is
 /// not a number where that is `None`.
-pub(super) fn text_number(text: &str, year: Option<i64>) -> Option<f64> {
+pub(crate) fn text_number(text: &str, year: Option<i64>) -> Option<f64> {
     let text = text.trim();
     if text.eq_ignore_ascii_case("true") {
         return Some(1.0);

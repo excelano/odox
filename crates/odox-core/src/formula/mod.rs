@@ -19,6 +19,7 @@ mod parse;
 mod shift;
 mod typed;
 
+pub(crate) use convert::text_number;
 pub use eval::{Cells, evaluate};
 pub(crate) use eval::{
     GREGORIAN, approx, civil as eval_civil, is_volatile, iso_day, julian, read_iso_day,
