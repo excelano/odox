@@ -1106,6 +1106,19 @@ or the caret is at it; in edit mode the box edits the text, a line to a
 paragraph of the body in the style of its first, or deletes the note. Find's
 Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 
+**A page's header and footer are edited where they are drawn.** The body's
+header and footer are the first master page's `style:header` and
+`style:footer`, in the styles part; the window draws the header above the
+body and the footer below it, each set off by a faint rule. A click into one
+makes it the part typed into, the edit model then addressing paragraphs under
+it rather than under the body (`FlowModel::in_styles_part`), so typing, the
+toolbar, links and fields work there as in the body, and each edit is one
+step to undo that puts the styles part back. Format > Header and Format >
+Footer give the page one, with an empty paragraph in the document's Header or
+Footer style, or take it away, asking first where it holds text; a first or
+left page's own header or footer is left as it is (`TextDocument::set_header`,
+`set_footer`).
+
 **A field is put in at the caret** (`edit/field.rs`) from Format > Field, as
 `LibreOffice` writes one: a date as `text:date` with its `text:date-value`,
 `text:fixed="true"` where it keeps the day it was put in, a page number as

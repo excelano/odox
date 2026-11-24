@@ -300,6 +300,11 @@ pub struct TextView {
     page_wanted: Option<PageSetup>,
     /// The link question.
     link: LinkQuestion,
+    /// The part of the page being typed into.
+    region: Region,
+    /// The header, or with true the footer, asked about before it and its
+    /// text are taken away.
+    band_question: Option<bool>,
     notice: Option<Notice>,
 }
 
@@ -322,6 +327,8 @@ impl Default for TextView {
             picture_question: None,
             picture_wanted: None,
             link: LinkQuestion::default(),
+            region: Region::Body,
+            band_question: None,
             page_question: None,
             page_wanted: None,
             table_wanted: None,
@@ -446,6 +453,7 @@ impl View for TextView {
         model.replace_matches(&matches.iter().collect::<Vec<_>>(), with, true)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn central(&mut self, ui: &mut Ui, zoom: &mut Zoom, editing: &mut Editing) {
         if let Some(document) = &mut self.document {
             self.export.show(ui.ctx(), document, editing);
@@ -455,8 +463,10 @@ impl View for TextView {
         let asked = self.table_size.is_some()
             || self.picture_question.is_some()
             || self.page_question.is_some()
-            || self.link.is_up();
+            || self.link.is_up()
+            || self.band_question.is_some();
         self.link.ask(ui.ctx());
+        self.ask_band(ui.ctx(), editing);
         self.ask_table_size(ui.ctx());
         self.ask_picture(ui.ctx());
         self.ask_page_setup(ui.ctx());
@@ -501,15 +511,16 @@ impl View for TextView {
         let output = area.show(ui, |ui| {
             // What was typed goes into the tree before it is laid out, so
             // this frame already draws it.
-            if edit_mode && let Some(root) = document.body_path() {
-                let Document {
-                    content, styles, ..
-                } = &mut document.document;
-                let mut model = FlowModel::new(content, styles, root, editing);
-                self.wanted
-                    .apply(&mut self.page, &mut model, &mut self.notice);
+            let region = self.region;
+            if edit_mode && let Some((mut model, _)) = region_model(document, region, editing) {
+                if region == Region::Body {
+                    self.wanted
+                        .apply(&mut self.page, &mut model, &mut self.notice);
+                }
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
-                break_keys(ui, &mut self.page, &mut model);
+                if region == Region::Body {
+                    break_keys(ui, &mut self.page, &mut model);
+                }
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -529,19 +540,86 @@ impl View for TextView {
                         // it, shrunk with the page when the window is
                         // narrower.
                         ui.set_min_height(page_height * width / page);
-                        let mut flow = Flow::new(&document.document, &mut self.pictures, scale);
-                        flow.palette = palette;
-                        flow.scroll_to_heading = self.scroll_to.take();
-                        flow.scroll_to_place = self.place.take();
-                        flow.page = edit_mode.then_some(&mut self.page);
-                        flow.find = self.found.highlights(0);
-                        flow.marks = marks::shown(ui.ctx());
-                        flow.blocks(ui, body, width);
-                        if self.wanted.take(&mut flow) {
-                            ui.ctx().request_repaint();
+                        let master = document.master_page();
+                        let band = |footer: bool| {
+                            master.and_then(|m| {
+                                m.child(
+                                    &odox_core::Ns::Style,
+                                    if footer { "footer" } else { "header" },
+                                )
+                            })
+                        };
+                        let active = edit_mode.then_some(self.region);
+                        let mut wanted = None;
+                        if let Some(header) = band(false) {
+                            let page = (active == Some(Region::Header)).then_some(&mut self.page);
+                            let clickable = active.is_some_and(|region| region != Region::Header);
+                            if band_drawn(
+                                ui,
+                                &document.document,
+                                &mut self.pictures,
+                                (header, page),
+                                palette,
+                                (scale, width),
+                                clickable,
+                            ) {
+                                wanted = Some(Region::Header);
+                            }
+                            rule(ui, palette);
                         }
-                        if flow.followed.is_some() {
-                            self.place = flow.followed.take();
+                        let body_rect = ui
+                            .scope(|ui| {
+                                let mut flow =
+                                    Flow::new(&document.document, &mut self.pictures, scale);
+                                flow.palette = palette;
+                                flow.scroll_to_heading = self.scroll_to.take();
+                                flow.scroll_to_place = self.place.take();
+                                flow.page =
+                                    (active == Some(Region::Body)).then_some(&mut self.page);
+                                flow.find = self.found.highlights(0);
+                                flow.marks = marks::shown(ui.ctx());
+                                flow.blocks(ui, body, width);
+                                if self.wanted.take(&mut flow) {
+                                    ui.ctx().request_repaint();
+                                }
+                                if flow.followed.is_some() {
+                                    self.place = flow.followed.take();
+                                    ui.ctx().request_repaint();
+                                }
+                            })
+                            .response
+                            .rect;
+                        if active.is_some_and(|region| region != Region::Body)
+                            && ui
+                                .interact(
+                                    body_rect,
+                                    egui::Id::unique("body-region"),
+                                    egui::Sense::click(),
+                                )
+                                .clicked()
+                        {
+                            wanted = Some(Region::Body);
+                        }
+                        if let Some(footer) = band(true) {
+                            rule(ui, palette);
+                            let page = (active == Some(Region::Footer)).then_some(&mut self.page);
+                            let clickable = active.is_some_and(|region| region != Region::Footer);
+                            if band_drawn(
+                                ui,
+                                &document.document,
+                                &mut self.pictures,
+                                (footer, page),
+                                palette,
+                                (scale, width),
+                                clickable,
+                            ) {
+                                wanted = Some(Region::Footer);
+                            }
+                        }
+                        if let Some(region) = wanted {
+                            self.region = region;
+                            self.page.clear();
+                            self.begin = true;
                             ui.ctx().request_repaint();
                         }
                     });
@@ -671,31 +749,30 @@ impl TextView {
     /// The toolbar over the page in edit mode, and what it and the Format menu
     /// asked for: carried out here, or asked about first.
     fn edit_toolbar(&mut self, ui: &mut Ui, editing: &mut Editing, edit_mode: bool) {
-        let found = self
-            .document
-            .as_mut()
-            .filter(|_| edit_mode)
-            .and_then(|document| {
-                let root = document.body_path()?;
-                Some((document, root))
-            });
-        let Some((document, root)) = found else {
+        let command = if edit_mode { self.command.take() } else { None };
+        if let Some(Command::Band { footer, on }) = command {
+            self.band(footer, on, editing);
+        }
+        let region = self.region;
+        let Some(document) = self.document.as_mut().filter(|_| edit_mode) else {
             self.command = None;
             self.menu = MenuState::offering_blocks(true);
             return;
         };
+        let bands = (
+            document.band_path(false).is_some(),
+            document.band_path(true).is_some(),
+        );
         let text_width = document.text_width();
-        let command = self.command.take();
         if command == Some(Command::PageSetup) {
             self.page_question = Some(PageSetupQuestion::new(document.page_setup()));
         }
-        let Document {
-            content,
-            styles,
-            package,
-            ..
-        } = &mut document.document;
-        let mut model = FlowModel::new(content, styles, root, editing);
+        let Some((mut model, package)) = region_model(document, region, editing) else {
+            self.region = Region::Body;
+            self.page.clear();
+            self.menu = MenuState::offering_blocks(true);
+            return;
+        };
         if std::mem::take(&mut self.begin)
             && let Some(first) = model.first()
         {
@@ -736,8 +813,86 @@ impl TextView {
         if asked.notice.is_some() {
             self.notice = asked.notice;
         }
-        self.menu = MenuState::of(&self.page, &model, true);
+        self.menu = MenuState::of(&self.page, &model, true).with_bands(bands.0, bands.1);
         ui.separator();
+    }
+
+    /// Give the page a header or a footer, or take it away, as one step to
+    /// undo; one with text in it is asked about first.
+    fn band(&mut self, footer: bool, on: bool, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let holds_text = document
+            .band_path(footer)
+            .and_then(|path| {
+                document
+                    .document
+                    .styles_part
+                    .as_ref()?
+                    .at(&path)
+                    .map(odox_core::Element::plain_text)
+            })
+            .is_some_and(|text| !text.trim().is_empty());
+        if !on && holds_text && self.band_question.is_none() {
+            self.band_question = Some(footer);
+            return;
+        }
+        self.band_question = None;
+        let content = document.document.content.clone();
+        let styles = document.document.styles_part.clone();
+        let changed = if footer {
+            document.set_footer(on)
+        } else {
+            document.set_header(on)
+        };
+        match changed {
+            Ok(true) => {
+                editing.record_styles(content, styles, None);
+                let removed = if footer {
+                    Region::Footer
+                } else {
+                    Region::Header
+                };
+                if !on && self.region == removed {
+                    self.region = Region::Body;
+                    self.page.clear();
+                }
+            }
+            Ok(false) => {}
+            Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
+        }
+    }
+
+    /// Ask before a header or footer with text in it is taken away.
+    fn ask_band(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let Some(footer) = self.band_question else {
+            return;
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("band-question")).show(ctx, |ui| {
+            ui.label(if footer {
+                t("The footer holds text. Take it away with its text?")
+            } else {
+                t("The header holds text. Take it away with its text?")
+            });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("Take it away")).clicked() {
+                    answer = Some(true);
+                }
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+                {
+                    answer = Some(false);
+                }
+            });
+        });
+        match answer {
+            Some(true) => self.band(footer, false, editing),
+            Some(false) => self.band_question = None,
+            None => {}
+        }
     }
 
     /// Ask what a chosen picture shows, while the question is up, and keep
@@ -973,6 +1128,82 @@ impl Wanted {
     }
 }
 
+/// The part of the page typed into: the body, or the page's header or footer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Region {
+    Body,
+    Header,
+    Footer,
+}
+
+/// Draw a page header or footer, with the page editor where it is being typed
+/// into; answers whether it was clicked into where it is not.
+fn band_drawn(
+    ui: &mut Ui,
+    document: &odox_core::Document,
+    pictures: &mut Pictures,
+    (band, page): (&odox_core::Element, Option<&mut PageEditor>),
+    palette: odox_ui::format::Palette,
+    (scale, width): (f32, f32),
+    clickable: bool,
+) -> bool {
+    let rect = ui
+        .scope(|ui| {
+            let mut flow = Flow::new(document, pictures, scale);
+            flow.palette = palette;
+            flow.page = page;
+            flow.blocks(ui, band, width);
+        })
+        .response
+        .rect;
+    clickable
+        && ui
+            .interact(
+                rect,
+                egui::Id::unique(("band-region", band.name.local.as_ref())),
+                egui::Sense::click(),
+            )
+            .clicked()
+}
+
+/// The faint rule between a page's header or footer and its body.
+fn rule(ui: &mut Ui, palette: odox_ui::format::Palette) {
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 1.0), egui::Sense::hover());
+    ui.painter().hline(
+        rect.x_range(),
+        rect.center().y,
+        egui::Stroke::new(1.0, palette.ink.gamma_multiply(0.2)),
+    );
+}
+
+/// The model of a part of the page, with the package a picture put in it is
+/// kept in: the body in the content, a header or footer in the styles part.
+fn region_model<'d>(
+    document: &'d mut TextDocument,
+    region: Region,
+    editing: &'d mut Editing,
+) -> Option<(FlowModel<'d>, &'d mut odox_core::Package)> {
+    let root = match region {
+        Region::Body => document.body_path()?,
+        Region::Header => document.band_path(false)?,
+        Region::Footer => document.band_path(true)?,
+    };
+    let Document {
+        content,
+        styles,
+        styles_part,
+        package,
+        ..
+    } = &mut document.document;
+    let model = if region == Region::Body {
+        FlowModel::new(content, styles, root, editing)
+    } else {
+        FlowModel::new(styles_part.as_mut()?, styles, root, editing).in_styles_part()
+    };
+    Some((model, package))
+}
+
 /// The bar over a page with tracked changes, saying so, and in edit mode
 /// offering to accept or reject them all.
 fn changes_bar(ui: &mut Ui, content: &odox_core::Element, edit_mode: bool, wanted: &mut Wanted) {
@@ -1119,5 +1350,61 @@ fn toolbar_commands(
         notice: changed
             .and_then(Result::err)
             .map(|refused| Notice::Problem(table_refused(&refused))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Editing, TextDocument, TextView};
+    use odox_core::{Node, Ns};
+
+    fn with_header(words: &str) -> (TextView, Editing) {
+        let mut document =
+            TextDocument::read(&odox_core::blank::text("en-US")).expect("a blank document");
+        document.set_header(true).expect("on");
+        if !words.is_empty() {
+            let path = document.band_path(false).expect("a header");
+            let header = document
+                .document
+                .styles_part
+                .as_mut()
+                .and_then(|part| part.at_mut(&path))
+                .expect("the header");
+            let paragraph = header.child_mut(&Ns::Text, "p").expect("its paragraph");
+            paragraph.children.push(Node::Text(words.to_owned()));
+            paragraph.self_closing = false;
+        }
+        let view = TextView {
+            document: Some(document),
+            ..TextView::default()
+        };
+        let mut editing = Editing::default();
+        editing.reset();
+        (view, editing)
+    }
+
+    fn has_header(view: &TextView) -> bool {
+        view.document
+            .as_ref()
+            .is_some_and(|document| document.band_path(false).is_some())
+    }
+
+    #[test]
+    fn turning_header_off_asks_when_not_empty() {
+        let (mut view, mut editing) = with_header("Words");
+        view.band(false, false, &mut editing);
+        assert_eq!(view.band_question, Some(false));
+        assert!(has_header(&view), "nothing is taken away before the answer");
+        view.band(false, false, &mut editing);
+        assert!(!has_header(&view));
+        assert!(editing.can_undo());
+    }
+
+    #[test]
+    fn an_empty_header_is_taken_away_without_asking() {
+        let (mut view, mut editing) = with_header("");
+        view.band(false, false, &mut editing);
+        assert_eq!(view.band_question, None);
+        assert!(!has_header(&view));
     }
 }

@@ -128,6 +128,8 @@ Tracked changes are drawn in their authors' colours, insertions underlined and
 deletions struck through, and each one's author and date show beside it under
 the pointer; in edit mode it is accepted or rejected there, or all of them at
 once from the bar over the page. Edits made here are not tracked.
+A page's header and footer are drawn above and below the text and typed into
+like it; Format > Header and Format > Footer give the page one or take it away.
 Format > Field puts in a date, fixed or following the day, a page number or a
 page count, which the PDF fills in page by page.
 Ctrl+K, or Format > Link…, makes the selection a link to a web page, a mail

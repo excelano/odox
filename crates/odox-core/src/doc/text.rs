@@ -254,6 +254,132 @@ impl TextDocument {
             .child(&Ns::Style, "master-page")
     }
 
+    /// Give the body's pages a header, or take it away, leaving a first or
+    /// left page's own as it is. Answers whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// The document has no master page.
+    pub fn set_header(&mut self, on: bool) -> Result<bool, Refused> {
+        self.set_band("header", on)
+    }
+
+    /// The same for the footer.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_header`].
+    pub fn set_footer(&mut self, on: bool) -> Result<bool, Refused> {
+        self.set_band("footer", on)
+    }
+
+    fn set_band(&mut self, band: &str, on: bool) -> Result<bool, Refused> {
+        let master = self.master_path().ok_or(Refused::NotFound)?;
+        let style = if band == "header" { "Header" } else { "Footer" };
+        let has_style = self
+            .document
+            .styles
+            .style(&crate::Family::Paragraph, style)
+            .is_some();
+        let part = self
+            .document
+            .styles_part
+            .as_mut()
+            .ok_or(Refused::NotFound)?;
+        let names = (
+            part.name_for(&Ns::Style, band),
+            part.name_for(&Ns::Text, "p"),
+            part.name_for(&Ns::Text, "style-name"),
+        );
+        let element = part.at_mut(&master).ok_or(Refused::NotFound)?;
+        let found = element
+            .children
+            .iter()
+            .position(|node| matches!(node, Node::Element(e) if e.is(&Ns::Style, band)));
+        match (found, on) {
+            (Some(_), true) | (None, false) => return Ok(false),
+            (Some(at), false) => {
+                element.children.remove(at);
+            }
+            (None, true) => {
+                let mut paragraph = Element::new("", "p", Ns::Text);
+                paragraph.name = names.1;
+                if has_style {
+                    paragraph.set_attr(names.2, style);
+                }
+                let mut new = Element::new("", band, Ns::Style);
+                new.name = names.0;
+                new.children = vec![Node::Element(paragraph)];
+                new.self_closing = false;
+                let before: &[&str] = if band == "header" {
+                    &[
+                        "header-left",
+                        "header-first",
+                        "footer",
+                        "footer-left",
+                        "footer-first",
+                    ]
+                } else {
+                    &["footer-left", "footer-first"]
+                };
+                let at = element
+                    .children
+                    .iter()
+                    .position(|node| {
+                        matches!(node, Node::Element(e)
+                            if e.name.ns == Ns::Style && before.contains(&e.name.local.as_ref()))
+                    })
+                    .or_else(|| {
+                        (band == "footer").then(|| {
+                            element
+                                .children
+                                .iter()
+                                .rposition(|node| {
+                                    matches!(node, Node::Element(e)
+                                        if e.name.ns == Ns::Style
+                                            && e.name.local.starts_with("header"))
+                                })
+                                .map_or(0, |last| last + 1)
+                        })
+                    })
+                    .unwrap_or(0);
+                element.children.insert(at, Node::Element(new));
+                element.self_closing = false;
+            }
+        }
+        if let Some(part) = &self.document.styles_part {
+            self.document.styles.reread(part);
+        }
+        Ok(true)
+    }
+
+    /// Where the first master page is in the styles part.
+    fn master_path(&self) -> Option<Vec<usize>> {
+        let part = self.document.styles_part.as_ref()?;
+        let (styles, element) = part
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "master-styles"))?;
+        let (master, _) = element
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Style, "master-page"))?;
+        Some(vec![styles, master])
+    }
+
+    /// Where the body's page header, or with `footer` its footer, is in the
+    /// styles part, where it has one.
+    pub fn band_path(&self, footer: bool) -> Option<Vec<usize>> {
+        let master = self.master_path()?;
+        let local = if footer { "footer" } else { "header" };
+        let (at, _) = self
+            .document
+            .styles_part
+            .as_ref()?
+            .at(&master)?
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Style, local))?;
+        Some([master.as_slice(), &[at]].concat())
+    }
+
     /// The width a line of body text may be: the page less its side margins.
     pub fn text_width(&self) -> f32 {
         let layout = self.page_layout();

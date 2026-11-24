@@ -435,6 +435,13 @@ pub enum Command {
     Link,
     /// Put a field in at the caret.
     Field(odox_core::edit::Field),
+    /// Give the page a header, or with `footer` a footer, or take it away.
+    Band {
+        /// The footer, not the header.
+        footer: bool,
+        /// Give it, not take it away.
+        on: bool,
+    },
     /// Put a footnote or an endnote at the caret.
     Note(odox_core::edit::NoteClass),
     /// Start a numbered list again at the item, or carry it on from the list
@@ -505,9 +512,19 @@ pub struct MenuState {
     kinds: Vec<Block>,
     script: Option<Script>,
     spacing: Option<LineSpacing>,
+    /// Whether the page has a header, and a footer.
+    bands: (bool, bool),
 }
 
 impl MenuState {
+    /// The same, saying whether the page has a header and a footer, which
+    /// Format > Header and Footer show.
+    #[must_use]
+    pub fn with_bands(mut self, header: bool, footer: bool) -> Self {
+        self.bands = (header, footer);
+        self
+    }
+
     /// The state of a page over a model. `blocks` says whether the page has
     /// kinds of paragraph to offer, which a slide's labels do not.
     pub fn of(editor: &PageEditor, model: &FlowModel<'_>, blocks: bool) -> Self {
@@ -530,6 +547,7 @@ impl MenuState {
                 .collect(),
             align: model.alignment(selection),
             spacing: model.line_spacing(selection),
+            bands: (false, false),
             script: match editor.value(model, Property::Script) {
                 Some(Value::Script(script)) => Some(script),
                 _ => None,
@@ -765,6 +783,21 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     {
         chosen = Some(Command::PageSetup);
         ui.close();
+    }
+    band_menu(ui, state).or(chosen)
+}
+
+/// Format > Header and Format > Footer, lit where the page has one.
+fn band_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    for (footer, name, on) in [
+        (false, t("Header"), state.bands.0),
+        (true, t("Footer"), state.bands.1),
+    ] {
+        if ui.add(egui::Button::new(name).selected(on)).clicked() {
+            chosen = Some(Command::Band { footer, on: !on });
+            ui.close();
+        }
     }
     chosen
 }

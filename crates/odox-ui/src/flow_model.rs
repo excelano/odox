@@ -92,6 +92,9 @@ pub struct FlowModel<'a> {
     /// Every editable paragraph in drawing order, found when first asked for
     /// and forgotten when an edit changes it.
     order: OnceCell<Vec<Vec<usize>>>,
+    /// Whether the tree is the styles part, a page header's or footer's, which
+    /// an undo step puts back in its place rather than the content's.
+    styles_part: bool,
 }
 
 impl<'a> FlowModel<'a> {
@@ -111,6 +114,7 @@ impl<'a> FlowModel<'a> {
             scope: Vec::new(),
             tag: Vec::new(),
             order: OnceCell::new(),
+            styles_part: false,
         }
     }
 
@@ -129,6 +133,28 @@ impl<'a> FlowModel<'a> {
     pub fn within(mut self, scope: Vec<usize>) -> Self {
         self.scope = scope;
         self
+    }
+
+    /// Edit the styles part rather than the content: the tree given is the
+    /// styles part, and undo puts it back there.
+    #[must_use]
+    pub fn in_styles_part(mut self) -> Self {
+        self.styles_part = true;
+        self
+    }
+
+    /// Remember the tree as it was before an edit, as one step to undo.
+    fn record(&mut self, before: Element, caret: Option<Position<Vec<usize>>>) {
+        self.record_step(before, Kept::default(), caret);
+    }
+
+    /// The same, with the package entries the edit is about to write.
+    fn record_step(&mut self, before: Element, parts: Kept, caret: Option<Position<Vec<usize>>>) {
+        if self.styles_part {
+            self.editing.record_styles_part(Some(before), parts, caret);
+        } else {
+            self.editing.record_step(before, parts, caret);
+        }
     }
 
     fn root(&self) -> Option<&Element> {
@@ -347,7 +373,7 @@ impl<'a> FlowModel<'a> {
         };
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &at.paragraph].concat(),
@@ -589,7 +615,7 @@ impl<'a> FlowModel<'a> {
             selection.focus.offset,
         );
         self.editing.touch();
-        self.editing.record_snapshot(before, Some(begins));
+        self.record(before, Some(begins));
         let order = self.order().to_vec();
         if let (Some(a), Some(f)) = (order.get(anchor), order.get(focus)) {
             editor.select(Selection {
@@ -739,7 +765,7 @@ impl<'a> FlowModel<'a> {
         }
         self.follow_styles(children);
         self.editing.touch();
-        self.editing.record_step(before, Kept::default(), None);
+        self.record_step(before, Kept::default(), None);
         Ok(())
     }
 
@@ -774,7 +800,7 @@ impl<'a> FlowModel<'a> {
         }
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &paragraph].concat(),
@@ -914,7 +940,7 @@ impl<'a> FlowModel<'a> {
         let end = here.range.start + text.chars().count();
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &here.paragraph].concat(),
@@ -966,7 +992,7 @@ impl<'a> FlowModel<'a> {
         }
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &here.paragraph].concat(),
@@ -1001,7 +1027,7 @@ impl<'a> FlowModel<'a> {
         }
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &caret.paragraph].concat(),
@@ -1036,7 +1062,7 @@ impl<'a> FlowModel<'a> {
         }
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(
+        self.record(
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &caret.paragraph].concat(),
@@ -1072,7 +1098,7 @@ impl<'a> FlowModel<'a> {
         }
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(before, None);
+        self.record(before, None);
         Ok(())
     }
 
@@ -1103,7 +1129,7 @@ impl<'a> FlowModel<'a> {
         editor.clear();
         self.order = OnceCell::new();
         self.editing.touch();
-        self.editing.record_snapshot(before, None);
+        self.record(before, None);
         Ok(())
     }
 
@@ -1139,7 +1165,7 @@ impl<'a> FlowModel<'a> {
             return Err(refused);
         }
         self.editing.touch();
-        self.editing.record_snapshot(before, None);
+        self.record(before, None);
         Ok(())
     }
 
@@ -1233,7 +1259,7 @@ impl<'a> FlowModel<'a> {
             selection.focus.offset,
         );
         self.editing.touch();
-        self.editing.record_step(before, parts, Some(begins));
+        self.record_step(before, parts, Some(begins));
         editor.select(Selection::caret(Position::new(paragraph, 0)));
         Ok(())
     }
@@ -1351,7 +1377,7 @@ impl<'a> FlowModel<'a> {
         self.editing.touch();
         if new_step {
             let begins = Position::new([self.tag.as_slice(), &at.paragraph].concat(), at.offset);
-            self.editing.record_snapshot(original, Some(begins));
+            self.record(original, Some(begins));
         }
         Some(Position::new(path, offset))
     }
@@ -1648,7 +1674,7 @@ impl Model for FlowModel<'_> {
         self.editing.touch();
         if let Some(before) = before {
             let begins = Position::new([self.tag.as_slice(), &at.paragraph].concat(), at.offset);
-            self.editing.record_snapshot(before, Some(begins));
+            self.record(before, Some(begins));
         }
         self.order = OnceCell::new();
         Some(Position::new(path, offset))
@@ -1690,7 +1716,7 @@ impl Model for FlowModel<'_> {
         if at.is_some() {
             self.editing.touch();
             if let Some(before) = before {
-                self.editing.record_snapshot(before, Some(begins));
+                self.record(before, Some(begins));
             }
             self.order = OnceCell::new();
         }
@@ -2541,5 +2567,68 @@ mod tests {
                 .is_err()
         );
         assert_eq!(model.text(&vec![0]).as_deref(), Some("click here now"));
+    }
+
+    fn with_header() -> odox_core::doc::TextDocument {
+        let mut document =
+            odox_core::doc::TextDocument::read(&odox_core::blank::text("en-US")).expect("a blank");
+        document.set_header(true).expect("on");
+        document
+    }
+
+    fn type_in_header(document: &mut odox_core::doc::TextDocument, editing: &mut Editing) {
+        let path = document.band_path(false).expect("a header");
+        let Document {
+            styles_part,
+            styles,
+            ..
+        } = &mut document.document;
+        let part = styles_part.as_mut().expect("styles");
+        let mut model = FlowModel::new(part, styles, path, editing).in_styles_part();
+        model.apply(
+            Edit::Replace {
+                from: Position::new(vec![0], 0),
+                to: Position::new(vec![0], 0),
+                text: "Head",
+            },
+            true,
+        );
+    }
+
+    fn header_text(document: &odox_core::doc::TextDocument) -> String {
+        let path = document.band_path(false).expect("a header");
+        document
+            .document
+            .styles_part
+            .as_ref()
+            .and_then(|part| part.at(&path))
+            .map(Element::plain_text)
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn typing_in_header_changes_styles_part_only() {
+        let mut document = with_header();
+        let content = document.document.content.clone();
+        let mut editing = Editing::default();
+        editing.reset();
+        type_in_header(&mut document, &mut editing);
+        assert_eq!(header_text(&document), "Head");
+        assert_eq!(document.document.content, content);
+        assert!(editing.modified());
+    }
+
+    #[test]
+    fn undo_restores_header() {
+        let mut document = with_header();
+        let content = document.document.content.clone();
+        let mut editing = Editing::default();
+        editing.reset();
+        type_in_header(&mut document, &mut editing);
+        editing.undo(&mut document.document, None).expect("a step");
+        assert_eq!(header_text(&document), "");
+        assert_eq!(document.document.content, content);
+        editing.redo(&mut document.document, None).expect("a step");
+        assert_eq!(header_text(&document), "Head");
     }
 }
