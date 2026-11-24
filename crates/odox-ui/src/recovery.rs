@@ -51,6 +51,7 @@ enum Job {
 pub struct Recovery {
     _lock: File,
     files: std::sync::Arc<Files>,
+    failed: std::sync::Arc<std::sync::Mutex<Option<String>>>,
     jobs: Option<Sender<Job>>,
     worker: Option<JoinHandle<()>>,
 }
@@ -85,11 +86,17 @@ impl Recovery {
         let files = std::sync::Arc::new(Files::of(lock));
         let (jobs, received) = channel::<Job>();
         let written = std::sync::Arc::clone(&files);
+        let failed = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let failing = std::sync::Arc::clone(&failed);
         let worker = std::thread::spawn(move || {
             for job in received {
                 match job {
                     Job::Save(bytes, original) => {
-                        let _ = write(&written, &bytes, original.as_deref());
+                        if let Err(error) = write(&written, &bytes, original.as_deref())
+                            && let Ok(mut failed) = failing.lock()
+                        {
+                            *failed = Some(error.to_string());
+                        }
                     }
                     Job::Clear => written.clear(),
                     Job::Done(answer) => {
@@ -101,6 +108,7 @@ impl Recovery {
         Ok(Self {
             _lock: file,
             files,
+            failed,
             jobs: Some(jobs),
             worker: Some(worker),
         })
@@ -110,6 +118,11 @@ impl Recovery {
     /// the worker writes while the window goes on.
     pub fn save(&self, bytes: Vec<u8>, original: Option<&Path>) {
         self.send(Job::Save(bytes, original.map(Path::to_path_buf)));
+    }
+
+    /// Why the last copy could not be kept, said once.
+    pub fn failure(&self) -> Option<String> {
+        self.failed.lock().ok()?.take()
     }
 
     /// Forget what was kept: the document was saved, or closed.
@@ -179,9 +192,53 @@ fn write(files: &Files, bytes: &[u8], original: Option<&Path>) -> std::io::Resul
         .map_or(0, |since| since.as_secs());
     let mut note = format!("saved = {saved}\n");
     if let Some(original) = original {
-        let _ = writeln!(note, "original = {}", original.display());
+        let _ = writeln!(note, "path = {}", encoded(original));
     }
     put(&files.note, note.as_bytes())
+}
+
+/// A path as hexadecimal, a byte at a time where the system names files in
+/// bytes and a 16-bit unit at a time where it names them in those, so that
+/// any path reads back as it was.
+fn encoded(path: &Path) -> String {
+    let mut text = String::new();
+    #[cfg(unix)]
+    for byte in std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str()) {
+        let _ = write!(text, "{byte:02x}");
+    }
+    #[cfg(windows)]
+    for unit in std::os::windows::ffi::OsStrExt::encode_wide(path.as_os_str()) {
+        let _ = write!(text, "{unit:04x}");
+    }
+    text
+}
+
+/// The path `encoded` wrote.
+#[cfg(unix)]
+fn decoded(text: &str) -> Option<PathBuf> {
+    use std::os::unix::ffi::OsStrExt as _;
+    let bytes = units(text, 2, |digits| u8::from_str_radix(digits, 16).ok())?;
+    Some(PathBuf::from(std::ffi::OsStr::from_bytes(&bytes)))
+}
+
+/// The path `encoded` wrote.
+#[cfg(windows)]
+fn decoded(text: &str) -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStringExt as _;
+    let wide = units(text, 4, |digits| u16::from_str_radix(digits, 16).ok())?;
+    Some(PathBuf::from(std::ffi::OsString::from_wide(&wide)))
+}
+
+/// Text cut into runs of hexadecimal digits of one width, each read as a
+/// unit.
+fn units<T>(text: &str, width: usize, unit: impl Fn(&str) -> Option<T>) -> Option<Vec<T>> {
+    if text.is_empty() || !text.len().is_multiple_of(width) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(width)
+        .map(|at| unit(text.get(at..at + width)?))
+        .collect()
 }
 
 /// Changes a window that stopped without closing left behind, locked by
@@ -258,7 +315,9 @@ pub fn orphans_in(directory: &Path, app: &str) -> Vec<Orphan> {
         };
         found.push(Orphan {
             _lock: file,
-            original: value("original").map(PathBuf::from),
+            original: value("path")
+                .and_then(decoded)
+                .or_else(|| value("original").map(PathBuf::from)),
             saved: value("saved").and_then(|s| s.parse().ok()).unwrap_or(0),
             files,
         });
@@ -391,6 +450,35 @@ mod tests {
         std::fs::write(super::part_of(&recovery.files.bytes), b"half").expect("written");
         recovery.finish();
         assert_eq!(std::fs::read_dir(&directory).expect("listed").count(), 0);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn any_original_path_reads_back_as_it_was() {
+        use std::os::unix::ffi::OsStrExt as _;
+        let directory = scratch("lossless");
+        let original = Path::new(std::ffi::OsStr::from_bytes(b"/home/someone/a\nb\xff.odt"));
+        let recovery = Recovery::start_in(&directory, "xodt").expect("started");
+        recovery.save(b"kept".to_vec(), Some(original));
+        recovery.settle();
+        drop(recovery);
+        let found = orphans_in(&directory, "xodt");
+        assert_eq!(found[0].original.as_deref(), Some(original));
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_that_cannot_be_written_is_reported_once() {
+        let directory = scratch("unwritable");
+        let recovery = Recovery::start_in(&directory, "xodt").expect("started");
+        std::fs::create_dir_all(super::part_of(&recovery.files.bytes)).expect("in the way");
+        assert_eq!(recovery.failure(), None);
+        recovery.save(b"kept".to_vec(), None);
+        recovery.settle();
+        assert!(recovery.failure().is_some());
+        assert_eq!(recovery.failure(), None, "said once");
+        recovery.finish();
         let _ = std::fs::remove_dir_all(&directory);
     }
 }
