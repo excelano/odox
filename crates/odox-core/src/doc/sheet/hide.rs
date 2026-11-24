@@ -64,7 +64,8 @@ impl SheetDocument {
     ) -> Result<(), Refused> {
         let before = self.anchored(sheet);
         self.set_shown(sheet, Line::Row, rows, shown)?;
-        self.move_drawings(sheet, &before)
+        self.move_drawings(sheet, &before);
+        Ok(())
     }
 
     /// Hide columns, or show them.
@@ -80,7 +81,8 @@ impl SheetDocument {
     ) -> Result<(), Refused> {
         let before = self.anchored(sheet);
         self.set_shown(sheet, Line::Column, columns, shown)?;
-        self.move_drawings(sheet, &before)
+        self.move_drawings(sheet, &before);
+        Ok(())
     }
 
     fn set_shown(
