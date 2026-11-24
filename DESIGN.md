@@ -287,6 +287,23 @@ arrow at a line break and a pilcrow after the last character, so nothing is
 laid out differently and the PDF, which lays out its own lines, never sees
 them. A slideshow and text read right to left in its visual order draw none.
 
+**A menu entry has a letter the keyboard reaches it by** (`mnemonic.rs`),
+marked in its message with `&` before the letter, `&&` for an ampersand, so
+each language places its own and the catalog carries it: `&File`, `&Datei`.
+Holding Alt underlines the menu bar's letters and Alt with one opens its menu;
+in an open menu every letter is underlined and the letter alone chooses the
+entry, ticks the checkbox or opens the submenu, while a disabled entry is
+passed over and no letter typed with a menu open reaches the document. An
+entry registers its letter and widget as it is drawn; once the menu bar is
+drawn the letter is matched against the deepest open menu, and the entry is
+clicked at the start of the next frame as a screen reader's click is, so a
+button, a checkbox and a submenu each do what a click does. Letters are
+unique within a menu, which a debug build asserts as each menu is drawn, and
+a test holds every mark in the catalogs on a letter a key types. An entry
+whose label has no letter free in its menu goes without, as in LibreOffice.
+macOS has no menu letters, and Option with a letter types a character there,
+so there the mark is dropped and nothing is underlined.
+
 **A text document pages with its keys.** Page Up and Page Down move the view
 nine tenths of the window, so the line read last is still in sight, while no
 caret is taking them, and Home and End, with or without Ctrl, go to the top and

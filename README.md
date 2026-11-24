@@ -81,6 +81,9 @@ on. View > Formatting marks, or Ctrl+F10, shows in `xodt` and on a slide in
 and hand-made line breaks are, without moving anything; they are never
 exported.
 
+Every menu is reached from the keyboard, except on macOS: Alt and a menu's
+underlined letter opens it, and an entry's underlined letter chooses it.
+
 A window opens reading. Ctrl+E, or Edit mode in the Edit menu, turns editing
 on, and a preference in the same menu opens every document that way. Ctrl+S
 saves over the file you opened and Ctrl+Shift+S saves somewhere else; Ctrl+Z

@@ -10,7 +10,7 @@ use odox_core::edit::{LineSpacing, TableEdit};
 
 use crate::color_picker::{self, Kind};
 use crate::i18n::{fill, t};
-use crate::{Block, FlowModel, PageEditor, fonts};
+use crate::{Block, FlowModel, PageEditor, fonts, mnemonic};
 
 /// What was pressed on the toolbar over a page.
 #[derive(Default)]
@@ -85,7 +85,7 @@ fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed
         .and_then(|selection| model.alignment(selection));
     for align in ALIGNMENTS {
         if align_button(ui, current == Some(align), align)
-            .on_hover_text(align_name(align))
+            .on_hover_text(mnemonic::plain(align_name(align)))
             .clicked()
         {
             pressed.align = Some(align);
@@ -265,10 +265,10 @@ const ALIGNMENTS: [TextAlign; 4] = [
 
 fn align_name(align: TextAlign) -> &'static str {
     match align {
-        TextAlign::Start => t("Align left"),
-        TextAlign::Center => t("Center"),
-        TextAlign::End => t("Align right"),
-        TextAlign::Justify => t("Justify"),
+        TextAlign::Start => t("Align &left"),
+        TextAlign::Center => t("&Center"),
+        TextAlign::End => t("Align &right"),
+        TextAlign::Justify => t("&Justify"),
     }
 }
 
@@ -324,7 +324,7 @@ pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed 
                     .is_some_and(|selection| model.is_block(selection, block));
                 if ui
                     .selectable_label(lit, label)
-                    .on_hover_text(block_name(block))
+                    .on_hover_text(mnemonic::plain(&block_name(block)))
                     .clicked()
                 {
                     pressed.block = Some(block);
@@ -359,10 +359,10 @@ pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed 
 /// Strikethrough has no shortcut that people share, so it has none.
 fn mark_facts(mark: Mark) -> (&'static str, Option<Key>) {
     match mark {
-        Mark::Bold => (t("Bold"), Some(Key::B)),
-        Mark::Italic => (t("Italic"), Some(Key::I)),
-        Mark::Underline => (t("Underline"), Some(Key::U)),
-        Mark::Strike => (t("Strikethrough"), None),
+        Mark::Bold => (t("&Bold"), Some(Key::B)),
+        Mark::Italic => (t("&Italic"), Some(Key::I)),
+        Mark::Underline => (t("&Underline"), Some(Key::U)),
+        Mark::Strike => (t("Stri&kethrough"), None),
     }
 }
 
@@ -381,9 +381,10 @@ fn mark_buttons<M: Model<Paragraph = Vec<usize>>>(
             Mark::Underline => RichText::new(t("U")).underline(),
             Mark::Strike => RichText::new(t("S")).strikethrough(),
         };
+        let name = mnemonic::plain(name);
         let hint = match key {
             Some(key) => format!("{name} ({})", shortcut(ui.ctx(), key)),
-            None => name.to_owned(),
+            None => name,
         };
         if ui
             .selectable_label(lit, label)
@@ -485,10 +486,16 @@ fn every_block() -> impl Iterator<Item = Block> {
 
 fn block_name(block: Block) -> String {
     match block {
-        Block::Body => t("Body text").to_owned(),
-        Block::Heading(level) => fill(t("Heading {level}"), &[("level", &level.to_string())]),
-        Block::Bullets => t("Bulleted list").to_owned(),
-        Block::Numbers => t("Numbered list").to_owned(),
+        Block::Body => t("Bod&y text").to_owned(),
+        Block::Heading(level) => {
+            let digit = if level < 10 { "&" } else { "" };
+            fill(
+                t("Heading {level}"),
+                &[("level", &format!("{digit}{level}"))],
+            )
+        }
+        Block::Bullets => t("&Bulleted list").to_owned(),
+        Block::Numbers => t("N&umbered list").to_owned(),
     }
 }
 
@@ -592,45 +599,49 @@ impl MenuState {
 fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
     let mut offer = |ui: &mut Ui, block: Block| {
-        let button = egui::Button::new(block_name(block)).selected(state.kinds.contains(&block));
-        if ui.add_enabled(state.enabled, button).clicked() {
+        let lit = state.kinds.contains(&block);
+        let name = block_name(block);
+        if mnemonic::add(ui, state.enabled, &name, |label| {
+            egui::Button::new(label).selected(lit)
+        })
+        .clicked()
+        {
             chosen = Some(Command::Block(block));
             ui.close();
         }
     };
     offer(ui, Block::Body);
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Heading"), |ui| {
-            for level in LEVELS {
-                offer(ui, Block::Heading(level));
-            }
-        });
+    mnemonic::menu(ui, state.enabled, t("Headin&g"), |ui| {
+        for level in LEVELS {
+            offer(ui, Block::Heading(level));
+        }
     });
     offer(ui, Block::Bullets);
     offer(ui, Block::Numbers);
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Lists"), |ui| {
-            for (restart, name) in [
-                (true, t("Restart numbering")),
-                (false, t("Continue numbering")),
-            ] {
-                if ui.button(name).clicked() {
-                    chosen = Some(Command::Numbering(restart));
-                    ui.close();
-                }
+    mnemonic::menu(ui, state.enabled, t("Li&sts"), |ui| {
+        for (restart, name) in [
+            (true, t("&Restart numbering")),
+            (false, t("&Continue numbering")),
+        ] {
+            if mnemonic::button(ui, true, name).clicked() {
+                chosen = Some(Command::Numbering(restart));
+                ui.close();
             }
-        });
+        }
     });
     ui.separator();
     for (delta, name, key) in [
-        (-1, t("Promote heading"), Key::ArrowLeft),
-        (1, t("Demote heading"), Key::ArrowRight),
+        (-1, t("Pro&mote heading"), Key::ArrowLeft),
+        (1, t("Demote &heading"), Key::ArrowRight),
     ] {
         let keys = ui
             .ctx()
             .format_shortcut(&KeyboardShortcut::new(OUTLINE, key));
-        let button = egui::Button::new(name).shortcut_text(keys);
-        if ui.add_enabled(state.here.headings, button).clicked() {
+        if mnemonic::add(ui, state.here.headings, name, |label| {
+            egui::Button::new(label).shortcut_text(keys)
+        })
+        .clicked()
+        {
             chosen = Some(Command::Outline(delta));
             ui.close();
         }
@@ -641,38 +652,34 @@ fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// The alignments, the indent steps and the line spacings in the Format menu.
 fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Align"), |ui| {
-            for align in ALIGNMENTS {
-                let button =
-                    egui::Button::new(align_name(align)).selected(state.align == Some(align));
-                if ui.add(button).clicked() {
-                    chosen = Some(Command::Align(align));
-                    ui.close();
-                }
-            }
-        });
-    });
-    for (step, name) in [(1, t("Increase indent")), (-1, t("Decrease indent"))] {
-        if ui
-            .add_enabled(state.enabled, egui::Button::new(name))
+    mnemonic::menu(ui, state.enabled, t("&Align"), |ui| {
+        for align in ALIGNMENTS {
+            let lit = state.align == Some(align);
+            if mnemonic::add(ui, true, align_name(align), |label| {
+                egui::Button::new(label).selected(lit)
+            })
             .clicked()
-        {
+            {
+                chosen = Some(Command::Align(align));
+                ui.close();
+            }
+        }
+    });
+    for (step, name) in [(1, t("I&ncrease indent")), (-1, t("&Decrease indent"))] {
+        if mnemonic::button(ui, state.enabled, name).clicked() {
             chosen = Some(Command::Indent(step));
             ui.close();
         }
     }
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Line spacing"), |ui| {
-            for spacing in SPACINGS {
-                let button = egui::Button::new(spacing_label(spacing))
-                    .selected(state.spacing == Some(spacing));
-                if ui.add(button).clicked() {
-                    chosen = Some(Command::LineSpacing(spacing));
-                    ui.close();
-                }
+    mnemonic::menu(ui, state.enabled, t("&Line spacing"), |ui| {
+        for spacing in SPACINGS {
+            let button =
+                egui::Button::new(spacing_label(spacing)).selected(state.spacing == Some(spacing));
+            if ui.add(button).clicked() {
+                chosen = Some(Command::LineSpacing(spacing));
+                ui.close();
             }
-        });
+        }
     });
     chosen
 }
@@ -680,39 +687,39 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// The Format menu's comment and notes, which belong to the body.
 fn notes_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::C,
-    ));
-    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
-    if ui
-        .add_enabled(state.enabled && !state.in_band, comment)
+    let in_body = state.enabled && !state.in_band;
+    let notes = [
+        (t("&Comment"), Some(Key::C), Command::Comment),
+        (
+            t("&Footnote"),
+            Some(Key::F),
+            Command::Note(odox_core::edit::NoteClass::Footnote),
+        ),
+        (
+            t("&Endnote"),
+            None,
+            Command::Note(odox_core::edit::NoteClass::Endnote),
+        ),
+    ];
+    for (name, key, command) in notes {
+        let keys = key.map(|key| {
+            ui.ctx().format_shortcut(&KeyboardShortcut::new(
+                Modifiers::COMMAND | Modifiers::ALT,
+                key,
+            ))
+        });
+        if mnemonic::add(ui, in_body, name, |label| {
+            let button = egui::Button::new(label);
+            match keys {
+                Some(keys) => button.shortcut_text(keys),
+                None => button,
+            }
+        })
         .clicked()
-    {
-        chosen = Some(Command::Comment);
-        ui.close();
-    }
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::F,
-    ));
-    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
-    if ui
-        .add_enabled(state.enabled && !state.in_band, footnote)
-        .clicked()
-    {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
-        ui.close();
-    }
-    if ui
-        .add_enabled(
-            state.enabled && !state.in_band,
-            egui::Button::new(t("Endnote")),
-        )
-        .clicked()
-    {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
-        ui.close();
+        {
+            chosen = Some(command);
+            ui.close();
+        }
     }
     chosen
 }
@@ -721,23 +728,21 @@ fn notes_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// the page count.
 fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Field"), |ui| {
-            for (field, name) in [
-                (odox_core::edit::Field::Date { fixed: false }, t("Date")),
-                (
-                    odox_core::edit::Field::Date { fixed: true },
-                    t("Date, fixed"),
-                ),
-                (odox_core::edit::Field::PageNumber, t("Page number")),
-                (odox_core::edit::Field::PageCount, t("Page count")),
-            ] {
-                if ui.button(name).clicked() {
-                    chosen = Some(Command::Field(field));
-                    ui.close();
-                }
+    mnemonic::menu(ui, state.enabled, t("Field"), |ui| {
+        for (field, name) in [
+            (odox_core::edit::Field::Date { fixed: false }, t("D&ate")),
+            (
+                odox_core::edit::Field::Date { fixed: true },
+                t("&Date, fixed"),
+            ),
+            (odox_core::edit::Field::PageNumber, t("&Page number")),
+            (odox_core::edit::Field::PageCount, t("Page &count")),
+        ] {
+            if mnemonic::button(ui, true, name).clicked() {
+                chosen = Some(Command::Field(field));
+                ui.close();
             }
-        });
+        }
     });
     chosen
 }
@@ -746,79 +751,67 @@ fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// its rows and columns, a page break, a picture, and the page's setup.
 fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Table"), |ui| {
-            if ui.button(t("Insert a table…")).clicked() {
-                chosen = Some(Command::InsertTable);
+    mnemonic::menu(ui, state.enabled, t("&Table"), |ui| {
+        if mnemonic::button(ui, true, t("Insert &a table…")).clicked() {
+            chosen = Some(Command::InsertTable);
+            ui.close();
+        }
+        ui.separator();
+        for (edit, name) in [
+            (TableEdit::RowAbove, t("Insert &row above")),
+            (TableEdit::RowBelow, t("Insert row &below")),
+            (TableEdit::ColumnLeft, t("&Insert column left")),
+            (TableEdit::ColumnRight, t("I&nsert column right")),
+            (TableEdit::DeleteRow, t("D&elete row")),
+            (TableEdit::DeleteColumn, t("&Delete column")),
+            (TableEdit::DeleteTable, t("Delete &table")),
+        ] {
+            if matches!(edit, TableEdit::DeleteRow) {
+                ui.separator();
+                for (command, name) in [
+                    (Command::MergeCells, t("Mer&ge cells")),
+                    (Command::SplitCell, t("&Split cell")),
+                    (Command::EqualWidths, t("Equal &column widths")),
+                ] {
+                    if mnemonic::button(ui, state.here.table, name).clicked() {
+                        chosen = Some(command);
+                        ui.close();
+                    }
+                }
+                ui.separator();
+            }
+            if mnemonic::button(ui, state.here.table, name).clicked() {
+                chosen = Some(Command::Table(edit));
                 ui.close();
             }
-            ui.separator();
-            for (edit, name) in [
-                (TableEdit::RowAbove, t("Insert row above")),
-                (TableEdit::RowBelow, t("Insert row below")),
-                (TableEdit::ColumnLeft, t("Insert column left")),
-                (TableEdit::ColumnRight, t("Insert column right")),
-                (TableEdit::DeleteRow, t("Delete row")),
-                (TableEdit::DeleteColumn, t("Delete column")),
-                (TableEdit::DeleteTable, t("Delete table")),
-            ] {
-                if matches!(edit, TableEdit::DeleteRow) {
-                    ui.separator();
-                    for (command, name) in [
-                        (Command::MergeCells, t("Merge cells")),
-                        (Command::SplitCell, t("Split cell")),
-                        (Command::EqualWidths, t("Equal column widths")),
-                    ] {
-                        if ui
-                            .add_enabled(state.here.table, egui::Button::new(name))
-                            .clicked()
-                        {
-                            chosen = Some(command);
-                            ui.close();
-                        }
-                    }
-                    ui.separator();
-                }
-                if ui
-                    .add_enabled(state.here.table, egui::Button::new(name))
-                    .clicked()
-                {
-                    chosen = Some(Command::Table(edit));
-                    ui.close();
-                }
-            }
-        });
+        }
     });
     let keys = ui
         .ctx()
         .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Enter));
-    let insert = egui::Button::new(t("Insert page break")).shortcut_text(keys);
-    if ui
-        .add_enabled(state.enabled && !state.in_band, insert)
-        .clicked()
+    if mnemonic::add(
+        ui,
+        state.enabled && !state.in_band,
+        t("Insert page break"),
+        |label| egui::Button::new(label).shortcut_text(keys),
+    )
+    .clicked()
     {
         chosen = Some(Command::PageBreak(true));
         ui.close();
     }
     chosen = notes_menu(ui, state).or(chosen);
     chosen = field_menu(ui, state).or(chosen);
-    let remove = egui::Button::new(t("Remove page break"));
-    if ui.add_enabled(state.here.page_break, remove).clicked() {
+    if mnemonic::button(ui, state.here.page_break, t("Remo&ve page break")).clicked() {
         chosen = Some(Command::PageBreak(false));
         ui.close();
     }
-    if ui
-        .add_enabled(state.enabled, egui::Button::new(t("Insert a picture…")))
-        .clicked()
-    {
+    if mnemonic::button(ui, state.enabled, t("&Insert a picture…")).clicked() {
         chosen = Some(Command::InsertPicture);
         ui.close();
     }
     ui.separator();
-    if ui
-        .add_enabled(state.enabled, egui::Button::new(t("Page setup…")))
-        .clicked()
-    {
+    if mnemonic::button(ui, state.enabled, t("&Page setup…")).clicked() {
         chosen = Some(Command::PageSetup);
         ui.close();
     }
@@ -829,10 +822,14 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 fn band_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
     for (footer, name, on) in [
-        (false, t("Header"), state.bands.0),
-        (true, t("Footer"), state.bands.1),
+        (false, t("Heade&r"), state.bands.0),
+        (true, t("F&ooter"), state.bands.1),
     ] {
-        if ui.add(egui::Button::new(name).selected(on)).clicked() {
+        if mnemonic::add(ui, true, name, |label| {
+            egui::Button::new(label).selected(on)
+        })
+        .clicked()
+        {
             chosen = Some(Command::Band { footer, on: !on });
             ui.close();
         }
@@ -846,16 +843,19 @@ fn band_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// and not live without a caret. Answers the command chosen.
 pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    ui.add_enabled_ui(state.enabled, |ui| {
-        ui.menu_button(t("Text"), |ui| chosen = text_menu(ui, state));
+    mnemonic::menu(ui, state.enabled, t("Te&xt"), |ui| {
+        chosen = text_menu(ui, state);
     });
     ui.separator();
     chosen = paragraph_menu(ui, state).or(chosen);
     let keys = ui
         .ctx()
         .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::K));
-    let link = egui::Button::new(t("Link…")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, link).clicked() {
+    if mnemonic::add(ui, state.enabled, t("Lin&k…"), |label| {
+        egui::Button::new(label).shortcut_text(keys)
+    })
+    .clicked()
+    {
         chosen = Some(Command::Link);
         ui.close();
     }
@@ -868,43 +868,54 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
-/// Format > Text: the marks, raising and lowering, and the size.
 fn text_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
     for mark in Mark::ALL {
         let (name, key) = mark_facts(mark);
-        let mut button = egui::Button::new(name).selected(state.marks.contains(&mark));
-        if let Some(key) = key {
-            button = button.shortcut_text(shortcut(ui.ctx(), key));
-        }
-        if ui.add_enabled(state.enabled, button).clicked() {
+        let lit = state.marks.contains(&mark);
+        let keys = key.map(|key| shortcut(ui.ctx(), key));
+        if mnemonic::add(ui, state.enabled, name, |label| {
+            let button = egui::Button::new(label).selected(lit);
+            match keys {
+                Some(keys) => button.shortcut_text(keys),
+                None => button,
+            }
+        })
+        .clicked()
+        {
             chosen = Some(Command::Mark(mark));
             ui.close();
         }
     }
     for (script, name, key) in [
-        (Script::Super, t("Superscript"), Key::P),
-        (Script::Sub, t("Subscript"), Key::B),
+        (Script::Super, t("Su&perscript"), Key::P),
+        (Script::Sub, t("Subscrip&t"), Key::B),
     ] {
         let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
             Modifiers::COMMAND | Modifiers::SHIFT,
             key,
         ));
-        let button = egui::Button::new(name)
-            .selected(state.script == Some(script))
-            .shortcut_text(keys);
-        if ui.add_enabled(state.enabled, button).clicked() {
+        let lit = state.script == Some(script);
+        if mnemonic::add(ui, state.enabled, name, |label| {
+            egui::Button::new(label).selected(lit).shortcut_text(keys)
+        })
+        .clicked()
+        {
             chosen = Some(Command::Script(script));
             ui.close();
         }
     }
     ui.separator();
     for (larger, name, key) in [
-        (true, t("Larger"), Key::CloseBracket),
-        (false, t("Smaller"), Key::OpenBracket),
+        (true, t("&Larger"), Key::CloseBracket),
+        (false, t("&Smaller"), Key::OpenBracket),
     ] {
-        let button = egui::Button::new(name).shortcut_text(shortcut(ui.ctx(), key));
-        if ui.add_enabled(state.enabled, button).clicked() {
+        let keys = shortcut(ui.ctx(), key);
+        if mnemonic::add(ui, state.enabled, name, |label| {
+            egui::Button::new(label).shortcut_text(keys)
+        })
+        .clicked()
+        {
             chosen = Some(Command::Size(larger));
             ui.close();
         }

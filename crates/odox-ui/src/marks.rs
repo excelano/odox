@@ -26,10 +26,10 @@ pub fn menu_item(ui: &mut Ui) {
     let mut on = shown(ui.ctx());
     let label = format!(
         "{}  ({})",
-        t("Formatting marks"),
+        t("Formatting &marks"),
         ui.ctx().format_shortcut(&TOGGLE)
     );
-    if ui.checkbox(&mut on, label).changed() {
+    if crate::mnemonic::checkbox(ui, &mut on, &label).changed() {
         set(ui.ctx(), on);
     }
 }

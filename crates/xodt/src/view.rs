@@ -14,6 +14,7 @@ use odox_core::words::Count;
 use odox_ui::find::{Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::link_dialog::LinkQuestion;
+use odox_ui::mnemonic;
 use odox_ui::note_popup::NoteResponse;
 use odox_ui::page_setup::PageSetupQuestion;
 use odox_ui::picture_question::PictureQuestion;
@@ -412,7 +413,7 @@ impl View for TextView {
     }
 
     fn menus(&mut self, ui: &mut Ui, _editing: &Editing) {
-        ui.menu_button(t("Format"), |ui| {
+        mnemonic::menu(ui, true, t("F&ormat"), |ui| {
             if let Some(command) = toolbar::menu(ui, &self.menu) {
                 self.command = Some(command);
             }
@@ -707,7 +708,7 @@ impl View for TextView {
             return;
         };
         ui.separator();
-        if ui.button(t("Copy the document as text")).clicked() {
+        if mnemonic::button(ui, true, t("&Copy the document as text")).clicked() {
             if let Some(body) = document.body() {
                 ui.ctx().copy_text(body.plain_text());
             }

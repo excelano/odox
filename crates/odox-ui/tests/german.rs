@@ -21,9 +21,9 @@ fn german_is_shipped_and_can_be_chosen() {
     assert_eq!(chosen.as_deref(), Some("de"), "German was not chosen");
 
     // The fleet's words, from Comma's glossary, so every window agrees.
-    assert_eq!(t("File"), "Datei");
-    assert_eq!(t("Open…"), "Öffnen …");
-    assert_eq!(t("Reload"), "Neu einlesen");
+    assert_eq!(t("&File"), "&Datei");
+    assert_eq!(t("&Open…"), "Ö&ffnen …");
+    assert_eq!(t("Reloa&d"), "Neu ein&lesen");
     assert_eq!(
         t("OpenDocument Spreadsheet"),
         "OpenDocument-Tabellendokument"

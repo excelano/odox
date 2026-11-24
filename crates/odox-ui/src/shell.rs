@@ -17,6 +17,7 @@ use crate::edit::{Caret, Editing};
 use crate::find::{Options, Replaced};
 use crate::find_bar::{FindBar, Replace, Step};
 use crate::i18n::{fill, t};
+use crate::mnemonic;
 use crate::recent::Recent;
 use crate::recovery::{Orphan, Recovery};
 use crate::settings::Settings;
@@ -583,22 +584,21 @@ impl<V: View> Shell<V> {
         self.recent.refresh();
         let mut picked = None;
         let mut clear = false;
-        ui.add_enabled_ui(!self.recent.paths().is_empty(), |ui| {
-            ui.menu_button(t("Open recent"), |ui| {
-                for path in self.recent.paths() {
-                    let folder = path
-                        .parent()
-                        .map(|folder| folder.display().to_string())
-                        .unwrap_or_default();
-                    if ui.button(name_of(path)).on_hover_text(folder).clicked() {
-                        picked = Some(path.clone());
-                    }
+        let any = !self.recent.paths().is_empty();
+        mnemonic::menu(ui, any, t("Open &recent"), |ui| {
+            for path in self.recent.paths() {
+                let folder = path
+                    .parent()
+                    .map(|folder| folder.display().to_string())
+                    .unwrap_or_default();
+                if ui.button(name_of(path)).on_hover_text(folder).clicked() {
+                    picked = Some(path.clone());
                 }
-                ui.separator();
-                if ui.button(t("Clear the list")).clicked() {
-                    clear = true;
-                }
-            });
+            }
+            ui.separator();
+            if mnemonic::button(ui, true, t("&Clear the list")).clicked() {
+                clear = true;
+            }
         });
         if clear {
             ui.close();
@@ -807,6 +807,7 @@ impl<V: View> Shell<V> {
 impl<V: View> eframe::App for Shell<V> {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        crate::mnemonic::deliver(&ctx);
 
         // The window's own close button, which asks like Quit does. The close
         // is cancelled and asked for again when the person has answered.
@@ -931,6 +932,7 @@ impl<V: View> Shell<V> {
     /// the view's side panel.
     fn chrome(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui, ctx));
+        crate::mnemonic::keys(ctx);
         self.search(ui);
 
         if let Some(reason) = crate::instance::failure() {
@@ -1006,44 +1008,32 @@ impl<V: View> Shell<V> {
     /// zoomed.
     fn menu_bar(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button(t("File"), |ui| {
-                if ui.button(t("New")).clicked() {
+            mnemonic::menu(ui, true, t("&File"), |ui| {
+                if mnemonic::button(ui, true, t("&New")).clicked() {
                     ui.close();
                     self.new_document(ctx);
                 }
-                if ui.button(t("Open…")).clicked() {
+                if mnemonic::button(ui, true, t("&Open…")).clicked() {
                     ui.close();
                     self.request(ctx, Pending::AskForAFile);
                 }
                 self.open_recent(ui, ctx);
                 let open = self.view.is_open();
-                if ui
-                    .add_enabled(self.path.is_some(), egui::Button::new(t("Reload")))
-                    .clicked()
-                {
+                if mnemonic::button(ui, self.path.is_some(), t("Reloa&d")).clicked() {
                     ui.close();
                     self.request(ctx, Pending::Reload);
                 }
-                if ui
-                    .add_enabled(open, egui::Button::new(t("Close")))
-                    .clicked()
-                {
+                if mnemonic::button(ui, open, t("&Close")).clicked() {
                     ui.close();
                     self.request(ctx, Pending::Close);
                 }
                 ui.separator();
                 let modified = open && self.editing.modified();
-                if ui
-                    .add_enabled(modified, egui::Button::new(t("Save")))
-                    .clicked()
-                {
+                if mnemonic::button(ui, modified, t("&Save")).clicked() {
                     ui.close();
                     self.save();
                 }
-                if ui
-                    .add_enabled(open, egui::Button::new(t("Save as…")))
-                    .clicked()
-                {
+                if mnemonic::button(ui, open, t("Save &as…")).clicked() {
                     ui.close();
                     self.save_as();
                 }
@@ -1051,31 +1041,31 @@ impl<V: View> Shell<V> {
                     self.view.file_menu(ui, self.path.as_deref());
                 }
                 ui.separator();
-                if ui.button(t("Quit")).clicked() {
+                if mnemonic::button(ui, true, t("&Quit")).clicked() {
                     ui.close();
                     self.request(ctx, Pending::Quit);
                 }
             });
-            ui.menu_button(t("Edit"), |ui| self.edit_menu(ui));
+            mnemonic::menu(ui, true, t("&Edit"), |ui| self.edit_menu(ui));
             if self.view.is_open() {
                 self.view.menus(ui, &self.editing);
             }
-            ui.menu_button(t("View"), |ui| {
-                if ui.button(t("Zoom in")).clicked() {
+            mnemonic::menu(ui, true, t("&View"), |ui| {
+                if mnemonic::button(ui, true, t("Zoom &in")).clicked() {
                     self.zoom.zoom_in();
                 }
-                if ui.button(t("Zoom out")).clicked() {
+                if mnemonic::button(ui, true, t("Zoom &out")).clicked() {
                     self.zoom.zoom_out();
                 }
-                if ui.button(t("Actual size")).clicked() {
+                if mnemonic::button(ui, true, t("&Actual size")).clicked() {
                     self.zoom.set(1.0);
                 }
                 if self.view.fits() {
-                    ui.checkbox(&mut self.zoom.fit, t("Fit to the window"));
+                    mnemonic::checkbox(ui, &mut self.zoom.fit, t("&Fit to the window"));
                 }
                 if self.view.has_side() {
                     ui.separator();
-                    ui.checkbox(&mut self.show_side, t("Show the side panel"));
+                    mnemonic::checkbox(ui, &mut self.show_side, t("&Show the side panel"));
                 }
                 if self.view.has_formatting_marks() {
                     ui.separator();
@@ -1098,46 +1088,37 @@ impl<V: View> Shell<V> {
     /// The Edit menu: undo and redo, search, and the two preferences about
     /// editing.
     fn edit_menu(&mut self, ui: &mut Ui) {
-        if ui
-            .add_enabled(self.editing.can_undo(), egui::Button::new(t("Undo")))
-            .clicked()
-        {
+        if mnemonic::button(ui, self.editing.can_undo(), t("&Undo")).clicked() {
             ui.close();
             self.undo();
         }
-        if ui
-            .add_enabled(self.editing.can_redo(), egui::Button::new(t("Redo")))
-            .clicked()
-        {
+        if mnemonic::button(ui, self.editing.can_redo(), t("&Redo")).clicked() {
             ui.close();
             self.redo();
         }
         ui.separator();
-        if ui
-            .add_enabled(self.view.is_open(), egui::Button::new(t("Find…")))
-            .clicked()
-        {
+        if mnemonic::button(ui, self.view.is_open(), t("&Find…")).clicked() {
             ui.close();
             self.find.open();
         }
-        if ui
-            .add_enabled(
-                self.view.is_open() && self.view.can_replace(&self.editing),
-                egui::Button::new(t("Replace…")),
-            )
-            .clicked()
+        if mnemonic::button(
+            ui,
+            self.view.is_open() && self.view.can_replace(&self.editing),
+            t("R&eplace…"),
+        )
+        .clicked()
         {
             ui.close();
             self.find.open_replacing();
         }
         ui.separator();
-        ui.checkbox(&mut self.editing.on, t("Edit mode"));
-        if ui
-            .checkbox(
-                &mut self.settings.open_in_edit_mode,
-                t("Open documents in edit mode"),
-            )
-            .changed()
+        mnemonic::checkbox(ui, &mut self.editing.on, t("Edit &mode"));
+        if mnemonic::checkbox(
+            ui,
+            &mut self.settings.open_in_edit_mode,
+            t("&Open documents in edit mode"),
+        )
+        .changed()
             && let Err(e) = self.settings.save()
         {
             self.error = Some(fill(
