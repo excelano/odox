@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 18:55-0600\n"
+"POT-Creation-Date: 2026-11-23 19:17-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -436,7 +436,7 @@ msgstr ""
 msgid "Justify"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:298 crates/odox-ui/src/toolbar.rs:568
+#: crates/odox-ui/src/toolbar.rs:298 crates/odox-ui/src/toolbar.rs:584
 msgid "Table"
 msgstr ""
 
@@ -480,87 +480,99 @@ msgstr ""
 msgid "S"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:410
+#: crates/odox-ui/src/toolbar.rs:413
 msgid "Body text"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:411
+#: crates/odox-ui/src/toolbar.rs:414
 msgid "Heading {level}"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:412
+#: crates/odox-ui/src/toolbar.rs:415
 msgid "Bulleted list"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:413
+#: crates/odox-ui/src/toolbar.rs:416
 msgid "Numbered list"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:486
+#: crates/odox-ui/src/toolbar.rs:489
 msgid "Heading"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:496
+#: crates/odox-ui/src/toolbar.rs:498
+msgid "Lists"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:500
+msgid "Restart numbering"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:501
+msgid "Continue numbering"
+msgstr ""
+
+#: crates/odox-ui/src/toolbar.rs:512
 msgid "Promote heading"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:497
+#: crates/odox-ui/src/toolbar.rs:513
 msgid "Demote heading"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:529
+#: crates/odox-ui/src/toolbar.rs:545
 msgid "Superscript"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:530
+#: crates/odox-ui/src/toolbar.rs:546
 msgid "Subscript"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:546
+#: crates/odox-ui/src/toolbar.rs:562
 msgid "Larger"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:547
+#: crates/odox-ui/src/toolbar.rs:563
 msgid "Smaller"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:569
+#: crates/odox-ui/src/toolbar.rs:585
 msgid "Insert a table…"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:575 crates/xods/src/view.rs:576
+#: crates/odox-ui/src/toolbar.rs:591 crates/xods/src/view.rs:576
 msgid "Insert row above"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:576 crates/xods/src/view.rs:577
+#: crates/odox-ui/src/toolbar.rs:592 crates/xods/src/view.rs:577
 msgid "Insert row below"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:577 crates/xods/src/view.rs:578
+#: crates/odox-ui/src/toolbar.rs:593 crates/xods/src/view.rs:578
 msgid "Insert column left"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:578 crates/xods/src/view.rs:579
+#: crates/odox-ui/src/toolbar.rs:594 crates/xods/src/view.rs:579
 msgid "Insert column right"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:579 crates/xods/src/view.rs:580
+#: crates/odox-ui/src/toolbar.rs:595 crates/xods/src/view.rs:580
 msgid "Delete row"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:580 crates/xods/src/view.rs:581
+#: crates/odox-ui/src/toolbar.rs:596 crates/xods/src/view.rs:581
 msgid "Delete column"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:581
+#: crates/odox-ui/src/toolbar.rs:597
 msgid "Delete table"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:597
+#: crates/odox-ui/src/toolbar.rs:613
 msgid "Insert a picture…"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:605
+#: crates/odox-ui/src/toolbar.rs:621
 msgid "Page setup…"
 msgstr ""
 
@@ -1018,4 +1030,8 @@ msgstr ""
 
 #: crates/xodt/src/view.rs:789
 msgid "The table could not be changed here."
+msgstr ""
+
+#: crates/xodt/src/view.rs:836
+msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
