@@ -961,6 +961,20 @@ one the selection has where it is one of those; spacing stated those other ways
 shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
+**A page break by hand is `fo:break-before="page"`** on the paragraph's
+automatic style, written as an alignment is (`edit/page_break.rs`). Ctrl+Enter
+and Format > Insert page break split the paragraph at the caret and begin the
+page at its second half, or at the paragraph itself where the caret is at its
+start; Format > Remove page break takes it off, as Backspace or Delete across
+the start of that paragraph does before they would join anything, the caret
+staying where it was. Enter in a paragraph a break begins leaves the break on
+the first half only, and a paragraph in a table cell is refused one, since a
+page cannot begin inside a row. The break
+comes out of the automatic style, and is written `auto` only where the style
+it inherits from breaks the page. The window does not paginate, so it draws a
+dashed rule across the page labelled "Page break" above the paragraph; the
+PDF begins a page there, as it does for every break a document sets.
+
 **A page is told to assistive technology a paragraph at a time.** Each paragraph
 the flow draws is a node carrying its text as the rows the galley laid out, with
 the role of a heading and its level where the paragraph is a `text:h`, and

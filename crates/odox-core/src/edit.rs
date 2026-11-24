@@ -25,6 +25,7 @@ pub mod html;
 mod indent;
 mod list;
 mod numbering;
+mod page_break;
 mod picture;
 mod table;
 
@@ -44,6 +45,7 @@ pub(crate) use format::{automatic_styles, element};
 pub use indent::{LineSpacing, line_spacing, set_indent, set_line_spacing};
 pub use list::{continue_numbering, list_level, restart_numbering};
 pub use numbering::ListCounters;
+pub use page_break::{insert_page_break, page_break, remove_page_break};
 pub use picture::{NewPicture, insert_picture};
 pub use table::{InTable, TableEdit, edit_table, insert_table, step_cell, table_at};
 

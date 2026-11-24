@@ -569,6 +569,9 @@ impl Flow<'_> {
         } else {
             Sense::click()
         };
+        if properties.paragraph.break_before == Some(odox_core::Break::Page) {
+            page_break(ui, width, zoom, self.palette.ink);
+        }
         let (rect, response) = ui.allocate_exact_size(vec2(width, height), sense);
 
         if element.is(&Ns::Text, "h") {
@@ -1248,6 +1251,35 @@ fn edge_of(borders: &odox_core::Edges<Border>, edge: Edge) -> Option<Border> {
         Edge::Top => borders.top,
         Edge::Bottom => borders.bottom,
     }
+}
+
+/// Where a page break begins the next paragraph: the window does not
+/// paginate, so a dashed rule across the page with a faint label stands for
+/// the page's end.
+fn page_break(ui: &mut Ui, width: f32, zoom: f32, ink: Color32) {
+    let faint = ink.gamma_multiply(0.45);
+    let font = eframe::egui::FontId::proportional(9.0 * zoom);
+    let label = ui
+        .painter()
+        .layout_no_wrap(t("Page break").to_owned(), font, faint);
+    let (strip, _) = ui.allocate_exact_size(vec2(width, label.size().y * 1.6), Sense::hover());
+    let y = strip.center().y;
+    let gap = label.size().x + 12.0 * zoom;
+    let middle = strip.center().x;
+    let dash = Stroke::new(1.0, faint);
+    for (from, to) in [
+        (strip.left(), middle - gap / 2.0),
+        (middle + gap / 2.0, strip.right()),
+    ] {
+        ui.painter().extend(eframe::egui::Shape::dashed_line(
+            &[pos2(from, y), pos2(to, y)],
+            dash,
+            4.0 * zoom,
+            3.0 * zoom,
+        ));
+    }
+    let at = pos2(middle - label.size().x / 2.0, y - label.size().y / 2.0);
+    ui.painter().galley(at, label, faint);
 }
 
 fn paint_borders(

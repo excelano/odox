@@ -496,6 +496,7 @@ impl View for TextView {
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
+                break_keys(ui, &mut self.page, &mut model);
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -790,6 +791,25 @@ fn table_refused(refused: &odox_core::Refused) -> String {
     }
 }
 
+/// Ctrl+Enter begins a page at the caret, and Backspace or Delete across the
+/// start of a paragraph a page break begins takes the break off before they
+/// would join anything, while the page has the keyboard.
+fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
+    if !page.has_focus(ui.ctx()) {
+        return;
+    }
+    if ui.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)) {
+        model.insert_page_break(page);
+    }
+    for (key, backspace) in [(egui::Key::Backspace, true), (egui::Key::Delete, false)] {
+        if ui.input(|input| input.key_pressed(key) && input.modifiers.is_none())
+            && model.remove_break_by_key(page, backspace)
+        {
+            ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key));
+        }
+    }
+}
+
 /// Tab and Shift+Tab, while the page has the keyboard: at the start of a list
 /// item, or over several, they move the items a level in or out, and in a
 /// table they move from cell to cell rather than typing a tab. Why an item
@@ -908,6 +928,15 @@ fn toolbar_commands(
     }
     if let Some(Command::Numbering(restart)) = command {
         model.numbering(page, restart);
+    }
+    match command {
+        Some(Command::PageBreak(true)) => {
+            model.insert_page_break(page);
+        }
+        Some(Command::PageBreak(false)) => {
+            model.remove_page_break(page);
+        }
+        _ => {}
     }
     if let Some(delta) = pressed.outline.or(match command {
         Some(Command::Outline(delta)) => Some(delta),

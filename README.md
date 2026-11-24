@@ -119,7 +119,10 @@ to 10 under Format > Heading, and in `xodp` the marks. Alt+Shift+Left and
 Alt+Shift+Right move every heading the selection runs over a level up or down,
 as Format > Promote heading and Demote heading do. Tab and Shift+Tab at the
 start of a list item move it a level in or out, and Format > Lists restarts a
-numbered list at the caret's item or continues it from the list before. The
+numbered list at the caret's item or continues it from the list before.
+Ctrl+Enter begins a page at the caret, drawn as a dashed rule in the window and
+taking effect in the PDF; Backspace at its start, or Format > Remove page break,
+takes it out. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
 last one adds a row. The Picture button, or Format > Insert a picture…, puts a
