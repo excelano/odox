@@ -16,7 +16,7 @@ use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Options, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
-use odox_ui::{Editing, Export, Found, Notice, View, Zoom, fonts};
+use odox_ui::{Canvas, Editing, Export, Found, Notice, View, Zoom, fonts};
 
 use crate::access;
 use crate::format::Formatting;
@@ -69,6 +69,8 @@ pub struct SheetView {
     /// may have left out of date because it could not be worked out again.
     stale: HashSet<(usize, usize, usize)>,
     export: Export,
+    /// The pictures of the sheets' drawings, decoded once.
+    pictures: odox_ui::Pictures,
 }
 
 /// Where the grid scrolls to.
@@ -124,6 +126,54 @@ impl Place {
     /// A cell's top left corner.
     fn at(self, metrics: &Metrics, row: usize, column: usize) -> egui::Pos2 {
         pos2(self.x(metrics, column), self.y(metrics, row))
+    }
+}
+
+/// A sheet as it is drawn this frame, for its drawings to be placed over it.
+struct Sheets<'a> {
+    index: usize,
+    sheet: &'a Sheet,
+    metrics: &'a Metrics,
+    place: Place,
+    zoom: f32,
+    palette: format::Palette,
+}
+
+/// The sheet's pictures and shapes, over its cells: each placed from the
+/// cell it stands in, and kept inside the pane of frozen or scrolling cells
+/// that cell is drawn in.
+fn drawings(
+    ui: &mut Ui,
+    document: &SheetDocument,
+    pictures: &mut odox_ui::Pictures,
+    drawn: &Sheets<'_>,
+    pane: impl Fn(usize, usize) -> Rect,
+) {
+    let Sheets {
+        index,
+        sheet,
+        metrics,
+        place,
+        zoom,
+        palette,
+    } = *drawn;
+    for drawing in document.drawings(index) {
+        let (Some([x, y, ..]), Some((row, column, within))) = (
+            document.drawing_place(sheet, &drawing),
+            document.drawing_cell(sheet, &drawing),
+        ) else {
+            continue;
+        };
+        let within = vec2(within.0, within.1) * zoom;
+        let corner = place.at(metrics, row, column) + within;
+        let (width, height) = metrics.size();
+        let canvas_page = Rect::from_min_size(corner - vec2(x, y) * zoom, vec2(width, height));
+        let clip = pane(row, column);
+        ui.scope(|ui| {
+            ui.set_clip_rect(clip);
+            let mut canvas = Canvas::new(&document.document, pictures, canvas_page, zoom, palette);
+            canvas.shape(ui, drawing.element);
+        });
     }
 }
 
@@ -1788,6 +1838,21 @@ impl SheetView {
                         );
                     }
                 }
+
+                drawings(
+                    ui,
+                    document,
+                    &mut self.pictures,
+                    &Sheets {
+                        index: self.sheet,
+                        sheet,
+                        metrics,
+                        place,
+                        zoom,
+                        palette,
+                    },
+                    |row, column| pane_of(row, column).intersect(visible),
+                );
 
                 // The picked cell, over everything in it.
                 let (row, column) = selected;

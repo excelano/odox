@@ -31,6 +31,7 @@ use crate::bands::{Bands, Regions};
 use crate::fonts::Faces;
 use crate::layout::{Item, Layout};
 use crate::model::{self, Block, Paragraph};
+use crate::odp::Slides;
 use crate::tags::NodeId;
 use crate::text;
 use crate::{Exported, Laid, Options, Page, Refusal};
@@ -220,10 +221,27 @@ impl Sheets<'_, '_, '_> {
     #[allow(clippy::too_many_lines)]
     fn sheet(&mut self) -> Result<Option<SheetPages>, Refusal> {
         let (document, sheet) = (self.document, self.sheet);
-        // A print range goes no further than the cells in use: one written as
-        // whole columns, which is how Excel writes a print area, reaches the
-        // last row a sheet can have.
-        let used = (0..sheet.used_rows, 0..sheet.used_columns);
+        // A print range goes no further than the cells in use, or the cells a
+        // drawing stands in: one written as whole columns, which is how Excel
+        // writes a print area, reaches the last row a sheet can have.
+        let reach = document
+            .sheets()
+            .iter()
+            .position(|s| std::ptr::eq(s, sheet))
+            .map(|index| {
+                document
+                    .drawings(index)
+                    .iter()
+                    .filter_map(|drawing| document.drawing_cell(sheet, drawing))
+                    .fold((0, 0), |(rows, columns), (row, column, _)| {
+                        (rows.max(row + 1), columns.max(column + 1))
+                    })
+            })
+            .unwrap_or((0, 0));
+        let used = (
+            0..sheet.used_rows.max(reach.0),
+            0..sheet.used_columns.max(reach.1),
+        );
         let (row_range, column_range) = match document.print_range(sheet) {
             Some((rows, columns)) => (
                 rows.start..rows.end.min(used.0.end),
@@ -387,6 +405,51 @@ impl Sheets<'_, '_, '_> {
                 pages[on]
                     .items
                     .extend(items.into_iter().map(|item| (top, item)));
+            }
+        }
+
+        // The sheet's pictures and shapes, each on the page of the cell it
+        // stands in, carried there at the scale the cells are printed at.
+        if let Some(index) = document
+            .sheets()
+            .iter()
+            .position(|s| std::ptr::eq(s, sheet))
+        {
+            let group = self.layout.tree.group(Some(section), Tag::Div);
+            for drawing in document.drawings(index) {
+                let (Some([x, y, ..]), Some((row, column, within))) = (
+                    document.drawing_place(sheet, &drawing),
+                    document.drawing_cell(sheet, &drawing),
+                ) else {
+                    continue;
+                };
+                let (Some(at), Some(column_index)) = (
+                    rows.iter().position(|&r| r == row),
+                    columns.iter().position(|&c| c == column),
+                ) else {
+                    continue;
+                };
+                let corner = (
+                    left + (column_at[column_index] + within.0) * share,
+                    band_top(row_band[at]) + (row_at[at] + within.1) * share,
+                );
+                let items = Slides::new(self.layout, &document.document).shape(
+                    drawing.element,
+                    group,
+                    false,
+                )?;
+                let on = page_of(row_band[at], column_band[column_index]);
+                drawn[on] = true;
+                pages[on].items.push((
+                    top,
+                    Item::Turned {
+                        origin: (corner.0 - x * share, corner.1 - y * share),
+                        across: (share, 0.0),
+                        down: (0.0, share),
+                        size: (1.0, 1.0),
+                        items,
+                    },
+                ));
             }
         }
 
@@ -815,5 +878,22 @@ mod tests {
         assert_eq!(bands(&[40.0, 40.0, 40.0], 100.0, 100.0), [0..2, 2..3]);
         assert_eq!(bands(&[40.0, 40.0, 40.0], 50.0, 100.0), [0..1, 1..3]);
         assert_eq!(bands(&[250.0, 10.0], 100.0, 100.0), [0..1, 1..2]);
+    }
+
+    #[test]
+    fn a_sheets_drawings_are_printed_over_its_cells_and_a_hidden_ones_are_not() {
+        let mut faces = Faces::new();
+        let laid = lay_out(&corpus("drawings.ods"), &options(), &mut faces).expect("laid out");
+        let carried: Vec<&Item> = laid.pages[0]
+            .items
+            .iter()
+            .map(|(_, item)| item)
+            .filter(|item| matches!(item, Item::Turned { .. }))
+            .collect();
+        assert_eq!(carried.len(), 4);
+        let free = laid.pages[0].items.iter().any(|(_, item)| {
+            matches!(item, Item::Turned { items, .. } if items.iter().any(|inner| matches!(inner, Item::Text { text, .. } if text.contains("Free"))))
+        });
+        assert!(free);
     }
 }

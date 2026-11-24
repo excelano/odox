@@ -12,6 +12,7 @@
 
 mod comment;
 mod conditional;
+mod drawing;
 mod fill;
 mod format;
 mod freeze;
@@ -23,6 +24,7 @@ mod sheets;
 mod size;
 mod sort;
 pub use comment::Comment;
+pub use drawing::{Anchor, SheetDrawing};
 pub use fill::Block;
 pub use format::{Borders, CellFormat, NumberFormat};
 pub use freeze::Frozen;

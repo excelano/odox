@@ -481,6 +481,27 @@ cell styles, and a formula moves as a copy does, its relative references going
 with it, as `LibreOffice` and Excel sort unless asked otherwise. A sort across a
 merged cell is refused. Each sort is one step to undo.
 
+**Pictures and shapes on a sheet are drawn** (`sheet/drawing.rs`): those in
+`table:shapes`, anchored to the sheet, and those in a cell, anchored to it and,
+with `table:end-cell-address`, stretched to another. Each is drawn at the
+`svg:x`, `svg:y` and size it was written with, from the sheet's top left corner
+with hidden rows and columns taking no room, which is how `LibreOffice` writes
+them; `LibreOffice` itself places some differently from what it writes (an
+end-anchored shape, and one below a hidden row, have printed elsewhere), and
+that is not reproduced. One anchored to a cell is not drawn while the cell's
+row or column is hidden. Resizing or hiding a row or column moves each shape
+anchored to a cell by as much as its cell moved, and stretches one with an end
+cell by as much again as the end cell moved, writing the new place into
+`svg:x`, `svg:y`, `svg:width` and `svg:height`, so the file says where they
+now are. `xods` draws them over the cells after the grid, each from the cell it
+stands in, the one it is anchored to or the one its corner falls in, and inside
+the pane of frozen or scrolling cells that cell is in; the PDF prints each on
+the page of that cell, at the scale the cells are printed at, and prints the
+cells a drawing stands in even where nothing else is in them. They are drawn
+by the slides' shape code, so a chart or other object shows as the empty box
+every object does. Inserting or deleting rows and columns still refuses a
+sheet with objects or shapes stretched to an end cell.
+
 **A conditional format is shown** (`sheet/conditional.rs`). A table's
 `calcext:conditional-formats` is read where it has one, and the `style:map`
 of its cells' styles otherwise, `LibreOffice` writing both. A cell a format

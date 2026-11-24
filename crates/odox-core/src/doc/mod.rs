@@ -20,9 +20,9 @@ mod text;
 pub use band::{PageFields, page_band, with_page_fields};
 pub use pres::{Presentation, Slide};
 pub use sheet::{
-    Block, Blocked, Borders, Cell, CellFormat, Column, Comment, DEFAULT_COLUMN_WIDTH,
+    Anchor, Block, Blocked, Borders, Cell, CellFormat, Column, Comment, DEFAULT_COLUMN_WIDTH,
     DEFAULT_ROW_HEIGHT, Frozen, Merged, NumberFormat, Place, Recalculated, Restructure, Sheet,
-    SheetDocument, Value,
+    SheetDocument, SheetDrawing, Value,
 };
 pub use text::{PageSetup, TextDocument};
 

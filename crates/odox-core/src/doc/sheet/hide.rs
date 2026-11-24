@@ -62,7 +62,9 @@ impl SheetDocument {
         rows: RangeInclusive<usize>,
         shown: bool,
     ) -> Result<(), Refused> {
-        self.set_shown(sheet, Line::Row, rows, shown)
+        let before = self.anchored(sheet);
+        self.set_shown(sheet, Line::Row, rows, shown)?;
+        self.move_drawings(sheet, &before)
     }
 
     /// Hide columns, or show them.
@@ -76,7 +78,9 @@ impl SheetDocument {
         columns: RangeInclusive<usize>,
         shown: bool,
     ) -> Result<(), Refused> {
-        self.set_shown(sheet, Line::Column, columns, shown)
+        let before = self.anchored(sheet);
+        self.set_shown(sheet, Line::Column, columns, shown)?;
+        self.move_drawings(sheet, &before)
     }
 
     fn set_shown(

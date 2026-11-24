@@ -155,6 +155,10 @@ convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
 # cell, text tests, and one condition this does not read, which LibreOffice
 # writes both as calcext:conditional-formats and as style:map.
 convert ods:calc8 conditional.ods "OpenDocument Spreadsheet Flat XML" conditional.fods
+
+# Drawings on a sheet: a shape anchored to the sheet, one in a cell, one
+# stretched to an end cell, one in a hidden row, and a picture.
+convert ods:calc8 drawings.ods "OpenDocument Spreadsheet Flat XML" drawings.fods
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods
