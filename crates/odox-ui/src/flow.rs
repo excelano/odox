@@ -280,6 +280,8 @@ pub struct Flow<'a> {
     /// The document's tracked changes, each with its author's ink, read the
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
+    /// Today, which a date that follows the day shows.
+    today: (i64, i64, i64),
     /// The insertion the text being laid out is in, and its ink.
     inserting: std::cell::RefCell<Option<(String, Color32)>>,
     /// Where the flow is, as a path of child indices from the root, or from
@@ -316,6 +318,7 @@ impl<'a> Flow<'a> {
             decided: None,
             tracked: std::cell::OnceCell::new(),
             inserting: std::cell::RefCell::new(None),
+            today: crate::today(),
             path: Vec::new(),
             detached: false,
         }
@@ -919,14 +922,7 @@ impl Flow<'_> {
                     } else if element.is(&Ns::Text, "ruby-text") {
                         job.atom(&edit::ruby_shown(element), 0, format.clone());
                     } else if edit::is_inline_passthrough(element) {
-                        // A mark's contents are the paragraph's text; a field's
-                        // are its value, which the paragraph's text does not
-                        // hold.
-                        let run = Run {
-                            counted: counted && edit::holds_text(element),
-                            ..*run
-                        };
-                        self.runs(element, &run, job, frames);
+                        self.passthrough(element, run, job, frames);
                     }
                 }
             }
@@ -1365,6 +1361,35 @@ impl Flow<'_> {
                 })
                 .collect()
         })
+    }
+
+    /// Draw what is inside a mark or a field. A mark's contents are the
+    /// paragraph's text; a field's are its value, which the paragraph's text
+    /// does not hold, shaded faintly, and a date that follows the day shows
+    /// today's.
+    fn passthrough(
+        &self,
+        element: &Element,
+        run: &Run<'_>,
+        job: &mut ParagraphJob,
+        frames: &mut Vec<Element>,
+    ) {
+        let field = !edit::holds_text(element);
+        let mut shaded = run.format.clone();
+        if field {
+            shaded.background = run.palette.ink.gamma_multiply(0.12);
+        }
+        if let Some(today) = odox_core::doc::date_shown(element, self.today, &self.document.styles)
+        {
+            job.atom(&today, 0, shaded);
+            return;
+        }
+        let run = Run {
+            counted: run.counted && !field,
+            format: &shaded,
+            ..*run
+        };
+        self.runs(element, &run, job, frames);
     }
 
     /// Draw a tracked change's mark, answering whether the element was one:

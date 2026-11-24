@@ -71,9 +71,104 @@ pub(crate) struct Paragraph {
     pub right_to_left: bool,
     /// The footnotes cited in it, for the foot of the page it is on.
     pub footnotes: Vec<Note>,
+    /// The page number and page count fields in it, by the characters each
+    /// shows, which the pages are filled in with once they are known.
+    pub page_fields: Vec<(Range<usize>, PageField)>,
+    /// Which paragraph with page fields it is, counting from nought, to find
+    /// the page it lands on.
+    pub fielded: Option<usize>,
+}
+
+/// A field a page fills in: the page number, moved by so many pages, or the
+/// page count, each in a numbering format.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PageField {
+    Number { adjust: i64, format: String },
+    Count { format: String },
+}
+
+impl PageField {
+    /// Read `text:page-number` or `text:page-count`.
+    fn read(element: &Element) -> Self {
+        let format = element
+            .attr(&Ns::Style, "num-format")
+            .unwrap_or("1")
+            .to_owned();
+        if element.is(&Ns::Text, "page-count") {
+            return Self::Count { format };
+        }
+        let select = match element.attr(&Ns::Text, "select-page") {
+            Some("previous") => -1,
+            Some("next") => 1,
+            _ => 0,
+        };
+        let adjust = element
+            .attr(&Ns::Text, "page-adjust")
+            .and_then(|n| n.parse::<i64>().ok())
+            .unwrap_or(0);
+        Self::Number {
+            adjust: select + adjust,
+            format,
+        }
+    }
+
+    /// What the field shows on a page of so many: nothing for a page number
+    /// moved off the document.
+    fn shown(&self, page: usize, pages: usize) -> String {
+        match self {
+            Self::Number { adjust, format } => {
+                let moved = i64::try_from(page).unwrap_or(0) + adjust;
+                match usize::try_from(moved) {
+                    Ok(n) if (1..=pages).contains(&n) => edit::number_text(n, format),
+                    _ => String::new(),
+                }
+            }
+            Self::Count { format } => edit::number_text(pages, format),
+        }
+    }
 }
 
 impl Paragraph {
+    /// Show one of its page fields as it comes to on a page of so many, the
+    /// runs moving with the characters.
+    pub(crate) fn fill_field(&mut self, at: usize, page: usize, pages: usize) {
+        let (range, field) = self.page_fields[at].clone();
+        let shown = field.shown(page, pages);
+        let delta = shown.len().cast_signed() - range.len().cast_signed();
+        self.text.replace_range(range.clone(), &shown);
+        let moved = |at: usize| at.saturating_add_signed(delta);
+        let mut covered = !range.is_empty();
+        for run in &mut self.runs {
+            if run.range.start == range.start && range.is_empty() {
+                run.range.end = moved(run.range.end);
+                covered = true;
+            } else if run.range.start >= range.end {
+                run.range = moved(run.range.start)..moved(run.range.end);
+            } else if run.range.end >= range.end {
+                run.range.end = moved(run.range.end);
+                covered |= run.range.end > range.start;
+            }
+        }
+        if !covered && !shown.is_empty() {
+            let place = self
+                .runs
+                .iter()
+                .position(|run| run.range.start > range.start)
+                .unwrap_or(self.runs.len());
+            self.runs.insert(
+                place,
+                Run {
+                    range: range.start..range.start + shown.len(),
+                    style: self.base.clone(),
+                },
+            );
+        }
+        for (other, _) in &mut self.page_fields[at + 1..] {
+            *other = moved(other.start)..moved(other.end);
+        }
+        self.page_fields[at].0 = range.start..range.start + shown.len();
+    }
+
     /// A line of text in one style and nothing else: a list label.
     pub(crate) fn plain(text: &str, style: &Style) -> Self {
         Self {
@@ -100,6 +195,8 @@ impl Paragraph {
             tab_distance: TAB_DISTANCE,
             right_to_left: false,
             footnotes: Vec::new(),
+            page_fields: Vec::new(),
+            fielded: None,
         }
     }
 }
@@ -200,15 +297,20 @@ pub(crate) fn read(
     path: Vec<usize>,
     shape: Option<std::rc::Rc<Properties>>,
 ) -> Vec<Block> {
-    read_notes(document, root, path, shape, false)
+    read_notes(document, root, path, shape, false, None)
 }
 
 /// [`read`] for a text document's body, whose footnotes go with the
 /// paragraphs that cite them, for the foot of their pages. Anywhere else, a
 /// slide's text, a header, a footnote is read as an endnote, since there is no
-/// page foot for it there.
-pub(crate) fn read_text(document: &Document, root: &Element, path: Vec<usize>) -> Vec<Block> {
-    read_notes(document, root, path, None, true)
+/// page foot for it there. A date that follows the day shows `today`.
+pub(crate) fn read_text(
+    document: &Document,
+    root: &Element,
+    path: Vec<usize>,
+    today: Option<(i64, i64, i64)>,
+) -> Vec<Block> {
+    read_notes(document, root, path, None, true, today)
 }
 
 fn read_notes(
@@ -217,6 +319,7 @@ fn read_notes(
     path: Vec<usize>,
     shape: Option<std::rc::Rc<Properties>>,
     at_foot: bool,
+    today: Option<(i64, i64, i64)>,
 ) -> Vec<Block> {
     let mut reader = Reader {
         document,
@@ -224,6 +327,8 @@ fn read_notes(
         shape,
         notes: Vec::new(),
         at_foot,
+        fielded: 0,
+        today,
     };
     let mut blocks = Vec::new();
     reader.blocks(root, &mut blocks, &mut ListCounters::default());
@@ -241,6 +346,11 @@ struct Reader<'a> {
     /// Whether a footnote goes with the paragraph citing it, rather than to
     /// the end with the endnotes.
     at_foot: bool,
+    /// How many paragraphs with page fields have been read.
+    fielded: usize,
+    /// Today, which a date that follows the day shows, where the document is
+    /// printed rather than read for a slide or a band.
+    today: Option<(i64, i64, i64)>,
 }
 
 impl Reader<'_> {
@@ -296,6 +406,7 @@ impl Reader<'_> {
             text: String::new(),
             runs: Vec::new(),
             links: Vec::new(),
+            page_fields: Vec::new(),
         };
         let mut anchored = Vec::new();
         self.runs(
@@ -346,6 +457,11 @@ impl Reader<'_> {
             tab_distance: p.tab_distance.map_or(TAB_DISTANCE, Length::points),
             right_to_left: p.right_to_left == Some(true),
             footnotes,
+            fielded: (!text.page_fields.is_empty()).then(|| {
+                self.fielded += 1;
+                self.fielded - 1
+            }),
+            page_fields: text.page_fields,
         }));
         for (element, path) in frames {
             let outer = std::mem::replace(&mut self.path, path);
@@ -433,6 +549,17 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
+                    } else if element.is(&Ns::Text, "page-number")
+                        || element.is(&Ns::Text, "page-count")
+                    {
+                        let start = text.text.len();
+                        self.runs(element, inherited, size, link, text, anchored, path);
+                        text.page_fields
+                            .push((start..text.text.len(), PageField::read(element)));
+                    } else if let Some(shown) = self.today.and_then(|today| {
+                        odox_core::doc::date_shown(element, today, &self.document.styles)
+                    }) {
+                        text.push(&shown, &current, inherited);
                     } else if element.is(&Ns::Text, "ruby-text") {
                         text.push(&edit::ruby_shown(element), &current, inherited);
                     } else if edit::is_inline_passthrough(element)
@@ -659,6 +786,7 @@ struct Text {
     text: String,
     runs: Vec<Run>,
     links: Vec<String>,
+    page_fields: Vec<(Range<usize>, PageField)>,
 }
 
 impl Text {
@@ -805,6 +933,87 @@ pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
                     undescribed(&note.blocks, into);
                 }
             }
+            _ => {}
+        }
+    }
+}
+
+/// Whether any paragraph among blocks has page fields.
+pub(crate) fn has_page_fields(blocks: &[Block]) -> bool {
+    let mut any = false;
+    each_paragraph(blocks, &mut |paragraph| any |= paragraph.fielded.is_some());
+    any
+}
+
+/// Fill every page field among blocks: a page number with the page it was
+/// found on, and every page count with the count. A page number found on no
+/// page keeps what it shows.
+pub(crate) fn fill_page_fields(
+    blocks: &mut [Block],
+    page_of: &std::collections::HashMap<(usize, usize), usize>,
+    pages: usize,
+) {
+    each_paragraph_mut(blocks, &mut |paragraph| {
+        let Some(fielded) = paragraph.fielded else {
+            return;
+        };
+        for at in 0..paragraph.page_fields.len() {
+            let page = page_of.get(&(fielded, at)).copied();
+            let count = matches!(paragraph.page_fields[at].1, PageField::Count { .. });
+            if let Some(page) = page.or(count.then_some(1)) {
+                paragraph.fill_field(at, page, pages);
+            }
+        }
+    });
+}
+
+fn each_paragraph(blocks: &[Block], each: &mut impl FnMut(&Paragraph)) {
+    for block in blocks {
+        match block {
+            Block::Paragraph(paragraph) => {
+                each(paragraph);
+                for note in &paragraph.footnotes {
+                    each_paragraph(&note.blocks, each);
+                }
+            }
+            Block::List(list) => {
+                for item in &list.items {
+                    each_paragraph(&item.blocks, each);
+                }
+            }
+            Block::Table(table) => {
+                for cell in table.rows.iter().flatten() {
+                    each_paragraph(&cell.blocks, each);
+                }
+            }
+            Block::TextBox(text_box) => each_paragraph(&text_box.blocks, each),
+            Block::Note(note) => each_paragraph(&note.blocks, each),
+            _ => {}
+        }
+    }
+}
+
+fn each_paragraph_mut(blocks: &mut [Block], each: &mut impl FnMut(&mut Paragraph)) {
+    for block in blocks {
+        match block {
+            Block::Paragraph(paragraph) => {
+                each(paragraph);
+                for note in &mut paragraph.footnotes {
+                    each_paragraph_mut(&mut note.blocks, each);
+                }
+            }
+            Block::List(list) => {
+                for item in &mut list.items {
+                    each_paragraph_mut(&mut item.blocks, each);
+                }
+            }
+            Block::Table(table) => {
+                for cell in table.rows.iter_mut().flatten() {
+                    each_paragraph_mut(&mut cell.blocks, each);
+                }
+            }
+            Block::TextBox(text_box) => each_paragraph_mut(&mut text_box.blocks, each),
+            Block::Note(note) => each_paragraph_mut(&mut note.blocks, each),
             _ => {}
         }
     }

@@ -17,7 +17,7 @@ pub(crate) use sheet::{MAX_COLUMNS, MAX_ROWS};
 mod slides;
 mod text;
 
-pub use band::{PageFields, page_band, with_page_fields};
+pub use band::{PageFields, date_shown, page_band, with_page_fields};
 pub use pres::{Presentation, Slide};
 pub use sheet::{
     Anchor, Block, Blocked, Borders, Cell, CellFormat, Column, Comment, DEFAULT_COLUMN_WIDTH,

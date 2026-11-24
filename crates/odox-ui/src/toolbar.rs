@@ -433,6 +433,8 @@ pub enum Command {
     Comment,
     /// Make a link of the selection, or change the one at the caret.
     Link,
+    /// Put a field in at the caret.
+    Field(odox_core::edit::Field),
     /// Put a footnote or an endnote at the caret.
     Note(odox_core::edit::NoteClass),
     /// Start a numbered list again at the item, or carry it on from the list
@@ -638,6 +640,31 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// Format > Field: a date, fixed or following the day, the page number or
+/// the page count.
+fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Field"), |ui| {
+            for (field, name) in [
+                (odox_core::edit::Field::Date { fixed: false }, t("Date")),
+                (
+                    odox_core::edit::Field::Date { fixed: true },
+                    t("Date, fixed"),
+                ),
+                (odox_core::edit::Field::PageNumber, t("Page number")),
+                (odox_core::edit::Field::PageCount, t("Page count")),
+            ] {
+                if ui.button(name).clicked() {
+                    chosen = Some(Command::Field(field));
+                    ui.close();
+                }
+            }
+        });
+    });
+    chosen
+}
+
 /// What the Format menu puts in or takes out in a text document: a table and
 /// its rows and columns, a page break, a picture, and the page's setup.
 fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
@@ -718,6 +745,7 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
         ui.close();
     }
+    chosen = field_menu(ui, state).or(chosen);
     let remove = egui::Button::new(t("Remove page break"));
     if ui.add_enabled(state.here.page_break, remove).clicked() {
         chosen = Some(Command::PageBreak(false));

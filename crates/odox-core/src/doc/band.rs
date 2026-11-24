@@ -63,9 +63,7 @@ fn fill(element: &mut Element, fields: &PageFields<'_>, styles: &Styles) {
                 "page-count" => Some(fields.pages.to_string()),
                 "sheet-name" => fields.sheet.map(ToOwned::to_owned),
                 "title" | "file-name" => Some(fields.title.to_owned()),
-                "date" if child.attr(&Ns::Text, "fixed") != Some("true") => {
-                    Some(today(child, fields.today, styles))
-                }
+                "date" => date_shown(child, fields.today, styles),
                 _ => None,
             }
         } else {
@@ -76,6 +74,13 @@ fn fill(element: &mut Element, fields: &PageFields<'_>, styles: &Styles) {
             None => fill(child, fields, styles),
         }
     }
+}
+
+/// What a date field that follows the day shows today, in its own data
+/// style; `None` for a fixed date, which shows what it holds.
+pub fn date_shown(field: &Element, today: (i64, i64, i64), styles: &Styles) -> Option<String> {
+    (field.is(&Ns::Text, "date") && field.attr(&Ns::Text, "fixed") != Some("true"))
+        .then(|| self::today(field, today, styles))
 }
 
 fn today(field: &Element, (year, month, day): (i64, i64, i64), styles: &Styles) -> String {

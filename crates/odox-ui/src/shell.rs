@@ -502,6 +502,7 @@ impl<V: View> Shell<V> {
         let Some(document) = self.view.document_mut() else {
             return false;
         };
+        odox_core::edit::follow_dates(&mut document.content, crate::today(), &document.styles);
         let written = document
             .write_verified()
             .map_err(|e| e.to_string())

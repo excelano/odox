@@ -1,0 +1,126 @@
+//! Fields put in at the caret: a date, fixed or following, the page number
+//! and the page count.
+
+// Author: David M. Anderson
+// Built with AI assistance (Claude, Anthropic)
+
+use odox_core::edit::{Field, follow_dates, insert_field};
+use odox_core::{Element, xml};
+
+const NAMESPACES: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0""#;
+
+fn content(body: &str) -> Element {
+    let source = format!(
+        "<office:document-content {NAMESPACES}><office:body><office:text>{body}</office:text></office:body></office:document-content>"
+    );
+    xml::parse(source.as_bytes(), "test").expect("a content root")
+}
+
+fn written(root: &Element) -> String {
+    String::from_utf8(xml::serialize(root.at(&[0, 0]).expect("the text"))).expect("UTF-8")
+}
+
+const FIRST: [usize; 3] = [0, 0, 0];
+const TODAY: (i64, i64, i64) = (2026, 11, 23);
+
+#[test]
+fn date_field_written_fixed_or_following() {
+    let mut root = content("<text:p>Dated </text:p>");
+    insert_field(&mut root, &FIRST, 6, Field::Date { fixed: true }, TODAY).expect("put in");
+    insert_field(&mut root, &FIRST, 0, Field::Date { fixed: false }, TODAY).expect("put in");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"<text:date text:date-value="2026-11-23">2026-11-23</text:date>Dated <text:date text:date-value="2026-11-23" text:fixed="true">2026-11-23</text:date>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn page_fields_are_written_as_libreoffice_writes_them() {
+    let mut root = content("<text:p>Page <text:s/>of </text:p>");
+    insert_field(&mut root, &FIRST, 9, Field::PageCount, TODAY).expect("put in");
+    insert_field(&mut root, &FIRST, 5, Field::PageNumber, TODAY).expect("put in");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"<text:page-number text:select-page="current">1</text:page-number>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains("<text:page-count>1</text:page-count>"),
+        "{out}"
+    );
+    assert_eq!(
+        root.at(&FIRST).expect("paragraph").plain_text(),
+        "Page 1 of 1"
+    );
+}
+
+#[test]
+fn fixed_date_keeps_its_value() {
+    let mut root = content(
+        r#"<text:p><text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date> and <text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p>"#,
+    );
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(follow_dates(&mut root, TODAY, &styles));
+    let out = written(&root);
+    assert!(
+        out.contains(
+            r#"<text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date>"#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"<text:date text:date-value="2026-11-23">2026-11-23</text:date>"#),
+        "{out}"
+    );
+    assert!(
+        !follow_dates(&mut root, TODAY, &styles),
+        "nothing left to change"
+    );
+}
+
+#[test]
+fn following_date_shows_today_without_changing_tree() {
+    let root = content(
+        r#"<text:p><text:date text:date-value="2020-01-02">2020-01-02</text:date><text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date></text:p>"#,
+    );
+    let before = root.clone();
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    let paragraph = root.at(&FIRST).expect("paragraph");
+    let dates: Vec<&Element> = paragraph.elements().collect();
+    assert_eq!(
+        odox_core::doc::date_shown(dates[0], TODAY, &styles).as_deref(),
+        Some("2026-11-23")
+    );
+    assert_eq!(odox_core::doc::date_shown(dates[1], TODAY, &styles), None);
+    assert!(root == before);
+}
+
+#[test]
+fn a_date_saved_today_keeps_its_time_and_one_from_another_day_its_style() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES} xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"><office:automatic-styles><number:date-style style:name="N30"><number:month/><number:text>/</number:text><number:day/><number:text>/</number:text><number:year/></number:date-style></office:automatic-styles><office:body><office:text><text:p><text:date style:data-style-name="N30" text:date-value="2026-11-23T10:00:00">11/23/26</text:date> <text:date style:data-style-name="N30" text:date-value="2020-01-02T10:00:00">1/2/20</text:date></text:p></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(follow_dates(&mut root, TODAY, &styles));
+    let out = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    assert!(
+        out.contains(r#"text:date-value="2026-11-23T10:00:00">11/23/26</text:date>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"text:date-value="2026-11-23">11/23/26</text:date>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_spreadsheets_dates_are_left_alone() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES}><office:body><office:spreadsheet><text:p><text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(!follow_dates(&mut root, TODAY, &styles));
+}

@@ -322,6 +322,9 @@ pub(crate) struct Piece {
     pub heading: Option<(u8, String)>,
     /// The footnotes cited in it, laid out for the foot of its page.
     pub footnotes: Vec<Piece>,
+    /// The page fields whose text is in it: the paragraph, as the model counts
+    /// those with page fields, and the field's place among the paragraph's.
+    pub fields: Vec<(usize, usize)>,
 }
 
 /// Lays blocks out and builds the structure tree as it goes.
@@ -491,6 +494,7 @@ impl<'a> Layout<'a> {
 
             let mut piece = Piece {
                 height,
+                fields: fields_in(paragraph, &line, last),
                 ..Piece::default()
             };
             if let Some(fill) = paragraph.background {
@@ -1068,6 +1072,7 @@ impl<'a> Layout<'a> {
     ) -> Result<Piece, Refusal> {
         let mut laid: Vec<(f32, f32, &Cell, Vec<Item>, f32)> = Vec::new();
         let mut footnotes = Vec::new();
+        let mut fields = Vec::new();
         for cell in row {
             let left = x + columns.iter().take(cell.column).sum::<f32>();
             let width: f32 = columns
@@ -1118,6 +1123,7 @@ impl<'a> Layout<'a> {
                 }
                 items.extend(piece.items.into_iter().map(|item| item.shifted(0.0, y)));
                 footnotes.extend(piece.footnotes);
+                fields.extend(piece.fields);
                 y += piece.height + piece.after;
             }
             laid.push((left, width, cell, items, y + cell.padding));
@@ -1132,6 +1138,7 @@ impl<'a> Layout<'a> {
             ..Piece::default()
         };
         piece.footnotes = footnotes;
+        piece.fields = fields;
         for (left, width, cell, ..) in &laid {
             if let Some(fill) = cell.background {
                 piece.items.push(Item::Rect {
@@ -1262,6 +1269,22 @@ fn column_widths(declared: &[Option<f32>], width: f32) -> Vec<f32> {
         .collect()
 }
 
+/// The page fields of a paragraph whose text begins in a line of it: those
+/// that begin in the line, and on the last line one that shows nothing at its
+/// end.
+fn fields_in(paragraph: &Paragraph, line: &Range<usize>, last: bool) -> Vec<(usize, usize)> {
+    let Some(fielded) = paragraph.fielded else {
+        return Vec::new();
+    };
+    paragraph
+        .page_fields
+        .iter()
+        .enumerate()
+        .filter(|(_, (range, _))| line.contains(&range.start) || (last && range.start == line.end))
+        .map(|(at, _)| (fielded, at))
+        .collect()
+}
+
 /// The short rule that sets the footnotes at the foot of a page off from the
 /// text above them.
 pub(crate) fn foot_rule(x: f32, width: f32) -> Piece {
@@ -1289,6 +1312,7 @@ pub(crate) fn split(piece: Piece, at: f32) -> (Piece, Piece) {
         repeat: piece.repeat.clone(),
         page_before: piece.page_before,
         footnotes: piece.footnotes,
+        fields: piece.fields,
         ..Piece::default()
     };
     let mut below = Piece {
