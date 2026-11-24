@@ -170,6 +170,9 @@ pub trait View {
     /// read from, which is where such a file is offered to go.
     fn file_menu(&mut self, _ui: &mut Ui, _path: Option<&Path>) {}
 
+    /// Print the document, read from the file given, as File > Print does.
+    fn print(&mut self, _path: Option<&Path>) {}
+
     /// Something the view has to tell the person, for the bar at the foot of
     /// the window, once.
     fn take_notice(&mut self) -> Option<Notice> {
@@ -1251,6 +1254,9 @@ impl<V: View> Shell<V> {
         }
         if pressed(Key::R) {
             self.request(ctx, Pending::Reload);
+        }
+        if self.view.is_open() && !ctx.input(|input| input.modifiers.shift) && pressed(Key::P) {
+            self.view.print(self.path.as_deref());
         }
         if pressed(Key::W) {
             self.request(ctx, Pending::Close);

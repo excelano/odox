@@ -699,6 +699,10 @@ impl View for TextView {
         }
     }
 
+    fn print(&mut self, path: Option<&Path>) {
+        self.export.print(path);
+    }
+
     fn file_menu(&mut self, ui: &mut Ui, path: Option<&Path>) {
         ui.separator();
         self.export.menu(ui, path);

@@ -21,6 +21,7 @@ use odox_core::{Document, Element, Ns, edit};
 use odox_pdf::{Exportable, Refusal, Substitution};
 
 use crate::i18n::{fill, reading_language, t};
+use crate::print::{HandOver, Printed, temporary_pdf};
 use crate::{Editing, Notice, Pictures, replace_file};
 
 /// The export, from the menu to the notice.
@@ -35,24 +36,39 @@ pub struct Export {
     /// The export being made, once a file has been chosen for it.
     running: Option<Running>,
     notice: Option<Notice>,
+    /// What hands a PDF made to print over, where it is not the platform's
+    /// own.
+    hand_over: Option<HandOver>,
+    /// How many prints the window has made, which names each one's folder.
+    prints: u32,
 }
 
 /// An export on its own thread, and the file it is writing.
 struct Running {
     file: String,
-    worker: JoinHandle<Result<Vec<Substitution>, Failure>>,
+    printing: bool,
+    worker: JoinHandle<Result<Done, Failure>>,
+}
+
+/// What a finished export did: the families it drew in other faces, and,
+/// for one made to print, how it was handed over.
+struct Done {
+    substituted: Vec<Substitution>,
+    printed: Option<Printed>,
 }
 
 /// Why an export that was started did not end in a file.
 enum Failure {
     Refused(Refusal),
     Unwritten(std::io::Error),
+    Unprinted(std::io::Error),
 }
 
 /// An export asked for, with the file the document was read from, which is
-/// where the PDF is offered to go.
+/// where the PDF is offered to go, and whether it is to be printed instead.
 struct Request {
     source: Option<PathBuf>,
+    printing: bool,
 }
 
 /// The pictures an export cannot describe by itself.
@@ -91,6 +107,25 @@ impl Export {
             ui.close();
             self.requested = Some(Request {
                 source: source.map(Path::to_path_buf),
+                printing: false,
+            });
+        }
+        if ui
+            .add_enabled(self.running.is_none(), egui::Button::new(t("Print…")))
+            .clicked()
+        {
+            ui.close();
+            self.print(source);
+        }
+    }
+
+    /// Ask for the document to be printed, from the file it was read from,
+    /// whose name the PDF takes; it is printed on the next frame.
+    pub fn print(&mut self, source: Option<&Path>) {
+        if self.running.is_none() && self.asking.is_none() {
+            self.requested = Some(Request {
+                source: source.map(Path::to_path_buf),
+                printing: true,
             });
         }
     }
@@ -114,7 +149,24 @@ impl Export {
         editing: &mut Editing,
     ) {
         self.follow(ctx);
-        if let Some(Request { source }) = self.requested.take() {
+        let requested = self.requested.take();
+        if let Some(Request {
+            source,
+            printing: true,
+        }) = requested
+        {
+            let stem = stem(source.as_deref());
+            let hand_over = self.hand_over.unwrap_or(crate::print::hand_over);
+            self.prints += 1;
+            let pdf = temporary_pdf(&stem, self.prints);
+            self.start(document, pdf, stem, Some(hand_over));
+            if let Some(running) = &mut self.running {
+                running.file = source.as_deref().and_then(Path::file_name).map_or_else(
+                    || t("Untitled").to_owned(),
+                    |name| name.to_string_lossy().into_owned(),
+                );
+            }
+        } else if let Some(Request { source, .. }) = requested {
             let content = &document.document().content;
             let body = body_index(content);
             let answers: Vec<Answer> = document
@@ -180,17 +232,40 @@ impl Export {
                     egui::Frame::popup(ui.style()).show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.spinner();
-                            ui.label(fill(t("Exporting {file}…"), &[("file", &running.file)]));
+                            let doing = if running.printing {
+                                t("Printing {file}…")
+                            } else {
+                                t("Exporting {file}…")
+                            };
+                            ui.label(fill(doing, &[("file", &running.file)]));
                         });
                     });
                 });
             return;
         }
-        let Some(Running { file, worker }) = self.running.take() else {
+        let Some(Running { file, worker, .. }) = self.running.take() else {
             return;
         };
-        self.notice = Some(match worker.join() {
-            Ok(Ok(substituted)) => {
+        self.notice = match worker.join() {
+            Ok(Ok(Done {
+                printed: Some(Printed::Cancelled),
+                ..
+            })) => None,
+            Ok(Ok(Done {
+                printed: Some(Printed::Sent),
+                ..
+            })) => Some(Notice::Done(fill(
+                t("Sent {file} to be printed."),
+                &[("file", &file)],
+            ))),
+            Ok(Ok(Done {
+                printed: Some(Printed::Opened),
+                ..
+            })) => Some(Notice::Done(fill(
+                t("Opened {file} in the viewer, to print from there."),
+                &[("file", &file)],
+            ))),
+            Ok(Ok(Done { substituted, .. })) => Some({
                 let mut said = fill(t("Exported {file} as PDF/UA."), &[("file", &file)]);
                 for substitution in &substituted {
                     said.push(' ');
@@ -203,17 +278,21 @@ impl Export {
                     ));
                 }
                 Notice::Done(said)
-            }
-            Ok(Err(Failure::Unwritten(e))) => Notice::Problem(fill(
+            }),
+            Ok(Err(Failure::Unwritten(e))) => Some(Notice::Problem(fill(
                 t("{file} could not be saved: {reason}"),
                 &[("file", &file), ("reason", &e.to_string())],
-            )),
-            Ok(Err(Failure::Refused(refusal))) => Notice::Problem(refused(&refusal)),
-            Err(_) => Notice::Problem(fill(
+            ))),
+            Ok(Err(Failure::Unprinted(e))) => Some(Notice::Problem(fill(
+                t("{file} could not be printed: {reason}"),
+                &[("file", &file), ("reason", &e.to_string())],
+            ))),
+            Ok(Err(Failure::Refused(refusal))) => Some(Notice::Problem(refused(&refusal))),
+            Err(_) => Some(Notice::Problem(fill(
                 t("The export of {file} stopped before it was finished."),
                 &[("file", &file)],
-            )),
-        });
+            ))),
+        };
     }
 
     /// Ask where to write the PDF, and start writing it there.
@@ -232,22 +311,25 @@ impl Export {
         let Some(target) = dialog.save_file() else {
             return;
         };
-        self.start(document, as_pdf(target), stem);
+        self.start(document, as_pdf(target), stem, None);
     }
 
     /// Make the PDF from a copy of the document and write it, on a thread of
-    /// its own, and answer at once.
+    /// its own, and answer at once; one made to print is handed over there
+    /// too, and draws a picture that says nothing rather than refusing it.
     fn start<D: Exportable + From<Document> + 'static>(
         &mut self,
         document: &D,
         target: PathBuf,
         stem: String,
+        print: Option<HandOver>,
     ) {
         let options = odox_pdf::Options {
             title: stem,
             language: reading_language(),
             untitled_slide: t("Slide {number}").to_owned(),
             today: crate::today(),
+            printing: print.is_some(),
         };
         let file = target.file_name().map_or_else(
             || target.display().to_string(),
@@ -255,12 +337,27 @@ impl Export {
         );
         let snapshot = document.document().snapshot();
         let worker = thread::spawn(move || {
+            let title = options.title.clone();
             let document = D::from(snapshot.into_document());
             let exported = document.export(&options).map_err(Failure::Refused)?;
+            if let Some(folder) = target.parent().filter(|_| print.is_some()) {
+                std::fs::create_dir_all(folder).map_err(Failure::Unwritten)?;
+            }
             replace_file(&target, &exported.pdf).map_err(Failure::Unwritten)?;
-            Ok(exported.substituted)
+            let printed = print
+                .map(|hand_over| hand_over(&target, &title))
+                .transpose()
+                .map_err(Failure::Unprinted)?;
+            Ok(Done {
+                substituted: exported.substituted,
+                printed,
+            })
         });
-        self.running = Some(Running { file, worker });
+        self.running = Some(Running {
+            file,
+            printing: print.is_some(),
+            worker,
+        });
     }
 }
 
@@ -463,7 +560,7 @@ mod tests {
             .collect();
         describe(&mut document, &answers, &mut editing).expect("described");
 
-        export.start(&document, target.clone(), "export".to_owned());
+        export.start(&document, target.clone(), "export".to_owned(), None);
         assert!(
             export.running.is_some(),
             "start answers before the export is made"
@@ -611,6 +708,7 @@ mod tests {
         let mut export = Export {
             requested: Some(Request {
                 source: Some(PathBuf::from("/home/me/export.odt")),
+                printing: false,
             }),
             ..Export::default()
         };
@@ -628,5 +726,56 @@ mod tests {
         assert!(!export.asking());
         assert!(export.running.is_none(), "nothing was exported");
         assert_eq!(document.undescribed().len(), undescribed);
+    }
+
+    fn handed(pdf: &Path, title: &str) -> std::io::Result<Printed> {
+        let written = std::fs::read(pdf)?;
+        assert!(written.starts_with(b"%PDF-"), "a PDF was handed over");
+        assert_eq!(title, "export");
+        Ok(Printed::Sent)
+    }
+
+    #[test]
+    fn print_export_never_asks_about_pictures() {
+        let mut document = fixture();
+        let chart = edit::figures(&document.document.content)[0].clone();
+        document
+            .document
+            .content
+            .at_mut(&chart)
+            .expect("the chart")
+            .children
+            .retain(|n| !matches!(n, odox_core::Node::Element(e) if e.is(&Ns::Svg, "title")));
+        assert_eq!(
+            document.undescribed().len(),
+            1,
+            "the chart says nothing now"
+        );
+        let mut export = Export {
+            hand_over: Some(handed),
+            ..Export::default()
+        };
+        export.print(Some(Path::new("/home/me/export.odt")));
+        frame(&mut export, &mut document, &[]);
+        assert!(!export.asking(), "printing asks nothing");
+        let ctx = egui::Context::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        while export.notice.is_none() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the print never finished"
+            );
+            ctx.run_ui(egui::RawInput::default(), |ui| export.follow(ui.ctx()))
+                .textures_delta
+                .clear();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(
+            matches!(export.take_notice(), Some(Notice::Done(_))),
+            "the print was handed over"
+        );
+        let _ = std::fs::remove_dir_all(
+            std::env::temp_dir().join(format!("odox-print-{}", std::process::id())),
+        );
     }
 }

@@ -84,7 +84,7 @@ fn shown(presentation: &Presentation) -> impl Iterator<Item = Slide<'_>> {
 /// Export a presentation as PDF/UA-1.
 pub(crate) fn export(presentation: &Presentation, options: &Options) -> Result<Exported, Refusal> {
     let missing = undescribed(presentation);
-    if !missing.is_empty() {
+    if !missing.is_empty() && !options.printing {
         return Err(Refusal::Undescribed(missing));
     }
     let document = &presentation.document;
@@ -938,6 +938,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         }
     }
 

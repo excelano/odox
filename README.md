@@ -227,6 +227,11 @@ skips or the speaker's notes. A picture that has neither alternative text nor a
 mark that it is decoration is asked about first, and what you answer is saved
 into the document, so the next export does not ask again.
 
+File > Print…, or Ctrl+P, prints the same pages, with nothing asked about the
+pictures. On Linux it opens the desktop's print dialog; where the desktop has
+none, and on Windows and macOS, the PDF opens in the default viewer, which
+prints it.
+
 Ctrl+F opens a search bar in any of the three, in reading or in edit mode:
 Enter or F3 goes to the next match, Shift+Enter or Shift+F3 to the one before,
 and Escape closes it. The Aa and W toggles on the bar, or Alt+C and Alt+W,

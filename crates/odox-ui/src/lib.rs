@@ -47,6 +47,7 @@ pub mod note_popup;
 pub mod opened_document;
 pub mod page_setup;
 pub mod picture_question;
+pub mod print;
 pub mod recent;
 pub mod recovery;
 pub mod settings;
