@@ -1,3 +1,14 @@
+odox (0.19.2) unstable; urgency=low
+
+  * A field travels with cut and paste, and links and pastes count it right
+  * Text typed right after a field goes after it
+  * A row or column resize always leaves its undo step
+  * Recovery keeps any original path and says when it cannot keep changes
+  * A following date in a header or footer saves as today
+  * Editing a comment keeps a list in it where it stands
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 24 Nov 2026 16:31:50 -0600
+
 odox (0.19.1) unstable; urgency=low
 
   * A shadow's outline no longer darkens a ring over its fill
