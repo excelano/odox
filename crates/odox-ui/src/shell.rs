@@ -226,6 +226,21 @@ pub struct Shell<V: View> {
 /// How often unsaved changes are kept.
 const KEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// How a write to a file went.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Written {
+    Done,
+    Failed,
+    /// The system did not let it be written there.
+    NotPermitted,
+}
+
+/// Whether a write was refused for want of permission, which another place
+/// chosen in the save dialog may be given.
+fn asks_another_place(error: &std::io::Error) -> bool {
+    error.kind() == std::io::ErrorKind::PermissionDenied
+}
+
 /// How much of the screen the window has.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Screen {
@@ -605,9 +620,18 @@ impl<V: View> Shell<V> {
     ///
     /// Answers whether it was written, which is what a pending action waits
     /// on: a save that failed is not a reason to go on and close the window.
+    ///
+    /// A file the system does not let this write, a read-only one or, on
+    /// macOS, one the sandbox no longer has the person's choice of, as after
+    /// changes are recovered, is asked about in the save dialog: choosing it
+    /// there is that choice.
     fn save(&mut self) -> bool {
         match self.path.clone() {
-            Some(path) => self.write_to(&path),
+            Some(path) => match self.write_to(&path) {
+                Written::Done => true,
+                Written::Failed => false,
+                Written::NotPermitted => self.save_as(),
+            },
             None => self.save_as(),
         }
     }
@@ -633,7 +657,7 @@ impl<V: View> Shell<V> {
         if path.extension().is_none() {
             path.set_extension(self.product.extension);
         }
-        if self.write_to(&path) {
+        if self.write_to(&path) == Written::Done {
             self.recent.opened(&path);
             self.path = Some(path);
             true
@@ -644,27 +668,33 @@ impl<V: View> Shell<V> {
 
     /// Serialize the document, prove it reads back, and put it on disk.
     /// DESIGN.md §11.
-    fn write_to(&mut self, path: &Path) -> bool {
+    fn write_to(&mut self, path: &Path) -> Written {
         let Some(document) = self.view.document_mut() else {
-            return false;
+            return Written::Failed;
         };
         odox_core::edit::follow_dates(&mut document.content, crate::today(), &document.styles);
         let written = document
             .write_verified()
-            .map_err(|e| e.to_string())
-            .and_then(|bytes| replace_file(path, &bytes).map_err(|e| e.to_string()));
+            .map_err(|e| (e.to_string(), false))
+            .and_then(|bytes| {
+                replace_file(path, &bytes).map_err(|e| (e.to_string(), asks_another_place(&e)))
+            });
         match written {
             Ok(()) => {
                 self.editing.mark_saved();
                 self.error = None;
-                true
+                Written::Done
             }
-            Err(reason) => {
+            Err((reason, not_permitted)) => {
                 self.error = Some(fill(
                     t("{file} could not be saved: {reason}"),
                     &[("file", &name_of(path)), ("reason", &reason)],
                 ));
-                false
+                if not_permitted {
+                    Written::NotPermitted
+                } else {
+                    Written::Failed
+                }
             }
         }
     }
@@ -1499,6 +1529,26 @@ mod tests {
             .collect();
         assert_eq!(left, vec![std::ffi::OsString::from("document.odt")]);
         std::fs::remove_dir_all(directory).expect("tidy");
+    }
+
+    /// A write the system refuses for want of permission, as a read-only
+    /// folder refuses it here and the macOS sandbox refuses a file it no
+    /// longer has the person's say-so for, is one to ask another place for.
+    #[cfg(unix)]
+    #[test]
+    fn a_write_refused_for_permission_asks_for_another_place() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = std::env::temp_dir().join(format!("odox-locked-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("a scratch directory");
+        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o555))
+            .expect("made read-only");
+        let refused = replace_file(&directory.join("document.odt"), b"x").expect_err("refused");
+        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o755))
+            .expect("made writable again");
+        std::fs::remove_dir_all(&directory).expect("tidy");
+        assert!(super::asks_another_place(&refused));
+        let missing = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert!(!super::asks_another_place(&missing));
     }
 
     /// A target that cannot be written leaves nothing behind and says so.
