@@ -498,6 +498,9 @@ fn block_name(block: Block) -> String {
 struct Here {
     table: bool,
     page_break: bool,
+    /// Whether everything selected is a heading, which can move on the
+    /// outline.
+    headings: bool,
 }
 
 /// What the Format menu draws itself from: what the page said the last time it
@@ -550,6 +553,7 @@ impl MenuState {
             here: Here {
                 table: blocks && model.in_table(selection),
                 page_break: blocks && model.page_break_here(selection),
+                headings: blocks && model.all_headings(selection),
             },
             marks: Mark::ALL
                 .into_iter()
@@ -626,7 +630,7 @@ fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
             .ctx()
             .format_shortcut(&KeyboardShortcut::new(OUTLINE, key));
         let button = egui::Button::new(name).shortcut_text(keys);
-        if ui.add_enabled(state.enabled, button).clicked() {
+        if ui.add_enabled(state.here.headings, button).clicked() {
             chosen = Some(Command::Outline(delta));
             ui.close();
         }
