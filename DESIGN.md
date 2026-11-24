@@ -892,9 +892,13 @@ items, moves each a level in, into a `text:list` inside the item before it, as
 `LibreOffice` writes one, or into an item of its own that holds no paragraph
 where nothing comes before it, never past the tenth level; Shift+Tab moves it
 out, after the item it was inside, and the items after it in that list become
-its own (`edit::list_level`). An item moves with the items inside it. Format >
+its own (`edit::list_level`). An item moves with the items inside it, and an
+item whose own item goes on after its list, a paragraph after the nested list,
+is refused moving out, since it would land after that paragraph. In a table Tab
+stays the table's and moves between cells. Format >
 Lists restarts the numbering at one at the caret's item, as `text:start-value`,
-or carries its list on from the one before, as `text:continue-numbering`. One pass over the selection is one undo step, and the buttons
+or carries its list on from the one before, as `text:continue-numbering`,
+taking back a restart there. One pass over the selection is one undo step, and the buttons
 are lit where every paragraph in the selection is one. The Format menu is the same commands by name, with the marks' shortcuts beside them, so each has a route that needs no pointer; a menu is drawn before the page, so it draws from what the page last said was lit and hands its choice to the page to apply with the model. Enter at the end of a heading starts body text, in the style a heading
 taken off takes; Enter inside one leaves two headings.
 

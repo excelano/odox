@@ -256,14 +256,19 @@ impl<'a> FlowModel<'a> {
 
     /// Move the list items a selection runs over a level in (`delta` above
     /// zero) or out, as one step to undo: with a caret, only where it stands at
-    /// the start of an item. Answers whether it applied, which is when Tab is
-    /// the list's and not the text's.
-    pub fn list_level(&mut self, editor: &mut PageEditor, delta: i8) -> bool {
+    /// the start of an item, and never in a table, where Tab moves between
+    /// cells. Answers whether the keys were the list's.
+    ///
+    /// # Errors
+    ///
+    /// The move was refused, and nothing changed: an item to lift out sits in
+    /// an item that goes on after its list.
+    pub fn list_level(&mut self, editor: &mut PageEditor, delta: i8) -> Result<bool, Refused> {
         let Some(selection) = editor.selection().cloned() else {
-            return false;
+            return Ok(false);
         };
         let Some(paragraphs) = self.selected_paragraphs(&selection) else {
-            return false;
+            return Ok(false);
         };
         let listed = |paragraph: &Vec<usize>| {
             let path = [self.root.as_slice(), paragraph].concat();
@@ -271,21 +276,26 @@ impl<'a> FlowModel<'a> {
                 .1
                 .is_some()
         };
-        let applies = if selection.is_caret() {
-            selection.focus.offset == 0 && listed(&selection.focus.paragraph)
-        } else {
-            paragraphs.len() > 1 && paragraphs.iter().all(listed)
-        };
-        if applies {
-            self.over_paragraphs(editor, |model, paragraphs| {
-                let paths: Vec<Vec<usize>> = paragraphs
-                    .iter()
-                    .map(|paragraph| [model.root.as_slice(), paragraph].concat())
-                    .collect();
-                edit::list_level(model.content, &paths, delta).ok()
-            });
+        let applies = !self.in_table(&selection)
+            && if selection.is_caret() {
+                selection.focus.offset == 0 && listed(&selection.focus.paragraph)
+            } else {
+                paragraphs.len() > 1 && paragraphs.iter().all(listed)
+            };
+        if !applies {
+            return Ok(false);
         }
-        applies
+        let mut refused = None;
+        self.over_paragraphs(editor, |model, paragraphs| {
+            let paths: Vec<Vec<usize>> = paragraphs
+                .iter()
+                .map(|paragraph| [model.root.as_slice(), paragraph].concat())
+                .collect();
+            edit::list_level(model.content, &paths, delta)
+                .map_err(|reason| refused = Some(reason))
+                .ok()
+        });
+        refused.map_or(Ok(true), Err)
     }
 
     /// Start the numbering again at the item the selection begins in, or carry
@@ -1582,12 +1592,16 @@ mod tests {
             1,
         )));
         let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
-        assert!(!model.list_level(&mut editor, 1), "not at the item's start");
+        assert_eq!(
+            model.list_level(&mut editor, 1),
+            Ok(false),
+            "not at the item's start"
+        );
         editor.select(egui_richedit::Selection::caret(Position::new(
             vec![0, 1, 0],
             0,
         )));
-        assert!(model.list_level(&mut editor, 1));
+        assert_eq!(model.list_level(&mut editor, 1), Ok(true));
         let nested = content
             .at(&[0, 0, 0, 0])
             .and_then(|one| one.child(&Ns::Text, "list"))
@@ -1600,5 +1614,22 @@ mod tests {
         }
         assert_eq!(undone, 1);
         assert_eq!(current.content, original);
+    }
+
+    #[test]
+    fn tab_in_a_table_cell_is_the_tables_even_at_a_list_items_start() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:text><table:table><table:table-column/><table:table-row><table:table-cell><text:list><text:list-item><text:p>One</text:p></text:list-item><text:list-item><text:p>Two</text:p></text:list-item></text:list></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let two = model.order()[1].clone();
+        editor.select(egui_richedit::Selection::caret(Position::new(two, 0)));
+        assert_eq!(model.list_level(&mut editor, 1), Ok(false));
     }
 }

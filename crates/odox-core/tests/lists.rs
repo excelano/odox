@@ -171,3 +171,54 @@ fn continue_joins_previous_list() {
     continue_numbering(&mut content, &all[2]).expect("continued");
     assert_eq!(lists(&content)[1], libreoffice()[2]);
 }
+
+#[test]
+fn an_item_of_two_paragraphs_moves_once() {
+    let mut content = body(&format!(
+        "<text:list>{}<text:list-item><text:p>B1</text:p><text:p>B2</text:p></text:list-item></text:list>",
+        item("A")
+    ));
+    let all = paragraphs(&content);
+    list_level(&mut content, &all[1..3], 1).expect("in a level");
+    assert_eq!(lists(&content), ["list[item[A list[item[B1 B2]]]]"]);
+}
+
+#[test]
+fn refuses_lifting_out_of_an_item_that_goes_on_after_its_list_and_changes_nothing() {
+    let mut content = body(&format!(
+        "<text:list><text:list-item><text:p>A</text:p><text:list>{}</text:list><text:p>A2</text:p></text:list-item>{}</text:list>",
+        item("B"),
+        item("C")
+    ));
+    let before = content.clone();
+    let all = paragraphs(&content);
+    assert_eq!(
+        list_level(&mut content, &all[1..2], -1),
+        Err(odox_core::Refused::Structure)
+    );
+    assert!(content == before);
+}
+
+#[test]
+fn continue_takes_back_a_restart() {
+    let mut content = body(&format!(
+        "<text:list>{}</text:list><text:p>Between</text:p><text:list><text:list-item text:start-value=\"1\"><text:p>Then</text:p></text:list-item></text:list>",
+        item("Before")
+    ));
+    let all = paragraphs(&content);
+    continue_numbering(&mut content, &all[2]).expect("continued");
+    assert_eq!(lists(&content)[1], "list+[item[Then]]");
+}
+
+#[test]
+fn refuses_restarting_at_a_list_header() {
+    let mut content =
+        body("<text:list><text:list-header><text:p>Head</text:p></text:list-header></text:list>");
+    let before = content.clone();
+    let all = paragraphs(&content);
+    assert_eq!(
+        restart_numbering(&mut content, &all[0]),
+        Err(odox_core::Refused::Structure)
+    );
+    assert!(content == before);
+}

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 19:10-0600\n"
+"POT-Creation-Date: 2026-11-23 19:17-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -1048,6 +1048,10 @@ msgstr ""
 #: crates/xodt/src/view.rs:789
 msgid "The table could not be changed here."
 msgstr "Die Tabelle konnte hier nicht geändert werden."
+
+#: crates/xodt/src/view.rs:836
+msgid "This item cannot move out: the item it is in goes on after its list."
+msgstr "Dieser Eintrag kann nicht ausgerückt werden: Der Eintrag, in dem er steht, geht nach seiner Liste weiter."
 
 #~ msgid "Heading 2"
 #~ msgstr "Überschrift 2"

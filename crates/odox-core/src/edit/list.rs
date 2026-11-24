@@ -24,8 +24,10 @@ const DEEPEST: usize = 10;
 ///
 /// # Errors
 ///
-/// A path does not lead to a paragraph, or the content root does not declare
-/// the text namespace. Each is refused before anything changes.
+/// A path does not lead to a paragraph, the content root does not declare the
+/// text namespace, or an item to lift out sits in an item that goes on after
+/// its list, which would put the item after text that follows it. Each is
+/// refused before anything changes.
 pub fn list_level(content: &mut Element, paths: &[Vec<usize>], delta: i8) -> Result<(), Refused> {
     for path in paths {
         content
@@ -34,25 +36,33 @@ pub fn list_level(content: &mut Element, paths: &[Vec<usize>], delta: i8) -> Res
             .ok_or(Refused::NotFound)?;
     }
     declares(content, &[Ns::Text])?;
-    let items: Vec<Vec<usize>> = paths
+    let mut items: Vec<Vec<usize>> = paths
         .iter()
         .filter_map(|path| item_of(content, path))
         .collect();
-    let order = paragraphs(content);
-    let mut ordinals: Vec<usize> = paths
+    items.sort();
+    items.dedup();
+    let outermost: Vec<&Vec<usize>> = items
         .iter()
-        .zip(paths.iter().map(|path| item_of(content, path)))
-        .filter(|(_, item)| {
-            item.as_ref().is_some_and(|item| {
-                !items
-                    .iter()
-                    .any(|other| other.len() < item.len() && item.starts_with(other))
-            })
+        .filter(|item| {
+            !items
+                .iter()
+                .any(|other| other.len() < item.len() && item.starts_with(other))
         })
-        .filter_map(|(path, _)| order.iter().position(|p| p == path))
+        .collect();
+    if delta < 0
+        && outermost
+            .iter()
+            .any(|item| lifts_out_of_order(content, item))
+    {
+        return Err(Refused::Structure);
+    }
+    let order = paragraphs(content);
+    let mut ordinals: Vec<usize> = outermost
+        .iter()
+        .filter_map(|item| order.iter().position(|p| p.starts_with(item)))
         .collect();
     ordinals.sort_unstable();
-    ordinals.dedup();
     for ordinal in ordinals {
         let Some(item) = paragraphs(content)
             .get(ordinal)
@@ -161,6 +171,21 @@ fn indent(content: &mut Element, item: &[usize]) {
     }
 }
 
+/// Whether lifting an item out would put it after text that comes after it:
+/// the item whose list it is in goes on, past that list, with more.
+fn lifts_out_of_order(content: &Element, item: &[usize]) -> bool {
+    let [.., list_at, _] = *item else {
+        return false;
+    };
+    let owner = &item[..item.len() - 2];
+    content.at(owner).is_some_and(|owner| {
+        is_item(owner)
+            && owner.children[list_at + 1..]
+                .iter()
+                .any(|n| matches!(n, Node::Element(_)))
+    })
+}
+
 /// An item a level out, after the item whose list it was in, taking the items
 /// after it in that list with it as its own.
 fn outdent(content: &mut Element, item: &[usize]) {
@@ -222,9 +247,16 @@ fn outdent(content: &mut Element, item: &[usize]) {
 ///
 /// # Errors
 ///
-/// The path does not lead to a paragraph in a list.
+/// The path does not lead to a paragraph in a list, or leads to one in a
+/// list's header, which is not numbered.
 pub fn restart_numbering(content: &mut Element, path: &[usize]) -> Result<(), Refused> {
     let item = item_of(content, path).ok_or(Refused::NotFound)?;
+    if !content
+        .at(&item)
+        .is_some_and(|e| e.is(&Ns::Text, "list-item"))
+    {
+        return Err(Refused::Structure);
+    }
     let start = content.name_for(&Ns::Text, "start-value");
     let item = content.at_mut(&item).ok_or(Refused::NotFound)?;
     item.set_attr(start, "1");
@@ -232,7 +264,7 @@ pub fn restart_numbering(content: &mut Element, path: &[usize]) -> Result<(), Re
 }
 
 /// Carry the numbering of the list holding a paragraph on from the list
-/// before it.
+/// before it, taking back a restart at its item or at the list's first.
 ///
 /// # Errors
 ///
@@ -251,5 +283,15 @@ pub fn continue_numbering(content: &mut Element, path: &[usize]) -> Result<(), R
         .at_mut(&item[..outermost])
         .ok_or(Refused::NotFound)?;
     list.set_attr(continues, "true");
+    if let Some(Node::Element(first)) = list
+        .children
+        .iter_mut()
+        .find(|n| matches!(n, Node::Element(e) if is_item(e)))
+    {
+        first.remove_attr(&Ns::Text, "start-value");
+    }
+    if let Some(own) = content.at_mut(&item) {
+        own.remove_attr(&Ns::Text, "start-value");
+    }
     Ok(())
 }

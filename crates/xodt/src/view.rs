@@ -495,7 +495,7 @@ impl View for TextView {
                     content, styles, ..
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
-                table_keys(ui, &mut self.page, &mut model, &mut self.notice);
+                tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -790,10 +790,12 @@ fn table_refused(refused: &odox_core::Refused) -> String {
     }
 }
 
-/// Tab and Shift+Tab in a table move from cell to cell rather than typing a
-/// tab, while the page has the keyboard. Why a row could not be put in past
-/// the last cell goes to `notice`.
-fn table_keys(
+/// Tab and Shift+Tab, while the page has the keyboard: at the start of a list
+/// item, or over several, they move the items a level in or out, and in a
+/// table they move from cell to cell rather than typing a tab. Why an item
+/// could not move out, or a row could not be put in past the last cell, goes
+/// to `notice`.
+fn tab_keys(
     ui: &Ui,
     page: &mut PageEditor,
     model: &mut FlowModel<'_>,
@@ -822,9 +824,20 @@ fn table_keys(
             input.consume_key(egui::Modifiers::NONE, egui::Key::Tab);
         });
     };
-    if model.list_level(page, if forward { 1 } else { -1 }) {
-        taken(ui);
-        return;
+    match model.list_level(page, if forward { 1 } else { -1 }) {
+        Ok(false) => {}
+        Ok(true) => {
+            taken(ui);
+            return;
+        }
+        Err(_) => {
+            taken(ui);
+            *notice = Some(Notice::Problem(
+                t("This item cannot move out: the item it is in goes on after its list.")
+                    .to_owned(),
+            ));
+            return;
+        }
     }
     let stepped = model.step_cell(page, forward);
     if stepped != Ok(false) {
