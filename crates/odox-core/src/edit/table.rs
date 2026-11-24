@@ -315,7 +315,7 @@ pub(super) fn rows(table: &Element) -> Vec<Vec<usize>> {
 }
 
 /// The paths of a table's `table:table-column` elements under it.
-fn column_elements(table: &Element) -> Vec<Vec<usize>> {
+pub(super) fn column_elements(table: &Element) -> Vec<Vec<usize>> {
     fn walk(parent: &Element, path: &mut Vec<usize>, out: &mut Vec<Vec<usize>>) {
         for (index, child) in parent.elements_indexed() {
             path.push(index);

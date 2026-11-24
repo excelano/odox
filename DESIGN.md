@@ -738,11 +738,14 @@ starts in to the one it ends in, and makes its top left cell span it with
 `table:number-columns-spanned` and `table:number-rows-spanned`, the paragraphs
 of the other cells after its own, empty cells adding none, and a
 `table:covered-table-cell` at every other place, as `LibreOffice` and xods write
-a merge. A rectangle that cuts across a cell merged already is refused, and the
-window says why. Split cell gives back an empty cell at every place the caret's
+a merge. The rectangle a selection asks for grows until it cuts across no cell
+merged already (`edit::merge_rectangle`), as `LibreOffice` grows a selection;
+`edit::merge_cells` itself refuses one that does. Split cell gives back an empty cell at every place the caret's
 cell covered. In edit mode an edge between two columns is dragged to resize the
 two beside it, the table keeping its width and neither column narrower than
-half a centimetre, and Equal column widths shares the table's width out evenly.
+half a centimetre, a pair already under a centimetre being refused, and Equal
+column widths shares the table's width out evenly. Only the columns that change
+are given styles, one style to a width.
 A width is written as `style:column-width` and as `style:rel-column-width` in
 twentieths of a point; a table whose columns state no width is not resized.
 The window draws a merged cell in its first row, at the width of the columns

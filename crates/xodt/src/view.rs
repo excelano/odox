@@ -502,7 +502,7 @@ impl View for TextView {
                     && model.set_column_width(&table, column, width).is_err()
                 {
                     self.notice = Some(Notice::Problem(
-                        t("This table does not say how wide its columns are.").to_owned(),
+                        t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
                     ));
                 }
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
@@ -959,20 +959,28 @@ fn toolbar_commands(
         model.shift_headings(page, delta);
     }
     let reshaped = match command {
-        Some(Command::MergeCells) => Some((
-            model.merge_cells(page),
-            t("These cells cannot be merged: the selection cuts across a merged cell."),
-        )),
-        Some(Command::SplitCell) => {
-            Some((model.split_cell(page), t("This cell cannot be split here.")))
-        }
-        Some(Command::EqualWidths) => Some((
-            model.equal_widths(page),
-            t("This table does not say how wide its columns are."),
-        )),
+        Some(Command::MergeCells) => Some(model.merge_cells(page).map_err(|refused| {
+            if refused == odox_core::Refused::NotFound {
+                t("Select the cells to merge, from one cell of a table to another.")
+            } else {
+                t("These cells cannot be merged: the table has repeated rows or cells.")
+            }
+        })),
+        Some(Command::SplitCell) => Some(model.split_cell(page).map_err(|refused| {
+            if refused == odox_core::Refused::NotFound {
+                t("The caret is not in a table cell.")
+            } else {
+                t("This cell cannot be split: the table has repeated rows or cells.")
+            }
+        })),
+        Some(Command::EqualWidths) => Some(
+            model
+                .equal_widths(page)
+                .map_err(|_| t("This table does not say how wide its columns are.")),
+        ),
         _ => None,
     };
-    if let Some((Err(_), message)) = reshaped {
+    if let Some(Err(message)) = reshaped {
         return Asked {
             size: false,
             picture: false,

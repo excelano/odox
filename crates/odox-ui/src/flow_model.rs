@@ -666,10 +666,11 @@ impl<'a> FlowModel<'a> {
                 return Err(Refused::NotFound);
             };
             if from.table != to.table {
-                return Err(Refused::Structure);
+                return Err(Refused::NotFound);
             }
             let rows = from.row.min(to.row)..from.row.max(to.row) + 1;
             let columns = from.column.min(to.column)..from.column.max(to.column) + 1;
+            let (rows, columns) = edit::merge_rectangle(content, &from.table, rows, columns)?;
             edit::merge_cells(content, &from.table, rows, columns)
         })
     }
@@ -818,6 +819,9 @@ impl<'a> FlowModel<'a> {
                 return Err(refused);
             }
         };
+        if *self.content == before {
+            return Ok(());
+        }
         let paragraph = caret
             .strip_prefix(root.as_slice())
             .map(<[usize]>::to_vec)
@@ -2001,5 +2005,25 @@ mod tests {
         }
         assert_eq!(undone, 1);
         assert_eq!(current.content, original);
+    }
+
+    #[test]
+    fn splitting_a_cell_not_merged_records_nothing() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:text><table:table><table:table-column/><table:table-row><table:table-cell><text:p>a</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection::caret(Position::new(
+            vec![0, 1, 0, 0],
+            0,
+        )));
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        model.split_cell(&mut editor).expect("nothing to split");
+        assert!(!editing.modified());
     }
 }

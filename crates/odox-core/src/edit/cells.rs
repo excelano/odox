@@ -15,7 +15,7 @@ use std::ops::Range;
 
 use super::block::declares;
 use super::format::automatic_styles;
-use super::table::{column_style, column_width, emptied, rows, spread_columns};
+use super::table::{column_elements, column_style, column_width, emptied, rows, spread_columns};
 use super::{Refused, is_paragraph};
 use crate::style::Styles;
 use crate::xml::{Element, Node, Ns};
@@ -170,6 +170,10 @@ pub fn merge_cells(
         cell.children.clear();
     }
     cell.children.extend(moved);
+    if !cell.elements().any(is_paragraph) {
+        let paragraph = super::format::element(cell.name_for(&Ns::Text, "p"));
+        cell.children.push(Node::Element(paragraph));
+    }
     cell.self_closing = false;
     for (name, span) in [(rows_spanned, rows.len()), (columns_spanned, columns.len())] {
         if span > 1 {
@@ -179,6 +183,38 @@ pub fn merge_cells(
         }
     }
     first_paragraph(content)
+}
+
+/// The rectangle from one cell to another grown until it cuts across no
+/// merged cell: what a selection between the two asks to merge.
+///
+/// # Errors
+///
+/// The table has repeated rows or cells, or a place in it no cell covers.
+pub fn merge_rectangle(
+    content: &Element,
+    table: &[usize],
+    rows: Range<usize>,
+    columns: Range<usize>,
+) -> Result<(Range<usize>, Range<usize>), Refused> {
+    let grid = Grid::read(content.at(table).ok_or(Refused::NotFound)?)?;
+    let (mut rows, mut columns) = (rows, columns);
+    loop {
+        let mut grown = (rows.clone(), columns.clone());
+        for row in rows.clone() {
+            for column in columns.clone() {
+                let (_, covering) = grid.places.get(&(row, column)).ok_or(Refused::Structure)?;
+                let anchor = &grid.anchors[covering.ok_or(Refused::Structure)?];
+                grown.0 = grown.0.start.min(anchor.row)..grown.0.end.max(anchor.row + anchor.rows);
+                grown.1 = grown.1.start.min(anchor.column)
+                    ..grown.1.end.max(anchor.column + anchor.columns);
+            }
+        }
+        if grown == (rows.clone(), columns.clone()) {
+            return Ok((rows, columns));
+        }
+        (rows, columns) = grown;
+    }
 }
 
 /// Split a merged cell back into the cells it covers, each new one empty.
@@ -239,50 +275,66 @@ pub fn set_column_width(
     width: f32,
     styles: &mut Styles,
 ) -> Result<(), Refused> {
-    let mut widths = stated_widths(content, table, styles)?;
+    let widths = stated_widths(content, table, styles)?;
     if column + 1 >= widths.len() {
         return Err(Refused::Structure);
     }
     let narrowest = 0.5 / 2.54 * 72.0;
     let pair = widths[column] + widths[column + 1];
-    let width = width.clamp(narrowest, pair - narrowest);
     if pair < narrowest * 2.0 {
         return Err(Refused::Structure);
     }
-    widths[column] = width;
-    widths[column + 1] = pair - width;
-    write_widths(content, table, &widths, styles)
+    let width = width.clamp(narrowest, pair - narrowest);
+    write_widths(
+        content,
+        table,
+        &[(column, width), (column + 1, pair - width)],
+        styles,
+    )
 }
 
-/// Every column's width in points, one to a column.
-fn stated_widths(
-    content: &mut Element,
-    table: &[usize],
-    styles: &Styles,
-) -> Result<Vec<f32>, Refused> {
+/// Every column's width in points, one to a column, read without changing
+/// anything.
+fn stated_widths(content: &Element, table: &[usize], styles: &Styles) -> Result<Vec<f32>, Refused> {
     declares(content, &[Ns::Table, Ns::Style])?;
-    let columns = spread_columns(content, table)?;
-    columns
-        .iter()
-        .map(|column| column_width(content, table, column, styles).ok_or(Refused::Structure))
-        .collect()
+    let element = content.at(table).ok_or(Refused::NotFound)?;
+    let mut widths = Vec::new();
+    for column in column_elements(element) {
+        let repeat = element
+            .at(&column)
+            .and_then(|c| c.attr_usize(&Ns::Table, "number-columns-repeated"))
+            .unwrap_or(1)
+            .clamp(1, 1024);
+        let width = column_width(content, table, &column, styles).ok_or(Refused::Structure)?;
+        widths.extend(std::iter::repeat_n(width, repeat));
+    }
+    Ok(widths)
 }
 
-/// Give each column a style of its width.
+/// Give columns, by their place among the table's, styles of widths: one
+/// style to a width, the document's own where it has one.
 fn write_widths(
     content: &mut Element,
     table: &[usize],
-    widths: &[f32],
+    changes: &[(usize, f32)],
     styles: &mut Styles,
 ) -> Result<(), Refused> {
     let columns = spread_columns(content, table)?;
     let style_name = content.name_for(&Ns::Table, "style-name");
+    let mut named: Vec<(f32, String)> = Vec::new();
     let mut minted = Vec::new();
-    for (column, &width) in columns.iter().zip(widths) {
-        let (name, fresh) = column_style(content, styles, width);
-        minted.extend(fresh);
+    for &(column, width) in changes {
+        let name = if let Some((_, name)) = named.iter().find(|(w, _)| (w - width).abs() < 0.001) {
+            name.clone()
+        } else {
+            let (name, fresh) = column_style(content, styles, width);
+            minted.extend(fresh);
+            named.push((width, name.clone()));
+            name
+        };
+        let path = columns.get(column).ok_or(Refused::NotFound)?;
         content
-            .at_mut(&[table, column.as_slice()].concat())
+            .at_mut(&[table, path.as_slice()].concat())
             .ok_or(Refused::NotFound)?
             .set_attr(style_name.clone(), name);
     }
@@ -309,5 +361,6 @@ pub fn equal_widths(
     let widths = stated_widths(content, table, styles)?;
     #[allow(clippy::cast_precision_loss)]
     let each = widths.iter().sum::<f32>() / widths.len().max(1) as f32;
-    write_widths(content, table, &vec![each; widths.len()], styles)
+    let changes: Vec<(usize, f32)> = (0..widths.len()).map(|column| (column, each)).collect();
+    write_widths(content, table, &changes, styles)
 }

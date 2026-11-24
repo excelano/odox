@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 19:51-0600\n"
+"POT-Creation-Date: 2026-11-23 20:03-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -180,7 +180,7 @@ msgstr ""
 msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1304
+#: crates/odox-ui/src/flow.rs:1306
 msgid "Page break"
 msgstr ""
 
@@ -1034,8 +1034,10 @@ msgstr ""
 msgid "This document has no text in it."
 msgstr ""
 
-#: crates/xodt/src/view.rs:505 crates/xodt/src/view.rs:971
-msgid "This table does not say how wide its columns are."
+#: crates/xodt/src/view.rs:505
+msgid ""
+"These columns cannot be resized: their widths are not stated, or together "
+"they are under a centimetre."
 msgstr ""
 
 #: crates/xodt/src/view.rs:575
@@ -1073,9 +1075,21 @@ msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
 
 #: crates/xodt/src/view.rs:964
-msgid "These cells cannot be merged: the selection cuts across a merged cell."
+msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 
-#: crates/xodt/src/view.rs:967
-msgid "This cell cannot be split here."
+#: crates/xodt/src/view.rs:966
+msgid "These cells cannot be merged: the table has repeated rows or cells."
+msgstr ""
+
+#: crates/xodt/src/view.rs:971
+msgid "The caret is not in a table cell."
+msgstr ""
+
+#: crates/xodt/src/view.rs:973
+msgid "This cell cannot be split: the table has repeated rows or cells."
+msgstr ""
+
+#: crates/xodt/src/view.rs:979
+msgid "This table does not say how wide its columns are."
 msgstr ""

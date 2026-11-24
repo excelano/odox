@@ -3,7 +3,9 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use odox_core::edit::{equal_widths, merge_cells, set_column_width, split_cell, text};
+use odox_core::edit::{
+    equal_widths, merge_cells, merge_rectangle, set_column_width, split_cell, text,
+};
 use odox_core::{Element, Family, Length, Ns, Refused, Styles, xml};
 
 const NAMESPACES: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0""#;
@@ -135,4 +137,83 @@ fn equal_widths_sum_to_table_width() {
         "{got:?}"
     );
     assert!((got.iter().sum::<f32>() - cm(10.0)).abs() < 0.1);
+}
+
+#[test]
+fn a_narrow_pair_of_columns_is_refused_and_unchanged() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES}><office:automatic-styles><style:style style:name="N" style:family="table-column"><style:table-column-properties style:column-width="0.4cm"/></style:style></office:automatic-styles><office:body><office:text><table:table><table:table-column table:style-name="N"/><table:table-column table:style-name="N"/><table:table-row><table:table-cell><text:p/></table:table-cell><table:table-cell><text:p/></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    let before = root.clone();
+    let mut styles = Styles::collect(Some(&root), None);
+    assert_eq!(
+        set_column_width(&mut root, &TABLE, 0, 10.0, &mut styles),
+        Err(Refused::Structure)
+    );
+    assert!(root == before);
+}
+
+#[test]
+fn widths_are_refused_before_repeated_columns_are_spread() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES}><office:automatic-styles><style:style style:name="W" style:family="table-column"><style:table-column-properties style:column-width="3cm"/></style:style></office:automatic-styles><office:body><office:text><table:table><table:table-column table:style-name="W" table:number-columns-repeated="2"/><table:table-row><table:table-cell><text:p/></table:table-cell><table:table-cell><text:p/></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    let before = root.clone();
+    let mut styles = Styles::collect(Some(&root), None);
+    assert!(set_column_width(&mut root, &TABLE, 1, cm(2.0), &mut styles).is_err());
+    assert!(
+        root == before,
+        "the last column has nothing after it to give"
+    );
+}
+
+fn style_names(content: &Element) -> Vec<String> {
+    content
+        .at(&TABLE)
+        .expect("the table")
+        .elements()
+        .filter(|e| e.is(&Ns::Table, "table-column"))
+        .map(|c| {
+            c.attr(&Ns::Table, "style-name")
+                .unwrap_or_default()
+                .to_owned()
+        })
+        .collect()
+}
+
+#[test]
+fn a_resize_restyles_only_the_two_columns_and_equal_widths_shares_one_style() {
+    let mut root = table(&[&["a", "b", "c"]]);
+    let mut styles = Styles::collect(Some(&root), None);
+    set_column_width(&mut root, &TABLE, 0, cm(4.0), &mut styles).expect("wider");
+    assert_eq!(
+        style_names(&root)[2],
+        "C5",
+        "the third column is left as it was"
+    );
+    let mut root = table(&[&["a", "b", "c"]]);
+    let mut styles = Styles::collect(Some(&root), None);
+    equal_widths(&mut root, &TABLE, &mut styles).expect("even");
+    let names = style_names(&root);
+    assert!(names.iter().all(|n| *n == names[0]), "{names:?}");
+}
+
+#[test]
+fn the_rectangle_grows_to_take_in_merged_cells_it_touches() {
+    let mut root = table(&[&["a", "b", "c"], &["d", "e", "f"]]);
+    merge_cells(&mut root, &TABLE, 0..1, 0..2).expect("top merged");
+    merge_cells(&mut root, &TABLE, 1..2, 0..2).expect("bottom merged");
+    assert_eq!(merge_rectangle(&root, &TABLE, 0..2, 0..1), Ok((0..2, 0..2)));
+}
+
+#[test]
+fn a_top_left_cell_without_a_paragraph_is_merged_into() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES}><office:body><office:text><table:table><table:table-column/><table:table-column/><table:table-row><table:table-cell/><table:table-cell><text:p/></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    let at = merge_cells(&mut root, &[0, 0, 0], 0..1, 0..2).expect("merged");
+    assert!(root.at(&at).is_some_and(|p| p.is(&Ns::Text, "p")));
 }
