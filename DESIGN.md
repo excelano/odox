@@ -468,7 +468,11 @@ and kept. Numbers, words with a digit, and web and mail addresses are not
 words. A word a dictionary does not know has a red wave under it; a right click
 on it offers up to five replacements, each one step to undo, Add to
 dictionary, which keeps it in `words.txt` beside `settings.toml`, and Ignore,
-which takes it as spelled until the application closes.
+which takes it as spelled until the application closes. An added word is taken
+as a dictionary takes its own: as written and in capitals, and one written in
+small letters also with a capital first. A window reads `words.txt` again when
+it is focused and the file has changed, and a word the file could not take is
+ignored until the application closes, with the reason shown.
 
 **A cell is edited in place.** Typing on the picked cell replaces it, Enter or
 F2 opens it with what it holds, Enter commits and moves down, Tab commits and

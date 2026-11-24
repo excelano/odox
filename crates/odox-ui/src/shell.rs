@@ -927,6 +927,18 @@ impl<V: View> Shell<V> {
                 &[("reason", &reason)],
             ));
         }
+        let speller = crate::spell::Speller::shared();
+        if let Some(message) = speller.failure() {
+            self.error = Some(message);
+        }
+        if ctx.input(|input| {
+            input
+                .events
+                .iter()
+                .any(|event| matches!(event, egui::Event::WindowFocused(true)))
+        }) {
+            speller.refresh();
+        }
         match self.view.take_notice() {
             Some(Notice::Done(message)) => {
                 self.notice = Some(message);
