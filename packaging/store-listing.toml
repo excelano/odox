@@ -62,7 +62,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Text under Open With, or launch the application and use Open.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click into the page and type, format text and paragraphs from the bar above the page or the Format menu, and insert a table, a picture, a footnote, a comment, a link or a field, each one step to undo. Ctrl+F finds text and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click into the page and type, format text and paragraphs from the bar above the page or the Format menu, and insert a table, a picture, a footnote, a comment, a link or a field, each one step to undo. Ctrl+F finds text and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %APPDATA% it keeps one preference, a recent-documents list and the words added to the dictionary, under %LOCALAPPDATA% a copy of unsaved changes; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .odt association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -117,7 +117,7 @@ features = [
     "Find with Ctrl+F, matching case or whole words, and replace one match or every match with Ctrl+H",
     "Spelling checked as you type, with suggestions, Add to dictionary and Ignore on a right click",
     "A count of the document's words and characters, and of the selection's",
-    "Export as PDF/UA-1, the standard for accessible PDF, checked as it is written, and print through your system's own dialog",
+    "Export as PDF/UA-1, the standard for accessible PDF, checked as it is written, and print from your PDF viewer",
     "What you did not touch is written back as it was read, element for element, including what Odox has never heard of",
     "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
@@ -176,7 +176,7 @@ features = [
     "Mit Strg+F suchen, auch nach Groß- und Kleinschreibung oder ganzen Wörtern, und mit Strg+H einen Treffer oder alle ersetzen",
     "Rechtschreibprüfung beim Tippen, mit Vorschlägen, Zum Wörterbuch hinzufügen und Ignorieren per Rechtsklick",
     "Die Zahl der Wörter und Zeichen im Dokument und in der Auswahl",
-    "Export als PDF/UA-1, der Norm für barrierefreies PDF, beim Schreiben geprüft, und Drucken über den Dialog Ihres Systems",
+    "Export als PDF/UA-1, der Norm für barrierefreies PDF, beim Schreiben geprüft, und Drucken aus Ihrem PDF-Betrachter",
     "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, auch das, wovon Odox nie gehört hat",
     "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
@@ -214,7 +214,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Grid under Open With, or launch the application and use Open.
 
-Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, and what begins with = is a formula, worked out as soon as it is entered; a change works out again every formula that reads it. Ctrl+1 formats the picked cells, Ctrl+D fills down, and the Sheet menu sorts, comments, changes rows, columns and sheets, and merges cells, with formulas following what moved; Undo takes any of it back. Ctrl+F finds text in any sheet and Ctrl+H replaces it, and a misspelled word in the cell being typed is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
+Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, and what begins with = is a formula, worked out as soon as it is entered; a change works out again every formula that reads it. Ctrl+1 formats the picked cells, Ctrl+D fills down, and the Sheet menu sorts, comments, changes rows, columns and sheets, and merges cells, with formulas following what moved; Undo takes any of it back. Ctrl+F finds text in any sheet and Ctrl+H replaces it, and spelling is checked in the cell being typed. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %APPDATA% it keeps one preference, a recent-documents list and the words added to the dictionary, under %LOCALAPPDATA% a copy of unsaved changes; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .ods association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -247,7 +247,7 @@ privacy = "https://excelano.com/legal/#odox"
 name = "Odox Grid"
 subtitle = "Edit OpenDocument sheets"
 promotional-text = "Open an OpenDocument spreadsheet at its own column widths and cell styles, change the cells that need changing, and save it back as the document it was."
-keywords = "opendocument,odf,ods,spreadsheet,editor,edit,sheet,oasis,calc,csv"
+keywords = "opendocument,odf,ods,spreadsheet,editor,edit,sheet,oasis,calc,table"
 
 [products.xods.locales."en-us".microsoft]
 name = "Odox Grid"
@@ -271,7 +271,7 @@ features = [
     "Freeze the top rows and left columns, resize columns and rows by their headers, and see a selection's sum, average and count",
     "Find text in any sheet with Ctrl+F and replace it with Ctrl+H; spelling is checked in the cell you are typing in",
     "A sheet with a large empty gap in it opens as fast as one without, because the gap is never expanded",
-    "Export as PDF/UA-1, each sheet a tagged table with its header row, and print through your system's own dialog",
+    "Export as PDF/UA-1, each sheet a tagged table with its header row, and print from your PDF viewer",
     "What you did not touch is written back as it was read, and a save that would not read back the same is refused",
     "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
@@ -332,7 +332,7 @@ features = [
     "Oberste Zeilen und linke Spalten fixieren, Spalten und Zeilen am Kopf in der Größe ändern, Summe, Mittelwert und Anzahl sehen",
     "Text in jedem Blatt mit Strg+F suchen und mit Strg+H ersetzen; die Rechtschreibung wird in der Zelle geprüft, in die Sie tippen",
     "Ein Blatt mit einer großen leeren Lücke öffnet so schnell wie ein volles, weil die Lücke nie ausgerollt wird",
-    "Export als PDF/UA-1, jedes Blatt eine ausgezeichnete Tabelle mit Kopfzeile, und Drucken über den Dialog Ihres Systems",
+    "Export als PDF/UA-1, jedes Blatt eine ausgezeichnete Tabelle mit Kopfzeile, und Drucken aus Ihrem PDF-Betrachter",
     "Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde, und ein Speichern, das nicht so zurückkäme, wird verweigert",
     "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
@@ -370,7 +370,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Deck under Open With, or launch the application and use Open.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change and format it where it sits, and take any of it back with Undo. The Slide menu adds, duplicates, moves and deletes slides and puts a text box, a picture or a comment on one. F5 starts a slideshow that reveals a slide's builds click by click, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA asks about two undescribed pictures, then writes a PDF. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change and format it where it sits, and take any of it back with Undo. The Slide menu adds, duplicates, moves and deletes slides and puts a text box, a picture or a comment on one. F5 starts a slideshow that reveals a slide's builds click by click, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and misspelled words are underlined. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA asks about two undescribed pictures, then writes a PDF. Under %APPDATA% it keeps one preference, a recent-documents list and the words added to the dictionary, under %LOCALAPPDATA% a copy of unsaved changes; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .odp association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -427,7 +427,7 @@ features = [
     "Find text with Ctrl+F across every slide and every slide's notes, and replace it with Ctrl+H",
     "Spelling checked as you type, with suggestions, Add to dictionary and Ignore on a right click",
     "What you did not touch is written back as it was read, element for element, the master page and the template included",
-    "Export as PDF/UA-1, a page per slide tagged in reading order, and print through your system's own dialog",
+    "Export as PDF/UA-1, a page per slide tagged in reading order, and print from your PDF viewer",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
     "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
@@ -488,7 +488,7 @@ features = [
     "Text mit Strg+F über alle Folien und alle Notizen suchen und mit Strg+H ersetzen",
     "Rechtschreibprüfung beim Tippen, mit Vorschlägen, Zum Wörterbuch hinzufügen und Ignorieren per Rechtsklick",
     "Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde, Element für Element, Masterfolie und Vorlage eingeschlossen",
-    "Export als PDF/UA-1, eine Seite je Folie in Lesereihenfolge ausgezeichnet, und Drucken über den Dialog Ihres Systems",
+    "Export als PDF/UA-1, eine Seite je Folie in Lesereihenfolge ausgezeichnet, und Drucken aus Ihrem PDF-Betrachter",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
     "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
