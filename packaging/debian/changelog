@@ -1,3 +1,65 @@
+odox (0.19.0) unstable; urgency=low
+
+  * Refusals in a sheet say why, a read-only file system asks for another place, and the privacy and store text match what is written where
+  * A save the system refuses asks where to save instead, so recovered changes can be kept on macOS
+  * Spelling finds the dictionaries the Windows and macOS packages carry
+  * The bundled German dictionary is igerman98 under its OASIS distribution license, so every store package may carry it
+  * The Debian packages describe what the editors now do, and build again
+  * An edit the window cannot make says why, in the reader's language, instead of doing nothing
+  * German dictionaries read with their affix rules, fields and other scripts left unmarked, and header corrections made
+  * Spelling checked in edit mode, with a red wave under unknown words and suggestions on a right click
+  * A print whose dialog goes away ends instead of holding Print and Export, and each print gets a file of its own
+  * File > Print and Ctrl+P, through the desktop's print dialog on Linux and the default viewer elsewhere
+  * Recovered changes that fail to open are kept, two windows never offer the same ones, and a logout keeps a last copy
+  * Unsaved changes are kept every minute, and offered again after a window stops without closing
+  * A click in a show moves it on without freezing, text not yet shown takes no clicks, and a text-only build leaves its shape drawn
+  * A slideshow reveals a slide's builds click by click, each at its end
+  * Slide frames drawn with no fill or outline, as LibreOffice shows its own, and placing a text box ends when it should
+  * A text box drawn or clicked onto a slide, and a picture put in its middle, from the Slide menu
+  * Headers made here print, the body's own master page is edited, carets follow undo into their part, and body-only things stay out of bands
+  * Page headers and footers drawn around the text and typed into like it, turned on and off from the Format menu
+  * Page fields filled per line and per field, in tables, with LibreOffice's adjustments and numerals, until the pages settle, and following dates saved in their own style
+  * Date, page number and page count fields put in from Format > Field, shaded in the window and filled page by page in the PDF
+  * Links keep their neighbours' spaces and marks, change only what differs, take Ctrl+K only from the page, and refuse a question left behind
+  * Links made, changed and taken off from Ctrl+K, with the document's headings, bookmarks or slides to pick from
+  * Validity rules take quoted numbers and typed dates, honour case, and leave formulas and empty cells alone, and Cancel gives the editor back its keys
+  * Validity rules checked as values are typed, pasted or filled, refusing, warning or telling as each rule says
+  * Array arguments, reference and date bounds, month ends, TEXT refusals and SEARCH patterns as LibreOffice works them out
+  * Thirty-four more functions worked out, with TODAY, NOW, OFFSET and INDIRECT recalculated on every change
+  * Sheet drawings past the used cells reach the grid and the page, lines and groups stay put, and pictures without a description are asked about
+  * Pictures and shapes on a sheet drawn over its cells and printed, moving with the cells they are anchored to
+  * Conditional ranges read quoted sheet names, reach past the used cells, and compare as LibreOffice does
+  * Conditional formats shown in the grid and the PDF, and worked out again after each edit
+  * Rejecting a change refuses what it cannot undo, restores lists and headings, and keeps the recording switch
+  * Tracked changes shown in their authors' colours, and accepted or rejected one by one or all at once
+  * Footnotes in lists, cells and tall notes reach the page, and boxes find nested notes
+  * Footnotes and endnotes shown, inserted and edited, and footnotes at the page foot in the PDF
+  * Comments keep their end marks, names and spaces, read out of headings, and their boxes stay open
+  * Comments in text documents and on slides, read, added, edited and deleted
+  * Table widths never panic or change before refusing, and a merge grows over merged cells
+  * Merge and split table cells, and resize columns by dragging
+  * Page breaks stay on one paragraph, keys keep the caret, and tables refuse them
+  * Manual page breaks with Ctrl+Enter
+  * Indent refuses before changing anything, and line spacing replaces other spacing
+  * Indent buttons and line spacing for paragraphs
+  * List levels move each item once, refuse reordering, and leave Tab to tables
+  * List levels by Tab, and restarting or continuing numbering
+  * Automatic colour and no highlight override the colour around them
+  * Font colour, highlighting, superscript and subscript
+  * Formatting marks after a citation, on screen only, in a shaded paragraph's ink
+  * View > Formatting marks shows spaces, tabs, breaks and paragraph ends
+  * Heading keys act only while the page has the keyboard
+  * Headings of every level, promoted and demoted by key
+  * A picture casts its shadow, and a translucent shape a lighter one
+  * Shapes cast their shadows, in the window and the PDF
+  * Windows share the recent list, and the privacy statement names it
+  * File > Open recent lists the last ten documents
+  * Count words and characters under the page
+  * Alt+C and Alt+W type nothing on any keyboard layout
+  * Match case and whole words in the find bar
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 24 Nov 2026 11:49:09 -0600
+
 odox (0.18.1) unstable; urgency=low
 
   * A right-to-left paragraph ending in a line break keeps the empty line after it
