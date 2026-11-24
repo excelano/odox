@@ -50,6 +50,7 @@ pub mod picture_question;
 pub mod print;
 pub mod recent;
 pub mod recovery;
+pub mod refusal;
 pub mod settings;
 pub mod shapes;
 pub mod shell;

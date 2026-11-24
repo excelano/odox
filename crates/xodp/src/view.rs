@@ -21,6 +21,7 @@ use odox_ui::i18n::{fill, t};
 use odox_ui::link_dialog::LinkQuestion;
 use odox_ui::note_popup::{self, NoteContent, NoteResponse};
 use odox_ui::picture_question::PictureQuestion;
+use odox_ui::refusal;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
@@ -891,7 +892,7 @@ impl SlideView {
             Err(refused) => {
                 document.document.content = before;
                 document.document.package.restore(parts);
-                self.notice = Some(Notice::Problem(refused.to_string()));
+                self.notice = Some(Notice::Problem(refusal::message(&refused)));
             }
         }
     }
@@ -926,7 +927,7 @@ impl SlideView {
                                 .select(Selection::caret(Caret::new(vec![shape, 0, 0], 0)));
                         }
                     }
-                    Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
+                    Err(refused) => self.notice = Some(Notice::Problem(refusal::message(&refused))),
                 }
             }
             Action::Pick(shape) => {
