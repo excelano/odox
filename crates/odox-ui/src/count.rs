@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn list_labels_are_not_counted() {
+    fn text_odt_counts_by_word_boundaries_not_by_libreoffice_rule() {
         let document = odox_core::doc::TextDocument::read(&read("text.odt")).expect("it reads");
         assert_eq!(
             in_paragraphs(document.body().expect("a body")),
