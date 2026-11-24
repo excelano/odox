@@ -61,7 +61,7 @@ fn fixed_date_keeps_its_value() {
         r#"<text:p><text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date> and <text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p>"#,
     );
     let styles = odox_core::Styles::collect(Some(&root), None);
-    assert!(follow_dates(&mut root, TODAY, &styles));
+    assert!(follow_dates(&mut root, None, TODAY, &styles));
     let out = written(&root);
     assert!(
         out.contains(
@@ -74,7 +74,7 @@ fn fixed_date_keeps_its_value() {
         "{out}"
     );
     assert!(
-        !follow_dates(&mut root, TODAY, &styles),
+        !follow_dates(&mut root, None, TODAY, &styles),
         "nothing left to change"
     );
 }
@@ -103,7 +103,7 @@ fn a_date_saved_today_keeps_its_time_and_one_from_another_day_its_style() {
     );
     let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
     let styles = odox_core::Styles::collect(Some(&root), None);
-    assert!(follow_dates(&mut root, TODAY, &styles));
+    assert!(follow_dates(&mut root, None, TODAY, &styles));
     let out = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
     assert!(
         out.contains(r#"text:date-value="2026-11-23T10:00:00">11/23/26</text:date>"#),
@@ -122,5 +122,35 @@ fn a_spreadsheets_dates_are_left_alone() {
     );
     let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
     let styles = odox_core::Styles::collect(Some(&root), None);
-    assert!(!follow_dates(&mut root, TODAY, &styles));
+    assert!(!follow_dates(&mut root, None, TODAY, &styles));
+}
+
+#[test]
+fn a_following_date_in_a_header_follows_too() {
+    let mut root = content("<text:p>Body</text:p>");
+    let source = format!(
+        r#"<office:document-styles {NAMESPACES} xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:master-styles><style:master-page style:name="Standard"><style:header><text:p><text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p></style:header></style:master-page></office:master-styles></office:document-styles>"#
+    );
+    let mut styles_part = xml::parse(source.as_bytes(), "styles").expect("a styles root");
+    let styles = odox_core::Styles::collect(Some(&root), Some(&styles_part));
+    assert!(follow_dates(
+        &mut root,
+        Some(&mut styles_part),
+        TODAY,
+        &styles
+    ));
+    let out = String::from_utf8(xml::serialize(&styles_part)).expect("UTF-8");
+    assert!(
+        out.contains(r#"<text:date text:date-value="2026-11-23">2026-11-23</text:date>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_date_in_a_tracked_deletion_is_left_as_it_was_deleted() {
+    let mut root = content(
+        r#"<text:tracked-changes><text:changed-region text:id="c1"><text:deletion><office:change-info><dc:date xmlns:dc="http://purl.org/dc/elements/1.1/">2020-01-02T10:00:00</dc:date></office:change-info><text:p><text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p></text:deletion></text:changed-region></text:tracked-changes><text:p>Body</text:p>"#,
+    );
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(!follow_dates(&mut root, None, TODAY, &styles));
 }

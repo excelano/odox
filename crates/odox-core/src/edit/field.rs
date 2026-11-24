@@ -7,7 +7,7 @@
 use super::block::declares;
 use super::{Refused, insert_inline, is_paragraph};
 use crate::style::Styles;
-use crate::xml::{Element, Node, Ns};
+use crate::xml::{Element, Name, Node, Ns};
 
 /// A field to put in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,12 +80,16 @@ fn iso((year, month, day): (i64, i64, i64)) -> String {
     format!("{year:04}-{month:02}-{day:02}")
 }
 
-/// Write today into every date in a text document's body that follows the
-/// day and holds another, shown in its own data style, answering whether
-/// any changed. A date already of today keeps its time.
-pub fn follow_dates(content: &mut Element, today: (i64, i64, i64), styles: &Styles) -> bool {
-    let iso = iso(today);
-    let mut changed = false;
+/// Write today into every date in a text document's body, headers and
+/// footers that follows the day and holds another, shown in its own data
+/// style, answering whether any changed. A date already of today keeps its
+/// time, and one in a tracked deletion keeps the day it was deleted with.
+pub fn follow_dates(
+    content: &mut Element,
+    styles_part: Option<&mut Element>,
+    today: (i64, i64, i64),
+    styles: &Styles,
+) -> bool {
     let value = content.name_for(&Ns::Text, "date-value");
     let Some(text) = content
         .child_mut(&Ns::Office, "body")
@@ -93,7 +97,22 @@ pub fn follow_dates(content: &mut Element, today: (i64, i64, i64), styles: &Styl
     else {
         return false;
     };
-    walk(text, &mut |date| {
+    let mut changed = follow(text, &value, today, styles);
+    if let Some(part) = styles_part {
+        let value = part.name_for(&Ns::Text, "date-value");
+        if let Some(pages) = part.child_mut(&Ns::Office, "master-styles") {
+            changed |= follow(pages, &value, today, styles);
+        }
+    }
+    changed
+}
+
+/// Write today into every following date under an element, answering
+/// whether any changed.
+fn follow(root: &mut Element, value: &Name, today: (i64, i64, i64), styles: &Styles) -> bool {
+    let iso = iso(today);
+    let mut changed = false;
+    walk(root, &mut |date| {
         let Some(shown) = crate::doc::date_shown(date, today, styles) else {
             return;
         };
@@ -115,7 +134,7 @@ fn walk(element: &mut Element, each: &mut impl FnMut(&mut Element)) {
         if let Node::Element(child) = child {
             if child.is(&Ns::Text, "date") {
                 each(child);
-            } else {
+            } else if !child.is(&Ns::Text, "tracked-changes") {
                 walk(child, each);
             }
         }
