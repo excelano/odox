@@ -55,33 +55,52 @@ fn set(ctx: &Context, on: bool) {
 /// put each character, so that nothing moves.
 pub fn paint(ui: &Ui, galley: &Galley, map: &OffsetMap, origin: Pos2, flat: &str, ink: Color32) {
     let ink = ink.gamma_multiply(0.45);
-    let place = |offset: usize| {
-        galley
-            .pos_from_cursor(CCursor::new(map.to_galley(offset.min(map.model_len()))))
-            .translate(origin.to_vec2())
-    };
     let painter = ui.painter();
-    for (at, mark) in of(flat) {
-        let here = place(at);
-        let font = FontId::proportional(here.height() * 0.7);
-        let span = |here: Rect| {
-            let next = place(at + 1);
-            let end = if (next.center().y - here.center().y).abs() < 1.0 {
-                next.left()
-            } else {
-                here.left() + here.height() * 0.3
-            };
-            pos2(f32::midpoint(here.left(), end), here.center().y)
-        };
-        let (at, symbol, align) = match mark {
-            Mark::Space => (span(here), "\u{b7}", Align2::CENTER_CENTER),
-            Mark::NoBreakSpace => (span(here), "\u{b0}", Align2::CENTER_CENTER),
-            Mark::Tab => (span(here), "\u{2192}", Align2::CENTER_CENTER),
-            Mark::LineBreak => (here.left_center(), "\u{21b5}", Align2::LEFT_CENTER),
-            Mark::ParagraphEnd => (here.left_center(), "\u{b6}", Align2::LEFT_CENTER),
-        };
-        painter.text(at, align, symbol, font, ink);
+    for (at, symbol, align, size) in placed(galley, map, flat) {
+        painter.text(
+            origin + at.to_vec2(),
+            align,
+            symbol,
+            FontId::proportional(size),
+            ink,
+        );
     }
+}
+
+/// Where each mark goes in the galley, what it is drawn as, which side of it
+/// the point is, and how large. The paragraph's end is after the last thing
+/// shown, a note's citation or a field's value included.
+fn placed(galley: &Galley, map: &OffsetMap, flat: &str) -> Vec<(Pos2, &'static str, Align2, f32)> {
+    let place = |offset: usize| {
+        galley.pos_from_cursor(CCursor::new(map.to_galley(offset.min(map.model_len()))))
+    };
+    of(flat)
+        .into_iter()
+        .map(|(at, mark)| {
+            let here = match mark {
+                Mark::ParagraphEnd => galley.pos_from_cursor(CCursor::new(galley.len())),
+                _ => place(at),
+            };
+            let size = here.height() * 0.7;
+            let span = |here: Rect| {
+                let next = place(at + 1);
+                let end = if (next.center().y - here.center().y).abs() < 1.0 {
+                    next.left()
+                } else {
+                    here.left() + here.height() * 0.3
+                };
+                pos2(f32::midpoint(here.left(), end), here.center().y)
+            };
+            let (point, symbol, align) = match mark {
+                Mark::Space => (span(here), "\u{b7}", Align2::CENTER_CENTER),
+                Mark::NoBreakSpace => (span(here), "\u{b0}", Align2::CENTER_CENTER),
+                Mark::Tab => (span(here), "\u{2192}", Align2::CENTER_CENTER),
+                Mark::LineBreak => (here.left_center(), "\u{21b5}", Align2::LEFT_CENTER),
+                Mark::ParagraphEnd => (here.left_center(), "\u{b6}", Align2::LEFT_CENTER),
+            };
+            (point, symbol, align, size)
+        })
+        .collect()
 }
 
 /// What a mark stands for.
@@ -142,5 +161,27 @@ mod tests {
     fn paragraph_end_mark_after_last_char() {
         assert_eq!(of("ünï"), vec![(3, Mark::ParagraphEnd)]);
         assert_eq!(of(""), vec![(0, Mark::ParagraphEnd)]);
+    }
+
+    #[test]
+    fn the_paragraph_end_follows_a_citation_that_ends_it() {
+        use eframe::egui::text::{LayoutJob, TextFormat};
+        let ctx = Context::default();
+        let mut job = egui_richedit::ParagraphJob::new(LayoutJob::default());
+        job.text("End.", TextFormat::default());
+        job.atom("12", 0, TextFormat::default());
+        let (job, map) = job.into_parts();
+        let mut marks = Vec::new();
+        let mut output = ctx.run_ui(eframe::egui::RawInput::default(), |ui| {
+            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job.clone()));
+            let end = galley.pos_from_cursor(CCursor::new(galley.len())).left();
+            marks = placed(&galley, &map, "End.")
+                .into_iter()
+                .map(|(at, _, _, _)| at.x - end)
+                .collect();
+        });
+        output.textures_delta.clear();
+        assert_eq!(marks.len(), 1);
+        assert!(marks[0].abs() < 0.01, "{marks:?}");
     }
 }

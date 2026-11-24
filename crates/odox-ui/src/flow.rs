@@ -613,11 +613,12 @@ impl Flow<'_> {
                 response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
             }
         } else {
-            let marked = self.marks.then(|| (Arc::clone(&galley), map.clone()));
+            let marked = (self.marks && ui.is_rect_visible(rect))
+                .then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
             if let Some((galley, map)) = marked {
                 let flat = odox_core::edit::text(element);
-                crate::marks::paint(ui, &galley, &map, origin, &flat, self.palette.ink);
+                crate::marks::paint(ui, &galley, &map, origin, &flat, ground.ink);
             }
         }
 

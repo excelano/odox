@@ -543,7 +543,7 @@ impl View for TextView {
     }
 
     fn has_formatting_marks(&self) -> bool {
-        true
+        self.document.is_some()
     }
 
     fn has_side(&self) -> bool {
