@@ -18,6 +18,7 @@ use crate::find::{Options, Replaced};
 use crate::find_bar::{FindBar, Replace, Step};
 use crate::i18n::{fill, t};
 use crate::recent::Recent;
+use crate::recovery::{Orphan, Recovery};
 use crate::settings::Settings;
 
 /// What an application tells the shell about itself.
@@ -210,7 +211,17 @@ pub struct Shell<V: View> {
     /// The person has answered that the window may close, so the next request
     /// to close it is not asked about again.
     closing: bool,
+    /// Where the unsaved changes are kept while the window runs, where the
+    /// platform's data directory could be had.
+    recovery: Option<Recovery>,
+    /// The revision last kept there, and when.
+    kept: (Option<u64>, std::time::Instant),
+    /// Changes windows that stopped left behind, offered one at a time.
+    orphans: Vec<Orphan>,
 }
+
+/// How often unsaved changes are kept.
+const KEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// How much of the screen the window has.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -285,6 +296,8 @@ impl<V: View> Shell<V> {
         let show_side = view.side_at_start();
         let recent = Recent::load(product.id);
         let zoom = Zoom::new(view.fits());
+        let recovery = Recovery::start(product.id).ok();
+        let orphans = crate::recovery::orphans(product.id);
         Self {
             view,
             product,
@@ -301,6 +314,136 @@ impl<V: View> Shell<V> {
             screen: Screen::Window,
             pending: None,
             closing: false,
+            recovery,
+            kept: (None, std::time::Instant::now()),
+            orphans,
+        }
+    }
+
+    /// Whether a document is open with changes no file holds.
+    fn unsaved(&self) -> bool {
+        self.view.is_open() && self.editing.modified()
+    }
+
+    /// Whether a question is up that everything else waits on.
+    fn asking(&self) -> bool {
+        self.pending.is_some() || !self.orphans.is_empty()
+    }
+
+    /// Keep the document's unsaved changes, a minute at most after they
+    /// were made, and forget them once there are none.
+    fn keep_changes(&mut self, ctx: &egui::Context) {
+        let Some(recovery) = &self.recovery else {
+            return;
+        };
+        if !self.unsaved() {
+            if self.kept.0.is_some() {
+                recovery.clear();
+                self.kept.0 = None;
+            }
+            return;
+        }
+        let revision = self.editing.revision();
+        if self.kept.0 == Some(revision) {
+            return;
+        }
+        let waited = self.kept.1.elapsed();
+        if waited < KEEP_EVERY {
+            ctx.request_repaint_after(KEEP_EVERY.saturating_sub(waited));
+            return;
+        }
+        let Some(document) = self.view.document_mut() else {
+            return;
+        };
+        if let Ok(bytes) = document.write_verified() {
+            recovery.save(bytes, self.path.as_deref());
+        }
+        self.kept = (Some(revision), std::time::Instant::now());
+    }
+
+    /// Offer the changes a window that stopped left behind: opened, they are
+    /// the file they were made to, unsaved. A window that has a file of its
+    /// own lets them go, for the next window that starts with none.
+    fn offer_orphan(&mut self, ctx: &egui::Context) {
+        if self.path.is_some() || self.unsaved() {
+            self.orphans.clear();
+        }
+        let Some(orphan) = self.orphans.first() else {
+            return;
+        };
+        let file = orphan
+            .original
+            .as_deref()
+            .map_or_else(|| t("Untitled").to_owned(), name_of);
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("recovered")).show(ctx, |ui| {
+            ui.label(fill(
+                t("{app} stopped before {file} was saved. Open the changes it had?"),
+                &[("app", self.product.id), ("file", &file)],
+            ));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("Open")).clicked() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                    answer = Some(true);
+                }
+                if ui.button(t("Discard")).clicked() {
+                    answer = Some(false);
+                }
+            });
+        });
+        let Some(open) = answer else {
+            return;
+        };
+        let orphan = self.orphans.remove(0);
+        if !open {
+            orphan.discard();
+            return;
+        }
+        let opened = match orphan.bytes() {
+            Ok(bytes) => self.open_recovered(ctx, &bytes, orphan.original.clone()),
+            Err(e) => {
+                self.error = Some(fill(
+                    t("The changes to {file} could not be read: {reason}"),
+                    &[("file", &file), ("reason", &e.to_string())],
+                ));
+                false
+            }
+        };
+        if opened {
+            orphan.discard();
+        }
+    }
+
+    /// Open recovered bytes; answers whether they opened, as the copy is
+    /// kept for another time if not.
+    fn open_recovered(
+        &mut self,
+        ctx: &egui::Context,
+        bytes: &[u8],
+        original: Option<PathBuf>,
+    ) -> bool {
+        let shown = original
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(t("Untitled")));
+        match self.view.open(ctx, bytes, &shown) {
+            Ok(()) => {
+                self.path = original;
+                self.error = None;
+                self.settling = true;
+                self.editing.reset();
+                self.editing.mark_unsaved();
+                self.editing.on = self.settings.open_in_edit_mode;
+                if let Some(recovery) = &self.recovery {
+                    recovery.save(bytes.to_vec(), self.path.as_deref());
+                    recovery.settle();
+                    self.kept = (Some(self.editing.revision()), std::time::Instant::now());
+                }
+                true
+            }
+            Err(message) => {
+                self.error = Some(message);
+                false
+            }
         }
     }
 
@@ -638,14 +781,14 @@ impl<V: View> eframe::App for Shell<V> {
             self.screen = screen;
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(presenting));
         }
-        self.editing.asking = self.pending.is_some();
+        self.editing.asking = self.asking();
         let field_focused = ctx
             .memory(egui::Memory::focused)
             .is_some_and(|id| id != crate::flow_model::page_editor_id());
-        if self.pending.is_none() && !presenting {
+        if !self.asking() && !presenting {
             self.find_keys(&ctx);
         }
-        if self.pending.is_none() && !field_focused && !presenting {
+        if !self.asking() && !field_focused && !presenting {
             self.keys(&ctx);
             if self.view.has_formatting_marks() {
                 crate::marks::keys(&ctx);
@@ -708,6 +851,28 @@ impl<V: View> eframe::App for Shell<V> {
         });
 
         self.ask_about_changes(&ctx);
+        self.offer_orphan(&ctx);
+        self.keep_changes(&ctx);
+    }
+
+    /// A window that ends with changes nobody was asked about, as a logout
+    /// or Quit from the macOS menu ends it, leaves them to be offered again.
+    fn on_exit(&mut self) {
+        let Some(recovery) = self.recovery.take() else {
+            return;
+        };
+        if self.unsaved() && !self.closing {
+            if let Some(bytes) = self
+                .view
+                .document_mut()
+                .and_then(|document| document.write_verified().ok())
+            {
+                recovery.save(bytes, self.path.as_deref());
+            }
+            recovery.leave();
+        } else {
+            recovery.finish();
+        }
     }
 }
 

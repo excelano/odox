@@ -325,6 +325,28 @@ except on a link, which is followed instead.
 Forward takes the next step and then the next slide, back undoes one and then
 enters the slide before at its last step.
 
+**Unsaved changes are kept against a crash** (`recovery.rs`). Each window
+takes an exclusive lock, `File::try_lock`, on a file of its own in
+`odox/recovery` under the platform's data directory, and the operating system
+lets that lock go when the process ends however it ends. While the document has
+changes no file holds, it is written as Save writes it, at most once a minute
+and only when it changed, on the window's thread, and the bytes go to disk on a
+worker, beside their note of the file they were made to and when, each written
+whole beside its place, onto the disk, and moved there. A save, a close or
+undoing back to the saved state takes them away, and a window that closes as it
+should takes its lock away too; a panic does not, because nothing removes them
+but that close, and neither does an ending nobody was asked about, Quit from the
+macOS menu or a logout, which keeps a last copy and lets only the lock go. A
+window that starts with no file of its own looks for the files of its
+application whose lock no running window holds, locks each while it offers it
+so no other window offers it too, and offers them one at a time; opened, they
+are the original's path with changes unsaved, written at once as this window's
+own, and the others wait for the next window. Copies that cannot be opened stay
+for another time. A window opened on a file lets them go for the next. A lock
+with no bytes beside it is tidied away unasked, and the lock itself is taken
+under another name and moved into place, so a window scanning never finds one
+still being made.
+
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
 one in a window of its own: a window holds one document, as it does for Open.

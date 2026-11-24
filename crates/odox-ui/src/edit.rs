@@ -222,6 +222,12 @@ impl Editing {
     pub fn mark_saved(&mut self) {
         self.saved_at = Some(self.undo.len());
     }
+
+    /// The document holds what no file does, and no undo reaches a state
+    /// that a file holds: changes brought back after a window stopped.
+    pub fn mark_unsaved(&mut self) {
+        self.saved_at = None;
+    }
 }
 
 #[cfg(test)]
