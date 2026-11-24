@@ -293,7 +293,10 @@ each language places its own and the catalog carries it: `&File`, `&Datei`.
 Holding Alt underlines the menu bar's letters and Alt with one opens its menu;
 in an open menu every letter is underlined and the letter alone chooses the
 entry, ticks the checkbox or opens the submenu, while a disabled entry is
-passed over and no letter typed with a menu open reaches the document. An
+passed over and no letter typed with a menu open reaches the document. A
+modal question takes its keys first, and an Alt and letter no menu has is
+left for whatever else takes one, such as the find bar's Alt+C. A context
+menu drawn with the document, such as a sheet tab's, has no letters. An
 entry registers its letter and widget as it is drawn; once the menu bar is
 drawn the letter is matched against the deepest open menu, and the entry is
 clicked at the start of the next frame as a screen reader's click is, so a

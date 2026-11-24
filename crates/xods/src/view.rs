@@ -802,7 +802,7 @@ impl View for SheetView {
                 }
                 ui.separator();
             }
-            self.book_menu(ui, self.sheet, can);
+            self.book_menu(ui, self.sheet, can, true);
         });
     }
 
@@ -1202,8 +1202,9 @@ impl SheetView {
     }
 
     /// The items that add, rename, delete and move a sheet, for the Sheet
-    /// menu and for a tab's own.
-    fn book_menu(&mut self, ui: &mut Ui, sheet: usize, can: bool) {
+    /// menu, with their letters, and for a tab's own, which is drawn after
+    /// the keys are read and so has none.
+    fn book_menu(&mut self, ui: &mut Ui, sheet: usize, can: bool, lettered: bool) {
         let Some(document) = &self.document else {
             return;
         };
@@ -1230,7 +1231,12 @@ impl SheetView {
             ),
         ];
         for (name, command, possible) in entries {
-            if mnemonic::button(ui, can && possible, name).clicked() {
+            let chosen = if lettered {
+                mnemonic::button(ui, can && possible, name)
+            } else {
+                ui.add_enabled(can && possible, egui::Button::new(mnemonic::plain(name)))
+            };
+            if chosen.clicked() {
                 self.book_command = Some((command, sheet));
                 ui.close();
             }
@@ -1882,7 +1888,7 @@ impl SheetView {
                         if response.double_clicked() && can {
                             self.book_command = Some((BookCommand::Rename, index));
                         }
-                        response.context_menu(|ui| self.book_menu(ui, index, can));
+                        response.context_menu(|ui| self.book_menu(ui, index, can, false));
                     }
                 });
             });

@@ -210,45 +210,60 @@ pub fn keys(ctx: &Context) {
     let Some((key, letter, modifiers)) = pressed else {
         return;
     };
+    let reachable = |layer: LayerId| ctx.memory(|memory| memory.allows_interaction(layer));
     let open: Vec<LayerId> = entries
         .iter()
-        .filter(|entry| !entry.bar)
+        .filter(|entry| !entry.bar && reachable(entry.layer))
         .map(|entry| entry.layer)
         .collect();
-    let chosen = |layer: Option<LayerId>, bar: bool| {
+    let chosen = |layer: LayerId, bar: bool| {
         entries
             .iter()
             .find(|entry| {
                 entry.bar == bar
                     && entry.enabled
                     && entry.letter == letter
-                    && layer.is_none_or(|layer| entry.layer == layer)
+                    && entry.layer == layer
+                    && reachable(layer)
             })
             .map(|entry| entry.id)
     };
     let target = if modifiers.alt && !modifiers.ctrl && !modifiers.command {
-        let target = chosen(None, true);
-        if target.is_some() {
-            egui::Popup::close_all(ctx);
-        }
-        target
-    } else if modifiers.is_none() && !open.is_empty() {
+        let Some(target) = entries
+            .iter()
+            .filter(|entry| entry.bar)
+            .find_map(|entry| chosen(entry.layer, true))
+        else {
+            return;
+        };
+        egui::Popup::close_all(ctx);
+        ctx.input_mut(|input| {
+            input.events.retain(|event| match event {
+                Event::Key { key: pressed, .. } => *pressed != key,
+                Event::Text(text) => !text.eq_ignore_ascii_case(&letter.to_string()),
+                _ => true,
+            });
+        });
+        Some(target)
+    } else if (modifiers.is_none() || modifiers == egui::Modifiers::SHIFT) && !open.is_empty() {
         let deepest = open
             .iter()
             .rev()
             .find(|layer| MenuState::is_deepest_open_sub_menu(ctx, layer.id))
             .copied();
-        chosen(deepest, false)
+        ctx.input_mut(|input| {
+            input.events.retain(|event| match event {
+                Event::Key { key: pressed, .. } => *pressed != key,
+                Event::Text(_) => false,
+                _ => true,
+            });
+        });
+        deepest
+            .filter(|_| modifiers.is_none())
+            .and_then(|layer| chosen(layer, false))
     } else {
         return;
     };
-    ctx.input_mut(|input| {
-        input.events.retain(|event| match event {
-            Event::Key { key: pressed, .. } => *pressed != key,
-            Event::Text(text) => !text.eq_ignore_ascii_case(&letter.to_string()),
-            _ => true,
-        });
-    });
     if let Some(target) = target {
         ctx.data_mut(|data| data.insert_temp(pending_id(), target));
         ctx.request_repaint();
@@ -374,6 +389,11 @@ mod tests {
                             ui.close();
                         }
                     });
+                    menu(ui, true, "&Plain", |ui| {
+                        if ui.button("Unlettered").clicked() {
+                            chosen.push("unlettered");
+                        }
+                    });
                 });
                 if shown.is_some() {
                     chosen.push("file open");
@@ -382,7 +402,20 @@ mod tests {
                     button(ui, true, "&Undo");
                 });
             });
+            if chosen.contains(&"modal up") {
+                egui::Modal::new(Id::unique("question")).show(ui.ctx(), |ui| {
+                    ui.label("Save changes?");
+                });
+            }
             keys(ui.ctx());
+            if ui.input(|input| {
+                input
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, Event::Key { pressed: true, .. }))
+            }) {
+                chosen.push("key left");
+            }
         });
         output.textures_delta.clear();
     }
@@ -435,12 +468,58 @@ mod tests {
     }
 
     #[test]
+    fn nothing_is_reached_behind_a_modal_question() {
+        let ctx = Context::default();
+        let mut chosen = vec!["modal up"];
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::F, Modifiers::ALT), &mut chosen);
+        settle(&ctx, &mut chosen);
+        assert!(!chosen.contains(&"file open"), "{chosen:?}");
+        assert!(chosen.contains(&"key left"), "the question has the key");
+    }
+
+    #[test]
+    fn alt_and_a_letter_no_menu_has_is_left_for_others() {
+        let ctx = Context::default();
+        let mut chosen = Chosen::new();
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::W, Modifiers::ALT), &mut chosen);
+        assert!(chosen.contains(&"key left"), "{chosen:?}");
+    }
+
+    #[test]
+    fn a_letter_in_a_submenu_without_letters_chooses_nothing_behind_it() {
+        let ctx = Context::default();
+        let mut chosen = Chosen::new();
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::F, Modifiers::ALT), &mut chosen);
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::P, Modifiers::NONE), &mut chosen);
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::S, Modifiers::NONE), &mut chosen);
+        settle(&ctx, &mut chosen);
+        assert!(!chosen.contains(&"save"), "{chosen:?}");
+        assert!(!chosen.contains(&"key left"), "{chosen:?}");
+    }
+
+    #[test]
+    fn a_capital_typed_with_a_menu_open_reaches_nothing() {
+        let ctx = Context::default();
+        let mut chosen = Chosen::new();
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::F, Modifiers::ALT), &mut chosen);
+        settle(&ctx, &mut chosen);
+        frame(&ctx, key(Key::Q, Modifiers::SHIFT), &mut chosen);
+        assert!(!chosen.contains(&"key left"), "{chosen:?}");
+    }
+
+    #[test]
     fn a_letter_without_an_open_menu_is_left_for_the_document() {
         let ctx = Context::default();
         let mut chosen = Chosen::new();
         settle(&ctx, &mut chosen);
         frame(&ctx, key(Key::S, Modifiers::NONE), &mut chosen);
         settle(&ctx, &mut chosen);
-        assert_eq!(chosen, Chosen::new());
+        assert_eq!(chosen, vec!["key left"]);
     }
 }

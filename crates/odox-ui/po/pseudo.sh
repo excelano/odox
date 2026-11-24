@@ -74,7 +74,8 @@ function accent(s,   n, i, c, r) {
     for (i = 1; i <= length(s); i++) {
         c = substr(s, i, 1)
         r = c
-        if (c == "a") r = "ä"; else if (c == "A") r = "Å"
+        if (c == "&") { r = substr(s, i, 2); i++ }
+        else if (c == "a") r = "ä"; else if (c == "A") r = "Å"
         else if (c == "e") r = "é"; else if (c == "E") r = "É"
         else if (c == "i") r = "í"; else if (c == "I") r = "Î"
         else if (c == "o") r = "ö"; else if (c == "O") r = "Ö"
