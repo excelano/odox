@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.19.1"
+version = "0.19.2"
 
 [products.xodt.locales.en-us]
-whats-new = "A fix release. The Format menu fits a short window, with the text marks and alignment in submenus, and Promote and Demote heading are offered only on headings. The default font colour is in the colour palette, a styled link is drawn as a link, and words added to the dictionary are taken in capitals and in other open windows, with a failure to keep one shown. A document opened from Finder asks before replacing one with unsaved changes, and an empty window no longer asks to save."
+whats-new = "A fix release. Text typed right after a field, such as a page count, goes after it, the arrows step over a field as one character, and a field moves with cut and paste. A date that follows the day is saved as today in headers and footers too, and editing a comment that holds a list keeps the list in its place. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
 
 [products.xodt.locales.de-de]
-whats-new = "Eine Korrekturversion. Das Menü Format passt in ein niedriges Fenster, mit Zeichenformaten und Ausrichtung in Untermenüs, und Überschrift höher und tiefer stufen werden nur bei Überschriften angeboten. Die voreingestellte Schriftfarbe steht in der Farbpalette, ein formatierter Link wird als Link gezeichnet, und Wörter im Wörterbuch gelten auch in Großbuchstaben und in anderen offenen Fenstern; kann eines nicht gespeichert werden, wird das angezeigt. Ein aus dem Finder geöffnetes Dokument fragt, bevor es eines mit ungespeicherten Änderungen ersetzt, und ein leeres Fenster fragt nicht mehr nach dem Speichern."
+whats-new = "Eine Korrekturversion. Direkt nach einem Feld wie der Seitenanzahl getippter Text steht hinter dem Feld, die Pfeiltasten überspringen ein Feld als ein Zeichen, und ein Feld wandert mit Ausschneiden und Einfügen. Ein mitlaufendes Datum wird auch in Kopf- und Fußzeilen als heutiges gespeichert, und beim Bearbeiten eines Kommentars mit einer Liste bleibt die Liste an ihrem Platz. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
 
 [products.xods.locales.en-us]
-whats-new = "A fix release. Renaming a sheet whose name has a space keeps its print and conditional-format ranges whole. Words added to the dictionary are taken in capitals and in other open windows, with a failure to keep one shown. A document opened from Finder asks before replacing one with unsaved changes, and an empty window no longer asks to save."
+whats-new = "A fix release. Resizing a row or a column always leaves a step to undo. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
 
 [products.xods.locales.de-de]
-whats-new = "Eine Korrekturversion. Wird ein Blatt umbenannt, dessen Name ein Leerzeichen enthält, bleiben seine Druck- und Formatierungsbereiche ganz. Wörter im Wörterbuch gelten auch in Großbuchstaben und in anderen offenen Fenstern; kann eines nicht gespeichert werden, wird das angezeigt. Ein aus dem Finder geöffnetes Dokument fragt, bevor es eines mit ungespeicherten Änderungen ersetzt, und ein leeres Fenster fragt nicht mehr nach dem Speichern."
+whats-new = "Eine Korrekturversion. Das Ändern der Größe einer Zeile oder Spalte lässt sich immer rückgängig machen. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
 
 [products.xodp.locales.en-us]
-whats-new = "A fix release. The slideshow passes over hidden slides, follows links to other slides, and Shift+F5 starts it at the slide in view. A link in a label is drawn as a link, and a shadow's outline no longer darkens a ring over its fill. Words added to the dictionary are taken in capitals and in other open windows. A document opened from Finder asks before replacing one with unsaved changes, and an empty window no longer asks to save."
+whats-new = "A fix release. Text typed right after a field in a label goes after it. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
 
 [products.xodp.locales.de-de]
-whats-new = "Eine Korrekturversion. Die Bildschirmpräsentation überspringt ausgeblendete Folien, folgt Links zu anderen Folien, und Umschalt+F5 beginnt sie bei der angezeigten Folie. Ein Link in einer Beschriftung wird als Link gezeichnet, und der Umriss eines Schattens dunkelt keinen Ring über seiner Füllung mehr ab. Wörter im Wörterbuch gelten auch in Großbuchstaben und in anderen offenen Fenstern. Ein aus dem Finder geöffnetes Dokument fragt, bevor es eines mit ungespeicherten Änderungen ersetzt, und ein leeres Fenster fragt nicht mehr nach dem Speichern."
+whats-new = "Eine Korrekturversion. Direkt nach einem Feld in einer Beschriftung getippter Text steht hinter dem Feld. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
