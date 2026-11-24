@@ -322,6 +322,9 @@ pub(crate) struct Piece {
     pub heading: Option<(u8, String)>,
     /// The footnotes cited in it, laid out for the foot of its page.
     pub footnotes: Vec<Piece>,
+    /// The paragraph with page fields it is the first piece of, as the model
+    /// counts them.
+    pub fielded: Option<usize>,
 }
 
 /// Lays blocks out and builds the structure tree as it goes.
@@ -403,6 +406,9 @@ impl<'a> Layout<'a> {
     ) -> Result<(), Refusal> {
         let first = out.len();
         self.paragraph_lines(paragraph, x, width, parent, label, out)?;
+        if let Some(piece) = out.get_mut(first) {
+            piece.fielded = paragraph.fielded;
+        }
         if !paragraph.footnotes.is_empty() {
             let mut foot = Vec::new();
             for note in &paragraph.footnotes {

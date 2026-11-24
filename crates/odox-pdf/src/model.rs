@@ -71,9 +71,48 @@ pub(crate) struct Paragraph {
     pub right_to_left: bool,
     /// The footnotes cited in it, for the foot of the page it is on.
     pub footnotes: Vec<Note>,
+    /// The page number and page count fields in it, by the characters each
+    /// shows, which the pages are filled in with once they are known.
+    pub page_fields: Vec<(Range<usize>, PageField)>,
+    /// Which paragraph with page fields it is, counting from nought, to find
+    /// the page it lands on.
+    pub fielded: Option<usize>,
+}
+
+/// A field a page fills in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PageField {
+    Number,
+    Count,
 }
 
 impl Paragraph {
+    /// The paragraph with each page field showing what it comes to: its
+    /// page's number, or the count, the runs moving with the characters.
+    pub(crate) fn filled(&mut self, page: usize, pages: usize) {
+        for at in (0..self.page_fields.len()).rev() {
+            let (range, field) = self.page_fields[at].clone();
+            let shown = match field {
+                PageField::Number => page.to_string(),
+                PageField::Count => pages.to_string(),
+            };
+            let delta = shown.len() as isize - range.len() as isize;
+            self.text.replace_range(range.clone(), &shown);
+            let moved = |at: usize| at.saturating_add_signed(delta);
+            for run in &mut self.runs {
+                if run.range.start >= range.end {
+                    run.range = moved(run.range.start)..moved(run.range.end);
+                } else if run.range.end >= range.end {
+                    run.range.end = moved(run.range.end);
+                }
+            }
+            for (other, _) in &mut self.page_fields[at + 1..] {
+                *other = moved(other.start)..moved(other.end);
+            }
+            self.page_fields[at].0 = range.start..range.start + shown.len();
+        }
+    }
+
     /// A line of text in one style and nothing else: a list label.
     pub(crate) fn plain(text: &str, style: &Style) -> Self {
         Self {
@@ -100,6 +139,8 @@ impl Paragraph {
             tab_distance: TAB_DISTANCE,
             right_to_left: false,
             footnotes: Vec::new(),
+            page_fields: Vec::new(),
+            fielded: None,
         }
     }
 }
@@ -224,6 +265,7 @@ fn read_notes(
         shape,
         notes: Vec::new(),
         at_foot,
+        fielded: 0,
     };
     let mut blocks = Vec::new();
     reader.blocks(root, &mut blocks, &mut ListCounters::default());
@@ -241,6 +283,8 @@ struct Reader<'a> {
     /// Whether a footnote goes with the paragraph citing it, rather than to
     /// the end with the endnotes.
     at_foot: bool,
+    /// How many paragraphs with page fields have been read.
+    fielded: usize,
 }
 
 impl Reader<'_> {
@@ -296,6 +340,7 @@ impl Reader<'_> {
             text: String::new(),
             runs: Vec::new(),
             links: Vec::new(),
+            page_fields: Vec::new(),
         };
         let mut anchored = Vec::new();
         self.runs(
@@ -346,6 +391,11 @@ impl Reader<'_> {
             tab_distance: p.tab_distance.map_or(TAB_DISTANCE, Length::points),
             right_to_left: p.right_to_left == Some(true),
             footnotes,
+            fielded: (!text.page_fields.is_empty()).then(|| {
+                self.fielded += 1;
+                self.fielded - 1
+            }),
+            page_fields: text.page_fields,
         }));
         for (element, path) in frames {
             let outer = std::mem::replace(&mut self.path, path);
@@ -433,6 +483,17 @@ impl Reader<'_> {
                             text.push(&citation.plain_text(), &raised, inherited);
                         }
                         anchored.push((element.clone(), path.clone()));
+                    } else if element.is(&Ns::Text, "page-number")
+                        || element.is(&Ns::Text, "page-count")
+                    {
+                        let start = text.text.len();
+                        self.runs(element, inherited, size, link, text, anchored, path);
+                        let field = if element.is(&Ns::Text, "page-number") {
+                            PageField::Number
+                        } else {
+                            PageField::Count
+                        };
+                        text.page_fields.push((start..text.text.len(), field));
                     } else if element.is(&Ns::Text, "ruby-text") {
                         text.push(&edit::ruby_shown(element), &current, inherited);
                     } else if edit::is_inline_passthrough(element)
@@ -659,6 +720,7 @@ struct Text {
     text: String,
     runs: Vec<Run>,
     links: Vec<String>,
+    page_fields: Vec<(Range<usize>, PageField)>,
 }
 
 impl Text {
@@ -805,6 +867,80 @@ pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
                     undescribed(&note.blocks, into);
                 }
             }
+            _ => {}
+        }
+    }
+}
+
+/// Whether any paragraph among blocks has page fields.
+pub(crate) fn has_page_fields(blocks: &[Block]) -> bool {
+    let mut any = false;
+    each_paragraph(blocks, &mut |paragraph| any |= paragraph.fielded.is_some());
+    any
+}
+
+/// Fill every page field among blocks: a paragraph's page numbers with the
+/// page it begins on, the first where it was not found on one, and every page
+/// count with the count.
+pub(crate) fn fill_page_fields(
+    blocks: &mut [Block],
+    page_of: &std::collections::HashMap<usize, usize>,
+    pages: usize,
+) {
+    each_paragraph_mut(blocks, &mut |paragraph| {
+        if let Some(fielded) = paragraph.fielded {
+            paragraph.filled(page_of.get(&fielded).copied().unwrap_or(1), pages);
+        }
+    });
+}
+
+fn each_paragraph(blocks: &[Block], each: &mut impl FnMut(&Paragraph)) {
+    for block in blocks {
+        match block {
+            Block::Paragraph(paragraph) => {
+                each(paragraph);
+                for note in &paragraph.footnotes {
+                    each_paragraph(&note.blocks, each);
+                }
+            }
+            Block::List(list) => {
+                for item in &list.items {
+                    each_paragraph(&item.blocks, each);
+                }
+            }
+            Block::Table(table) => {
+                for cell in table.rows.iter().flatten() {
+                    each_paragraph(&cell.blocks, each);
+                }
+            }
+            Block::TextBox(text_box) => each_paragraph(&text_box.blocks, each),
+            Block::Note(note) => each_paragraph(&note.blocks, each),
+            _ => {}
+        }
+    }
+}
+
+fn each_paragraph_mut(blocks: &mut [Block], each: &mut impl FnMut(&mut Paragraph)) {
+    for block in blocks {
+        match block {
+            Block::Paragraph(paragraph) => {
+                each(paragraph);
+                for note in &mut paragraph.footnotes {
+                    each_paragraph_mut(&mut note.blocks, each);
+                }
+            }
+            Block::List(list) => {
+                for item in &mut list.items {
+                    each_paragraph_mut(&mut item.blocks, each);
+                }
+            }
+            Block::Table(table) => {
+                for cell in table.rows.iter_mut().flatten() {
+                    each_paragraph_mut(&mut cell.blocks, each);
+                }
+            }
+            Block::TextBox(text_box) => each_paragraph_mut(&mut text_box.blocks, each),
+            Block::Note(note) => each_paragraph_mut(&mut note.blocks, each),
             _ => {}
         }
     }

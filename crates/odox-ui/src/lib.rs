@@ -75,13 +75,13 @@ pub fn now() -> f64 {
     UNIX_EPOCH_DAY + days
 }
 
-/// Today, as year, month and day in UTC: what a date that follows the clock
-/// shows.
+/// Today, as year, month and day in local time: what a date that follows the
+/// clock shows.
 pub fn today() -> (i64, i64, i64) {
-    let seconds = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| {
-            i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
-        });
-    odox_core::date_of(seconds)
+    let now = jiff::ZonedDateTime::now();
+    (
+        i64::from(now.year()),
+        i64::from(now.month()),
+        i64::from(now.day()),
+    )
 }

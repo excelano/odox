@@ -22,6 +22,7 @@ mod annotation;
 mod block;
 mod cells;
 mod changes;
+mod field;
 mod figure;
 pub(crate) mod format;
 pub mod html;
@@ -50,6 +51,7 @@ pub use cells::{equal_widths, merge_cells, merge_rectangle, set_column_width, sp
 pub use changes::{
     Change, ChangeKind, accept, accept_all, change_marks, changes, reject, reject_all, tracking,
 };
+pub use field::{Field, follow_dates, insert_field};
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };

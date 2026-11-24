@@ -1106,6 +1106,19 @@ or the caret is at it; in edit mode the box edits the text, a line to a
 paragraph of the body in the style of its first, or deletes the note. Find's
 Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 
+**A field is put in at the caret** (`edit/field.rs`) from Format > Field, as
+`LibreOffice` writes one: a date as `text:date` with its `text:date-value`,
+`text:fixed="true"` where it keeps the day it was put in, a page number as
+`text:page-number text:select-page="current"` and a page count as
+`text:page-count`, each holding the value it shows. A field's value is not
+the paragraph's text, so text typed at its place goes in before it. The
+window shades every field faintly, and draws a date that follows the day as
+today's, local, in its own data style, without changing the tree; saving
+writes today into each such date, as `LibreOffice` does. The PDF fills page
+numbers and page counts wherever they stand: a document whose paragraphs hold
+them is laid out once to find the page each lands on and how many pages there
+are, then again with those filled in, the headers and footers as before.
+
 **A link is a `text:a`** with `xlink:type="simple"` and `xlink:href`
 (`edit/link.rs`), made over a range of one paragraph by cutting the paragraph
 at both ends of it, so a span the range begins or ends in is cut there and

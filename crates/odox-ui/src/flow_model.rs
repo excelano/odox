@@ -1012,6 +1012,41 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
+    /// Put a field in at the caret, as one step to undo, a date being today's.
+    ///
+    /// # Errors
+    ///
+    /// As [`edit::insert_field`].
+    pub fn insert_field(
+        &mut self,
+        editor: &mut PageEditor,
+        field: edit::Field,
+    ) -> Result<(), Refused> {
+        let caret = editor
+            .selection()
+            .map(|s| s.focus.clone())
+            .ok_or(Refused::NotFound)?;
+        let before = self.content.clone();
+        let path = [self.root.as_slice(), &caret.paragraph].concat();
+        if let Err(refused) =
+            edit::insert_field(self.content, &path, caret.offset, field, crate::today())
+        {
+            *self.content = before;
+            return Err(refused);
+        }
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &caret.paragraph].concat(),
+                caret.offset,
+            )),
+        );
+        editor.select(Selection::caret(caret));
+        Ok(())
+    }
+
     /// Do what was done in a note's box, the note by its path under the root
     /// the flow draws: its new text, or its removal, as one step to undo.
     ///

@@ -1009,6 +1009,9 @@ fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Opti
         Some(Command::Note(class)) => {
             let _ = model.insert_note(page, class);
         }
+        Some(Command::Field(field)) => {
+            let _ = model.insert_field(page, field);
+        }
         Some(Command::PageBreak(true)) => {
             model.insert_page_break(page);
         }
