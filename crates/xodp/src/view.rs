@@ -69,6 +69,9 @@ pub struct SlideView {
     presenting: bool,
     /// Where the show is on the slide in view.
     show: Show,
+    /// A misspelled word in a label and what goes in its place, done when
+    /// the slide's text is next edited.
+    correction: Option<(Vec<usize>, std::ops::Range<usize>, String)>,
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
@@ -107,6 +110,7 @@ impl Default for SlideView {
             found: Found::default(),
             presenting: false,
             show: Show::default(),
+            correction: None,
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
@@ -556,6 +560,7 @@ impl View for SlideView {
         let dragging = self.drag.is_some();
         let mut action = None;
         let mut followed = None;
+        let mut corrected = None;
         let mut noted = None;
         let opened = self.opened_note.take();
 
@@ -630,6 +635,7 @@ impl View for SlideView {
                     canvas.slide_shape(ui, index, shape);
                 }
                 followed = canvas.followed.take();
+                corrected = canvas.corrected.take();
                 noted = slide_comments(
                     ui,
                     page,
@@ -665,6 +671,10 @@ impl View for SlideView {
         }
         if let Some(name) = followed {
             self.go_to_slide_named(&name);
+        }
+        if corrected.is_some() {
+            self.correction = corrected;
+            ui.ctx().request_repaint();
         }
         if let Some(action) = action {
             self.act(action, scale, editing);
@@ -763,6 +773,16 @@ impl SlideView {
         let Document {
             content, styles, ..
         } = &mut document.document;
+        if let Some((paragraph, range, word)) = self.correction.take() {
+            let found = odox_ui::find::Match {
+                scope: 0,
+                paragraph,
+                range,
+            };
+            FlowModel::new(content, styles, root.clone(), editing)
+                .tagged(vec![self.slide])
+                .replace_matches(&[&found], &word, true);
+        }
         let mut model = FlowModel::new(content, styles, root, editing)
             .within(scope)
             .tagged(vec![self.slide]);

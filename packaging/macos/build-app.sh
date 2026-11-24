@@ -420,6 +420,7 @@ build_bundle() {
         }
         install -m 0644 "$icns" "${bundle}/Contents/Resources/${family}.icns"
     done
+    cp -R "${root}/packaging/dictionaries" "${bundle}/Contents/Resources/dictionaries"
 
     # `|` as the delimiter because half these values carry a `/` and all of them
     # carry a `.`. None carries a `|`.

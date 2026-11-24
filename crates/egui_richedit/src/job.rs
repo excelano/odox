@@ -142,6 +142,11 @@ impl ParagraphJob {
         &self.job
     }
 
+    /// How many characters have been drawn so far.
+    pub fn drawn_len(&self) -> usize {
+        self.job.text.chars().count()
+    }
+
     /// Whether nothing has been drawn yet.
     pub fn is_empty(&self) -> bool {
         self.job.text.is_empty()
@@ -204,6 +209,16 @@ impl OffsetMap {
             model: model..model + model_len,
             atom,
         });
+    }
+
+    /// The drawn characters that stand for no characters of the model's
+    /// one for one: a field, a note's citation, a tab.
+    pub fn atoms(&self) -> Vec<Range<usize>> {
+        self.pieces
+            .iter()
+            .filter(|piece| piece.atom)
+            .map(|piece| piece.shown.clone())
+            .collect()
     }
 
     /// How many characters the model holds for the paragraph.

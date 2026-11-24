@@ -14,6 +14,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::Arc;
 
 use eframe::egui::emath::TSTransform;
@@ -283,6 +284,12 @@ pub struct Flow<'a> {
     pub veiled: Vec<usize>,
     /// How far the flow is through what [`Self::veiled`] names.
     veil: Veil,
+    /// A word the spell check's menu replaced: the paragraph, the
+    /// characters, and what to put there, for the view to do.
+    pub corrected: Option<(Vec<usize>, Range<usize>, String)>,
+    /// Where each language begins in the paragraph being laid out, by drawn
+    /// character, as its runs say.
+    spoken: std::cell::RefCell<Vec<(usize, Option<String>)>>,
     /// The document's tracked changes, each with its author's ink, read the
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
@@ -347,6 +354,8 @@ impl<'a> Flow<'a> {
             decided: None,
             veiled: Vec::new(),
             veil: Veil::default(),
+            corrected: None,
+            spoken: std::cell::RefCell::new(Vec::new()),
             tracked: std::cell::OnceCell::new(),
             inserting: std::cell::RefCell::new(None),
             today: crate::today(),
@@ -723,6 +732,32 @@ impl Flow<'_> {
         }
     }
 
+    /// Under each word a dictionary for its language does not know, a red
+    /// wave; a replacement chosen from its menu is for the view to make.
+    fn spell(
+        &mut self,
+        ui: &mut Ui,
+        response: &Response,
+        (galley, map): (Arc<Galley>, OffsetMap),
+        origin: Pos2,
+    ) {
+        if !ui.is_rect_visible(response.rect) {
+            return;
+        }
+        crate::spell::Speller::shared().wake(ui.ctx());
+        let spoken = self.spoken.borrow().clone();
+        let drawn = galley.text();
+        let wrong = crate::spell::wrong_in(drawn, &spoken, &map.atoms());
+        if let Some((range, word)) =
+            crate::spell::mark(ui, response, (&galley, origin), drawn, &wrong, self.zoom)
+        {
+            let model = map.to_model(range.start)..map.to_model(range.end);
+            if !model.is_empty() {
+                self.corrected = Some((self.path.clone(), model, word));
+            }
+        }
+    }
+
     /// A frame anchored in a paragraph whose text starts at `start`: as a
     /// character, where the paragraph's alignment puts its text; otherwise at
     /// the paragraph's start, which is `LibreOffice`'s `from-left` default, as
@@ -769,6 +804,7 @@ impl Flow<'_> {
         edited: bool,
     ) {
         let mut galley = galley;
+        let spelled = edited.then(|| (Arc::clone(&galley), map.clone()));
         self.show_matches(ui, &mut galley, &map, origin);
         let readable = Arc::clone(&galley);
         let links = edit::links(element);
@@ -804,6 +840,9 @@ impl Flow<'_> {
         if let Some((galley, map)) = hit {
             self.follow_link(ui, response, &links, &galley, &map, origin, edited);
         }
+        if let Some(laid) = spelled {
+            self.spell(ui, response, laid, origin);
+        }
     }
 
     /// The layout job for a paragraph, and the frames anchored inside it,
@@ -827,6 +866,7 @@ impl Flow<'_> {
         };
         let mut job = ParagraphJob::new(job);
         let mut frames = Vec::new();
+        self.spoken.borrow_mut().clear();
         let run = Run {
             inherited: &properties.text,
             size,
@@ -883,6 +923,11 @@ impl Flow<'_> {
         let mut small = format.clone();
         small.font_id.size *= SMALL_CAPS;
         let put = |job: &mut ParagraphJob, shown: &str, model_len: usize| {
+            let mut spoken = self.spoken.borrow_mut();
+            if spoken.last().map(|(_, language)| language) != Some(&inherited.language) {
+                spoken.push((job.drawn_len(), inherited.language.clone()));
+            }
+            drop(spoken);
             let same_length = shown.chars().count() == model_len;
             for (piece, drawn_small) in inherited.cased(shown) {
                 let plain = if drawn_small { &small } else { format };

@@ -527,6 +527,7 @@ impl View for TextView {
             // this frame already draws it.
             let region = self.region;
             if edit_mode && let Some((mut model, _)) = region_model(document, region, editing) {
+                self.wanted.correct(&mut model);
                 if region == Region::Body {
                     self.wanted
                         .apply(&mut self.page, &mut model, &mut self.notice);
@@ -574,7 +575,7 @@ impl View for TextView {
                         if let Some(header) = band(false) {
                             let page = (active == Some(Region::Header)).then_some(&mut self.page);
                             let clickable = active.is_some_and(|region| region != Region::Header);
-                            if band_drawn(
+                            let (clicked, corrected) = band_drawn(
                                 ui,
                                 &document.document,
                                 &mut self.pictures,
@@ -582,8 +583,13 @@ impl View for TextView {
                                 palette,
                                 (scale, width),
                                 clickable,
-                            ) {
+                            );
+                            if clicked {
                                 wanted = Some(Region::Header);
+                            }
+                            if corrected.is_some() {
+                                self.wanted.correction = corrected;
+                                ui.ctx().request_repaint();
                             }
                             rule(ui, palette);
                         }
@@ -624,7 +630,7 @@ impl View for TextView {
                             rule(ui, palette);
                             let page = (active == Some(Region::Footer)).then_some(&mut self.page);
                             let clickable = active.is_some_and(|region| region != Region::Footer);
-                            if band_drawn(
+                            let (clicked, corrected) = band_drawn(
                                 ui,
                                 &document.document,
                                 &mut self.pictures,
@@ -632,8 +638,13 @@ impl View for TextView {
                                 palette,
                                 (scale, width),
                                 clickable,
-                            ) {
+                            );
+                            if clicked {
                                 wanted = Some(Region::Footer);
+                            }
+                            if corrected.is_some() {
+                                self.wanted.correction = corrected;
+                                ui.ctx().request_repaint();
                             }
                         }
                         if let Some(region) = wanted {
@@ -1102,6 +1113,9 @@ struct Asked {
     notice: Option<Notice>,
 }
 
+/// A misspelled word's paragraph and characters, and what to put there.
+type Correction = (Vec<usize>, std::ops::Range<usize>, String);
+
 /// What the page asked for while it was drawn, which the model, not there
 /// then, does on the next frame: a column dragged to a width, and what was
 /// done in a comment's or a note's box.
@@ -1112,6 +1126,8 @@ struct Wanted {
     note: Option<(Vec<usize>, NoteResponse)>,
     /// A tracked change to accept or reject, or every one when the id is none.
     decision: Option<(Option<String>, bool)>,
+    /// A misspelled word and what the spell check's menu puts in its place.
+    correction: Option<Correction>,
 }
 
 impl Wanted {
@@ -1123,7 +1139,9 @@ impl Wanted {
         if let Some((id, accept)) = flow.decided.take() {
             self.decision = Some((Some(id), accept));
         }
-        self.column.is_some()
+        self.correction = flow.corrected.take().or(self.correction.take());
+        self.correction.is_some()
+            || self.column.is_some()
             || self.comment.is_some()
             || self.note.is_some()
             || self.decision.is_some()
@@ -1159,6 +1177,19 @@ impl Wanted {
         }
         if let Some((note, done)) = self.note.take() {
             let _ = model.note_body(&note, &done);
+        }
+    }
+
+    /// Put a word the spell check's menu chose in place of the one marked,
+    /// in the part of the page being typed into, where the menu was.
+    fn correct(&mut self, model: &mut FlowModel<'_>) {
+        if let Some((paragraph, range, word)) = self.correction.take() {
+            let found = odox_ui::find::Match {
+                scope: 0,
+                paragraph,
+                range,
+            };
+            model.replace_matches(&[&found], &word, true);
         }
     }
 }
@@ -1206,24 +1237,27 @@ fn band_drawn(
     palette: odox_ui::format::Palette,
     (scale, width): (f32, f32),
     clickable: bool,
-) -> bool {
+) -> (bool, Option<Correction>) {
+    let mut corrected = None;
     let rect = ui
         .scope(|ui| {
             let mut flow = Flow::new(document, pictures, scale);
             flow.palette = palette;
             flow.page = page;
             flow.blocks(ui, band, width);
+            corrected = flow.corrected.take();
         })
         .response
         .rect;
-    clickable
+    let clicked = clickable
         && ui
             .interact(
                 rect,
                 egui::Id::unique(("band-region", band.name.local.as_ref())),
                 egui::Sense::click(),
             )
-            .clicked()
+            .clicked();
+    (clicked, corrected)
 }
 
 /// The faint rule between a page's header or footer and its body.

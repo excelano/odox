@@ -444,6 +444,24 @@ preference lives in one small file, `odox/settings.toml` under the platform's
 configuration directory, written only when a preference is changed in the menu,
 so an installation nobody has configured has no file.
 
+**Spelling is checked in edit mode** (`spell.rs`), with Hunspell dictionaries
+read by `spellbook`, which is pure Rust. A paragraph is checked in the language
+each of its runs is in, `fo:language` and `fo:country` resolved through the
+styles as any text property is, and a cell in its style's; `zxx` is no language
+and is not checked, and neither is a formula. A language tag finds `de_AT`, then
+`de`, then the first `de_` of any country. Linux reads the dictionaries the
+system has, under `/usr/share/hunspell` and `/usr/share/myspell`, and the
+person's own under `~/.local/share/hunspell`; Windows reads them from a
+`dictionaries` folder beside the executable and macOS from the bundle's
+resources, where the packages put en_US and de_DE with their licenses. A
+dictionary is read on a thread of its own the first time its language is asked
+for, UTF-8 or ISO 8859, and a paragraph is checked once for each text it holds
+and kept. Numbers, words with a digit, and web and mail addresses are not
+words. A word a dictionary does not know has a red wave under it; a right click
+on it offers up to five replacements, each one step to undo, Add to
+dictionary, which keeps it in `words.txt` beside `settings.toml`, and Ignore,
+which takes it as spelled until the application closes.
+
 **A cell is edited in place.** Typing on the picked cell replaces it, Enter or
 F2 opens it with what it holds, Enter commits and moves down, Tab commits and
 moves right, Escape puts it back, and Delete clears it; the text box sits in

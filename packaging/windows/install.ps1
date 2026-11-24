@@ -179,6 +179,10 @@ foreach ($app in $Applications) {
     Copy-Item -LiteralPath $built -Destination (Join-Path $Prefix $app.Exe) -Force
 }
 
+$dictionaries = Join-Path $Prefix 'dictionaries'
+if (Test-Path -LiteralPath $dictionaries) { Remove-Item -LiteralPath $dictionaries -Recurse -Force }
+Copy-Item -LiteralPath (Join-Path $here '..\dictionaries') -Destination $dictionaries -Recurse
+
 # The uninstaller travels with what it removes, because Add/Remove Programs
 # points at it and a person who has deleted the source tree still has to be able
 # to get this off the machine.

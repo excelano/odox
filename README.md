@@ -227,6 +227,13 @@ skips or the speaker's notes. A picture that has neither alternative text nor a
 mark that it is decoration is asked about first, and what you answer is saved
 into the document, so the next export does not ask again.
 
+In edit mode a word the dictionary for its language does not know has a red
+wave under it, and a right click on it offers what to put instead, Add to
+dictionary and Ignore. On Linux the dictionaries are the system's Hunspell ones
+(`apt install hunspell-en-us`, or `hunspell-de-de` and so on, or `.aff` and
+`.dic` files in `~/.local/share/hunspell`); the Windows and macOS packages carry
+en_US and de_DE, under `packaging/dictionaries` with their licenses.
+
 File > Print…, or Ctrl+P, prints the same pages, with nothing asked about the
 pictures. On Linux it opens the desktop's print dialog; where the desktop has
 none, and on Windows and macOS, the PDF opens in the default viewer, which

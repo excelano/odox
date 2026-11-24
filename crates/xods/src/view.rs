@@ -530,6 +530,32 @@ struct CellEditor {
     opened: bool,
 }
 
+/// The spell check over the text being typed into a cell, in the cell's
+/// language: a wave under each word its dictionary does not know, and what
+/// its menu put in place of one. A formula is not words.
+fn spell_cell(
+    ui: &mut Ui,
+    response: &egui::Response,
+    output: &egui::text_edit::TextEditOutput,
+    text: &str,
+    language: Option<&str>,
+    zoom: f32,
+) -> Option<(std::ops::Range<usize>, String)> {
+    if text.starts_with('=') {
+        return None;
+    }
+    odox_ui::spell::Speller::shared().wake(ui.ctx());
+    let wrong = odox_ui::spell::wrong_in(text, &[(0, language.map(ToOwned::to_owned))], &[]);
+    odox_ui::spell::mark(
+        ui,
+        response,
+        (&output.galley, output.galley_pos),
+        text,
+        &wrong,
+        zoom,
+    )
+}
+
 /// What the Sheet menu asked for, applied when the grid is next drawn.
 #[derive(Clone, Copy)]
 enum SheetCommand {
@@ -2123,16 +2149,33 @@ impl SheetView {
                                 .set_char_range(Some(egui::text::CCursorRange::one(end)));
                             egui::TextEdit::store_state(ui.ctx(), id, state);
                         }
-                        let response = ui.put(
-                            rect,
-                            egui::TextEdit::singleline(&mut editor.text)
-                                .id(id)
-                                .font(format.font_id.clone())
-                                .text_color(format.color)
-                                .background_color(palette.paper)
-                                .margin(vec2(3.0 * zoom, 0.0))
-                                .align(egui::Align2::LEFT_CENTER),
-                        );
+                        let output = ui
+                            .scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                                egui::TextEdit::singleline(&mut editor.text)
+                                    .id(id)
+                                    .font(format.font_id.clone())
+                                    .text_color(format.color)
+                                    .background_color(palette.paper)
+                                    .margin(vec2(3.0 * zoom, 0.0))
+                                    .align(egui::Align2::LEFT_CENTER)
+                                    .desired_width(rect.width())
+                                    .min_size(rect.size())
+                                    .show(ui)
+                            })
+                            .inner;
+                        let response = output.response.response.clone();
+                        if let Some((range, word)) = spell_cell(
+                            ui,
+                            &response,
+                            &output,
+                            &editor.text,
+                            style.text.language.as_deref(),
+                            zoom,
+                        ) {
+                            let mut chars: Vec<char> = editor.text.chars().collect();
+                            chars.splice(range, word.chars());
+                            editor.text = chars.into_iter().collect();
+                        }
                         // What a screen reader calls the box: the cell.
                         ui.ctx().accesskit_node_builder(response.id, |node| {
                             node.set_label(address(editor.row, editor.column));

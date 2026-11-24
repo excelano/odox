@@ -421,6 +421,7 @@ function Build-Package([string] $name) {
     New-Item -ItemType Directory -Path (Join-Path $stage 'Assets') -Force | Out-Null
 
     Copy-Item $exe (Join-Path $stage $spec.Executable)
+    Copy-Item (Join-Path $root 'packaging\dictionaries') (Join-Path $stage 'dictionaries') -Recurse
 
     # Each application has its own asset directory and it is staged as `Assets`,
     # which is the path the manifest names. `make-icons` writes one per

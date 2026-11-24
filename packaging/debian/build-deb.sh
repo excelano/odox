@@ -106,7 +106,7 @@ for app in xodt xods xodp odox; do
         closing="It draws nothing itself: it becomes the application that reads the file. Nothing is sent anywhere and nothing is written."
     else
         app_depends="$depends"
-        recommends="fonts-liberation"
+        recommends="fonts-liberation, hunspell-en-us | hunspell-dictionary"
         closing="Editing means changing what is there, not authoring: no formatting beyond bold, italic, underline and strikethrough, no inserting, no formulas. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and nothing is written until Save, and then only the file that was opened or the one named."
     fi
     # A control file's extended description is one space-prefixed line per line,
