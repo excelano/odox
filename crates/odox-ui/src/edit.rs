@@ -42,7 +42,6 @@ enum StylesPart {
 }
 
 /// The shell's editing state, handed to the view on every frame.
-#[derive(Default)]
 pub struct Editing {
     /// Whether the window is in edit mode. Outside it a view draws and
     /// selects and never opens an editor.
@@ -59,6 +58,20 @@ pub struct Editing {
     /// Counts every change to the content, including the ones an undo step
     /// absorbs, so that whatever is derived from the text can tell it is stale.
     revision: u64,
+}
+
+impl Default for Editing {
+    /// Nothing read yet, so nothing changed.
+    fn default() -> Self {
+        Self {
+            on: false,
+            asking: false,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            saved_at: Some(0),
+            revision: 0,
+        }
+    }
 }
 
 impl Editing {
@@ -239,6 +252,11 @@ mod tests {
         let mut e = Element::new("text", "p", Ns::Text);
         e.children.push(odox_core::Node::Text(text.to_owned()));
         e
+    }
+
+    #[test]
+    fn a_window_with_nothing_in_it_has_nothing_to_lose() {
+        assert!(!Editing::default().modified());
     }
 
     /// A document whose content is one paragraph of this text.
