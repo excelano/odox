@@ -307,6 +307,19 @@ its keys, puts the window full screen and fills the central panel with black,
 and the view draws one slide as large as the screen allows, keeping its shape.
 It is the view's own mode, so the keys that move through a show are the view's.
 
+**A show reveals a slide's builds click by click** (`doc/anim.rs`). The
+slide's main sequence is read into steps: each effect that starts on a click
+opens one, and one that starts with or after the effect before it joins that
+effect's step. An effect is taken at its end, what it leaves visible or hidden,
+from the visibility it sets or else from its class, entrance or exit; an
+emphasis or a motion changes nothing, and an interactive sequence, which a
+click on a shape starts, is not read. A target is a shape on the page or one of
+its paragraphs, found by `draw:id`, `xml:id` or `text:id`; before its first
+effect it is the opposite of what that effect makes it. A paragraph not yet
+shown is laid out and drawn at no opacity, so the others keep their places.
+Forward takes the next step and then the next slide, back undoes one and then
+enters the slide before at its last step.
+
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
 one in a window of its own: a window holds one document, as it does for Open.

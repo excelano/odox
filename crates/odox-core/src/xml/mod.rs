@@ -56,6 +56,12 @@ pub enum Ns {
     Of,
     /// `http://www.w3.org/1999/xlink`
     Xlink,
+    /// `urn:oasis:names:tc:opendocument:xmlns:animation:1.0`, a slide's
+    /// builds and transitions.
+    Anim,
+    /// `urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0`, the
+    /// timing an animation borrows from SMIL.
+    Smil,
     /// `http://purl.org/dc/elements/1.1/`
     Dc,
     /// `urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0`
@@ -94,6 +100,8 @@ impl Ns {
             "urn:oasis:names:tc:opendocument:xmlns:config:1.0" => Self::Config,
             "urn:oasis:names:tc:opendocument:xmlns:of:1.2" => Self::Of,
             "http://www.w3.org/1999/xlink" => Self::Xlink,
+            "urn:oasis:names:tc:opendocument:xmlns:animation:1.0" => Self::Anim,
+            "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" => Self::Smil,
             "http://purl.org/dc/elements/1.1/" => Self::Dc,
             "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" => Self::Loext,
             "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" => Self::Calcext,
@@ -122,6 +130,8 @@ impl Ns {
             Self::Config => "urn:oasis:names:tc:opendocument:xmlns:config:1.0",
             Self::Of => "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
             Self::Xlink => "http://www.w3.org/1999/xlink",
+            Self::Anim => "urn:oasis:names:tc:opendocument:xmlns:animation:1.0",
+            Self::Smil => "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0",
             Self::Dc => "http://purl.org/dc/elements/1.1/",
             Self::Loext => "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0",
             Self::Calcext => "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0",
@@ -149,6 +159,8 @@ impl Ns {
             Self::Config => "config",
             Self::Of => "of",
             Self::Xlink => "xlink",
+            Self::Anim => "anim",
+            Self::Smil => "smil",
             Self::Dc => "dc",
             Self::Loext => "loext",
             Self::Calcext => "calcext",

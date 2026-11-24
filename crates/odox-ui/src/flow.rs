@@ -277,6 +277,12 @@ pub struct Flow<'a> {
     /// A tracked change's box was used: the change, and whether it is to be
     /// accepted, for the view to do.
     pub decided: Option<(String, bool)>,
+    /// The paragraphs, by their place among those the flow draws, that a
+    /// slideshow's builds have not shown yet: laid out, so the others keep
+    /// their places, and not seen.
+    pub veiled: Vec<usize>,
+    /// How many paragraphs the flow has drawn so far.
+    counted: usize,
     /// The document's tracked changes, each with its author's ink, read the
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
@@ -316,6 +322,8 @@ impl<'a> Flow<'a> {
             turned: None,
             marks: false,
             decided: None,
+            veiled: Vec::new(),
+            counted: 0,
             tracked: std::cell::OnceCell::new(),
             inserting: std::cell::RefCell::new(None),
             today: crate::today(),
@@ -539,6 +547,19 @@ impl Flow<'_> {
 
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
+        let veiled = self.veiled.contains(&self.counted);
+        self.counted += 1;
+        if veiled {
+            let opacity = ui.opacity();
+            ui.set_opacity(0.0);
+            self.paragraph_drawn(ui, element, width, label);
+            ui.set_opacity(opacity);
+        } else {
+            self.paragraph_drawn(ui, element, width, label);
+        }
+    }
+
+    fn paragraph_drawn(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
         let properties = self.paragraph_style(element);
         let zoom = self.zoom;
         let size = format::size_of(&properties.text, DEFAULT_SIZE);

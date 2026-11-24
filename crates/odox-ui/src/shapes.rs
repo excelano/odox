@@ -65,6 +65,11 @@ pub struct Canvas<'a> {
     casting: Option<(Vec2, std::rc::Rc<Properties>)>,
     /// Whether formatting marks are drawn over the shapes' text.
     pub marks: bool,
+    /// In a slideshow, the slide's builds and how many clicks of them have
+    /// been taken: what they have not shown is not drawn.
+    pub build: Option<(&'a odox_core::doc::Steps, usize)>,
+    /// The paragraphs of the shape being drawn that its build has not shown.
+    veiled: Vec<usize>,
 }
 
 /// What is drawn inside a shape: its text, or the frame of a picture, and the
@@ -164,15 +169,24 @@ impl<'a> Canvas<'a> {
             at: None,
             casting: None,
             marks: false,
+            build: None,
+            veiled: Vec::new(),
         }
     }
 
     /// One of the slide's own shapes, by its index among the page's children,
     /// which is what a label inside it is edited under.
     pub fn slide_shape(&mut self, ui: &mut Ui, index: usize, shape: &Element) {
+        if let Some((steps, step)) = self.build {
+            if !steps.visible(step, odox_core::doc::Target::Shape(index)) {
+                return;
+            }
+            self.veiled = steps.veiled(step, index);
+        }
         self.at = Some(index);
         self.shape(ui, shape);
         self.at = None;
+        self.veiled.clear();
     }
 }
 
@@ -786,6 +800,7 @@ impl Canvas<'_> {
             flow.page = page_editor;
             flow.turned = turned;
             flow.marks = self.marks && !measuring;
+            flow.veiled.clone_from(&self.veiled);
             flow.find = self.find.clone().filter(|_| prefix.is_some() && !measuring);
             if let Some(prefix) = prefix {
                 flow.start_at(prefix.clone());

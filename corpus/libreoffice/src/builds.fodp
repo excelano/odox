@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:styles>
+  <style:style style:name="standard" style:family="graphic"><style:graphic-properties draw:stroke="none" draw:fill="none"/></style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="PM1"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" style:print-orientation="landscape"/></style:page-layout>
+ </office:automatic-styles>
+ <office:master-styles>
+  <style:master-page style:name="Default" style:page-layout-name="PM1"/>
+ </office:master-styles>
+ <office:body>
+  <office:presentation>
+   <draw:page draw:name="Builds" draw:master-page-name="Default">
+    <draw:frame draw:id="shapeA" xml:id="shapeA" draw:name="Appears" svg:x="2cm" svg:y="1cm" svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>Appears on the first click</text:p></draw:text-box></draw:frame>
+    <draw:frame draw:id="shapeB" xml:id="shapeB" draw:name="Points" svg:x="2cm" svg:y="4cm" svg:width="20cm" svg:height="6cm"><draw:text-box><text:p xml:id="p1">First point</text:p><text:p xml:id="p2">Second point</text:p><text:p xml:id="p3">Third point</text:p></draw:text-box></draw:frame>
+    <draw:frame draw:id="shapeC" xml:id="shapeC" draw:name="Leaves" svg:x="14cm" svg:y="1cm" svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>Leaves on the last click</text:p></draw:text-box></draw:frame>
+    <draw:frame draw:id="shapeD" xml:id="shapeD" draw:name="WithFirst" svg:x="2cm" svg:y="11cm" svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>Comes with the first</text:p></draw:text-box></draw:frame>
+    <draw:frame draw:id="shapeE" xml:id="shapeE" draw:name="AfterFirst" svg:x="14cm" svg:y="11cm" svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>Comes after the first</text:p></draw:text-box></draw:frame>
+    <anim:par presentation:node-type="timing-root">
+     <anim:seq presentation:node-type="main-sequence">
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="shapeA" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="with-previous" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="shapeD" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+       </anim:par>
+       <anim:par smil:begin="0.001s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="after-previous" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="shapeE" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="p1" anim:sub-item="text" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="p2" anim:sub-item="text" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-class="entrance" presentation:preset-id="ooo-entrance-appear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="p3" anim:sub-item="text" smil:attributeName="visibility" smil:to="visible"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+      <anim:par smil:begin="next">
+       <anim:par smil:begin="0s">
+        <anim:par smil:begin="0s" smil:fill="hold" presentation:node-type="on-click" presentation:preset-class="exit" presentation:preset-id="ooo-exit-disappear">
+         <anim:set smil:begin="0s" smil:dur="0.001s" smil:fill="hold" smil:targetElement="shapeC" smil:attributeName="visibility" smil:to="hidden"/>
+        </anim:par>
+       </anim:par>
+      </anim:par>
+     </anim:seq>
+    </anim:par>
+   </draw:page>
+   <draw:page draw:name="Plain" draw:master-page-name="Default">
+    <draw:frame svg:x="2cm" svg:y="1cm" svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>No timing here</text:p></draw:text-box></draw:frame>
+   </draw:page>
+  </office:presentation>
+ </office:body>
+</office:document>

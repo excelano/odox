@@ -164,6 +164,11 @@ convert ods:calc8 drawings.ods "OpenDocument Spreadsheet Flat XML" drawings.fods
 # list that refuses an empty cell, a text length with information, a date and
 # a time between, and a rule whose message is not shown.
 convert ods:calc8 validation.ods "OpenDocument Spreadsheet Flat XML" validation.fods
+
+# Builds in a slideshow: a shape that appears on the first click with one
+# that comes with it and one after it, a frame whose paragraphs appear one
+# click each, and a shape that leaves on the last click.
+convert odp:impress8 builds.odp "OpenDocument Presentation Flat XML" builds.fodp
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods
