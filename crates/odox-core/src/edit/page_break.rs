@@ -31,7 +31,8 @@ pub fn page_break(content: &Element, path: &[usize], styles: &Styles) -> bool {
 ///
 /// # Errors
 ///
-/// As `edit::split_at` and `edit::set_alignment`.
+/// As `edit::split_at` and `edit::set_alignment`, and a paragraph in a table
+/// cell, whose row a page cannot begin inside, is refused.
 pub fn insert_page_break(
     content: &mut Element,
     path: &[usize],
@@ -43,6 +44,13 @@ pub fn insert_page_break(
         .filter(|e| is_paragraph(e))
         .ok_or(Refused::NotFound)?;
     declares(content, &[Ns::Text, Ns::Style, Ns::Fo])?;
+    if (0..path.len()).any(|depth| {
+        content
+            .at(&path[..depth])
+            .is_some_and(|e| e.is(&Ns::Table, "table-cell"))
+    }) {
+        return Err(Refused::Structure);
+    }
     let begins = if at == 0 {
         path.to_vec()
     } else {
@@ -79,16 +87,46 @@ pub fn remove_page_break(
     path: &[usize],
     styles: &mut Styles,
 ) -> Result<(), Refused> {
-    for value in [None, Some("auto")] {
-        restyle_paragraphs(
-            content,
-            &[path.to_vec()],
-            styles,
-            |content, path, styles| {
-                page_break(content, path, styles)
-                    .then(|| vec![(Ns::Fo, "break-before", value.map(ToOwned::to_owned))])
-            },
-        )?;
-    }
-    Ok(())
+    restyle_paragraphs(
+        content,
+        &[path.to_vec()],
+        styles,
+        |content, path, styles| {
+            page_break(content, path, styles).then(|| {
+                let value = inherits_a_break(content, path, styles).then(|| "auto".to_owned());
+                vec![(Ns::Fo, "break-before", value)]
+            })
+        },
+    )
+}
+
+/// Whether the style a paragraph's own automatic style inherits from, or the
+/// named style it has, breaks the page: whether taking the break out of its
+/// automatic style would leave one.
+fn inherits_a_break(content: &Element, path: &[usize], styles: &Styles) -> bool {
+    let Some(name) = content
+        .at(path)
+        .and_then(|paragraph| paragraph.attr(&Ns::Text, "style-name"))
+    else {
+        return false;
+    };
+    let own = content
+        .child(&Ns::Office, "automatic-styles")
+        .into_iter()
+        .flat_map(Element::elements)
+        .find(|style| {
+            style.attr(&Ns::Style, "family") == Some("paragraph")
+                && style.attr(&Ns::Style, "name") == Some(name)
+        });
+    let inherited = match own {
+        Some(style) => style.attr(&Ns::Style, "parent-style-name"),
+        None => Some(name),
+    };
+    inherited.is_some_and(|parent| {
+        styles
+            .resolve(&Family::Paragraph, parent)
+            .paragraph
+            .break_before
+            == Some(Break::Page)
+    })
 }

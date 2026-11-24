@@ -66,3 +66,34 @@ fn remove_break_clears_break_before() {
         .unwrap_or_default();
     assert!(!own.contains("break-before"), "{own}");
 }
+
+#[test]
+fn refuses_a_break_in_a_table_cell_and_changes_nothing() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES} xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:automatic-styles/><office:body><office:text><table:table><table:table-row><table:table-cell><text:p>Cell text</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    let before = root.clone();
+    let mut styles = Styles::collect(Some(&root), None);
+    assert_eq!(
+        insert_page_break(&mut root, &[1, 0, 0, 0, 0, 0], 4, &mut styles),
+        Err(odox_core::Refused::Structure)
+    );
+    assert!(root == before);
+}
+
+#[test]
+fn removing_an_inherited_break_writes_one_style() {
+    let named = xml::parse(
+        format!(r#"<office:document-styles {NAMESPACES}><office:styles><style:style style:name="Chapter" style:family="paragraph"><style:paragraph-properties fo:break-before="page"/></style:style></office:styles></office:document-styles>"#).as_bytes(),
+        "test",
+    )
+    .expect("styles");
+    let mut root = content(r#"<text:p>One</text:p><text:p text:style-name="Chapter">Two</text:p>"#);
+    let mut styles = Styles::collect(Some(&root), Some(&named));
+    let two = vec![1, 0, 1];
+    remove_page_break(&mut root, &two, &mut styles).expect("removed");
+    assert!(!page_break(&root, &two, &styles));
+    let automatic = root.at(&[0]).expect("automatic styles").elements().count();
+    assert_eq!(automatic, 1, "one style, and none left unused");
+}
