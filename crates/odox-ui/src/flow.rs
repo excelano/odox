@@ -40,6 +40,7 @@ use crate::flow_model::PageEditor;
 use crate::format::{self, DEFAULT_SIZE};
 use crate::i18n::t;
 use crate::links;
+use crate::note_popup::{self, NoteContent, NoteResponse};
 
 /// Pictures already decoded, kept for as long as the document is open.
 ///
@@ -249,6 +250,10 @@ pub struct Flow<'a> {
     /// column left of the edge, and the width it was dragged to, in points,
     /// for the view to give it.
     pub resized: Option<(Vec<usize>, usize, f32)>,
+    /// A comment's box was used: the paragraph's path, the comment's place
+    /// among the paragraph's comments, and what was done, for the view to
+    /// do.
+    pub noted: Option<(Vec<usize>, usize, NoteResponse)>,
     /// How many headings have been drawn this pass.
     headings_seen: usize,
     /// The page editor, which puts a caret in every paragraph under the root
@@ -288,6 +293,7 @@ impl<'a> Flow<'a> {
             scroll_to_place: None,
             followed: None,
             resized: None,
+            noted: None,
             headings_seen: 0,
             page: None,
             find: None,
@@ -621,12 +627,12 @@ impl Flow<'_> {
                 response.on_hover_text(t("Text that reads right to left cannot be edited yet."));
             }
         } else {
-            let marked = (self.marks && ui.is_rect_visible(rect))
+            let kept = ui
+                .is_rect_visible(rect)
                 .then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
-            if let Some((galley, map)) = marked {
-                let flat = odox_core::edit::text(element);
-                crate::marks::paint(ui, &galley, &map, origin, &flat, ground.ink);
+            if let Some(laid) = kept {
+                self.over_text(ui, element, rect, laid, origin, ground.ink);
             }
         }
 
@@ -1292,6 +1298,107 @@ fn edge_of(borders: &odox_core::Edges<Border>, edge: Edge) -> Option<Border> {
         Edge::Right => borders.right,
         Edge::Top => borders.top,
         Edge::Bottom => borders.bottom,
+    }
+}
+
+impl Flow<'_> {
+    /// What is drawn over a paragraph's text once it is laid out: the
+    /// formatting marks where they are shown, and its comments.
+    fn over_text(
+        &mut self,
+        ui: &Ui,
+        element: &Element,
+        rect: Rect,
+        (galley, map): (Arc<Galley>, OffsetMap),
+        origin: Pos2,
+        ink: Color32,
+    ) {
+        if self.marks {
+            let flat = odox_core::edit::text(element);
+            crate::marks::paint(ui, &galley, &map, origin, &flat, ink);
+        }
+        if element.descendant(&Ns::Office, "annotation").is_some() {
+            self.comments(ui, element, rect, (&galley, &map), origin);
+        }
+    }
+
+    /// A paragraph's comments: a mark in the margin beside each, its range
+    /// tinted, and its box while the mark is under the pointer or the caret
+    /// is at it, editable where the page is.
+    fn comments(
+        &mut self,
+        ui: &Ui,
+        paragraph: &Element,
+        rect: Rect,
+        (galley, map): (&Galley, &OffsetMap),
+        origin: Pos2,
+    ) {
+        let amber = Color32::from_rgb(0xf2, 0xb7, 0x05);
+        let caret = self
+            .page
+            .as_ref()
+            .and_then(|page| page.selection())
+            .filter(|selection| selection.focus.paragraph == self.path)
+            .map(|selection| selection.focus.offset);
+        let place = |offset: usize| {
+            galley
+                .pos_from_cursor(CCursor::new(map.to_galley(offset.min(map.model_len()))))
+                .translate(origin.to_vec2())
+        };
+        for (index, (at, note)) in edit::annotations_in(paragraph).into_iter().enumerate() {
+            let here = place(at);
+            if let Some(end) = note.end {
+                for offset in at..end {
+                    let (from, to) = (place(offset), place(offset + 1));
+                    if (from.top() - to.top()).abs() < 0.5 {
+                        let tint = Rect::from_min_max(from.left_top(), to.left_bottom());
+                        ui.painter()
+                            .rect_filled(tint, 0.0, amber.gamma_multiply(0.25));
+                    }
+                }
+            }
+            ui.painter().vline(
+                here.left(),
+                here.y_range(),
+                Stroke::new(1.5 * self.zoom, amber),
+            );
+            let mark = Rect::from_min_size(
+                pos2(rect.right() + 4.0 * self.zoom, here.top()),
+                vec2(8.0, 10.0) * self.zoom,
+            );
+            ui.painter().rect_filled(mark, 2.0, amber);
+            let id = eframe::egui::Id::unique(("odox-comment", self.path.clone(), index));
+            let open = id.with("open");
+            let was_open = ui
+                .ctx()
+                .data(|data| data.get_temp::<bool>(open))
+                .unwrap_or(false);
+            let hovered = ui.rect_contains_pointer(mark.expand(2.0));
+            let at_caret =
+                caret.is_some_and(|c| c == at || note.end.is_some_and(|e| at <= c && c <= e));
+            if !(hovered || at_caret || was_open) {
+                continue;
+            }
+            let header = [
+                note.author.clone().unwrap_or_default(),
+                note.date.clone().unwrap_or_default().replace('T', " "),
+            ]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" \u{b7} ");
+            let content = NoteContent {
+                header,
+                text: note.text,
+            };
+            let editable = self.page.is_some() && !self.detached;
+            let (done, keep) = note_popup::show(ui, mark, id, &content, editable);
+            ui.ctx()
+                .data_mut(|data| data.insert_temp(open, keep && done.is_none()));
+            if let Some(done) = done {
+                self.noted = Some((self.path.clone(), index, done));
+            }
+        }
     }
 }
 

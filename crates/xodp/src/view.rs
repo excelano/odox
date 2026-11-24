@@ -14,9 +14,11 @@ use std::path::Path;
 use eframe::egui::{self, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2, pos2, vec2};
 use egui_richedit::Selection;
 use odox_core::doc::Presentation;
+use odox_core::edit;
 use odox_core::{Document, Element, Length, Ns, PageLayout};
 use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::note_popup::{self, NoteContent, NoteResponse};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
@@ -46,6 +48,13 @@ pub struct SlideView {
     command: Option<Command>,
     /// What the Slide menu last chose.
     slide_command: Option<SlideCommand>,
+    /// Slide > Comment was chosen, and a comment is put on the slide on the
+    /// next frame.
+    comment_wanted: bool,
+    /// A comment just put on the slide, whose box opens on the next frame.
+    opened_note: Option<usize>,
+    /// What was done in a slide comment's box, done on the next frame.
+    note_wanted: Option<(usize, NoteResponse)>,
     export: Export,
 }
 
@@ -64,6 +73,9 @@ impl Default for SlideView {
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
+            comment_wanted: false,
+            opened_note: None,
+            note_wanted: None,
             export: Export::default(),
         }
     }
@@ -77,6 +89,59 @@ enum SlideCommand {
     Delete,
     Earlier,
     Later,
+}
+
+/// A slide's comments: a mark at each, and its box while the mark is under
+/// the pointer, editable in edit mode. `opened` is a comment just put on the
+/// slide, whose box opens now. Answers what was done in a box.
+fn slide_comments(
+    ui: &Ui,
+    page: Rect,
+    scale: f32,
+    slide: &Element,
+    editable: bool,
+    opened: Option<usize>,
+) -> Option<(usize, NoteResponse)> {
+    let mut noted = None;
+    for (child, (x, y), note) in edit::slide_annotations(slide) {
+        let mark = Rect::from_min_size(
+            pos2(page.left() + x * scale, page.top() + y * scale),
+            vec2(14.0, 12.0) * scale.max(0.5),
+        );
+        ui.painter()
+            .rect_filled(mark, 2.0, egui::Color32::from_rgb(0xf2, 0xb7, 0x05));
+        let id = egui::Id::unique(("odox-slide-comment", slide.attr(&Ns::Draw, "name"), child));
+        let open = id.with("open");
+        if opened == Some(child) {
+            ui.ctx().data_mut(|data| data.insert_temp(open, true));
+        }
+        let was_open = ui
+            .ctx()
+            .data(|data| data.get_temp::<bool>(open))
+            .unwrap_or(false);
+        if !(ui.rect_contains_pointer(mark.expand(2.0)) || was_open) {
+            continue;
+        }
+        let header = [
+            note.author.unwrap_or_default(),
+            note.date.unwrap_or_default().replace('T', " "),
+        ]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" \u{b7} ");
+        let content = NoteContent {
+            header,
+            text: note.text,
+        };
+        let (done, keep) = note_popup::show(ui, mark, id, &content, editable);
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(open, keep && done.is_none()));
+        if let Some(done) = done {
+            noted = Some((child, done));
+        }
+    }
+    noted
 }
 
 /// A shape's box on the page, in ODF points.
@@ -258,6 +323,14 @@ impl View for SlideView {
             .map_or(0, |document| document.slides().len());
         let can = editing.on && !editing.asking;
         ui.menu_button(t("Slide"), |ui| {
+            if ui
+                .add_enabled(can, egui::Button::new(t("Comment")))
+                .clicked()
+            {
+                self.comment_wanted = true;
+                ui.close();
+            }
+            ui.separator();
             let entries = [
                 (t("New slide"), SlideCommand::Add, can),
                 (t("Duplicate slide"), SlideCommand::Duplicate, can),
@@ -379,6 +452,12 @@ impl View for SlideView {
         if let Some(command) = self.slide_command.take() {
             self.change_slides(command, editing);
         }
+        if std::mem::take(&mut self.comment_wanted) {
+            self.add_comment(editing);
+        }
+        if let Some((child, done)) = self.note_wanted.take() {
+            self.note(child, &done, editing);
+        }
 
         // The document and the picture cache are taken as separate borrows of
         // separate fields, which is what lets the renderer hold one while filling
@@ -390,6 +469,8 @@ impl View for SlideView {
         let dragging = self.drag.is_some();
         let mut action = None;
         let mut followed = None;
+        let mut noted = None;
+        let opened = self.opened_note.take();
 
         if edit_mode {
             self.edit(ui, editing);
@@ -462,6 +543,7 @@ impl View for SlideView {
                     canvas.slide_shape(ui, index, shape);
                 }
                 followed = canvas.followed.take();
+                noted = slide_comments(ui, page, scale, slide.element, edit_mode, opened);
 
                 // The page's edge last, so a decoration running to the bleed
                 // does not paint over it.
@@ -479,6 +561,10 @@ impl View for SlideView {
         });
 
         self.found.drawn();
+        if noted.is_some() {
+            self.note_wanted = noted;
+            ui.ctx().request_repaint();
+        }
         if let Some(name) = followed {
             self.go_to_slide_named(&name);
         }
@@ -725,6 +811,64 @@ impl SlideView {
             self.export.show(ctx, document, editing);
         }
         self.export.asking()
+    }
+
+    /// Put an empty comment near the top left of the slide in view, as one
+    /// step to undo, with its box open to be written in.
+    fn add_comment(&mut self, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(page) = document
+            .slides()
+            .get(self.slide)
+            .and_then(|slide| document.page_path(slide.position))
+        else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let corner = 1.0 / 2.54 * 72.0;
+        if let Ok(child) = edit::add_slide_annotation(
+            &mut document.document.content,
+            &page,
+            (corner, corner),
+            "",
+            odox_ui::comments::author().as_deref(),
+            &odox_ui::comments::now(),
+        ) {
+            editing.record_snapshot(before, None);
+            self.opened_note = Some(child);
+        }
+    }
+
+    /// Do what was done in a slide comment's box, as one step to undo.
+    fn note(&mut self, child: usize, done: &NoteResponse, editing: &mut Editing) {
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(page) = document
+            .slides()
+            .get(self.slide)
+            .and_then(|slide| document.page_path(slide.position))
+        else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let content = &mut document.document.content;
+        let changed = match done {
+            NoteResponse::Saved(text) => edit::set_slide_annotation_text(
+                content,
+                &page,
+                child,
+                text,
+                odox_ui::comments::author().as_deref(),
+                &odox_ui::comments::now(),
+            ),
+            NoteResponse::Deleted => edit::remove_slide_annotation(content, &page, child),
+        };
+        if changed.is_ok() {
+            editing.record_snapshot(before, None);
+        }
     }
 
     /// Add a slide after the one in view, or duplicate, delete or move that

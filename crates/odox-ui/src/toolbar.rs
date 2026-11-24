@@ -429,6 +429,8 @@ pub enum Command {
     SplitCell,
     /// Make the table's columns the same width.
     EqualWidths,
+    /// Put a comment on the selection, or at the caret.
+    Comment,
     /// Start a numbered list again at the item, or carry it on from the list
     /// before when not.
     Numbering(bool),
@@ -685,6 +687,15 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let insert = egui::Button::new(t("Insert page break")).shortcut_text(keys);
     if ui.add_enabled(state.enabled, insert).clicked() {
         chosen = Some(Command::PageBreak(true));
+        ui.close();
+    }
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::C,
+    ));
+    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
+    if ui.add_enabled(state.enabled, comment).clicked() {
+        chosen = Some(Command::Comment);
         ui.close();
     }
     let remove = egui::Button::new(t("Remove page break"));

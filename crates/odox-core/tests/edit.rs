@@ -119,6 +119,9 @@ fn reads_back(paragraph: &Element) {
         name: odox_core::Name::new("xmlns", "svg", Ns::Xmlns),
         value: "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0".to_owned(),
     });
+    for ns in [Ns::Dc, Ns::Loext] {
+        root.declare(&ns);
+    }
     root.children.push(Node::Element(paragraph.clone()));
     root.self_closing = false;
     let written = xml::serialize(&root);

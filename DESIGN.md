@@ -980,6 +980,22 @@ one the selection has where it is one of those; spacing stated those other ways
 shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
+**A comment is an `office:annotation` where it is anchored** (`edit/annotation.rs`),
+with `dc:creator`, `dc:date` and its paragraphs, and one over a range closes
+at an `office:annotation-end` of the same `office:name`, as `LibreOffice`
+writes them. It adds nothing to the paragraph's text, so edits around it leave
+it where it is; it is put in by splitting the one text node it falls in, and
+taken out by joining that node again, so taking a comment off gives back the
+paragraph it was. The window marks each in the margin beside its line, with a
+tick where it is anchored and its range tinted, and shows who wrote it, when,
+and its text in a box beside the mark while the mark is under the pointer or
+the caret is at it; in edit mode the box edits the text, signed and dated
+anew, or deletes it, and Format > Comment (Ctrl+Alt+C) puts an empty one on
+the selection or at the caret with its box open. On a slide a comment is
+`LibreOffice`'s `officeooo:annotation` on the page at `svg:x` and `svg:y`,
+marked there and shown and edited in the same box, and Slide > Comment puts
+one near the slide's top left. Comments are not exported.
+
 **A page break by hand is `fo:break-before="page"`** on the paragraph's
 automatic style, written as an alignment is (`edit/page_break.rs`). Ctrl+Enter
 and Format > Insert page break split the paragraph at the caret and begin the

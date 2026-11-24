@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:officeooo="http://openoffice.org/2009/office" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:meta><dc:title>Slide comments</dc:title></office:meta>
+ <office:styles>
+  <style:style style:name="plain" style:family="graphic"><style:graphic-properties draw:fill="none" draw:stroke="none"/><style:text-properties fo:font-size="24pt" fo:color="#000000"/></style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:page-layout style:name="Page"><style:page-layout-properties fo:page-width="28cm" fo:page-height="15.75cm" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" fo:margin-right="0cm"/></style:page-layout>
+  <style:style style:name="dp" style:family="drawing-page"><style:drawing-page-properties draw:fill="solid" draw:fill-color="#ffffff"/></style:style>
+ </office:automatic-styles>
+ <office:master-styles><style:master-page style:name="Plain" style:page-layout-name="Page" draw:style-name="dp"/></office:master-styles>
+ <office:body>
+  <office:presentation>
+   <draw:page draw:name="Commented" draw:master-page-name="Plain">
+    <draw:frame draw:style-name="plain" svg:x="2cm" svg:y="2cm" svg:width="20cm" svg:height="3cm"><draw:text-box><text:p>A slide with a comment on it</text:p></draw:text-box></draw:frame>
+    <officeooo:annotation svg:x="20cm" svg:y="3cm" svg:width="5cm" svg:height="3cm"><dc:creator>Ada Reviewer</dc:creator><dc:date>2026-03-14T09:30:00</dc:date><text:p>Is this the right title?</text:p></officeooo:annotation>
+   </draw:page>
+  </office:presentation>
+ </office:body>
+</office:document>
