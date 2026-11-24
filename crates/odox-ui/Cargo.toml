@@ -37,6 +37,11 @@ zbus = { version = "5", default-features = false, features = ["async-io", "block
 # Waiting on the print portal's answer and on the portal going away at once,
 # which the blocking API cannot. Already in the tree under zbus.
 futures-lite = { version = "2", default-features = false, features = ["std"] }
+# The window a print dialog belongs to, as the portal names one: `x11:` and the
+# window's id, or under Wayland a handle exported through xdg-foreign, which
+# takes a raw surface pointer and so `unsafe` this crate keeps out. Pure Rust,
+# on the zbus and the wayland-client already here.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "raw_handle", "wayland"] }
 # Named for features only, which the workspace manifest gives; no code here
 # calls it.
 winit.workspace = true

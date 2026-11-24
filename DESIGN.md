@@ -1423,7 +1423,11 @@ same thread hands it over. On Linux that is the desktop portal's `PreparePrint`,
 whose dialog chooses the printer and the settings, and then `Print` with the
 file's descriptor and the token the first answered; each answer is listened for
 at the request path its handle token makes before the call is put, so it cannot
-be missed, and at the path the call answers where a portal gives another. The
+be missed, and at the path the call answers where a portal gives another. Both
+calls name the window the dialog belongs to, so it opens over it: `x11:` and
+the window's id, or under Wayland a handle exported through xdg-foreign, which
+`ashpd` makes once at start and keeps for the window's life, because the export
+takes a raw surface pointer and its `unsafe` stays out of `odox-ui`. The
 wait also ends when the portal's name loses its owner, and the PDF then goes to
 the viewer. A dialog closed without printing says nothing; a print the dialog
 failed is said. Where there is no
