@@ -55,11 +55,18 @@ impl Steps {
                 continue;
             };
             let mut targets = Vec::new();
-            for id in target_ids(effect) {
-                if let Some(target) = resolve(page, id)
-                    && !targets.contains(&target)
-                {
-                    targets.push(target);
+            for (id, text_only) in target_ids(effect) {
+                let found = match resolve(page, id) {
+                    Some(Target::Shape(shape)) if text_only => (0..paragraph_count(page, shape))
+                        .map(|paragraph| Target::Paragraph(shape, paragraph))
+                        .collect(),
+                    Some(target) => vec![target],
+                    None => Vec::new(),
+                };
+                for target in found {
+                    if !targets.contains(&target) {
+                        targets.push(target);
+                    }
                 }
             }
             steps
@@ -178,13 +185,14 @@ fn visibility(element: &Element, set: &mut Option<bool>) {
     }
 }
 
-/// The ids an effect names as its targets.
-fn target_ids(effect: &Element) -> Vec<&str> {
+/// The ids an effect names as its targets, each with whether the effect
+/// acts on its text alone, which `anim:sub-item="text"` says.
+fn target_ids(effect: &Element) -> Vec<(&str, bool)> {
     let mut ids = Vec::new();
     let mut stack = vec![effect];
     while let Some(element) = stack.pop() {
         if let Some(id) = element.attr(&Ns::Smil, "targetElement") {
-            ids.push(id);
+            ids.push((id, element.attr(&Ns::Anim, "sub-item") == Some("text")));
         }
         stack.extend(element.elements());
     }
@@ -201,14 +209,29 @@ fn has_id(element: &Element, id: &str) -> bool {
     })
 }
 
-/// The shape or paragraph on a page that an id names. A shape inside a
-/// group is not one the page draws alone, and is not found.
+/// How many paragraphs the shape at a page index holds; a group, whose
+/// members are each drawn alone, holds none of its own.
+fn paragraph_count(page: &Element, shape: usize) -> usize {
+    let mut paragraphs = Vec::new();
+    if let Some((_, shape)) = page.elements_indexed().find(|(i, _)| *i == shape)
+        && !shape.is(&Ns::Draw, "g")
+    {
+        paragraphs_of(shape, &mut paragraphs);
+    }
+    paragraphs.len()
+}
+
+/// The shape or paragraph on a page that an id names. A group is found
+/// whole; its members are each drawn alone, and nothing inside it is found.
 fn resolve(page: &Element, id: &str) -> Option<Target> {
     page.elements_indexed()
         .filter(|(_, e)| !e.is(&Ns::Presentation, "notes") && !e.is(&Ns::Anim, "par"))
         .find_map(|(index, shape)| {
             if has_id(shape, id) {
                 return Some(Target::Shape(index));
+            }
+            if shape.is(&Ns::Draw, "g") {
+                return None;
             }
             let mut paragraphs = Vec::new();
             paragraphs_of(shape, &mut paragraphs);

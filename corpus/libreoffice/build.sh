@@ -167,7 +167,8 @@ convert ods:calc8 validation.ods "OpenDocument Spreadsheet Flat XML" validation.
 
 # Builds in a slideshow: a shape that appears on the first click with one
 # that comes with it and one after it, a frame whose paragraphs appear one
-# click each, and a shape that leaves on the last click.
+# click each, and a shape that leaves on the last click; then a shape whose
+# text alone enters, and a paragraph in a group that enters.
 convert odp:impress8 builds.odp "OpenDocument Presentation Flat XML" builds.fodp
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods

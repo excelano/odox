@@ -93,3 +93,69 @@ fn slide_without_timing_has_zero_steps() {
     let plain = deck.slides()[1].shapes_indexed().next().expect("a shape").0;
     assert!(steps.visible(0, Target::Shape(plain)));
 }
+
+#[test]
+fn a_text_only_effect_leaves_the_shape_and_veils_its_paragraphs() {
+    let deck = deck();
+    let steps = steps(&deck, 2);
+    let index = deck.slides()[2]
+        .shapes_indexed()
+        .find(|(_, shape)| shape.attr(&odox_core::Ns::Draw, "name") == Some("TextOnly"))
+        .map(|(index, _)| index)
+        .expect("the shape");
+    assert!(steps.visible(0, Target::Shape(index)));
+    assert_eq!(steps.veiled(0, index), vec![0, 1]);
+    assert!(steps.veiled(1, index).is_empty());
+}
+
+#[test]
+fn a_paragraph_in_a_group_is_not_a_target() {
+    let deck = deck();
+    let steps = steps(&deck, 2);
+    let group = deck.slides()[2]
+        .shapes_indexed()
+        .find(|(_, shape)| shape.is(&odox_core::Ns::Draw, "g"))
+        .map(|(index, _)| index)
+        .expect("the group");
+    assert_eq!(steps.len(), 2);
+    assert!(steps.veiled(0, group).is_empty());
+}
+
+#[test]
+fn a_group_named_whole_is_a_target() {
+    let mut deck = deck();
+    let position = deck.slides()[2].position;
+    let page = deck.page_mut(position).expect("the page");
+    let group = page
+        .elements_indexed()
+        .find(|(_, e)| e.is(&odox_core::Ns::Draw, "g"))
+        .map(|(index, _)| index)
+        .expect("the group");
+    if let Some(odox_core::Node::Element(g)) = page.children.get_mut(group) {
+        g.set_attr(
+            odox_core::xml::Name::new("draw", "id", odox_core::Ns::Draw),
+            "whole",
+        );
+    }
+    let mut stack = vec![&mut *page];
+    while let Some(element) = stack.pop() {
+        if element.attr(&odox_core::Ns::Smil, "targetElement") == Some("id9") {
+            element
+                .attrs
+                .retain(|a| a.name.local.as_ref() != "sub-item");
+            for attribute in &mut element.attrs {
+                if attribute.name.local.as_ref() == "targetElement" {
+                    attribute.value = "whole".to_owned();
+                }
+            }
+        }
+        for child in &mut element.children {
+            if let odox_core::Node::Element(child) = child {
+                stack.push(child);
+            }
+        }
+    }
+    let steps = steps(&deck, 2);
+    assert!(!steps.visible(1, Target::Shape(group)));
+    assert!(steps.visible(2, Target::Shape(group)));
+}

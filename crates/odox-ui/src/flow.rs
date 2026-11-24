@@ -281,8 +281,8 @@ pub struct Flow<'a> {
     /// slideshow's builds have not shown yet: laid out, so the others keep
     /// their places, and not seen.
     pub veiled: Vec<usize>,
-    /// How many paragraphs the flow has drawn so far.
-    counted: usize,
+    /// How far the flow is through what [`Self::veiled`] names.
+    veil: Veil,
     /// The document's tracked changes, each with its author's ink, read the
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
@@ -298,6 +298,29 @@ pub struct Flow<'a> {
     /// cell, whose copies share one path: nothing in either can be edited in
     /// place.
     detached: bool,
+}
+
+/// Where a flow is among the paragraphs it veils.
+#[derive(Default)]
+struct Veil {
+    /// How many paragraphs the flow has drawn so far.
+    counted: usize,
+    /// Inside a veiled paragraph: laid out, and neither seen nor answering
+    /// the pointer.
+    hiding: bool,
+}
+
+/// A list label, ending just before the text begins at `start`, in the
+/// gutter the list opened for it. Painting left of the paragraph's rectangle
+/// is deliberate: the gutter is space the caller reserved and nothing else
+/// draws there.
+fn paint_label(ui: &Ui, label: &str, base: &TextFormat, start: Pos2, zoom: f32) {
+    let mut label_job = LayoutJob::default();
+    label_job.append(label, 0.0, base.clone());
+    let label_galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(label_job));
+    let x = start.x - label_galley.size().x - LABEL_GAP * zoom;
+    ui.painter()
+        .galley(pos2(x, start.y), label_galley, base.color);
 }
 
 impl<'a> Flow<'a> {
@@ -323,7 +346,7 @@ impl<'a> Flow<'a> {
             marks: false,
             decided: None,
             veiled: Vec::new(),
-            counted: 0,
+            veil: Veil::default(),
             tracked: std::cell::OnceCell::new(),
             inserting: std::cell::RefCell::new(None),
             today: crate::today(),
@@ -547,16 +570,17 @@ impl Flow<'_> {
 
     /// One paragraph or heading, with an optional list label drawn in its margin.
     fn paragraph(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
-        let veiled = self.veiled.contains(&self.counted);
-        self.counted += 1;
-        if veiled {
-            let opacity = ui.opacity();
+        let veiled = self.veiled.contains(&self.veil.counted);
+        self.veil.counted += 1;
+        let was = self.veil.hiding;
+        self.veil.hiding = was || veiled;
+        let opacity = ui.opacity();
+        if self.veil.hiding {
             ui.set_opacity(0.0);
-            self.paragraph_drawn(ui, element, width, label);
-            ui.set_opacity(opacity);
-        } else {
-            self.paragraph_drawn(ui, element, width, label);
         }
+        self.paragraph_drawn(ui, element, width, label);
+        ui.set_opacity(opacity);
+        self.veil.hiding = was;
     }
 
     fn paragraph_drawn(&mut self, ui: &mut Ui, element: &Element, width: f32, label: Option<&str>) {
@@ -614,7 +638,9 @@ impl Flow<'_> {
         // nothing is selected — measured, not read. The page editor selects
         // the same way, and on a slide in edit mode, where a drag moves the
         // shape, it takes clicks alone.
-        let sense = if self.selectable {
+        let sense = if self.veil.hiding {
+            Sense::hover()
+        } else if self.selectable {
             Sense::click_and_drag()
         } else {
             Sense::click()
@@ -659,7 +685,8 @@ impl Flow<'_> {
         // each paragraph was drawn.
         let origin = pos2(anchor, rect.top());
         paint_leaders(ui, &leaders, origin, &base);
-        if let Some(visual) = visual {
+        if self.veil.hiding {
+        } else if let Some(visual) = visual {
             ui.painter().galley(origin, visual, base.color);
             expose(ui, &response, element, &galley, origin, false);
             if self.page.is_some() && !self.detached {
@@ -678,16 +705,8 @@ impl Flow<'_> {
             }
         }
 
-        if let Some(label) = label {
-            let mut label_job = LayoutJob::default();
-            label_job.append(label, 0.0, base.clone());
-            let label_galley = ui.ctx().fonts_mut(|fonts| fonts.layout_job(label_job));
-            // Ending just before the text begins, in the gutter the list opened
-            // for it. Painting left of the allocated rectangle is deliberate: the
-            // gutter is space the caller reserved and nothing else draws there.
-            let x = rect.left() + left - label_galley.size().x - LABEL_GAP * zoom;
-            ui.painter()
-                .galley(pos2(x, rect.top()), label_galley, base.color);
+        if let Some(label) = label.filter(|_| !self.veil.hiding) {
+            paint_label(ui, label, &base, pos2(rect.left() + left, rect.top()), zoom);
         }
 
         // Reached by a clone rather than by a path, so nothing inside is

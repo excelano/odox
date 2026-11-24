@@ -67,8 +67,8 @@ pub struct SlideView {
     found: Found,
     /// The slideshow is on: one slide, filling the screen, and nothing else.
     presenting: bool,
-    /// How many of the shown slide's builds the show has clicked through.
-    step: usize,
+    /// Where the show is on the slide in view.
+    show: Show,
     /// What the Format menu draws itself from, and what it last chose.
     menu: MenuState,
     command: Option<Command>,
@@ -106,7 +106,7 @@ impl Default for SlideView {
             page_editor: page_editor(),
             found: Found::default(),
             presenting: false,
-            step: 0,
+            show: Show::default(),
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
@@ -201,6 +201,16 @@ struct Drag {
     from: Pos2,
     grab: Grab,
     start: Box,
+}
+
+/// Where a show is on the slide in view.
+#[derive(Default)]
+struct Show {
+    /// How many of the slide's builds have been clicked through.
+    step: usize,
+    /// The pointer was over a link when the show was last drawn: a click
+    /// there follows the link and does not move the show on.
+    over_link: bool,
 }
 
 /// The keys and clicks that move through a show, taken in one frame.
@@ -1139,7 +1149,7 @@ impl SlideView {
     fn start_show(&mut self, from: usize) {
         self.presenting = true;
         self.slide = from;
-        self.step = 0;
+        self.show.step = 0;
         self.picked = None;
         self.drag = None;
         self.page_editor.clear();
@@ -1149,7 +1159,17 @@ impl SlideView {
     /// and the keys and the mouse that move through it. Escape ends it.
     fn present(&mut self, ui: &mut Ui, count: usize) {
         let area = ui.max_rect();
-        let response = ui.allocate_rect(area, Sense::click());
+        ui.allocate_rect(area, Sense::click());
+        let (clicked, right_clicked) = ui.input(|input| {
+            let inside = input
+                .pointer
+                .interact_pos()
+                .is_some_and(|at| area.contains(at));
+            (
+                inside && input.pointer.primary_clicked() && !self.show.over_link,
+                inside && input.pointer.secondary_clicked(),
+            )
+        });
         let keys = ui.input_mut(|input| {
             let none = egui::Modifiers::NONE;
             let forward = [Key::Space, Key::Enter, Key::ArrowRight, Key::ArrowDown]
@@ -1163,8 +1183,8 @@ impl SlideView {
                 .count()
                 > 0;
             ShowKeys {
-                forward: forward || response.clicked(),
-                back: back || response.secondary_clicked(),
+                forward: forward || clicked,
+                back: back || right_clicked,
                 next: input.consume_key(none, Key::PageDown),
                 previous: input.consume_key(none, Key::PageUp),
                 first: input.consume_key(none, Key::Home),
@@ -1194,7 +1214,7 @@ impl SlideView {
         let palette = odox_ui::format::Palette::for_theme(ui.visuals().dark_mode);
         ui.painter().rect_filled(page, 0.0, palette.paper);
         let mut canvas = Canvas::new(&document.document, &mut self.pictures, page, fit, palette);
-        canvas.build = Some((&steps, self.step));
+        canvas.build = Some((&steps, self.show.step));
         canvas.background(ui, &document.background(slide));
         for shape in &document.background_objects(slide) {
             canvas.shape(ui, shape);
@@ -1203,6 +1223,8 @@ impl SlideView {
             canvas.slide_shape(ui, index, shape);
         }
 
+        self.show.over_link =
+            ui.ctx().output(|output| output.cursor_icon) == egui::CursorIcon::PointingHand;
         // The pointer is in the way of a slide, and is put away when it has
         // been still for a moment.
         let idle = ui.input(|input| input.pointer.time_since_last_movement());
@@ -1231,18 +1253,18 @@ impl SlideView {
         };
         let last = count.saturating_sub(1);
         if keys.forward {
-            if self.step < builds(self, self.slide) {
-                self.step += 1;
+            if self.show.step < builds(self, self.slide) {
+                self.show.step += 1;
             } else if self.slide < last {
                 self.show_slide(self.slide + 1);
             }
         }
         if keys.back {
-            if self.step > 0 {
-                self.step -= 1;
+            if self.show.step > 0 {
+                self.show.step -= 1;
             } else if self.slide > 0 {
                 self.show_slide(self.slide - 1);
-                self.step = builds(self, self.slide);
+                self.show.step = builds(self, self.slide);
             }
         }
         if keys.next {
@@ -1250,13 +1272,15 @@ impl SlideView {
         }
         if keys.previous && self.slide > 0 {
             self.show_slide(self.slide - 1);
-            self.step = builds(self, self.slide);
+            self.show.step = builds(self, self.slide);
         }
         if keys.first {
             self.show_slide(0);
+            self.show.step = 0;
         }
         if keys.last {
             self.show_slide(last);
+            self.show.step = 0;
         }
     }
 
@@ -1305,7 +1329,7 @@ impl SlideView {
     fn show_slide(&mut self, slide: usize) {
         if slide != self.slide {
             self.slide = slide;
-            self.step = 0;
+            self.show.step = 0;
             self.picked = None;
             self.drag = None;
             self.page_editor.clear();
@@ -1696,13 +1720,26 @@ mod tests {
         };
         for step in 1..=5 {
             view.walk_show(forward, 2);
-            assert_eq!((view.slide, view.step), (0, step));
+            assert_eq!((view.slide, view.show.step), (0, step));
         }
         view.walk_show(forward, 2);
-        assert_eq!((view.slide, view.step), (1, 0));
+        assert_eq!((view.slide, view.show.step), (1, 0));
         view.walk_show(back, 2);
-        assert_eq!((view.slide, view.step), (0, 5));
+        assert_eq!((view.slide, view.show.step), (0, 5));
         view.walk_show(back, 2);
-        assert_eq!((view.slide, view.step), (0, 4));
+        assert_eq!((view.slide, view.show.step), (0, 4));
+        let home = ShowKeys {
+            first: true,
+            back: false,
+            ..forward
+        };
+        view.walk_show(
+            ShowKeys {
+                forward: false,
+                ..home
+            },
+            2,
+        );
+        assert_eq!((view.slide, view.show.step), (0, 0));
     }
 }

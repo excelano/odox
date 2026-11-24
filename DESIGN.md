@@ -314,9 +314,14 @@ effect's step. An effect is taken at its end, what it leaves visible or hidden,
 from the visibility it sets or else from its class, entrance or exit; an
 emphasis or a motion changes nothing, and an interactive sequence, which a
 click on a shape starts, is not read. A target is a shape on the page or one of
-its paragraphs, found by `draw:id`, `xml:id` or `text:id`; before its first
-effect it is the opposite of what that effect makes it. A paragraph not yet
-shown is laid out and drawn at no opacity, so the others keep their places.
+its paragraphs, found by `draw:id`, `xml:id` or `text:id`; an effect on a
+shape's text alone, `anim:sub-item="text"`, acts on each of its paragraphs and
+leaves the shape drawn. A group is a target whole, and nothing inside it is
+one, since its members are each drawn alone. Before its first effect a target
+is the opposite of what that effect makes it. A paragraph not yet shown is
+laid out at no opacity and answers no pointer, so the others keep their places
+and its links cannot be followed. A click anywhere on the show moves it on,
+except on a link, which is followed instead.
 Forward takes the next step and then the next slide, back undoes one and then
 enters the slide before at its last step.
 
