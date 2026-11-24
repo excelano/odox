@@ -44,7 +44,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, make text bold, italic, underlined or struck through, make paragraphs headings or list items, and take any of it back with Undo. Ctrl+F finds text and Ctrl+H replaces it, a Format menu offers the same formatting by name, and a click on a link opens it. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel; nothing else is written, except one preference, in a settings file, when it is changed in the menu. There is no inserting a table or a picture, which is the scope of the application rather than a limitation of the review build. CFBundleTypeRole is Editor.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click into the page and type, format text and paragraphs from the bar above the page or the Format menu, and insert a table, a picture, a footnote, a comment, a link or a field, each one step to undo. Ctrl+F finds text and Ctrl+H replaces it, a misspelled word is underlined with suggestions on a right click, and a click on a link opens it. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel. Inside the sandbox container the application also keeps one preference when it is changed, the words added to the spelling dictionary, and, while there are unsaved changes, a copy of them against a crash, removed once they are saved or discarded. Print writes a PDF to the container's temporary folder and hands it to Preview, where it is printed. CFBundleTypeRole is Editor.
 
 Odox Text declares its one OpenDocument type at rank Alternate rather than Default or Owner. OpenDocument is an OASIS standard this project reads and does not own, on a machine that may well have a full office suite already claiming it, so the application adds itself to the list a person can choose from and does not ask to be preferred.
 
@@ -60,9 +60,9 @@ Open a document first. With nothing open the window is empty and there is nothin
     Odox Text
     https://github.com/excelano/odox/raw/main/corpus/libreoffice/text.odt
 
-It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Text under Open With, or launch the application and use Open.
+Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Text under Open With, or launch the application and use Open.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, make text bold, italic, underlined or struck through, make paragraphs headings or list items, and take any of it back with Undo. Ctrl+F finds text and Ctrl+H replaces it, a Format menu offers the same formatting by name, and a click on a link opens it. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. There is no inserting a table or a picture, which is the scope of the application rather than a limitation of the review build.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer click into the page and type, format text and paragraphs from the bar above the page or the Format menu, and insert a table, a picture, a footnote, a comment, a link or a field, each one step to undo. Ctrl+F finds text and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .odt association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -71,17 +71,17 @@ The package declares runFullTrust and no other capability. It makes no network c
 description = """
 Odox Text opens an OpenDocument text document, lets you change what is in it, and saves it back as the document it was.
 
-It is a lightweight editor and not a word processor. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you click a paragraph and change its text where it sits, start a new paragraph with Enter, join two with Backspace, make text bold, italic, underlined or struck through, make a paragraph a heading or a list item, take any of it back with Undo, and save. Ctrl+F finds text and Ctrl+H replaces it, and a click on a link opens it in your browser. Copied text keeps its formatting, between windows and between programs. You cannot apply other formatting or insert a table or a picture: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. Where the system allows it, the application remembers the last ten documents you opened, for File > Open recent; it keeps no cache.
+It is a lightweight editor, not a full word processor. A document opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you type into the page as it is drawn, set the font, size, colour and highlight, make text bold, italic, underlined, struck through, raised or lowered, align, indent and space paragraphs, and make them headings or list items. You can insert tables, pictures with a description of what they show, footnotes and endnotes, comments, links, page breaks, page numbers and dates, give the page a header and a footer, set its paper and margins, and accept or reject tracked changes. Every change is one step to undo. Ctrl+F finds text, matching case or whole words, and Ctrl+H replaces it; a misspelled word is underlined, with suggestions on a right click; the bar under the page counts words and characters. Copied text keeps its formatting, between windows and between programs. Nothing is written to your document until you press Save, and then only the file you opened or the one you named. While you have unsaved changes, a copy of them is kept on your own machine against a crash, and taken away when you save or discard them. The one preference the application keeps goes into a settings file only when you change it, and where the system allows it the application remembers the last ten documents you opened, for File > Open recent.
 
-It draws the page at the width the document asks for. Headings, nested lists, tables with merged cells and borders, and the pictures inside the document appear where the document puts them, in the fonts it asks for, resolved against the ones you have installed. An outline sits beside the page and moves it when you click a heading. You can select across paragraphs and copy, or take the whole document as plain text in one command.
+It draws the page at the width the document asks for. Headings, nested lists, tables with merged cells and borders, and the pictures inside the document appear where the document puts them, in the fonts it asks for, resolved against the ones you have installed. An outline sits beside the page and moves it when you click a heading.
 
-File > New starts a blank document, on the paper your country prints on, ready to type into. File > Export as PDF/UA… writes the document as a PDF that conforms to PDF/UA-1, the ISO standard for accessible PDF: its headings, lists, tables, links and pictures are tagged so that assistive technology reads them in order, and its fonts travel inside the file. The window shows one continuous page; the PDF is laid out on the paper and margins the document's own page style gives. Every export is checked against the standard as it is written, and a picture with no description is asked about first, so nothing reaches the file under that name without one.
+File > New starts a blank document, on the paper your country prints on, ready to type into. File > Export as PDF/UA… writes the document as a PDF that conforms to PDF/UA-1, the ISO standard for accessible PDF: its headings, lists, tables, links and pictures are tagged so that assistive technology reads them in order, and its fonts travel inside the file. The window shows one continuous page; the PDF is laid out on the paper and margins the document's own page style gives. Every export is checked against the standard as it is written, and a picture with no description is asked about first, so nothing reaches the file under that name without one. File > Print… prints the same pages.
 
 It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
 
-It is one of three. Odox Grid reads spreadsheets and Odox Deck reads presentations, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+It is one of three, beside Odox Grid for spreadsheets and Odox Deck for presentations, all drawn by one renderer.
 
-What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. A test that every document in the corpus comes back the same, and that an edit to any paragraph of it changes that paragraph and nothing else, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
 Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
@@ -105,23 +105,23 @@ It draws the page at the width the document asks for, with its headings, lists, 
 features = [
     "Opens .odt text documents written by any application that follows the OpenDocument standard",
     "Draws the page at the width the document asks for, with its own fonts resolved against the ones you have installed",
-    "Headings, nested lists, tables with merged cells, and the pictures inside the document, each where the document puts it",
+    "Headings, lists, tables, pictures, footnotes, comments and tracked changes, each where the document puts it",
     "An outline beside the page that moves it when you click a heading",
-    "Select across paragraphs and copy, or copy the whole document as plain text",
-    "Click a paragraph to change it, split it with Enter or join it with Backspace, and take any of it back with Undo",
-    "Make text bold, italic, underlined or struck through, from the keyboard or the buttons above the page",
-    "Make a paragraph body text, a heading of the first three levels, or an item in a bulleted or numbered list, from the buttons above the page",
-    "Find text with Ctrl+F, with every match lit and a way from one to the next, and replace one match or every match with Ctrl+H",
-    "A Format menu with the marks and the kinds of paragraph, by name, beside the buttons above the page",
-    "Copy formatted text and paste it back into the window with its bold, italic, underline, strikethrough, headings and lists",
-    "A click on a link opens it in your browser, or goes to the place in the document it names",
-    "Export as PDF/UA-1, the standard for accessible PDF: headings, lists, tables, links and pictures tagged in reading order, fonts embedded, checked as it is written",
-    "Start a blank document with File > New; save over the file you opened or somewhere else, and a save that would not read back as the document in the window is refused",
+    "Type into the page as it is drawn, with the arrows, the clipboard and Undo working as in any word processor",
+    "Font, size, colour, highlight, bold, italic, underline, strikethrough, superscript and subscript, from the bar above the page",
+    "Align, indent and space paragraphs, and make them headings of ten levels or items of bulleted and numbered lists",
+    "Insert tables and change their rows, columns and merged cells; insert pictures with a description of what they show",
+    "Footnotes and endnotes, comments, links, page breaks, page numbers, page counts and dates",
+    "A header and a footer for the page, and its paper, orientation and margins",
+    "Tracked changes drawn in their authors' colours, and accepted or rejected one at a time or all at once",
+    "Find with Ctrl+F, matching case or whole words, and replace one match or every match with Ctrl+H",
+    "Spelling checked as you type, with suggestions, Add to dictionary and Ignore on a right click",
+    "A count of the document's words and characters, and of the selection's",
+    "Export as PDF/UA-1, the standard for accessible PDF, checked as it is written, and print through your system's own dialog",
     "What you did not touch is written back as it was read, element for element, including what Odox has never heard of",
-    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference, only when you change it, and the last ten documents you opened",
+    "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
-    "Follows your desktop's light or dark setting",
-    "Speaks English and German",
+    "Follows your desktop's light or dark setting, and speaks English and German",
     "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "odt", "document editor", "edit document", "text document", "oasis"]
@@ -130,17 +130,17 @@ keywords = ["opendocument", "odf", "odt", "document editor", "edit document", "t
 description = """
 Odox Text öffnet ein OpenDocument-Textdokument, lässt Sie ändern, was darin steht, und speichert es als das Dokument zurück, das es war.
 
-Es ist ein leichter Editor und keine Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie auf einen Absatz klicken und seinen Text an Ort und Stelle ändern, mit Enter einen neuen Absatz beginnen, mit der Rücktaste zwei zusammenfügen, Text fett, kursiv, unterstrichen oder durchgestrichen formatieren, einen Absatz zur Überschrift oder zum Listeneintrag machen, alles mit Rückgängig zurücknehmen und speichern. Strg+F sucht Text und Strg+H ersetzt ihn, und ein Klick auf einen Link öffnet ihn im Browser. Kopierter Text behält seine Formatierung, auch zwischen Fenstern und Programmen. Anders formatieren oder eine Tabelle oder ein Bild einfügen: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern. Wo das System es zulässt, merkt sich die Anwendung die zehn zuletzt geöffneten Dokumente für Datei > Zuletzt verwendete Dokumente; einen Zwischenspeicher gibt es nicht.
+Es ist ein leichter Editor, keine vollständige Textverarbeitung. Ein Dokument öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie direkt in die gezeichnete Seite tippen, Schriftart, Größe, Farbe und Hervorhebung setzen, Text fett, kursiv, unterstrichen, durchgestrichen, hoch- oder tiefgestellt formatieren, Absätze ausrichten, einrücken und ihren Abstand setzen und sie zu Überschriften oder Listeneinträgen machen. Sie können Tabellen einfügen, Bilder mit einer Beschreibung dessen, was sie zeigen, Fuß- und Endnoten, Kommentare, Links, Seitenumbrüche, Seitenzahlen und Datumsangaben, der Seite eine Kopf- und eine Fußzeile geben, Papier und Ränder einstellen und nachverfolgte Änderungen annehmen oder ablehnen. Jede Änderung ist ein Schritt zum Rückgängigmachen. Strg+F sucht Text und Strg+H ersetzt ihn; ein falsch geschriebenes Wort wird unterstrichen, mit Vorschlägen per Rechtsklick; die Leiste unter der Seite zählt Wörter und Zeichen. In Ihr Dokument wird nichts geschrieben, bis Sie speichern, und dann nur in die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben. Solange Änderungen nicht gespeichert sind, wird eine Kopie davon auf Ihrem eigenen Rechner gegen einen Absturz bereitgehalten und entfernt, sobald Sie speichern oder verwerfen. Die eine Einstellung, die die Anwendung sich merkt, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern, und wo das System es zulässt, merkt sich die Anwendung die zehn zuletzt geöffneten Dokumente für Datei > Zuletzt verwendete Dokumente.
 
-Die Seite wird in der Breite gezeichnet, die das Dokument verlangt. Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und Rahmen sowie die Bilder im Dokument erscheinen dort, wo das Dokument sie hinsetzt, in den Schriften, die es verlangt, aufgelöst gegen die auf Ihrem Rechner installierten. Neben der Seite steht eine Gliederung, die beim Klick auf eine Überschrift dorthin springt. Sie können über Absätze hinweg markieren und kopieren oder das ganze Dokument mit einem Befehl als reinen Text übernehmen.
+Die Seite wird in der Breite gezeichnet, die das Dokument verlangt. Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und Rahmen sowie die Bilder im Dokument erscheinen dort, wo das Dokument sie hinsetzt, in den Schriften, die es verlangt, aufgelöst gegen die auf Ihrem Rechner installierten. Neben der Seite steht eine Gliederung, die beim Klick auf eine Überschrift dorthin springt.
 
-Datei > Neu beginnt ein leeres Dokument auf dem Papier, auf dem Ihr Land druckt, bereit zum Tippen. Datei > Als PDF/UA exportieren… schreibt das Dokument als PDF nach PDF/UA-1, der ISO-Norm für barrierefreies PDF: Überschriften, Listen, Tabellen, Links und Bilder sind so ausgezeichnet, dass Hilfstechnologien sie in Lesereihenfolge vorlesen, und die Schriften reisen in der Datei mit. Das Fenster zeigt eine durchgehende Seite; das PDF wird auf Papier und Ränder der eigenen Seitenvorlage gesetzt. Jeder Export wird beim Schreiben gegen die Norm geprüft, und nach einem Bild ohne Beschreibung wird zuerst gefragt.
+Datei > Neu beginnt ein leeres Dokument auf dem Papier, auf dem Ihr Land druckt, bereit zum Tippen. Datei > Als PDF/UA exportieren… schreibt das Dokument als PDF nach PDF/UA-1, der ISO-Norm für barrierefreies PDF: Überschriften, Listen, Tabellen, Links und Bilder sind so ausgezeichnet, dass Hilfstechnologien sie in Lesereihenfolge vorlesen, und die Schriften reisen in der Datei mit. Das Fenster zeigt eine durchgehende Seite; das PDF wird auf Papier und Ränder der eigenen Seitenvorlage gesetzt. Jeder Export wird beim Schreiben gegen die Norm geprüft, und nach einem Bild ohne Beschreibung wird zuerst gefragt. Datei > Drucken… druckt dieselben Seiten.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Text ist eines von dreien. Odox Grid bearbeitet Tabellendokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Text ist eines von dreien, neben Odox Grid für Tabellendokumente und Odox Deck für Präsentationen, alle von einem Zeichner dargestellt.
 
-Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
@@ -164,23 +164,23 @@ Die Seite wird in der Breite gezeichnet, die das Dokument verlangt, mit Übersch
 features = [
     "Öffnet ODT-Textdokumente aus jeder Anwendung, die dem OpenDocument-Standard folgt",
     "Zeichnet die Seite in der Breite, die das Dokument verlangt, mit den Schriften, die auf Ihrem Rechner installiert sind",
-    "Überschriften, verschachtelte Listen, Tabellen mit verbundenen Zellen und die Bilder im Dokument, jedes an seinem Platz",
+    "Überschriften, Listen, Tabellen, Bilder, Fußnoten, Kommentare und nachverfolgte Änderungen, jedes an seinem Platz",
     "Eine Gliederung neben der Seite, die beim Klick auf eine Überschrift dorthin springt",
-    "Über Absätze hinweg markieren und kopieren, oder das ganze Dokument als reinen Text übernehmen",
-    "Auf einen Absatz klicken und ihn ändern, mit Enter teilen oder mit der Rücktaste zusammenfügen, und alles mit Rückgängig zurücknehmen",
-    "Text fett, kursiv, unterstrichen oder durchgestrichen formatieren, über die Tastatur oder die Schaltflächen über der Seite",
-    "Einen Absatz zu Fließtext, zu einer Überschrift der ersten drei Ebenen oder zu einem Eintrag einer Aufzählung oder nummerierten Liste machen, über die Schaltflächen über der Seite",
-    "Text mit Strg+F suchen, jeder Treffer markiert und ein Weg von einem zum nächsten, und mit Strg+H einen Treffer oder alle ersetzen",
-    "Ein Menü Format mit den Auszeichnungen und den Absatzarten, mit Namen, neben den Schaltflächen über der Seite",
-    "Formatierten Text kopieren und mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften und Listen ins Fenster zurück einfügen",
-    "Ein Klick auf einen Link öffnet ihn im Browser oder springt zu der Stelle im Dokument, die er nennt",
-    "Export als PDF/UA-1, der Norm für barrierefreies PDF: Überschriften, Listen, Tabellen, Links und Bilder in Lesereihenfolge ausgezeichnet, Schriften eingebettet, beim Schreiben geprüft",
-    "Mit Datei > Neu ein leeres Dokument beginnen; über die geöffnete Datei oder anderswohin speichern, und ein Speichern, das nicht zurückgelesen würde, wird verweigert",
+    "Direkt in die gezeichnete Seite tippen, mit Pfeiltasten, Zwischenablage und Rückgängig wie in jeder Textverarbeitung",
+    "Schriftart, Größe, Farbe, Hervorhebung, fett, kursiv, unterstrichen, durchgestrichen, hoch- und tiefgestellt, über die Leiste über der Seite",
+    "Absätze ausrichten, einrücken und ihren Abstand setzen, und sie zu Überschriften von zehn Ebenen oder zu Listeneinträgen machen",
+    "Tabellen einfügen und ihre Zeilen, Spalten und verbundenen Zellen ändern; Bilder mit einer Beschreibung einfügen",
+    "Fuß- und Endnoten, Kommentare, Links, Seitenumbrüche, Seitenzahlen, Seitenanzahl und Datumsangaben",
+    "Eine Kopf- und eine Fußzeile für die Seite, dazu Papier, Ausrichtung und Ränder",
+    "Nachverfolgte Änderungen in den Farben ihrer Autoren, einzeln oder alle auf einmal angenommen oder abgelehnt",
+    "Mit Strg+F suchen, auch nach Groß- und Kleinschreibung oder ganzen Wörtern, und mit Strg+H einen Treffer oder alle ersetzen",
+    "Rechtschreibprüfung beim Tippen, mit Vorschlägen, Zum Wörterbuch hinzufügen und Ignorieren per Rechtsklick",
+    "Die Zahl der Wörter und Zeichen im Dokument und in der Auswahl",
+    "Export als PDF/UA-1, der Norm für barrierefreies PDF, beim Schreiben geprüft, und Drucken über den Dialog Ihres Systems",
     "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, auch das, wovon Odox nie gehört hat",
-    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung, nur wenn Sie sie ändern, und die zehn zuletzt geöffneten Dokumente",
+    "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
-    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
-    "Spricht Deutsch und Englisch",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung und spricht Deutsch und Englisch",
     "Frei und quelloffen unter der MIT-Lizenz",
 ]
 keywords = ["OpenDocument", "ODF", "ODT", "Textdokument", "Editor", "Dokument bearbeiten", "OASIS"]
@@ -196,7 +196,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well.
 
-Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and as a table, and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts, deletes, hides and shows rows and columns, merges and unmerges cells, and adds, renames, deletes and moves sheets, and the formulas that name what moved follow it. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited; once a value has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel; nothing else is written, except one preference, in a settings file, when it is changed in the menu. CFBundleTypeRole is Editor.
+Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, and what begins with = is a formula, worked out as soon as it is entered; a change works out again every formula that reads it. Ctrl+1 formats the picked cells, Ctrl+D fills down, and the Sheet menu sorts, writes a cell's comment, inserts, deletes, hides and shows rows and columns, merges cells and adds, renames, deletes and moves sheets, with the formulas that name what moved following it; Undo takes any of it back. Conditional formats colour cells while their conditions hold, a cell's validity rule is checked as a value goes in, and pictures and shapes are drawn over the cells. Ctrl+F finds text in any sheet and Ctrl+H replaces it, and a misspelled word in the cell being typed is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel. Inside the sandbox container the application also keeps one preference when it is changed, the words added to the spelling dictionary, and, while there are unsaved changes, a copy of them against a crash, removed once they are saved or discarded. Print writes a PDF to the container's temporary folder and hands it to Preview, where it is printed. CFBundleTypeRole is Editor.
 
 Odox Grid declares its one OpenDocument type at rank Alternate rather than Default or Owner. OpenDocument is an OASIS standard this project reads and does not own, on a machine that may well have a full office suite already claiming it, so the application adds itself to the list a person can choose from and does not ask to be preferred.
 
@@ -214,7 +214,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Grid under Open With, or launch the application and use Open.
 
-Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and as a table, and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts, deletes, hides and shows rows and columns, merges cells and manages sheets, and formulas follow what moved. A cell that holds a formula is kept as it is and not edited; once a value has changed, every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says.
+Typing on the cell you pick replaces it, Enter or F2 opens it with what it holds, and what begins with = is a formula, worked out as soon as it is entered; a change works out again every formula that reads it. Ctrl+1 formats the picked cells, Ctrl+D fills down, and the Sheet menu sorts, comments, changes rows, columns and sheets, and merges cells, with formulas following what moved; Undo takes any of it back. Ctrl+F finds text in any sheet and Ctrl+H replaces it, and a misspelled word in the cell being typed is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA writes a PDF where its save dialog says. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .ods association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -223,19 +223,19 @@ The package declares runFullTrust and no other capability. It makes no network c
 description = """
 Odox Grid opens an OpenDocument spreadsheet, lets you change the cells that need changing, and saves it back as the document it was.
 
-It is a lightweight editor and not a spreadsheet application. Typing on the cell you picked replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and as a table, and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts, deletes, hides and shows rows and columns, merges and unmerges cells, and adds, renames, deletes and moves sheets, and the formulas that name what moved follow it. Drag the edge of a column's or a row's header to resize it, freeze the top rows and the left columns from the View menu, and the bar above the grid gives the sum, average and count of a selection. A number is a number, TRUE and FALSE are booleans, anything else is text. A cell that holds a formula is kept as it is and not edited, and once a value has changed every formula's result is drawn faint until a spreadsheet application recalculates it, which LibreOffice does on opening the file. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. Where the system allows it, the application remembers the last ten documents you opened, for File > Open recent; it keeps no cache.
+It is a lightweight editor, not a full spreadsheet application. Typing on the cell you picked replaces it, Enter or F2 opens it with what it holds, Delete clears it, and Undo takes any of it back. What you type is read in the cell's own number format, and what begins with = is a formula, worked out as soon as it is entered; a change works out again every formula that reads it, and a formula calling a function Odox Grid does not know keeps its last result, drawn faint. Ctrl+1 sets a cell's number format, font, fill, alignment, wrapping and borders, Ctrl+D fills a selection down and the square at its corner carries a series on, and the Sheet menu sorts a block and writes a cell's comment. Conditional formats colour cells while their conditions hold, a cell's validity rule is checked as a value goes in, and the pictures and shapes on a sheet are drawn over its cells. Dragging, or Shift with the arrow keys, selects a range, which Ctrl+C and Ctrl+X take as tab separated text and as a table, and Ctrl+V puts down from the picked cell; Delete clears the range. Ctrl+F finds text in any sheet and Ctrl+H replaces it in the cells that hold text. The Sheet menu inserts, deletes, hides and shows rows and columns, merges and unmerges cells, and adds, renames, deletes and moves sheets, and the formulas that name what moved follow it. A misspelled word in the cell you are typing in is underlined, with suggestions on a right click. Nothing is written to your document until you press Save, and then only the file you opened or the one you named. While you have unsaved changes, a copy of them is kept on your own machine against a crash, and taken away when you save or discard them. The one preference the application keeps goes into a settings file only when you change it, and where the system allows it the application remembers the last ten documents you opened, for File > Open recent.
 
 It draws the sheet at the document's own column widths and row heights, with the cell styles the document carries and its text wrapped where a cell says so, and shows numbers, dates and booleans the way the document says to show them. There is one tab per sheet, and picking a cell shows the formula behind it above the grid.
 
-A spreadsheet often has a gap in it, a run of ten thousand empty rows between one block of figures and the next, and a reader that turns that gap into ten thousand rows in memory is slow to open and slow to scroll. Odox Grid keeps the gap as the document writes it, which is why a sparse sheet opens as fast as a dense one.
+A sheet with ten thousand empty rows between two blocks of figures opens as fast as a dense one, because the gap is kept as the document writes it.
 
-File > New starts a blank workbook, and File > Export as PDF/UA… writes one as an accessible PDF that conforms to PDF/UA-1: each sheet that is shown a tagged table with its header row, printed as its page style asks.
+File > New starts a blank workbook, and File > Export as PDF/UA… writes one as an accessible PDF that conforms to PDF/UA-1: each sheet that is shown a tagged table with its header row, printed as its page style asks. File > Print… prints the same pages.
 
 It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
 
-It is one of three. Odox Text reads text documents and Odox Deck reads presentations, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+It is one of three, beside Odox Text for text documents and Odox Deck for presentations, all drawn by one renderer.
 
-What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a run of a thousand identical rows the document wrote once is split around the one cell you changed and the rest stay one run. A test that every document in the corpus comes back the same, and that an edit changes one cell and no other, runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
 Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
@@ -254,28 +254,28 @@ name = "Odox Grid"
 short-description = """
 A small, fast editor for OpenDocument spreadsheets, the `.ods` files written by LibreOffice, OpenOffice and everything else that speaks the OASIS standard.
 
-It draws the sheet at the document's own column widths and cell styles, with one tab per sheet and the formula behind whichever cell you pick. Type into a cell to change it, take it back with Undo, and save: the formulas and everything you did not touch are written back as they were read, so the sheet you save is the one you opened.
+It draws the sheet at the document's own column widths and cell styles, with one tab per sheet and the formula behind whichever cell you pick. Type into a cell to change it, take it back with Undo, and save: everything you did not touch is written back as it was read, so the sheet you save is the one you opened.
 """
 features = [
     "Opens .ods spreadsheets written by any application that follows the OpenDocument standard",
     "Draws the sheet at the document's own column widths, row heights and cell styles, with text wrapped where a cell says so",
     "One tab per sheet, and the formula behind whichever cell you pick shown above the grid",
-    "Numbers, dates and booleans shown the way the document says to show them",
+    "Numbers, dates and booleans shown the way the document says, and typed in the cell's own number format",
+    "Formulas typed and worked out as you enter them, and worked out again whenever a cell they read changes",
+    "Format cells with Ctrl+1: number format, font, fill, alignment, wrapping and borders",
+    "Fill down, carry a series on by dragging, sort a block, and write a cell's comment",
+    "Conditional formats colour cells while their conditions hold; validity rules are checked as a value goes in",
+    "Pictures and shapes on a sheet drawn over its cells, and moved with the cells they are anchored to",
+    "Select a range, then copy, cut, paste or clear it as tab-separated text or a table, each one step to undo",
+    "Insert, delete, hide and show rows and columns, merge cells, and add, rename, delete and move sheets; formulas follow",
+    "Freeze the top rows and left columns, resize columns and rows by their headers, and see a selection's sum, average and count",
+    "Find text in any sheet with Ctrl+F and replace it with Ctrl+H; spelling is checked in the cell you are typing in",
     "A sheet with a large empty gap in it opens as fast as one without, because the gap is never expanded",
-    "Copy the whole sheet as tab-separated text, ready to paste anywhere",
-    "Type into a cell to change it: a number is a number, TRUE and FALSE are booleans, anything else is text, and Undo takes it back",
-    "Select a range by dragging, then copy, cut, paste or clear it as tab-separated text, each in one step to undo",
-    "Find text in any sheet with Ctrl+F, with every cell that holds it lit, and replace it in the cells that hold text with Ctrl+H",
-    "Insert and delete rows and columns from the Sheet menu; formulas that name the cells follow them, and a change that would break one is refused",
-    "Add, rename, delete and move sheets, or start a blank workbook with File > New; formulas that name a renamed sheet follow it",
-    "Freeze the top rows and left columns, drag a header's edge to resize a column or row, and see the sum, average and count of a selection",
-    "Formulas are kept and not edited; once a value has changed their results are drawn faint until a spreadsheet application recalculates them",
-    "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
-    "Export as PDF/UA-1, the standard for accessible PDF: each sheet a tagged table with its header row, printed as its page style asks, fonts embedded, checked as it is written",
-    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference, only when you change it, and the last ten documents you opened",
+    "Export as PDF/UA-1, each sheet a tagged table with its header row, and print through your system's own dialog",
+    "What you did not touch is written back as it was read, and a save that would not read back the same is refused",
+    "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
-    "Follows your desktop's light or dark setting",
-    "Speaks English and German",
+    "Follows your desktop's light or dark setting, and speaks English and German",
     "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "ods", "spreadsheet editor", "edit spreadsheet", "sheet", "oasis"]
@@ -284,17 +284,17 @@ keywords = ["opendocument", "odf", "ods", "spreadsheet editor", "edit spreadshee
 description = """
 Odox Grid öffnet ein OpenDocument-Tabellendokument, lässt Sie die Zellen ändern, die es brauchen, und speichert es als das Dokument zurück, das es war.
 
-Es ist ein leichter Editor und keine Tabellenkalkulation. Tippen auf der gewählten Zelle ersetzt sie, Enter oder F2 öffnet sie mit ihrem Inhalt, Entf leert sie, und Rückgängig nimmt alles zurück. Ziehen, oder Umschalt mit den Pfeiltasten, wählt einen Bereich, den Strg+C und Strg+X als tabulatorgetrennten Text und als Tabelle übernehmen und Strg+V ab der gewählten Zelle einfügt; Entf leert den Bereich. Strg+F sucht Text in jedem Blatt und Strg+H ersetzt ihn in den Zellen mit Text. Das Menü Blatt fügt Zeilen und Spalten ein, löscht sie, blendet sie aus und wieder ein, verbindet und trennt Zellen, fügt Blätter hinzu, benennt sie um, löscht und verschiebt sie, und die Formeln, die darauf verweisen, folgen. Am Rand eines Spalten- oder Zeilenkopfs ziehen ändert die Größe, das Menü Ansicht fixiert die obersten Zeilen und linken Spalten, und die Leiste über dem Gitter nennt Summe, Mittelwert und Anzahl einer Auswahl. Eine Zelle mit einer Formel bleibt, wie sie ist, und wird nicht bearbeitet; sobald sich ein Wert geändert hat, wird das Ergebnis jeder Formel blass gezeichnet, bis eine Tabellenkalkulation es neu berechnet, was LibreOffice beim Öffnen der Datei tut. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern.
+Es ist ein leichter Editor, keine vollständige Tabellenkalkulation. Tippen auf der gewählten Zelle ersetzt sie, Enter oder F2 öffnet sie mit ihrem Inhalt, Entf leert sie, und Rückgängig nimmt alles zurück. Was Sie tippen, wird im Zahlenformat der Zelle gelesen, und was mit = beginnt, ist eine Formel, die sofort ausgerechnet wird; eine Änderung rechnet jede Formel neu, die die Zelle liest, und eine Formel mit einer Funktion, die Odox Grid nicht kennt, behält ihr letztes Ergebnis, blass gezeichnet. Strg+1 setzt Zahlenformat, Schrift, Füllung, Ausrichtung, Umbruch und Rahmen einer Zelle, Strg+D füllt eine Auswahl nach unten, das Quadrat an ihrer Ecke setzt eine Reihe fort, und das Menü Blatt sortiert einen Block und schreibt den Kommentar einer Zelle. Bedingte Formatierungen färben Zellen, solange ihre Bedingung gilt, die Gültigkeitsregel einer Zelle wird bei der Eingabe geprüft, und Bilder und Formen eines Blatts werden über seine Zellen gezeichnet. Strg+F sucht Text in jedem Blatt und Strg+H ersetzt ihn in den Zellen mit Text. Das Menü Blatt fügt Zeilen und Spalten ein, löscht sie, blendet sie aus und wieder ein, verbindet und trennt Zellen, fügt Blätter hinzu, benennt sie um, löscht und verschiebt sie, und die Formeln, die darauf verweisen, folgen. Ein falsch geschriebenes Wort in der Zelle, in die Sie tippen, wird unterstrichen, mit Vorschlägen per Rechtsklick. In Ihr Dokument wird nichts geschrieben, bis Sie speichern, und dann nur in die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben. Solange Änderungen nicht gespeichert sind, wird eine Kopie davon auf Ihrem eigenen Rechner gegen einen Absturz bereitgehalten und entfernt, sobald Sie speichern oder verwerfen. Die eine Einstellung, die die Anwendung sich merkt, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern.
 
-Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, Text umbrochen, wo eine Zelle es verlangt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt. Es gibt einen Reiter je Tabellenblatt, und wer eine Zelle wählt, sieht die Formel dahinter über dem Gitter.
+Das Blatt wird mit den Spaltenbreiten und Zeilenhöhen des Dokuments und den Zellformaten gezeichnet, die es mitbringt, Text umbrochen, wo eine Zelle es verlangt, und Zahlen, Datumsangaben und Wahrheitswerte erscheinen so, wie das Dokument es vorgibt.
 
-Ein Tabellendokument hat oft eine Lücke: einen Lauf von zehntausend leeren Zeilen zwischen zwei Zahlenblöcken. Ein Programm, das daraus zehntausend Zeilen im Speicher macht, öffnet langsam und rollt langsam. Odox Grid behält die Lücke so, wie das Dokument sie schreibt, und deshalb öffnet ein dünn besetztes Blatt so schnell wie ein dichtes.
+Ein Blatt mit zehntausend leeren Zeilen zwischen zwei Zahlenblöcken öffnet so schnell wie ein dichtes, weil die Lücke so bleibt, wie das Dokument sie schreibt.
 
-Datei > Neu beginnt ein leeres Tabellendokument, und Datei > Als PDF/UA exportieren… schreibt eines als barrierefreies PDF nach PDF/UA-1: jedes sichtbare Blatt eine ausgezeichnete Tabelle mit Kopfzeile, gedruckt nach seiner Seitenvorlage.
+Datei > Neu beginnt ein leeres Tabellendokument, und Datei > Als PDF/UA exportieren… schreibt eines als barrierefreies PDF nach PDF/UA-1: jedes sichtbare Blatt eine ausgezeichnete Tabelle mit Kopfzeile, gedruckt nach seiner Seitenvorlage. Datei > Drucken… druckt dieselben Seiten.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Grid ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Deck Präsentationen. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Grid ist eines von dreien, neben Odox Text für Textdokumente und Odox Deck für Präsentationen, alle von einem Zeichner dargestellt.
 
 Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
@@ -315,28 +315,28 @@ name = "Odox Grid"
 short-description = """
 Ein kleiner, schneller Editor für OpenDocument-Tabellendokumente, also die ODS-Dateien, die LibreOffice, OpenOffice und alles andere schreiben, was dem OASIS-Standard folgt.
 
-Das Blatt wird mit den Spaltenbreiten und Zellformaten des Dokuments gezeichnet, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle. Tippen Sie in eine Zelle, um sie zu ändern, nehmen Sie es zurück und speichern Sie: Formeln und alles Unberührte bleiben, wie sie gelesen wurden.
+Das Blatt wird mit den Spaltenbreiten und Zellformaten des Dokuments gezeichnet, ein Reiter je Tabellenblatt, mit der Formel hinter der gewählten Zelle. Tippen Sie Werte und Formeln in eine Zelle, nehmen Sie es zurück und speichern Sie: Alles Unberührte bleibt, wie es gelesen wurde.
 """
 features = [
     "Öffnet ODS-Tabellendokumente aus jeder Anwendung, die dem OpenDocument-Standard folgt",
     "Zeichnet das Blatt mit den Spaltenbreiten, Zeilenhöhen und Zellformaten des Dokuments, Text umbrochen, wo eine Zelle es verlangt",
     "Ein Reiter je Tabellenblatt, und über dem Gitter die Formel hinter der gewählten Zelle",
-    "Zahlen, Datumsangaben und Wahrheitswerte so dargestellt, wie das Dokument es vorgibt",
+    "Zahlen, Datumsangaben und Wahrheitswerte so dargestellt, wie das Dokument es vorgibt, und im Zahlenformat der Zelle eingegeben",
+    "Formeln eingeben und sofort ausrechnen lassen; sie rechnen neu, sobald sich eine Zelle ändert, die sie lesen",
+    "Zellen mit Strg+1 formatieren: Zahlenformat, Schrift, Füllung, Ausrichtung, Umbruch und Rahmen",
+    "Nach unten ausfüllen, eine Reihe durch Ziehen fortsetzen, einen Block sortieren und den Kommentar einer Zelle schreiben",
+    "Bedingte Formatierungen färben Zellen, solange ihre Bedingung gilt; Gültigkeitsregeln werden bei der Eingabe geprüft",
+    "Bilder und Formen eines Blatts über seinen Zellen, verschoben mit den Zellen, an denen sie verankert sind",
+    "Einen Bereich wählen, dann als tabulatorgetrennten Text oder Tabelle kopieren, ausschneiden, einfügen oder leeren",
+    "Zeilen und Spalten einfügen, löschen, aus- und einblenden, Zellen verbinden, Blätter hinzufügen, umbenennen, löschen, verschieben",
+    "Oberste Zeilen und linke Spalten fixieren, Spalten und Zeilen am Kopf in der Größe ändern, Summe, Mittelwert und Anzahl sehen",
+    "Text in jedem Blatt mit Strg+F suchen und mit Strg+H ersetzen; die Rechtschreibung wird in der Zelle geprüft, in die Sie tippen",
     "Ein Blatt mit einer großen leeren Lücke öffnet so schnell wie ein volles, weil die Lücke nie ausgerollt wird",
-    "Das ganze Tabellenblatt als tabulatorgetrennten Text kopieren und überall einfügen",
-    "In eine Zelle tippen, um sie zu ändern: Eine Zahl ist eine Zahl, WAHR und FALSCH sind Wahrheitswerte, alles andere ist Text, und Rückgängig nimmt es zurück",
-    "Einen Bereich durch Ziehen wählen, dann als tabulatorgetrennten Text kopieren, ausschneiden, einfügen oder leeren, jedes in einem Schritt rückgängig zu machen",
-    "Text in jedem Blatt mit Strg+F suchen, jede Zelle mit einem Treffer markiert, und ihn mit Strg+H in den Zellen mit Text ersetzen",
-    "Zeilen und Spalten im Menü Blatt einfügen und löschen; Formeln, die auf die Zellen verweisen, folgen ihnen, und eine Änderung, die eine zerstören würde, wird abgelehnt",
-    "Blätter hinzufügen, umbenennen, löschen und verschieben oder mit Datei > Neu ein leeres Tabellendokument beginnen; Formeln folgen einem umbenannten Blatt",
-    "Oberste Zeilen und linke Spalten fixieren, Spalten und Zeilen am Rand ihres Kopfs in der Größe ändern, und Summe, Mittelwert und Anzahl einer Auswahl sehen",
-    "Formeln bleiben erhalten und werden nicht bearbeitet; sobald sich ein Wert geändert hat, werden ihre Ergebnisse blass gezeichnet, bis eine Tabellenkalkulation sie neu berechnet",
-    "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
-    "Export als PDF/UA-1, der Norm für barrierefreies PDF: jedes Blatt eine ausgezeichnete Tabelle mit Kopfzeile, gedruckt nach seiner Seitenvorlage, Schriften eingebettet, beim Schreiben geprüft",
-    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung, nur wenn Sie sie ändern, und die zehn zuletzt geöffneten Dokumente",
+    "Export als PDF/UA-1, jedes Blatt eine ausgezeichnete Tabelle mit Kopfzeile, und Drucken über den Dialog Ihres Systems",
+    "Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde, und ein Speichern, das nicht so zurückkäme, wird verweigert",
+    "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
-    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
-    "Spricht Deutsch und Englisch",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung und spricht Deutsch und Englisch",
     "Frei und quelloffen unter der MIT-Lizenz",
 ]
 keywords = ["OpenDocument", "ODF", "ODS", "Tabellendokument", "Tabelle", "Editor", "OASIS"]
@@ -352,7 +352,7 @@ Open a document first. With nothing open the window is empty and there is nothin
 
 It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu adds, duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel, asking first about the two pictures in this deck that have no description; nothing else is written, except one preference, in a settings file, when it is changed in the menu. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build. CFBundleTypeRole is Editor.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change and format it where it sits, and take any of it back with Undo. The Slide menu adds, duplicates, moves and deletes slides and puts a text box, a picture or a comment on one. F5 starts a slideshow that reveals a slide's builds click by click, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere, and File > Export as PDF/UA writes a PDF to a file named in the save panel, asking first about the two pictures in this deck that have no description. Inside the sandbox container the application also keeps one preference when it is changed, the words added to the spelling dictionary, and, while there are unsaved changes, a copy of them against a crash, removed once they are saved or discarded. Print writes a PDF to the container's temporary folder and hands it to Preview, where it is printed. Drawing shapes other than text boxes and changing a master page are outside the scope of the application rather than limitations of the review build. CFBundleTypeRole is Editor.
 
 Odox Deck declares its one OpenDocument type at rank Alternate rather than Default or Owner. OpenDocument is an OASIS standard this project reads and does not own, on a machine that may well have a full office suite already claiming it, so the application adds itself to the list a person can choose from and does not ask to be preferred.
 
@@ -368,9 +368,9 @@ Open a document first. With nothing open the window is empty and there is nothin
     Odox Deck
     https://github.com/excelano/odox/raw/main/corpus/libreoffice/growing-liberty.odp
 
-It was written by LibreOffice rather than by hand, so what you are opening is what an office application actually emits. Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Deck under Open With, or launch the application and use Open.
+Nothing in it is anybody else's copyright. Any OpenDocument file of your own will do as well; right-click it and choose Odox Deck under Open With, or launch the application and use Open.
 
-Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, and take any of it back with Undo. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu adds, duplicates, moves and deletes slides. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA asks about the deck's two undescribed pictures, then writes a PDF. There is no adding a shape, no other formatting, and no changing a master page, which is the scope of the application rather than a limitation of the review build.
+Edit mode, from the Edit menu or Ctrl+E, lets a reviewer pick a shape and drag it where it should be, resize it by a corner, click its text and change and format it where it sits, and take any of it back with Undo. The Slide menu adds, duplicates, moves and deletes slides and puts a text box, a picture or a comment on one. F5 starts a slideshow that reveals a slide's builds click by click, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and a misspelled word is underlined with suggestions on a right click. Save writes the document back over the file that was opened and Save As writes it elsewhere; Export as PDF/UA asks about two undescribed pictures, then writes a PDF. Under %LOCALAPPDATA% it also keeps one preference, the words added to the dictionary, and a copy of unsaved changes against a crash; Print opens a temporary PDF in the default viewer.
 
 The package declares runFullTrust and no other capability. It makes no network call, needs no broad filesystem access - it opens the file it was launched with and writes back to that file or to one a save dialog names - and asks for no device. The .odp association adds the application to Open With rather than claiming the default handler, since this is one editor for a format many applications open.
 """
@@ -379,19 +379,19 @@ The package declares runFullTrust and no other capability. It makes no network c
 description = """
 Odox Deck opens an OpenDocument presentation, lets you change what is on its slides, and saves it back as the deck it was.
 
-It is a lightweight editor and not a presentation application. A deck opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, make that text bold, italic, underlined or struck through, take any of it back with Undo, and save. F5 starts a slideshow, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and the Slide menu adds, duplicates, moves and deletes slides. You cannot add a shape, apply other formatting, or change a master page: for that you have an office suite. Nothing is written until you press Save, and then only the file you opened or the one you named; no temporary file is left beside it and no backup is kept. The one preference the application keeps, whether a document opens ready to edit, goes into a settings file only when you change it. Where the system allows it, the application remembers the last ten documents you opened, for File > Open recent; it keeps no cache.
+It is a lightweight editor, not a full presentation application. A deck opens reading; Edit mode, from the Edit menu or Ctrl+E, lets you pick a shape and drag it where it should be, resize it by a corner, click its text and change it where it sits, set its font, size, colour and alignment, take any of it back with Undo, and save. The Slide menu adds, duplicates, moves and deletes slides and puts a text box, a picture or a comment on one. F5 starts a slideshow that reveals a slide's builds click by click, Ctrl+F finds text in the slides and in the notes and Ctrl+H replaces it, and a misspelled word is underlined, with suggestions on a right click. You cannot draw other shapes or change a master page: for that you have an office suite. Nothing is written to your document until you press Save, and then only the file you opened or the one you named. While you have unsaved changes, a copy of them is kept on your own machine against a crash, and taken away when you save or discard them. The one preference the application keeps goes into a settings file only when you change it, and where the system allows it the application remembers the last ten documents you opened, for File > Open recent.
 
 It draws each slide at the size the document sets. Behind the slide's own text and pictures is the master page: the ground it fills and the decorations a template puts on every slide, which is most of what makes a deck look like the template it was built from. The shapes are drawn from the geometry the document states rather than approximated into rectangles, which covers paths, custom shapes with their own formulas, connectors routed between the shapes they join, and the labels a shape carries. The speaker's notes sit underneath the slide and a list of slides beside it.
 
 How well it draws is measured rather than asserted. Every slide of the templates in its corpus is rendered by Odox Deck and by LibreOffice from the same file, and the two are compared colour by colour, because a renderer is the kind of thing that passes every test and still looks wrong.
 
-File > New starts a blank deck, one wide slide with a title to type into. File > Export as PDF/UA… writes the deck as an accessible PDF that conforms to PDF/UA-1: a page per slide, titles, text and pictures tagged in reading order; a picture with no description is asked about first.
+File > New starts a blank deck, one wide slide with a title to type into. File > Export as PDF/UA… writes the deck as an accessible PDF that conforms to PDF/UA-1: a page per slide, titles, text and pictures tagged in reading order; a picture with no description is asked about first. File > Print… prints the same pages.
 
 It makes no network connection of any kind. There is no server behind it, no account to create, no analytics, no telemetry, no crash reporting and no third-party service. Its store privacy declaration is Data Not Collected, because the developer collects nothing and has nowhere to put it. The full statement is at https://excelano.com/legal/#odox and, because the source is open, every line of it is verifiable.
 
-It is one of three. Odox Text reads text documents and Odox Grid reads spreadsheets, and all three are built on one library that reads the format and one renderer that draws it, so a paragraph looks the same in a document, a spreadsheet cell and a slide.
+It is one of three, beside Odox Text for text documents and Odox Grid for spreadsheets, all drawn by one renderer.
 
-What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a moved shape is four attributes changed, in the unit the document wrote them in, and nothing else. A test that every document in the corpus comes back the same runs on every change. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
+What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a moved shape is four attributes changed, in the unit the document wrote them in, and nothing else. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
 Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
 """
@@ -402,7 +402,7 @@ privacy = "https://excelano.com/legal/#odox"
 [products.xodp.locales."en-us".apple]
 name = "Odox Deck"
 subtitle = "Edit OpenDocument slides"
-promotional-text = "Open an OpenDocument presentation and see each slide as it was designed; move a shape, resize it or change its text, and save the deck back as it was."
+promotional-text = "Open an OpenDocument presentation and see each slide as it was designed; change its text, add text boxes and pictures, present it, and save the deck back as it was."
 keywords = "opendocument,odf,odp,presentation,slides,editor,edit,deck,oasis,impress"
 
 [products.xodp.locales."en-us".microsoft]
@@ -410,28 +410,28 @@ name = "Odox Deck"
 short-description = """
 A small, fast editor for OpenDocument presentations, the `.odp` files written by LibreOffice, OpenOffice and everything else that speaks the OASIS standard.
 
-It draws each slide at the size the document sets, with the master page's background and decorations behind it and the shapes drawn from their own geometry. Pick a shape and drag it, resize it by a corner, or click its text to change it; take it back with Undo, and save: what you did not touch is written back as it was read.
+It draws each slide at the size the document sets, with the master page's background and decorations behind it and the shapes drawn from their own geometry. Move and resize shapes, change their text, add text boxes and pictures, take any of it back with Undo, and save: what you did not touch is written back as it was read.
 """
 features = [
     "Opens .odp presentations written by any application that follows the OpenDocument standard",
-    "Draws each slide at the size the document sets, on the master page's own background",
-    "The decorations a template puts behind every slide, drawn rather than skipped",
+    "Draws each slide at the size the document sets, on the master page's own background and decorations",
     "Shapes drawn from their own geometry: paths, custom shapes, connectors and the labels they carry",
     "Solid, linear and axial gradient fills, and the pictures a slide frames",
     "The speaker's notes underneath each slide, and a list of slides beside",
     "Pick a shape and drag it, resize it by a corner, or click its text to change it where it sits, and take any of it back with Undo",
-    "Make a shape's text bold, italic, underlined or struck through",
-    "A slideshow on F5: each slide as large as the screen allows, with the keys and the mouse to move through it",
+    "Set a label's font, size, colour, highlight and alignment, and make it bold, italic, underlined or struck through",
+    "Put a text box, a picture with a description, or a comment on a slide from the Slide menu",
+    "Add, duplicate, move and delete slides, each one step to undo; links to other slides go where they say",
+    "A slideshow on F5 that reveals a slide's builds click by click, each shown at its end",
     "File > New starts a blank deck: one wide slide, with its empty title saying where to type",
-    "Find text with Ctrl+F across every slide and every slide's notes, with each match lit, and replace it with Ctrl+H",
-    "A Slide menu to duplicate, move and delete slides, each one step to undo; a slide's links to other slides go where they say",
+    "Find text with Ctrl+F across every slide and every slide's notes, and replace it with Ctrl+H",
+    "Spelling checked as you type, with suggestions, Add to dictionary and Ignore on a right click",
+    "What you did not touch is written back as it was read, element for element, the master page and the template included",
+    "Export as PDF/UA-1, a page per slide tagged in reading order, and print through your system's own dialog",
     "Saves over the file you opened or somewhere else, and refuses a save that would not read back as the document in the window",
-    "What you did not touch is written back as it was read, element for element, the master page and the template's decorations included",
-    "Export as PDF/UA-1, the standard for accessible PDF: a page per slide, titles, text and pictures tagged in reading order, fonts embedded, checked as it is written",
-    "Writes nothing else: no temporary file left beside your document, no backup, no cache; one preference, only when you change it, and the last ten documents you opened",
+    "A copy of unsaved changes kept on your own machine against a crash, and offered again if the application stops",
     "No network connection of any kind, no account, and no telemetry",
-    "Follows your desktop's light or dark setting",
-    "Speaks English and German",
+    "Follows your desktop's light or dark setting, and speaks English and German",
     "Free and open source under the MIT license",
 ]
 keywords = ["opendocument", "odf", "odp", "presentation editor", "edit slides", "slides", "oasis"]
@@ -440,19 +440,19 @@ keywords = ["opendocument", "odf", "odp", "presentation editor", "edit slides", 
 description = """
 Odox Deck öffnet eine OpenDocument-Präsentation, lässt Sie ändern, was auf den Folien steht, und speichert sie als den Foliensatz zurück, der sie war.
 
-Es ist ein leichter Editor und kein Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, ihn fett, kursiv, unterstrichen oder durchgestrichen formatieren, alles mit Rückgängig zurücknehmen und speichern. F5 startet eine Bildschirmpräsentation, Strg+F sucht Text in den Folien und in den Notizen und Strg+H ersetzt ihn, und das Menü Folie fügt Folien hinzu, dupliziert, verschiebt, löscht sie. Eine Form hinzufügen, anders formatieren oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. Es wird nichts geschrieben, bis Sie speichern, und dann nur die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben; keine temporäre Datei bleibt daneben, keine Sicherungskopie. Die eine Einstellung, die die Anwendung sich merkt, ob ein Dokument zum Bearbeiten geöffnet wird, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern.
+Es ist ein leichter Editor, kein vollständiges Präsentationsprogramm. Ein Foliensatz öffnet sich zum Lesen; der Bearbeitungsmodus, im Menü Bearbeiten oder mit Strg+E, lässt Sie eine Form wählen und dorthin ziehen, wo sie hingehört, ihre Größe an einer Ecke ändern, auf ihren Text klicken und ihn an Ort und Stelle ändern, Schriftart, Größe, Farbe und Ausrichtung setzen, alles mit Rückgängig zurücknehmen und speichern. Das Menü Folie fügt Folien hinzu, dupliziert, verschiebt und löscht sie und setzt ein Textfeld, ein Bild oder einen Kommentar auf eine Folie. F5 startet eine Bildschirmpräsentation, die die Animationen einer Folie Klick für Klick zeigt, Strg+F sucht Text in den Folien und in den Notizen und Strg+H ersetzt ihn, und ein falsch geschriebenes Wort wird unterstrichen, mit Vorschlägen per Rechtsklick. Andere Formen zeichnen oder eine Masterfolie ändern: dafür haben Sie eine Bürosuite. In Ihr Dokument wird nichts geschrieben, bis Sie speichern, und dann nur in die Datei, die Sie geöffnet haben, oder die, die Sie benannt haben. Solange Änderungen nicht gespeichert sind, wird eine Kopie davon auf Ihrem eigenen Rechner gegen einen Absturz bereitgehalten und entfernt, sobald Sie speichern oder verwerfen. Die eine Einstellung, die die Anwendung sich merkt, landet nur dann in einer Einstellungsdatei, wenn Sie sie ändern.
 
 Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt. Hinter dem Text und den Bildern der Folie liegt die Masterfolie: der Grund, den sie füllt, und die Verzierungen, die eine Vorlage auf jede Folie legt, und das ist das meiste von dem, was einen Foliensatz nach seiner Vorlage aussehen lässt. Die Formen werden aus der Geometrie gezeichnet, die das Dokument angibt, statt zu Rechtecken angenähert zu werden: Pfade, benutzerdefinierte Formen mit ihren eigenen Formeln, Verbinder zwischen den Formen, die sie verknüpfen, und die Beschriftung, die eine Form trägt. Die Notizen stehen unter der Folie, eine Liste der Folien daneben.
 
 Wie gut gezeichnet wird, ist gemessen und nicht behauptet. Jede Folie der Vorlagen im Prüfbestand wird von Odox Deck und von LibreOffice aus derselben Datei gezeichnet, und beide werden Farbe für Farbe verglichen, denn ein Zeichner ist genau die Art von Sache, die jeden Test besteht und trotzdem falsch aussieht.
 
-Datei > Neu beginnt einen leeren Foliensatz: eine breite Folie mit Titel. Der Export als PDF/UA schreibt den Foliensatz als barrierefreies PDF (PDF/UA-1): eine Seite je Folie, Titel, Text und Bilder in Lesereihenfolge ausgezeichnet; ein Bild ohne Beschreibung wird vorher erfragt.
+Datei > Neu beginnt einen leeren Foliensatz: eine breite Folie mit Titel. Der Export als PDF/UA schreibt den Foliensatz als barrierefreies PDF (PDF/UA-1): eine Seite je Folie, Titel, Text und Bilder in Lesereihenfolge ausgezeichnet; ein Bild ohne Beschreibung wird vorher erfragt. Datei > Drucken… druckt dieselben Seiten.
 
 Es besteht keinerlei Netzwerkverbindung. Kein Server dahinter, kein Konto, keine Analyse, keine Telemetrie, keine Absturzberichte, kein Dienst Dritter. Die Datenschutzangabe im Store lautet daher „Keine Daten erfasst", weil der Entwickler nichts erfasst und nichts hätte, wohin er es legen könnte. Die vollständige Erklärung steht unter https://excelano.com/legal/#odox, und weil der Quelltext offen ist, lässt sich jede Zeile davon nachprüfen.
 
-Odox Deck ist eines von dreien. Odox Text bearbeitet Textdokumente und Odox Grid Tabellendokumente. Alle drei stehen auf einer Bibliothek, die das Format liest, und einem Zeichner, der es darstellt, sodass ein Absatz im Dokument, in einer Tabellenzelle und auf einer Folie gleich aussieht.
+Odox Deck ist eines von dreien, neben Odox Text für Textdokumente und Odox Grid für Tabellendokumente, alle von einem Zeichner dargestellt.
 
-Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Dass jedes Dokument im Prüfbestand unverändert zurückkommt und dass eine Änderung nur das ändert, was geändert wurde, wird bei jeder Änderung am Programm geprüft. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
+Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
 In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
@@ -475,24 +475,24 @@ Jede Folie wird in der Größe gezeichnet, die das Dokument vorgibt, mit der Mas
 """
 features = [
     "Öffnet ODP-Präsentationen aus jeder Anwendung, die dem OpenDocument-Standard folgt",
-    "Zeichnet jede Folie in der Größe, die das Dokument vorgibt, auf dem Hintergrund der Masterfolie",
-    "Die Verzierungen, die eine Vorlage hinter jede Folie legt, werden gezeichnet statt übergangen",
+    "Zeichnet jede Folie in der Größe, die das Dokument vorgibt, auf Hintergrund und Verzierungen der Masterfolie",
     "Formen aus ihrer eigenen Geometrie: Pfade, benutzerdefinierte Formen, Verbinder und ihre Beschriftungen",
     "Einfarbige, lineare und axiale Verlaufsfüllungen sowie die Bilder, die eine Folie rahmt",
     "Die Notizen unter jeder Folie und eine Liste der Folien daneben",
-    "Eine Form wählen und ziehen, an einer Ecke in der Größe ändern oder auf ihren Text klicken und ihn an Ort und Stelle ändern, und alles mit Rückgängig zurücknehmen",
-    "Den Text einer Form fett, kursiv, unterstrichen oder durchgestrichen formatieren",
-    "Eine Bildschirmpräsentation mit F5: jede Folie so groß, wie der Bildschirm es zulässt, mit Tasten und Maus zum Weiterschalten",
+    "Eine Form wählen und ziehen, an einer Ecke in der Größe ändern oder auf ihren Text klicken und ihn ändern, alles rückgängig zu machen",
+    "Schriftart, Größe, Farbe, Hervorhebung und Ausrichtung einer Beschriftung setzen, fett, kursiv, unterstrichen oder durchgestrichen",
+    "Ein Textfeld, ein Bild mit Beschreibung oder einen Kommentar über das Menü Folie auf eine Folie setzen",
+    "Folien hinzufügen, duplizieren, verschieben und löschen, jedes rückgängig zu machen; Verweise auf andere Folien führen dorthin",
+    "Eine Bildschirmpräsentation mit F5, die die Animationen einer Folie Klick für Klick zeigt, jede an ihrem Ende",
     "Datei > Neu beginnt einen leeren Foliensatz: eine breite Folie, deren leerer Titel zeigt, wo getippt wird",
-    "Text mit Strg+F über alle Folien und alle Notizen suchen, jeder Treffer markiert, und ihn mit Strg+H ersetzen",
-    "Ein Menü Folie zum Duplizieren, Verschieben und Löschen von Folien, jedes in einem Schritt rückgängig zu machen; Verweise einer Folie auf andere Folien führen dorthin",
+    "Text mit Strg+F über alle Folien und alle Notizen suchen und mit Strg+H ersetzen",
+    "Rechtschreibprüfung beim Tippen, mit Vorschlägen, Zum Wörterbuch hinzufügen und Ignorieren per Rechtsklick",
+    "Was Sie nicht angefasst haben, bleibt, wie es gelesen wurde, Element für Element, Masterfolie und Vorlage eingeschlossen",
+    "Export als PDF/UA-1, eine Seite je Folie in Lesereihenfolge ausgezeichnet, und Drucken über den Dialog Ihres Systems",
     "Speichert über die geöffnete Datei oder anderswohin und verweigert ein Speichern, das nicht als das Dokument im Fenster zurückgelesen würde",
-    "Was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element, Masterfolie und Verzierungen der Vorlage eingeschlossen",
-    "Export als PDF/UA-1, der Norm für barrierefreies PDF: eine Seite je Folie, Titel, Text und Bilder in Lesereihenfolge ausgezeichnet, Schriften eingebettet, beim Schreiben geprüft",
-    "Schreibt sonst nichts: keine temporäre Datei neben Ihrem Dokument, keine Sicherungskopie, kein Zwischenspeicher; eine Einstellung, nur wenn Sie sie ändern, und die zehn zuletzt geöffneten Dokumente",
+    "Eine Kopie ungespeicherter Änderungen auf Ihrem eigenen Rechner gegen einen Absturz, die nach einem Absturz wieder angeboten wird",
     "Keinerlei Netzwerkverbindung, kein Konto, keine Telemetrie",
-    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung",
-    "Spricht Deutsch und Englisch",
+    "Folgt der hellen oder dunklen Einstellung Ihrer Arbeitsumgebung und spricht Deutsch und Englisch",
     "Frei und quelloffen unter der MIT-Lizenz",
 ]
 keywords = ["OpenDocument", "ODF", "ODP", "Präsentation", "Folien", "Editor", "OASIS"]
