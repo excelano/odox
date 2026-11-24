@@ -24,6 +24,10 @@ use crate::{
     Clipboard, Edit, Fragment, Mark, Model, OffsetMap, Position, Property, Selection, Value,
 };
 
+/// The character a model's text holds for something that is not text, such
+/// as a field, which the caret steps over and a copy leaves out.
+pub const OBJECT: char = '\u{fffc}';
+
 /// Keys the editor keeps while it has the focus, rather than letting egui
 /// move the focus to another widget with them. Escape is not kept: it is how
 /// a person leaves the page.
@@ -936,7 +940,8 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         }
     }
 
-    /// The selected text, paragraphs separated by newlines. `None` for a
+    /// The selected text, paragraphs separated by newlines, without the
+    /// [`OBJECT`] characters that stand for what is not text. `None` for a
     /// caret.
     fn selected_text<M: Model<Paragraph = P>>(&self, model: &M) -> Option<String> {
         let selection = self.selection.as_ref().filter(|s| !s.is_caret())?;
@@ -950,11 +955,12 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
                 out.extend(
                     text.chars()
                         .skip(start)
-                        .take(to.offset.saturating_sub(start)),
+                        .take(to.offset.saturating_sub(start))
+                        .filter(|&c| c != OBJECT),
                 );
                 return Some(out);
             }
-            out.extend(text.chars().skip(start));
+            out.extend(text.chars().skip(start).filter(|&c| c != OBJECT));
             out.push('\n');
             paragraph = model.next(&paragraph)?;
             start = 0;

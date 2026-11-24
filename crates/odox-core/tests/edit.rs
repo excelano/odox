@@ -76,6 +76,7 @@ fn corpus_paragraphs() -> Vec<Element> {
 fn markers(element: &Element) -> usize {
     element
         .elements()
+        .filter(|e| !odox_core::edit::is_field(e))
         .map(|e| {
             let own = usize::from(
                 !(e.is(&Ns::Text, "s")

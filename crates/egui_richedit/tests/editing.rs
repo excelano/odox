@@ -401,6 +401,16 @@ fn copy_takes_the_selection_with_paragraphs_on_lines_of_their_own() {
 }
 
 #[test]
+fn an_object_in_the_text_goes_on_the_clipboard_as_nothing() {
+    let mut h = Harness::new(&["a\u{fffc}b"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 0),
+        focus: Position::new(0, 3),
+    });
+    assert_eq!(h.frame(vec![Event::Copy]).as_deref(), Some("ab"));
+}
+
+#[test]
 fn a_paste_of_several_lines_is_several_paragraphs_in_one_step() {
     let mut h = Harness::new(&["ab"]);
     h.caret(0, 1);

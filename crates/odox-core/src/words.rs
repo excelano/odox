@@ -37,7 +37,7 @@ pub struct Count {
 pub fn count(text: &str) -> Count {
     Count {
         words: word_ranges(text).len(),
-        characters: text.chars().count(),
+        characters: text.chars().filter(|&c| c != crate::edit::FIELD).count(),
     }
 }
 
@@ -53,6 +53,17 @@ mod tests {
     #[test]
     fn an_apostrophe_and_a_decimal_point_stay_inside_their_word() {
         assert_eq!(word_ranges("can't 3.5"), vec![0..5, 6..9]);
+    }
+
+    #[test]
+    fn a_field_counts_as_neither_word_nor_character() {
+        assert_eq!(
+            count("page \u{fffc} of"),
+            Count {
+                words: 2,
+                characters: 8
+            }
+        );
     }
 
     #[test]

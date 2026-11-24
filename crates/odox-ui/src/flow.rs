@@ -1444,10 +1444,9 @@ impl Flow<'_> {
         })
     }
 
-    /// Draw what is inside a mark or a field. A mark's contents are the
-    /// paragraph's text; a field's are its value, which the paragraph's text
-    /// does not hold, shaded faintly, and a date that follows the day shows
-    /// today's.
+    /// Draw a mark or a field. A mark's contents are the paragraph's text; a
+    /// field is one character of it drawn as its value, shaded faintly, and
+    /// a date that follows the day shows today's.
     fn passthrough(
         &self,
         element: &Element,
@@ -1455,22 +1454,15 @@ impl Flow<'_> {
         job: &mut ParagraphJob,
         frames: &mut Vec<Element>,
     ) {
-        let field = !edit::holds_text(element);
-        let mut shaded = run.format.clone();
-        if field {
-            shaded.background = run.palette.ink.gamma_multiply(0.12);
-        }
-        if let Some(today) = odox_core::doc::date_shown(element, self.today, &self.document.styles)
-        {
-            job.atom(&today, 0, shaded);
+        if !edit::is_field(element) {
+            self.runs(element, run, job, frames);
             return;
         }
-        let run = Run {
-            counted: run.counted && !field,
-            format: &shaded,
-            ..*run
-        };
-        self.runs(element, &run, job, frames);
+        let mut shaded = run.format.clone();
+        shaded.background = run.palette.ink.gamma_multiply(0.12);
+        let shown = odox_core::doc::date_shown(element, self.today, &self.document.styles)
+            .unwrap_or_else(|| element.plain_text());
+        job.atom(&shown, usize::from(run.counted), shaded);
     }
 
     /// Draw a tracked change's mark, answering whether the element was one:

@@ -1052,7 +1052,8 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
-    /// Put a field in at the caret, as one step to undo, a date being today's.
+    /// Put a field in at the caret, as one step to undo, a date being today's,
+    /// and stand the caret after it.
     ///
     /// # Errors
     ///
@@ -1083,7 +1084,10 @@ impl<'a> FlowModel<'a> {
                 caret.offset,
             )),
         );
-        editor.select(Selection::caret(caret));
+        editor.select(Selection::caret(Position::new(
+            caret.paragraph,
+            caret.offset + 1,
+        )));
         Ok(())
     }
 
@@ -1984,6 +1988,24 @@ mod tests {
             "test",
         )
         .expect("a document")
+    }
+
+    #[test]
+    fn the_caret_stands_after_a_field_put_in() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::PageEditor::new(eframe::egui::Id::unique("test"));
+        editor.select(egui_richedit::Selection::caret(Position::new(vec![1], 1)));
+        model
+            .insert_field(&mut editor, odox_core::edit::Field::PageCount)
+            .expect("put in");
+        assert_eq!(
+            editor.selection().map(|s| s.focus.offset),
+            Some(2),
+            "after the field"
+        );
     }
 
     #[test]

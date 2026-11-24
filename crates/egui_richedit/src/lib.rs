@@ -39,7 +39,7 @@ mod editor;
 mod job;
 mod raise;
 
-pub use editor::{Laid, RichEdit};
+pub use editor::{Laid, OBJECT, RichEdit};
 pub use job::{OffsetMap, ParagraphJob};
 pub use raise::raise;
 
