@@ -14,8 +14,9 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use super::recalc::held;
-use super::{Cell, SheetDocument};
+use super::{Cell, Sheet, SheetDocument};
 use crate::Family;
+use crate::doc::refs::{read_area, split_addresses};
 use crate::formula::{self, Address, Cells, Expr};
 use crate::style::Styles;
 use crate::xml::{Element, Ns};
@@ -43,11 +44,30 @@ struct Condition {
 
 #[derive(Debug)]
 enum Test {
-    Compare(&'static str, String),
-    Between(String, String, bool),
-    Formula(String),
-    Text(TextTest, String),
+    Compare(&'static str, Expression),
+    Between(Expression, Expression, bool),
+    Formula(Expression),
+    Text(TextTest, Expression),
     Never,
+}
+
+/// An expression in a condition: read once where it comes to the same at
+/// every cell, and moved to each cell where it has relative references.
+#[derive(Debug)]
+enum Expression {
+    Fixed(Option<Expr>),
+    Relative(String),
+}
+
+impl Expression {
+    fn new(text: &str) -> Self {
+        let stored = format!("of:={text}");
+        if formula::shifted(&stored, 1, 1) == stored {
+            Self::Fixed(formula::parse(&stored).ok())
+        } else {
+            Self::Relative(stored)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -153,7 +173,7 @@ fn calcext_test(value: &str) -> Test {
     let value = value.trim();
     for op in ["<=", ">=", "!=", "=", "<", ">"] {
         if let Some(rest) = value.strip_prefix(op) {
-            return Test::Compare(op, rest.to_owned());
+            return Test::Compare(op, Expression::new(rest));
         }
     }
     let Some((name, inside)) = call(value) else {
@@ -161,13 +181,17 @@ fn calcext_test(value: &str) -> Test {
     };
     match name {
         "between" | "not-between" => pair(inside).map_or(Test::Never, |(a, b)| {
-            Test::Between(a, b, name == "not-between")
+            Test::Between(
+                Expression::new(&a),
+                Expression::new(&b),
+                name == "not-between",
+            )
         }),
-        "formula-is" => Test::Formula(inside.to_owned()),
-        "begins-with" => Test::Text(TextTest::Begins, inside.to_owned()),
-        "ends-with" => Test::Text(TextTest::Ends, inside.to_owned()),
-        "contains-text" => Test::Text(TextTest::Contains, inside.to_owned()),
-        "not-contains-text" => Test::Text(TextTest::Lacks, inside.to_owned()),
+        "formula-is" => Test::Formula(Expression::new(inside)),
+        "begins-with" => Test::Text(TextTest::Begins, Expression::new(inside)),
+        "ends-with" => Test::Text(TextTest::Ends, Expression::new(inside)),
+        "contains-text" => Test::Text(TextTest::Contains, Expression::new(inside)),
+        "not-contains-text" => Test::Text(TextTest::Lacks, Expression::new(inside)),
         _ => Test::Never,
     }
 }
@@ -183,11 +207,16 @@ fn map_test(condition: &str) -> Test {
         return Test::Never;
     };
     match name {
-        "cell-content-is-between" | "cell-content-is-not-between" => pair(inside)
-            .map_or(Test::Never, |(a, b)| {
-                Test::Between(a, b, name == "cell-content-is-not-between")
-            }),
-        "is-true-formula" => Test::Formula(inside.to_owned()),
+        "cell-content-is-between" | "cell-content-is-not-between" => {
+            pair(inside).map_or(Test::Never, |(a, b)| {
+                Test::Between(
+                    Expression::new(&a),
+                    Expression::new(&b),
+                    name == "cell-content-is-not-between",
+                )
+            })
+        }
+        "is-true-formula" => Test::Formula(Expression::new(inside)),
         _ => Test::Never,
     }
 }
@@ -217,60 +246,70 @@ fn pair(inside: &str) -> Option<(String, String)> {
     None
 }
 
-/// `Sheet1.A1:Sheet1.A4`, and several of them with spaces between.
+/// The last row and column a sheet can have.
+const LAST: Address = Address {
+    row: 1_048_575,
+    column: 16_383,
+};
+
+/// `Sheet1.A1:Sheet1.A4`, and several of them with spaces between; one
+/// reaching past the last row or column a sheet can have is none.
 fn ranges(text: &str) -> Vec<(Address, Address)> {
-    text.split_whitespace()
-        .filter_map(|range| {
-            let (from, to) = range.split_once(':').unwrap_or((range, range));
-            Some((cell(from)?, cell(to)?))
+    split_addresses(text)
+        .into_iter()
+        .filter_map(read_area)
+        .filter(|(_, to)| to.0 <= LAST.row && to.1 <= LAST.column)
+        .map(|(from, to)| {
+            (
+                Address {
+                    row: from.0,
+                    column: from.1,
+                },
+                Address {
+                    row: to.0,
+                    column: to.1,
+                },
+            )
         })
         .collect()
 }
 
 fn base(text: Option<&str>) -> Address {
-    text.and_then(cell).unwrap_or(Address { row: 0, column: 0 })
-}
-
-/// `Sheet1.A1`, `$'My sheet'.$B$2`: the cell, whatever sheet it names.
-fn cell(text: &str) -> Option<Address> {
-    let local = text.rsplit('.').next()?.replace('$', "");
-    let split = local.find(|c: char| c.is_ascii_digit())?;
-    let (letters, digits) = local.split_at(split);
-    if letters.is_empty() {
-        return None;
-    }
-    let column = letters.chars().try_fold(0usize, |n, c| {
-        c.is_ascii_alphabetic()
-            .then(|| n * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1))
-    })?;
-    let row: usize = digits.parse().ok()?;
-    Some(Address {
-        row: row.checked_sub(1)?,
-        column: column - 1,
-    })
+    text.and_then(read_area)
+        .map_or(Address { row: 0, column: 0 }, |(from, _)| Address {
+            row: from.0,
+            column: from.1,
+        })
 }
 
 /// An expression of a condition worked out at a cell, its relative references
 /// moved there from the condition's base cell.
 fn work_out(
-    expression: &str,
+    expression: &Expression,
     base: Address,
     sheet: usize,
     at: Address,
     cells: &dyn Cells,
 ) -> Option<formula::Value> {
-    let offset = |to: usize, from: usize| {
-        isize::try_from(to)
-            .ok()?
-            .checked_sub(isize::try_from(from).ok()?)
+    let moved;
+    let parsed = match expression {
+        Expression::Fixed(parsed) => parsed.as_ref()?,
+        Expression::Relative(stored) => {
+            let offset = |to: usize, from: usize| {
+                isize::try_from(to)
+                    .ok()?
+                    .checked_sub(isize::try_from(from).ok()?)
+            };
+            let shifted = formula::shifted(
+                stored,
+                offset(at.row, base.row)?,
+                offset(at.column, base.column)?,
+            );
+            moved = formula::parse(&shifted).ok()?;
+            &moved
+        }
     };
-    let stored = formula::shifted(
-        &format!("of:={expression}"),
-        offset(at.row, base.row)?,
-        offset(at.column, base.column)?,
-    );
-    let parsed: Expr = formula::parse(&stored).ok()?;
-    formula::evaluate(&parsed, sheet, at, cells).ok()
+    formula::evaluate(parsed, sheet, at, cells).ok()
 }
 
 fn holds(
@@ -280,7 +319,7 @@ fn holds(
     value: &formula::Value,
     cells: &dyn Cells,
 ) -> bool {
-    let worked = |expression: &str| work_out(expression, condition.base, sheet, at, cells);
+    let worked = |expression: &Expression| work_out(expression, condition.base, sheet, at, cells);
     match &condition.test {
         Test::Never => false,
         Test::Formula(expression) => match worked(expression) {
@@ -292,14 +331,17 @@ fn holds(
             let Some(other) = worked(expression) else {
                 return false;
             };
-            compare(value, &other).is_some_and(|order| match *op {
-                "=" => order.is_eq(),
-                "!=" => order.is_ne(),
-                "<" => order.is_lt(),
-                ">" => order.is_gt(),
-                "<=" => order.is_le(),
-                _ => order.is_ge(),
-            })
+            match compare(value, &other) {
+                Some(order) => match *op {
+                    "=" => order.is_eq(),
+                    "!=" => order.is_ne(),
+                    "<" => order.is_lt(),
+                    ">" => order.is_gt(),
+                    "<=" => order.is_le(),
+                    _ => order.is_ge(),
+                },
+                None => *op == "!=" && !is_error(value) && !is_error(&other),
+            }
         }
         Test::Between(low, high, outside) => {
             let (Some(low), Some(high)) = (worked(low), worked(high)) else {
@@ -323,8 +365,9 @@ fn holds(
             let text = match value {
                 formula::Value::Text(text) => text.to_lowercase(),
                 formula::Value::Number(n) | formula::Value::Date(n) => n.to_string(),
-                formula::Value::Boolean(b) => if *b { "TRUE" } else { "FALSE" }.to_lowercase(),
-                formula::Value::Empty | formula::Value::Error(_) => return false,
+                formula::Value::Boolean(b) => if *b { "true" } else { "false" }.to_owned(),
+                formula::Value::Empty => String::new(),
+                formula::Value::Error(_) => return false,
             };
             let wanted = wanted.to_lowercase();
             match kind {
@@ -337,18 +380,59 @@ fn holds(
     }
 }
 
-/// Two values in order, numbers by number and text by text without regard to
-/// case; an empty cell, an error or a number against text has none.
+fn is_error(value: &formula::Value) -> bool {
+    matches!(value, formula::Value::Error(_))
+}
+
+/// Two values in order: numbers by number, equal where they differ only by
+/// rounding, and text by text without regard to case. An empty cell is
+/// nought against a number and no text against text. A number against text,
+/// or an error, has no order.
 fn compare(a: &formula::Value, b: &formula::Value) -> Option<Ordering> {
-    use formula::Value::{Boolean, Date, Number, Text};
+    use formula::Value::{Boolean, Date, Empty, Number, Text};
     let number = |value: &formula::Value| match value {
         Number(n) | Date(n) => Some(*n),
         Boolean(b) => Some(f64::from(u8::from(*b))),
+        Empty => Some(0.0),
         _ => None,
     };
     match (a, b) {
         (Text(a), Text(b)) => Some(a.to_lowercase().cmp(&b.to_lowercase())),
-        _ => number(a)?.partial_cmp(&number(b)?),
+        (Empty, Text(b)) => Some(String::new().cmp(&b.to_lowercase())),
+        (Text(a), Empty) => Some(a.to_lowercase().cmp(&String::new())),
+        _ => {
+            let (a, b) = (number(a)?, number(b)?);
+            if approximately_equal(a, b) {
+                Some(Ordering::Equal)
+            } else {
+                a.partial_cmp(&b)
+            }
+        }
+    }
+}
+
+/// Whether two numbers differ by no more than rounding in their last few
+/// bits, as a spreadsheet takes equal.
+fn approximately_equal(a: f64, b: f64) -> bool {
+    (a - b).abs() <= a.abs().max(b.abs()) * f64::EPSILON * 16.0
+}
+
+/// The most cells of one range worked out cell by cell: past it, a range is
+/// cut to the cells the sheet uses.
+const MOST_CELLS: usize = 100_000;
+
+/// The last row and column of a range to work out: its own, unless it covers
+/// more than [`MOST_CELLS`], when it stops at the last the sheet uses.
+fn within_reach(index: &Sheet, from: Address, to: Address) -> (usize, usize) {
+    let rows = to.row - from.row + 1;
+    let columns = to.column - from.column + 1;
+    if rows.saturating_mul(columns) <= MOST_CELLS {
+        (to.row, to.column)
+    } else {
+        (
+            to.row.min(index.used_rows.saturating_sub(1)),
+            to.column.min(index.used_columns.saturating_sub(1)),
+        )
     }
 }
 
@@ -383,15 +467,11 @@ impl Cells for Standing<'_> {
 }
 
 impl SheetDocument {
-    /// Work out which style every conditional format gives each cell it
-    /// covers, for every sheet.
-    pub(super) fn apply_conditions(&mut self) {
-        let applied: Vec<HashMap<(usize, usize), String>> = (0..self.sheets.len())
-            .map(|sheet| self.conditions_of(sheet))
-            .collect();
-        for (sheet, applied) in self.sheets.iter_mut().zip(applied) {
-            sheet.conditional = applied;
-        }
+    /// The style each cell of a sheet takes from a conditional format, worked
+    /// out the first time it is asked for after the index is built.
+    pub(super) fn conditions(&self, sheet: usize) -> Option<&HashMap<(usize, usize), String>> {
+        let index = self.sheets.get(sheet)?;
+        Some(index.conditional.get_or_init(|| self.conditions_of(sheet)))
     }
 
     /// The names of the cell styles that carry a `style:map`.
@@ -441,9 +521,9 @@ impl SheetDocument {
         let formats = ConditionalFormats::read(table);
         if !formats.is_empty() {
             for (from, to) in formats.ranges() {
-                for row in from.row..=to.row.min(index.used_rows.saturating_sub(1)) {
-                    for column in from.column..=to.column.min(index.used_columns.saturating_sub(1))
-                    {
+                let (last_row, last_column) = within_reach(index, *from, *to);
+                for row in from.row..=last_row {
+                    for column in from.column..=last_column {
                         if applied.contains_key(&(row, column)) {
                             continue;
                         }

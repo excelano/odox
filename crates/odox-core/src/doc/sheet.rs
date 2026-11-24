@@ -84,8 +84,8 @@ pub struct Sheet {
     /// the element can be reached again without holding a reference to it.
     table: usize,
     /// The style each cell a conditional format holds for takes, by row and
-    /// column, worked out when the index is built.
-    conditional: std::collections::HashMap<(usize, usize), String>,
+    /// column, worked out once after the index is built, when first asked.
+    conditional: std::cell::OnceCell<std::collections::HashMap<(usize, usize), String>>,
 }
 
 /// A column's own properties.
@@ -375,14 +375,12 @@ impl Cell<'_> {
 impl From<Document> for SheetDocument {
     fn from(document: Document) -> Self {
         let sheets = index_sheets(&document);
-        let mut read = Self {
+        Self {
             document,
             sheets,
             batch: false,
             this_year: None,
-        };
-        read.apply_conditions();
-        read
+        }
     }
 }
 
@@ -405,7 +403,6 @@ impl SheetDocument {
     /// which is what undo does.
     pub fn reindex(&mut self) {
         self.sheets = index_sheets(&self.document);
-        self.apply_conditions();
     }
 
     /// Rebuild the index after a cell changed, unless a bulk edit is under
@@ -761,9 +758,7 @@ impl SheetDocument {
     /// The style a conditional format gives a cell, where one of its
     /// conditions holds.
     pub fn conditional_style(&self, sheet: usize, row: usize, column: usize) -> Option<&str> {
-        self.sheets
-            .get(sheet)?
-            .conditional
+        self.conditions(sheet)?
             .get(&(row, column))
             .map(String::as_str)
     }
@@ -791,7 +786,13 @@ impl SheetDocument {
         column: usize,
     ) -> std::rc::Rc<Properties> {
         let name = Self::style_name(sheet, cell, column);
-        match sheet.conditional.get(&(row, column)) {
+        let applied = self
+            .sheets
+            .iter()
+            .position(|indexed| std::ptr::eq(indexed, sheet))
+            .and_then(|at| self.conditions(at))
+            .and_then(|applied| applied.get(&(row, column)));
+        match applied {
             Some(applied) => self
                 .document
                 .styles
@@ -1313,7 +1314,7 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         frozen: Frozen::default(),
         rows: index.rows,
         table: position,
-        conditional: std::collections::HashMap::new(),
+        conditional: std::cell::OnceCell::new(),
     }
 }
 
