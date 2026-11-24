@@ -45,13 +45,19 @@ impl SheetDocument {
             return Recalculated::default();
         }
         let formulas = self.formulas();
+        let volatile: Vec<Place> = formulas
+            .iter()
+            .filter(|(_, formula)| formula.parsed.as_ref().is_ok_and(formula::is_volatile))
+            .map(|(place, _)| *place)
+            .collect();
         let mut dirty: HashSet<Place> = formulas
             .iter()
             .filter(|(_, formula)| formula.parsed.is_err())
             .map(|(place, _)| *place)
             .collect();
         dirty.extend(changed.iter().filter(|place| formulas.contains_key(place)));
-        let mut frontier: Vec<Place> = changed.to_vec();
+        dirty.extend(&volatile);
+        let mut frontier: Vec<Place> = changed.iter().chain(&volatile).copied().collect();
         while let Some((sheet, row, column)) = frontier.pop() {
             for (place, formula) in &formulas {
                 if dirty.contains(place) {
@@ -290,6 +296,10 @@ impl Cells for Book<'_> {
 
     fn year(&self) -> Option<i64> {
         self.document.this_year
+    }
+
+    fn now(&self) -> Option<f64> {
+        self.document.now
     }
 
     fn value(

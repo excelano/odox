@@ -63,6 +63,17 @@ pub use settings::Settings;
 pub use shapes::Canvas;
 pub use shell::{Notice, Product, Shell, View, Zoom, replace_file, run};
 
+/// The moment it is in local time, as a spreadsheet counts days: the days
+/// since 1899-12-30 and the fraction of today gone.
+pub fn now() -> f64 {
+    const UNIX_EPOCH_DAY: f64 = 25_569.0;
+    let now = jiff::ZonedDateTime::now();
+    let local = now.timestamp().as_second() + i64::from(now.offset().seconds());
+    #[allow(clippy::cast_precision_loss)]
+    let days = local as f64 / 86_400.0;
+    UNIX_EPOCH_DAY + days
+}
+
 /// Today, as year, month and day in UTC: what a date that follows the clock
 /// shows.
 pub fn today() -> (i64, i64, i64) {

@@ -59,6 +59,12 @@ pub trait Cells {
     fn year(&self) -> Option<i64> {
         None
     }
+
+    /// The moment it is, as a serial day and the fraction of it gone, in
+    /// local time, where the caller knows it; `TODAY` and `NOW` read it.
+    fn now(&self) -> Option<f64> {
+        None
+    }
 }
 
 /// Work out a formula standing in a cell of a sheet.
@@ -110,6 +116,31 @@ macro_rules! tryv {
             Err(error) => return Ok(Value::Error(error)),
         }
     };
+}
+
+mod date;
+mod finance;
+mod logic;
+mod lookup;
+mod stats;
+mod text;
+
+/// The functions whose result can change with nothing they read changing:
+/// the clock, and the references worked out from arguments.
+const VOLATILE: [&str; 4] = ["TODAY", "NOW", "OFFSET", "INDIRECT"];
+
+/// Whether a formula calls a function whose result can change with nothing
+/// it reads changing, and so is worked out again on every change.
+pub(crate) fn is_volatile(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(name, args) => {
+            VOLATILE.contains(&name.strip_prefix(MICROSOFT).unwrap_or(name))
+                || args.iter().any(is_volatile)
+        }
+        Expr::Negate(inner) | Expr::Percent(inner) => is_volatile(inner),
+        Expr::Binary(_, left, right) => is_volatile(left) || is_volatile(right),
+        _ => false,
+    }
 }
 
 impl Context<'_> {
@@ -184,10 +215,63 @@ impl Context<'_> {
         }
     }
 
+    /// Two values an operator joins, each read as a number first where the
+    /// operator wants one.
+    fn combine(&self, op: Op, left: Value, right: Value) -> Value {
+        let (left, right) = match op {
+            Op::Join
+            | Op::Equal
+            | Op::NotEqual
+            | Op::Less
+            | Op::LessOrEqual
+            | Op::Greater
+            | Op::GreaterOrEqual => (left, right),
+            _ => (self.converted(left), self.converted(right)),
+        };
+        binary(op, &left, &right, self.cells.case_sensitive())
+    }
+
     fn arg(&self, expr: &Expr) -> Result<Arg, Unsupported> {
         match expr {
             Expr::Reference(reference) => Ok(Arg::Range(self.range(reference)?)),
+            Expr::Call(name, args) if is_reference_call(name) => {
+                Ok(match self.reference_call(name, args)? {
+                    Ok(reference) => Arg::Range(self.range(&reference)?),
+                    Err(error) => Arg::Scalar(Value::Error(error)),
+                })
+            }
             other => Ok(Arg::Scalar(self.scalar(other)?)),
+        }
+    }
+
+    /// Whether an argument is the number at an index, or an error to give
+    /// back.
+    fn number_at(&self, args: &[Expr], index: usize) -> Result<Result<f64, Error>, Unsupported> {
+        Ok(self.number(&self.scalar(&args[index])?))
+    }
+
+    /// An argument as text, or an error to give back.
+    fn text_at(&self, args: &[Expr], index: usize) -> Result<Result<String, Error>, Unsupported> {
+        Ok(text(&self.scalar(&args[index])?))
+    }
+
+    /// A function this module's families work out, or [`Unsupported`].
+    fn family(&self, name: &str, args: &[Expr]) -> Result<Value, Unsupported> {
+        let has = |names: &[&str]| names.contains(&name);
+        if has(lookup::NAMES) {
+            self.lookup_function(name, args)
+        } else if has(text::NAMES) {
+            self.text_function(name, args)
+        } else if has(logic::NAMES) {
+            self.logic_function(name, args)
+        } else if has(date::NAMES) {
+            self.date_function(name, args)
+        } else if has(stats::NAMES) {
+            self.stats_function(name, args)
+        } else if has(finance::NAMES) {
+            self.finance_function(name, args)
+        } else {
+            Err(Unsupported)
         }
     }
 
@@ -201,18 +285,7 @@ impl Context<'_> {
             Expr::Negate(inner) => Value::Number(-tryv!(self.number(&self.scalar(inner)?))),
             Expr::Percent(inner) => Value::Number(tryv!(self.number(&self.scalar(inner)?)) / 100.0),
             Expr::Binary(op, left, right) => {
-                let (left, right) = (self.scalar(left)?, self.scalar(right)?);
-                let (left, right) = match op {
-                    Op::Join
-                    | Op::Equal
-                    | Op::NotEqual
-                    | Op::Less
-                    | Op::LessOrEqual
-                    | Op::Greater
-                    | Op::GreaterOrEqual => (left, right),
-                    _ => (self.converted(left), self.converted(right)),
-                };
-                binary(*op, &left, &right, self.cells.case_sensitive())
+                self.combine(*op, self.scalar(left)?, self.scalar(right)?)
             }
             Expr::Call(name, arguments) => self.call(name, arguments)?,
         })
@@ -542,32 +615,7 @@ impl Context<'_> {
                     Some(expr) => tryv!(truth(&self.scalar(expr)?)),
                     None => true,
                 };
-                let found = if sorted {
-                    let mut last = None;
-                    for row in &rows {
-                        if !same_kind(&row[0], &wanted) {
-                            continue;
-                        }
-                        if compare(&row[0], &wanted, false) == Ok(Ordering::Greater) {
-                            break;
-                        }
-                        last = Some(row);
-                    }
-                    last
-                } else {
-                    let exact = Criterion::lookup(&wanted, self.matching());
-                    rows.iter().find(|row| match &wanted {
-                        Value::Text(_) => row[0] != Value::Empty && exact.matches(&row[0]),
-                        _ => {
-                            same_kind(&row[0], &wanted)
-                                && compare(&row[0], &wanted, false) == Ok(Ordering::Equal)
-                        }
-                    })
-                };
-                match found {
-                    Some(row) => row[column].clone(),
-                    None => Value::Error(Error::NotAvailable),
-                }
+                self.vertical(&wanted, &rows, column, sorted)
             }
             "SUMIF" | "COUNTIF" | "AVERAGEIF" => {
                 count(2, if name == "COUNTIF" { 2 } else { 3 })?;
@@ -622,8 +670,25 @@ impl Context<'_> {
                     _ => Value::Number(sum / n as f64),
                 }
             }
-            _ => return Err(Unsupported),
+            _ => return self.family(name, args),
         })
+    }
+}
+
+/// Whether a function answers with a reference rather than a value.
+fn is_reference_call(name: &str) -> bool {
+    matches!(
+        name.strip_prefix(MICROSOFT).unwrap_or(name),
+        "OFFSET" | "INDIRECT"
+    )
+}
+
+/// The number of arguments a call has to have, or [`Unsupported`].
+fn arity(args: &[Expr], low: usize, high: usize) -> Result<(), Unsupported> {
+    if (low..=high).contains(&args.len()) {
+        Ok(())
+    } else {
+        Err(Unsupported)
     }
 }
 

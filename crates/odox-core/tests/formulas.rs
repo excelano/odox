@@ -14,7 +14,9 @@ use odox_core::Ns;
 use odox_core::doc::{SheetDocument, Value};
 
 fn fixture() -> SheetDocument {
-    read("formulas.ods")
+    let mut document = read("formulas.ods");
+    document.now = Some(NOW);
+    document
 }
 
 fn read(name: &str) -> SheetDocument {
@@ -29,11 +31,14 @@ fn read(name: &str) -> SheetDocument {
 
 const CALC: usize = 1;
 
+/// 2026-11-23 at noon, as a serial day.
+const NOW: f64 = 46_349.5;
+
 /// Each formula on the Calc sheet: its label, its value, whether it is an
 /// error, and the text it shows.
 fn results(document: &SheetDocument) -> Vec<(String, Value, bool, String)> {
     let sheet = &document.sheets()[CALC];
-    (0..300)
+    (0..400)
         .filter_map(|row| {
             let label = document.cell(sheet, row, 0)?.text();
             let cell = document.cell(sheet, row, 1)?;
@@ -71,6 +76,7 @@ fn every_formula_comes_to_what_libreoffice_worked_out() {
         ("parts.ods", 33),
     ] {
         let mut document = read(name);
+        document.now = Some(NOW);
         let before = results(&document);
         assert!(
             before.len() >= least,
@@ -155,7 +161,7 @@ fn with_formula(row: usize, written: &str) -> SheetDocument {
 
 #[test]
 fn a_formula_outside_the_core_and_what_reads_it_go_stale() {
-    let mut document = with_formula(1, "of:=NPV(0.1;[$Data.B2:.B4])");
+    let mut document = with_formula(1, "of:=BESSELJ([$Data.B2];1)");
     let done = document.recalculate(&[(0, 1, 1)]);
     let calc_rows: Vec<usize> = done.stale.iter().map(|p| p.1).collect();
     assert!(
@@ -204,7 +210,7 @@ fn a_typed_formula_is_stored_and_worked_out_at_once() {
 #[test]
 fn a_typed_formula_outside_the_core_is_kept_and_stale() {
     let mut document = fixture();
-    let stored = odox_core::formula::to_stored("=NPV(0.1;Data.B2:B4)").expect("readable");
+    let stored = odox_core::formula::to_stored("=BESSELJ(Data.B2;1)").expect("readable");
     document.set_formula(CALC, 0, 2, &stored).expect("set");
     let done = document.recalculate(&[(CALC, 0, 2)]);
     assert_eq!(done.stale, vec![(CALC, 0, 2)]);
@@ -215,7 +221,7 @@ fn a_typed_formula_outside_the_core_is_kept_and_stale() {
             .expect("cell")
             .element
             .attr(&Ns::Table, "formula"),
-        Some("of:=NPV(0.1;[$Data.B2:.B4])")
+        Some("of:=BESSELJ([$Data.B2];1)")
     );
 }
 
@@ -274,4 +280,52 @@ fn a_typed_reference_past_the_last_column_is_a_name_not_known() {
     assert!(done.stale.is_empty());
     let sheet = &document.sheets()[CALC];
     assert_eq!(document.cell(sheet, 0, 2).expect("cell").text(), "#NAME?");
+}
+
+#[test]
+fn volatile_functions_are_worked_out_on_every_change_and_never_on_opening() {
+    let mut document = fixture();
+    document.now = Some(40_000.0);
+    assert_eq!(at(&document, "today"), Value::Boolean(true), "as opened");
+    document
+        .set_cell(0, 2, 1, &Value::Number(10.0))
+        .expect("set");
+    let done = document.recalculate(&[(0, 2, 1)]);
+    assert!(done.stale.is_empty(), "{:?}", done.stale);
+    assert_eq!(at(&document, "today"), Value::Boolean(false));
+    assert_eq!(at(&document, "offset"), Value::Number(10.0 + 6.0));
+}
+
+#[test]
+fn a_text_format_code_this_cannot_show_is_left_stale() {
+    for code in [
+        "000-00-0000",
+        "(000) 000-0000",
+        "# ##0",
+        "hh:mm:ss.00",
+        "#,##0,",
+        "0.0,,",
+        "@",
+        "",
+        "_(0_)",
+        "*-0",
+    ] {
+        let mut document = fixture();
+        let stored = format!("of:=TEXT(1234567;\"{code}\")");
+        document.set_formula(CALC, 0, 2, &stored).expect("set");
+        let done = document.recalculate(&[(CALC, 0, 2)]);
+        assert_eq!(done.stale, vec![(CALC, 0, 2)], "{code}");
+    }
+}
+
+#[test]
+fn an_offset_over_more_cells_than_are_worked_out_is_left_stale() {
+    let mut document = fixture();
+    let started = std::time::Instant::now();
+    document
+        .set_formula(CALC, 0, 2, "of:=SUM(OFFSET([$Data.A1];0;0;1048576;100))")
+        .expect("set");
+    let done = document.recalculate(&[(CALC, 0, 2)]);
+    assert_eq!(done.stale, vec![(CALC, 0, 2)]);
+    assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
 }
