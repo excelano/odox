@@ -69,9 +69,9 @@ mkdir -p "$out"
 
 describe() {
     case "$1" in
-        xodt) echo "lightweight OpenDocument text document editor|Open a .odt document and read it: headings, lists, tables, pictures and the document's own fonts, with an outline beside the page. Change the text that needs changing, undo, and save it back as the document it was." ;;
-        xods) echo "lightweight OpenDocument spreadsheet editor|Open a .ods workbook and read it: every sheet, the values the document holds and the text it displays, with the formula behind the cell you pick. Type into a cell to change it, undo, and save it back as the document it was." ;;
-        xodp) echo "lightweight OpenDocument presentation editor|Open a .odp deck and read it: every slide at the size the document sets, its shapes where the document puts them, and the speaker's notes. Move a shape, resize it or change its text, undo, and save the deck back as it was." ;;
+        xodt) echo "lightweight OpenDocument text document editor|Open a .odt document and read it: headings, lists, tables, pictures, notes, comments and tracked changes in the document's own fonts, with an outline beside the page. Type into it, format text and paragraphs, add tables, pictures, notes, comments, links and fields, accept or reject changes, undo, and save it back as the document it was." ;;
+        xods) echo "lightweight OpenDocument spreadsheet editor|Open a .ods workbook and read it: every sheet with its cell styles, conditional formats and pictures, and the formula behind the cell you pick. Type values and formulas, format cells, sort and fill, add and remove rows, columns and sheets, undo, and save it back as the document it was." ;;
+        xodp) echo "lightweight OpenDocument presentation editor|Open a .odp deck and read it: every slide at the size the document sets, its shapes where the document puts them, and the speaker's notes, or show it as a slideshow. Move and resize shapes, change their text, add slides, text boxes and pictures, undo, and save the deck back as it was." ;;
         odox) echo "open an OpenDocument file with the application that reads it|One command for any OpenDocument file. It works out from the file whether it is a text document, a spreadsheet or a presentation, and becomes xodt, xods or xodp accordingly." ;;
     esac
 }
@@ -107,7 +107,7 @@ for app in xodt xods xodp odox; do
     else
         app_depends="$depends"
         recommends="fonts-liberation, hunspell-en-us | hunspell-dictionary"
-        closing="Editing means changing what is there, not authoring: no formatting beyond bold, italic, underline and strikethrough, no inserting, no formulas. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and nothing is written until Save, and then only the file that was opened or the one named."
+        closing="It exports PDF/UA, prints, and checks spelling in edit mode against the system's Hunspell dictionaries. What was not touched is written back as it was read, element for element. Nothing is sent anywhere, and the document is written only on Save, to the file that was opened or the one named."
     fi
     # A control file's extended description is one space-prefixed line per line,
     # and lintian refuses one longer than eighty columns.
@@ -138,7 +138,7 @@ for app in xodt xods xodp odox; do
         "$here/control.in" > "$staging/DEBIAN/control.raw"
     # An empty `Recommends:` is malformed, so the line goes rather than emptying.
     if [ -n "$recommends" ]; then
-        sed "s|@RECOMMENDS_LINE@|Recommends: $recommends|" \
+        sed "s#@RECOMMENDS_LINE@#Recommends: $recommends#" \
             "$staging/DEBIAN/control.raw" > "$staging/DEBIAN/control.head"
     else
         sed '/@RECOMMENDS_LINE@/d' \

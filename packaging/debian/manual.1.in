@@ -7,16 +7,19 @@
 .SH DESCRIPTION
 @DESCRIPTION@
 .PP
-The document is read from the file and nothing is sent anywhere. Editing means
-changing what is there, not authoring: text can be typed and deleted, a
-paragraph split or joined, a cell given a value, a shape moved or resized, any
-of it undone, and the document saved; in a text document or on a slide, text
-can be made bold, italic, underlined or struck through. Other formatting,
-inserting and formulas are an office suite's. What was not touched is written back as it
-was read, element for element, so the saved document is the opened one with the
-change in it. Nothing is written until Save, and then only the file that was
-opened or the one named; before it is, what is about to be written is read back
-and compared with the document in the window, and a difference refuses the save.
+The document is read from the file and nothing is sent anywhere. In edit mode
+text is typed and formatted, paragraphs are made headings and list items, and
+tables, pictures, notes, comments, links and fields are added in a text
+document; values and formulas are typed into cells and cells formatted, sorted
+and filled in a spreadsheet; shapes are moved, resized and typed into, and
+slides, text boxes and pictures added, in a presentation. Every change can be
+undone. What was not touched is written back as it was read, element for
+element, so the saved document is the opened one with the changes in it. The
+document is written only on Save, to the file that was opened or the one
+named; before it is, what is about to be written is read back and compared with
+the document in the window, and a difference refuses the save. A document can
+also be exported as PDF/UA or printed, and spelling is checked in edit mode
+against the system's Hunspell dictionaries.
 .SH OPTIONS
 There are none. A path given on the command line is opened at startup; a
 document may also be chosen with Ctrl+O.
@@ -39,6 +42,13 @@ Search the document; go to the next match; go to the one before.
 .TP
 .B Ctrl+H
 Search and replace, where the document can be changed.
+.TP
+.B Ctrl+P
+Print the document.
+.TP
+.B Ctrl+K
+In a text document or on a slide, make the selection a link, or change the
+link the caret is in.
 .TP
 .B Ctrl+C, Ctrl+X, Ctrl+V
 In a spreadsheet, copy, cut and paste the selected cells as tab separated text.
@@ -73,12 +83,30 @@ is changed in the menu.
 .I $XDG_CONFIG_HOME/odox/recent-@APP@
 The paths of the last ten documents @APP@ opened or saved, newest first, one to
 a line, for File > Open recent.
+.TP
+.I $XDG_CONFIG_HOME/odox/words.txt
+The words added to the dictionary from the spell check, one to a line.
+.TP
+.I $XDG_DATA_HOME/odox/recovery/
+A copy of a document's unsaved changes, kept every minute while there are any
+and taken away when they are saved or discarded; after a crash, the next window
+started without a file offers to open it.
+.TP
+.I $XDG_DATA_HOME/hunspell/
+Hunspell dictionaries of the user's own, read before the system's in
+.IR /usr/share/hunspell .
+.PP
 .I ~/.config
-where
+and
+.I ~/.local/share
+stand in where
 .B XDG_CONFIG_HOME
-is unset. @APP@ writes no cache and no temporary copy; a save goes through a
+and
+.B XDG_DATA_HOME
+are unset. A save goes through a
 .I .part
-file beside the target that is renamed over it.
+file beside the target that is renamed over it, and a print through a PDF in
+the temporary directory.
 .SH SEE ALSO
 .BR xodt (1),
 .BR xods (1),
