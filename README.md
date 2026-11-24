@@ -128,6 +128,9 @@ Tracked changes are drawn in their authors' colours, insertions underlined and
 deletions struck through, and each one's author and date show beside it under
 the pointer; in edit mode it is accepted or rejected there, or all of them at
 once from the bar over the page. Edits made here are not tracked.
+Ctrl+K, or Format > Link…, makes the selection a link to a web page, a mail
+address, or a heading or bookmark in the document, and with the caret in a link
+changes it or takes it off; `xodp` offers the deck's slides.
 A comment is marked in the margin, and its author, date and text show beside the
 mark under the pointer or when the caret reaches it; in edit mode its text is
 edited or deleted there, and Ctrl+Alt+C, or Format > Comment, puts a new one on

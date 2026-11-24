@@ -18,12 +18,35 @@ use odox_core::edit;
 use odox_core::{Document, Element, Length, Ns, PageLayout};
 use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
+use odox_ui::link_dialog::LinkQuestion;
 use odox_ui::note_popup::{self, NoteContent, NoteResponse};
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
     Zoom, fonts, marks, page_editor,
 };
+
+/// The slides a link may go to: each named slide, as `#name`, with its number
+/// and name for a person to read.
+fn slide_places(document: &Presentation) -> Vec<(String, String)> {
+    document
+        .slides()
+        .iter()
+        .enumerate()
+        .filter_map(|(at, slide)| {
+            let name = slide.name?;
+            let unnamed = name
+                .strip_prefix("page")
+                .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+            let shown = if unnamed {
+                fill(t("Slide {number}"), &[("number", &(at + 1).to_string())])
+            } else {
+                format!("{}. {name}", at + 1)
+            };
+            Some((shown, format!("#{name}")))
+        })
+        .collect()
+}
 
 /// A presentation, open or not.
 pub struct SlideView {
@@ -56,6 +79,9 @@ pub struct SlideView {
     /// What was done in a slide comment's box, done on the next frame.
     note_wanted: Option<(usize, NoteResponse)>,
     export: Export,
+    /// The link question.
+    link: LinkQuestion,
+    notice: Option<Notice>,
 }
 
 impl Default for SlideView {
@@ -76,6 +102,8 @@ impl Default for SlideView {
             comment_wanted: false,
             opened_note: None,
             note_wanted: None,
+            link: LinkQuestion::default(),
+            notice: None,
             export: Export::default(),
         }
     }
@@ -435,7 +463,8 @@ impl View for SlideView {
             });
             return;
         }
-        let asking = self.carry_export(ui.ctx(), editing);
+        let asking = self.carry_export(ui.ctx(), editing) || self.link.is_up();
+        self.link.ask(ui.ctx());
         if !asking && self.keys_before_drawing(ui, editing, count) {
             return;
         }
@@ -613,7 +642,7 @@ impl View for SlideView {
     }
 
     fn take_notice(&mut self) -> Option<Notice> {
-        self.export.take_notice()
+        self.notice.take().or_else(|| self.export.take_notice())
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {
@@ -655,6 +684,7 @@ impl SlideView {
             .and_then(|selection| selection.focus.paragraph.first().copied())
             .into_iter()
             .collect();
+        let places = slide_places(document);
         let Document {
             content, styles, ..
         } = &mut document.document;
@@ -693,6 +723,15 @@ impl SlideView {
             _ => None,
         }) {
             model.apply_line_spacing(&mut self.page_editor, spacing);
+        }
+        if let Some(problem) = self.link.act(
+            ui,
+            &mut model,
+            &mut self.page_editor,
+            command == Some(Command::Link),
+            |_| places,
+        ) {
+            self.notice = Some(Notice::Problem(problem));
         }
         self.menu = MenuState::of(&self.page_editor, &model, false);
         ui.separator();
