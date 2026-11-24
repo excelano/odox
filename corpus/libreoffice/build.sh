@@ -159,6 +159,11 @@ convert ods:calc8 conditional.ods "OpenDocument Spreadsheet Flat XML" conditiona
 # Drawings on a sheet: a shape anchored to the sheet, one in a cell, one
 # stretched to an end cell, one in a hidden row, and a picture.
 convert ods:calc8 drawings.ods "OpenDocument Spreadsheet Flat XML" drawings.fods
+
+# Validity rules on entry: a whole number between, a decimal with a warning, a
+# list that refuses an empty cell, a text length with information, a date and
+# a time between, and a rule whose message is not shown.
+convert ods:calc8 validation.ods "OpenDocument Spreadsheet Flat XML" validation.fods
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods

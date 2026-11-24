@@ -481,6 +481,22 @@ cell styles, and a formula moves as a copy does, its relative references going
 with it, as `LibreOffice` and Excel sort unless asked otherwise. A sort across a
 merged cell is refused. Each sort is one step to undo.
 
+**A validity rule is checked on entry** (`sheet/validation.rs`). A cell that
+names a `table:content-validation` takes what its condition allows: a whole
+number, a decimal, a date or a time, compared or between two bounds, a text
+length compared or between, or one of a list, and an empty cell unless
+`table:allow-empty-cell` is false. The two bounds of a between are separated
+by a comma and the items of a list by a semicolon, as `LibreOffice` writes and
+reads them; a bound or an item that is not a literal number or text, a formula
+or a reference, makes the rule let anything in. What the rule does with a
+value it does not allow is its error message's: stop refuses it, warning asks
+whether to write it anyway, information writes it and says so, and a message
+not displayed, or none, lets it in. Typing a refused value keeps the editor
+open and says the message; a warning waits for OK or Cancel. A paste or a fill
+is checked cell by cell before anything stands: a refusal anywhere refuses all
+of it and names the first cell, and a warning asks once. Typing a formula,
+deleting and undo are not checked, as in `LibreOffice`.
+
 **Pictures and shapes on a sheet are drawn** (`sheet/drawing.rs`): those in
 `table:shapes`, anchored to the sheet, and those in a cell, anchored to it and,
 with `table:end-cell-address`, stretched to another. Each is drawn at the

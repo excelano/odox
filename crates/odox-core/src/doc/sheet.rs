@@ -23,6 +23,7 @@ mod restructure;
 mod sheets;
 mod size;
 mod sort;
+mod validation;
 pub use comment::Comment;
 pub use drawing::{Anchor, SheetDrawing};
 pub use fill::Block;
@@ -31,6 +32,7 @@ pub use freeze::Frozen;
 pub use merge::Merged;
 pub use recalc::{Place, Recalculated};
 pub use restructure::{Blocked, Restructure};
+pub use validation::{Message, Validation, Verdict};
 
 use std::ops::Range;
 

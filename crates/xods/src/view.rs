@@ -9,7 +9,9 @@ use std::path::Path;
 use eframe::egui::{
     self, Align, Event, FontId, Key, Modifiers, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use odox_core::doc::{Block, Blocked, Recalculated, Restructure, Sheet, SheetDocument, Value};
+use odox_core::doc::{
+    Block, Blocked, Message, Recalculated, Restructure, Sheet, SheetDocument, Value, Verdict,
+};
 use odox_core::edit::html;
 use odox_core::formula;
 use odox_core::{Document, Refused};
@@ -71,6 +73,84 @@ pub struct SheetView {
     export: Export,
     /// The pictures of the sheets' drawings, decoded once.
     pictures: odox_ui::Pictures,
+    /// A validity rule's warning about what is being written, asking whether
+    /// to write it anyway.
+    warning: Option<Warning>,
+}
+
+/// A write a validity rule warned about, waiting for the person to say.
+struct Warning {
+    message: Message,
+    then: Pending,
+}
+
+/// A write held back for a warning.
+enum Pending {
+    /// A value typed into a cell.
+    Typed(usize, usize, Value),
+    /// A block pasted with its top left corner at a cell.
+    Pasted((usize, usize), Vec<Vec<Value>>),
+    /// A fill from a block, down or across, of so many rows or columns, as a
+    /// series or a copy.
+    Filled(Block, bool, usize, bool),
+}
+
+/// What the validity rules of the cells a write reaches make of it: the first
+/// refusal, with its cell, or else the first warning, or else the first
+/// thing to tell.
+enum Checked {
+    Allowed,
+    Refused((usize, usize), Message),
+    Warned(Message),
+    Informed(Message),
+}
+
+/// Check what a write puts in each cell against the cell's validity rule.
+fn check<'a>(
+    document: &SheetDocument,
+    sheet: usize,
+    cells: impl IntoIterator<Item = (usize, usize, &'a Value)>,
+) -> Checked {
+    let mut warned = None;
+    let mut informed = None;
+    for (row, column, value) in cells {
+        let Some(rule) = document.validation(sheet, row, column) else {
+            continue;
+        };
+        match rule.check(value) {
+            Verdict::Allowed => {}
+            Verdict::Refused(message) => return Checked::Refused((row, column), message),
+            Verdict::Warned(message) => {
+                warned.get_or_insert(message);
+            }
+            Verdict::Informed(message) => {
+                informed.get_or_insert(message);
+            }
+        }
+    }
+    match (warned, informed) {
+        (Some(message), _) => Checked::Warned(message),
+        (None, Some(message)) => Checked::Informed(message),
+        (None, None) => Checked::Allowed,
+    }
+}
+
+/// A refusal of a paste or a fill, naming the first cell refused.
+fn refused_at(row: usize, column: usize, message: &Message) -> String {
+    fill(
+        t("{cell} does not take this: {message}"),
+        &[("cell", &address(row, column)), ("message", &said(message))],
+    )
+}
+
+/// A rule's message as a notice says it: its title, where it has one, and
+/// its text.
+fn said(message: &Message) -> String {
+    match (message.title.is_empty(), message.text.is_empty()) {
+        (true, _) => message.text.clone(),
+        (false, true) => message.title.clone(),
+        (false, false) => format!("{}: {}", message.title, message.text),
+    }
 }
 
 /// Where the grid scrolls to.
@@ -759,6 +839,7 @@ impl View for SheetView {
         if let Some((command, sheet)) = self.book_command.take() {
             self.change_book(command, sheet, editing);
         }
+        self.warning_question(ui.ctx(), editing);
         self.rename_question(ui.ctx(), editing);
         self.sort_question(ui.ctx(), editing);
         self.comment_question(ui.ctx(), editing);
@@ -1023,7 +1104,8 @@ impl SheetView {
     /// the first and back. Ctrl on a Mac too, where Command+Tab is the
     /// system's.
     fn asking(&self) -> bool {
-        self.renaming.is_some()
+        self.warning.is_some()
+            || self.renaming.is_some()
             || self.sorting.is_some()
             || self.commenting.is_some()
             || self.formatting.is_some()
@@ -1171,6 +1253,51 @@ impl SheetView {
                 self.show_sheet(index);
             }
             Err(blocked) => self.notice = Some(blocked_notice(&blocked)),
+        }
+    }
+
+    /// A validity rule's warning, asking whether to write what it warned
+    /// about anyway, while it is up.
+    fn warning_question(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        let Some(warning) = &self.warning else {
+            return;
+        };
+        let mut answer = None;
+        egui::Modal::new(egui::Id::unique("validity-warning")).show(ctx, |ui| {
+            if !warning.message.title.is_empty() {
+                ui.heading(&warning.message.title);
+            }
+            ui.label(&warning.message.text);
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("OK")).clicked() {
+                    answer = Some(true);
+                }
+                if ui.button(t("Cancel")).clicked()
+                    || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+                {
+                    answer = Some(false);
+                }
+            });
+        });
+        match answer {
+            Some(true) => {
+                let Some(warning) = self.warning.take() else {
+                    return;
+                };
+                match warning.then {
+                    Pending::Typed(row, column, value) => {
+                        self.write(row, column, &value, editing);
+                        self.editor = None;
+                    }
+                    Pending::Pasted(at, block) => self.put_block(at, &block, editing),
+                    Pending::Filled(source, down, count, series) => {
+                        self.fill_from(source, down, count, series, false, editing);
+                    }
+                }
+            }
+            Some(false) => self.warning = None,
+            None => {}
         }
     }
 
@@ -2276,7 +2403,7 @@ impl SheetView {
                 bottom,
                 right,
             };
-            if self.fill_from(source, down, count, true, editing) {
+            if self.fill_from(source, down, count, true, true, editing) {
                 let end = if down {
                     (bottom + count, right)
                 } else {
@@ -2376,7 +2503,7 @@ impl SheetView {
                 right: from,
             }
         };
-        self.fill_from(source, down, count, false, editing);
+        self.fill_from(source, down, count, false, true, editing);
     }
 
     /// Fill `count` rows below a block or columns to its right from it, as one
@@ -2387,6 +2514,7 @@ impl SheetView {
         down: bool,
         count: usize,
         series: bool,
+        checked: bool,
         editing: &mut Editing,
     ) -> bool {
         let Some(document) = &mut self.document else {
@@ -2395,6 +2523,42 @@ impl SheetView {
         let before = document.document.content.clone();
         match document.fill(self.sheet, source, down, count, series) {
             Ok(written) => {
+                if checked {
+                    let values: Vec<(usize, usize, Value)> = written
+                        .iter()
+                        .filter_map(|&(sheet, row, column)| {
+                            let index = document.sheets().get(sheet)?;
+                            let value = document.cell(index, row, column)?.value();
+                            Some((row, column, value))
+                        })
+                        .collect();
+                    let verdict = check(
+                        document,
+                        self.sheet,
+                        values
+                            .iter()
+                            .map(|(row, column, value)| (*row, *column, value)),
+                    );
+                    match verdict {
+                        Checked::Refused((row, column), message) => {
+                            document.document.content = before;
+                            document.reindex();
+                            self.notice = Some(refused_at(row, column, &message));
+                            return false;
+                        }
+                        Checked::Warned(message) => {
+                            document.document.content = before;
+                            document.reindex();
+                            self.warning = Some(Warning {
+                                message,
+                                then: Pending::Filled(source, down, count, series),
+                            });
+                            return false;
+                        }
+                        Checked::Informed(message) => self.notice = Some(said(&message)),
+                        Checked::Allowed => {}
+                    }
+                }
                 editing.record_snapshot(before, None);
                 let done = recalculate(document, &written);
                 self.recalculated(done);
@@ -2575,7 +2739,37 @@ impl SheetView {
         let block = cells_of(text, |down, across, input| {
             document.read_input(self.sheet, top + down, left + across, input)
         });
-        if self.write_block((top, left), &block, false, editing) {
+        let cells = block.iter().enumerate().flat_map(|(down, row)| {
+            row.iter()
+                .enumerate()
+                .map(move |(across, value)| (top + down, left + across, value))
+        });
+        match check(document, self.sheet, cells) {
+            Checked::Refused((row, column), message) => {
+                self.notice = Some(refused_at(row, column, &message));
+            }
+            Checked::Warned(message) => {
+                self.warning = Some(Warning {
+                    message,
+                    then: Pending::Pasted((top, left), block),
+                });
+            }
+            Checked::Informed(message) => {
+                self.put_block((top, left), &block, editing);
+                self.notice = Some(said(&message));
+            }
+            Checked::Allowed => self.put_block((top, left), &block, editing),
+        }
+    }
+
+    /// Write a pasted block and select it.
+    fn put_block(
+        &mut self,
+        (top, left): (usize, usize),
+        block: &[Vec<Value>],
+        editing: &mut Editing,
+    ) {
+        if self.write_block((top, left), block, false, editing) {
             let width = block.iter().map(Vec::len).max().unwrap_or(1);
             self.pick((top, left));
             self.extend((top + block.len() - 1, left + width - 1));
@@ -2671,7 +2865,24 @@ impl SheetView {
         let typed_formula = typed.trim_start().starts_with('=') && typed.trim().len() > 1;
         if !typed_formula {
             let value = document.read_input(self.sheet, row, column, typed);
-            self.write(row, column, &value, editing);
+            match check(document, self.sheet, [(row, column, &value)]) {
+                Checked::Refused(_, message) => {
+                    self.notice = Some(said(&message));
+                    return false;
+                }
+                Checked::Warned(message) => {
+                    self.warning = Some(Warning {
+                        message,
+                        then: Pending::Typed(row, column, value),
+                    });
+                    return false;
+                }
+                Checked::Informed(message) => {
+                    self.write(row, column, &value, editing);
+                    self.notice = Some(said(&message));
+                }
+                Checked::Allowed => self.write(row, column, &value, editing),
+            }
             return true;
         }
         let Ok(stored) = formula::to_stored(typed) else {
@@ -3624,5 +3835,68 @@ mod tests {
             .expect("one step");
         document.reindex();
         assert!(!shown(&view, 1), "the show undone");
+    }
+
+    fn ruled() -> (SheetView, Editing) {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/validation.ods"),
+        )
+        .expect("the validation sheet");
+        let view = SheetView {
+            document: Some(SheetDocument::read(&bytes).expect("it reads")),
+            ..SheetView::default()
+        };
+        let mut editing = Editing::default();
+        editing.reset();
+        (view, editing)
+    }
+
+    #[test]
+    fn a_typed_value_a_rule_refuses_stays_in_the_editor_and_is_not_written() {
+        let (mut view, mut editing) = ruled();
+        assert!(!view.commit(0, 0, "11", &mut editing));
+        assert_eq!(text_at(&view, 0, 0), "5");
+        assert!(
+            view.notice
+                .as_deref()
+                .is_some_and(|said| said.contains("1 to 10"))
+        );
+        assert!(view.commit(0, 0, "7", &mut editing));
+        assert_eq!(text_at(&view, 0, 0), "7");
+    }
+
+    #[test]
+    fn a_warned_value_waits_for_the_person_to_say() {
+        let (mut view, mut editing) = ruled();
+        assert!(!view.commit(0, 1, "-1", &mut editing));
+        assert_eq!(text_at(&view, 0, 1), "2.5");
+        assert!(view.warning.is_some());
+        let Some(Warning {
+            then: Pending::Typed(row, column, value),
+            ..
+        }) = view.warning.take()
+        else {
+            panic!("the typed value waits");
+        };
+        view.write(row, column, &value, &mut editing);
+        assert_eq!(text_at(&view, 0, 1), "-1");
+    }
+
+    #[test]
+    fn a_paste_one_cell_refuses_writes_nothing_and_names_the_cell() {
+        let (mut view, mut editing) = ruled();
+        view.pick((1, 0));
+        view.paste("3\t2.5\tpink", &mut editing);
+        assert_eq!(text_at(&view, 1, 0), "");
+        assert!(
+            view.notice
+                .as_deref()
+                .is_some_and(|said| said.contains("C2")),
+            "{:?}",
+            view.notice
+        );
+        view.paste("3\t2.5\tgreen", &mut editing);
+        assert_eq!(text_at(&view, 1, 2), "green");
     }
 }

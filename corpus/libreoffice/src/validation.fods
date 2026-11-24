@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:body>
+  <office:spreadsheet>
+   <table:content-validations>
+    <table:content-validation table:name="whole" table:condition="of:cell-content-is-whole-number() and cell-content-is-between(1,10)" table:allow-empty-cell="true" table:base-cell-address="Sheet1.A1">
+     <table:error-message table:message-type="stop" table:title="Out of range" table:display="true"><text:p>Type a whole number from 1 to 10.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="decimal" table:condition="of:cell-content-is-decimal-number() and cell-content()&gt;=0" table:allow-empty-cell="true" table:base-cell-address="Sheet1.B1">
+     <table:error-message table:message-type="warning" table:title="Negative" table:display="true"><text:p>A price is not usually negative.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="list" table:condition="of:cell-content-is-in-list(&quot;red&quot;;&quot;green&quot;;&quot;blue&quot;)" table:allow-empty-cell="false" table:base-cell-address="Sheet1.C1">
+     <table:error-message table:message-type="stop" table:title="Colour" table:display="true"><text:p>Pick red, green or blue.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="length" table:condition="of:cell-content-text-length()&lt;=5" table:allow-empty-cell="true" table:base-cell-address="Sheet1.D1">
+     <table:error-message table:message-type="information" table:title="Long" table:display="true"><text:p>Codes are five letters or fewer.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="date" table:condition="of:cell-content-is-date() and cell-content-is-between(46023,46387)" table:allow-empty-cell="true" table:base-cell-address="Sheet1.E1">
+     <table:error-message table:message-type="stop" table:title="Year" table:display="true"><text:p>A date in 2026.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="time" table:condition="of:cell-content-is-time() and cell-content-is-between(0.375,0.75)" table:allow-empty-cell="true" table:base-cell-address="Sheet1.F1">
+     <table:error-message table:message-type="stop" table:title="Hours" table:display="true"><text:p>Between nine and six.</text:p></table:error-message>
+    </table:content-validation>
+    <table:content-validation table:name="silent" table:condition="of:cell-content-is-whole-number() and cell-content()&gt;0" table:allow-empty-cell="true" table:base-cell-address="Sheet1.G1">
+     <table:error-message table:message-type="stop" table:title="" table:display="false"><text:p/></table:error-message>
+    </table:content-validation>
+   </table:content-validations>
+   <table:table table:name="Sheet1">
+    <table:table-column table:number-columns-repeated="7"/>
+    <table:table-row>
+     <table:table-cell table:content-validation-name="whole" office:value-type="float" office:value="5"><text:p>5</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="decimal" office:value-type="float" office:value="2.5"><text:p>2.5</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="list" office:value-type="string"><text:p>red</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="length" office:value-type="string"><text:p>abc</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="date" office:value-type="date" office:date-value="2026-06-01"><text:p>2026-06-01</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="time" office:value-type="time" office:time-value="PT12H00M00S"><text:p>12:00</text:p></table:table-cell>
+     <table:table-cell table:content-validation-name="silent" office:value-type="float" office:value="1"><text:p>1</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell table:content-validation-name="whole"/>
+     <table:table-cell table:content-validation-name="decimal"/>
+     <table:table-cell table:content-validation-name="list"/>
+     <table:table-cell/><table:table-cell/><table:table-cell/><table:table-cell/>
+    </table:table-row>
+   </table:table>
+  </office:spreadsheet>
+ </office:body>
+</office:document>
