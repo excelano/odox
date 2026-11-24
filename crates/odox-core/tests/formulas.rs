@@ -38,7 +38,7 @@ const NOW: f64 = 46_349.5;
 /// error, and the text it shows.
 fn results(document: &SheetDocument) -> Vec<(String, Value, bool, String)> {
     let sheet = &document.sheets()[CALC];
-    (0..300)
+    (0..400)
         .filter_map(|row| {
             let label = document.cell(sheet, row, 0)?.text();
             let cell = document.cell(sheet, row, 1)?;
@@ -294,4 +294,38 @@ fn volatile_functions_are_worked_out_on_every_change_and_never_on_opening() {
     assert!(done.stale.is_empty(), "{:?}", done.stale);
     assert_eq!(at(&document, "today"), Value::Boolean(false));
     assert_eq!(at(&document, "offset"), Value::Number(10.0 + 6.0));
+}
+
+#[test]
+fn a_text_format_code_this_cannot_show_is_left_stale() {
+    for code in [
+        "000-00-0000",
+        "(000) 000-0000",
+        "# ##0",
+        "hh:mm:ss.00",
+        "#,##0,",
+        "0.0,,",
+        "@",
+        "",
+        "_(0_)",
+        "*-0",
+    ] {
+        let mut document = fixture();
+        let stored = format!("of:=TEXT(1234567;\"{code}\")");
+        document.set_formula(CALC, 0, 2, &stored).expect("set");
+        let done = document.recalculate(&[(CALC, 0, 2)]);
+        assert_eq!(done.stale, vec![(CALC, 0, 2)], "{code}");
+    }
+}
+
+#[test]
+fn an_offset_over_more_cells_than_are_worked_out_is_left_stale() {
+    let mut document = fixture();
+    let started = std::time::Instant::now();
+    document
+        .set_formula(CALC, 0, 2, "of:=SUM(OFFSET([$Data.A1];0;0;1048576;100))")
+        .expect("set");
+    let done = document.recalculate(&[(CALC, 0, 2)]);
+    assert_eq!(done.stale, vec![(CALC, 0, 2)]);
+    assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
 }

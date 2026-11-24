@@ -40,14 +40,11 @@ impl Context<'_> {
                     };
                     let case = self.scalar(case)?;
                     let equal = match (&value, &case) {
-                        (Value::Text(a), Value::Text(b)) => {
-                            compare(
-                                &Value::Text(a.clone()),
-                                &Value::Text(b.clone()),
-                                self.cells.case_sensitive(),
-                            ) == Ok(Ordering::Equal)
-                        }
+                        (Value::Text(a), Value::Text(b)) => a.to_lowercase() == b.to_lowercase(),
                         (Value::Text(_), _) | (_, Value::Text(_)) => false,
+                        (Value::Empty, other) | (other, Value::Empty) => {
+                            matches!(other, Value::Empty)
+                        }
                         _ => compare(&value, &case, false) == Ok(Ordering::Equal),
                     };
                     if equal {
@@ -61,7 +58,9 @@ impl Context<'_> {
                 let value = self.scalar(&args[0])?;
                 Value::Boolean(match name {
                     "ISBLANK" => matches!(value, Value::Empty),
-                    "ISNUMBER" => matches!(value, Value::Number(_) | Value::Date(_)),
+                    "ISNUMBER" => {
+                        matches!(value, Value::Number(_) | Value::Date(_) | Value::Boolean(_))
+                    }
                     "ISTEXT" => matches!(value, Value::Text(_)),
                     _ => matches!(value, Value::Error(_)),
                 })

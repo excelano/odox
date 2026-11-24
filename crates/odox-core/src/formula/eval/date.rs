@@ -32,18 +32,22 @@ impl Context<'_> {
             }
             "EDATE" | "EOMONTH" => {
                 arity(args, 2, 2)?;
-                let day = tryv!(self.number_at(args, 0)?).floor();
+                let day = tryv!(self.day_at(args, 0)?);
                 let months = tryv!(self.number_at(args, 1)?).trunc();
+                if months.abs() > 12.0 * 65_536.0 {
+                    return Ok(Value::Error(Error::Argument));
+                }
                 let (y, m, d) = civil(day);
                 #[allow(clippy::cast_possible_truncation)]
                 let total = y * 12 + (m - 1) + months as i64;
                 let (y, m) = (total.div_euclid(12), total.rem_euclid(12) + 1);
                 let last = days_in_month(y, m);
-                Value::Number(if name == "EOMONTH" {
+                let result = if name == "EOMONTH" {
                     serial(y, m, last)
                 } else {
                     serial(y, m, d.min(last))
-                })
+                };
+                Value::Number(tryv!(within_dates(result)))
             }
             "WEEKDAY" => self.weekday(args)?,
             "NETWORKDAYS" => self.working_days(args)?,
@@ -56,7 +60,7 @@ impl Context<'_> {
 impl Context<'_> {
     fn weekday(&self, args: &[Expr]) -> Result<Value, Unsupported> {
         arity(args, 1, 2)?;
-        let day = tryv!(self.number_at(args, 0)?).floor();
+        let day = tryv!(self.day_at(args, 0)?);
         #[allow(clippy::cast_possible_truncation)]
         let kind = match args.get(1) {
             Some(_) => tryv!(self.number_at(args, 1)?).trunc() as i64,
@@ -76,8 +80,8 @@ impl Context<'_> {
 
     fn working_days(&self, args: &[Expr]) -> Result<Value, Unsupported> {
         arity(args, 2, 3)?;
-        let start = tryv!(self.number_at(args, 0)?).floor();
-        let end = tryv!(self.number_at(args, 1)?).floor();
+        let start = tryv!(self.day_at(args, 0)?);
+        let end = tryv!(self.day_at(args, 1)?);
         let mut holidays = Vec::new();
         if let Some(expr) = args.get(2) {
             for value in self.arg(expr)?.cells() {
@@ -93,21 +97,29 @@ impl Context<'_> {
         } else {
             (end, start, -1.0)
         };
-        let mut n = 0.0;
-        let mut day = low;
+        let weeks = ((high - low + 1.0) / 7.0).floor();
+        let mut n = weeks * 5.0;
+        let mut day = low + weeks * 7.0;
         while day <= high {
-            if !matches!(weekday(day), 0 | 6) && !holidays.contains(&day) {
+            if !matches!(weekday(day), 0 | 6) {
                 n += 1.0;
             }
             day += 1.0;
         }
-        Ok(Value::Number(n * sign))
+        holidays.sort_by(f64::total_cmp);
+        holidays.dedup();
+        let off = holidays
+            .iter()
+            .filter(|&&day| (low..=high).contains(&day) && !matches!(weekday(day), 0 | 6))
+            .count();
+        #[allow(clippy::cast_precision_loss)]
+        Ok(Value::Number((n - off as f64) * sign))
     }
 
     fn between(&self, args: &[Expr]) -> Result<Value, Unsupported> {
         arity(args, 3, 3)?;
-        let start = tryv!(self.number_at(args, 0)?).floor();
-        let end = tryv!(self.number_at(args, 1)?).floor();
+        let start = tryv!(self.day_at(args, 0)?);
+        let end = tryv!(self.day_at(args, 1)?);
         let unit = tryv!(self.text_at(args, 2)?).to_lowercase();
         if start > end {
             return Ok(Value::Error(Error::Argument));
@@ -128,17 +140,38 @@ impl Context<'_> {
                 } else {
                     (y2, m2 - 1)
                 };
-                end - serial(py, pm, d1.min(days_in_month(py, pm)))
+                #[allow(clippy::cast_precision_loss)]
+                let from = serial(py, pm, 1) + (d1 - 1) as f64;
+                end - from
             }
             "yd" => {
-                let mut from = serial(y2, m1, d1.min(days_in_month(y2, m1)));
-                if from > end {
-                    from = serial(y2 - 1, m1, d1.min(days_in_month(y2 - 1, m1)));
-                }
+                let year = if (m2, d2) >= (m1, d1) { y2 } else { y2 - 1 };
+                #[allow(clippy::cast_precision_loss)]
+                let from = serial(year, m1, 1) + (d1 - 1) as f64;
                 end - from
             }
             _ => return Ok(Value::Error(Error::Argument)),
         }))
+    }
+}
+
+impl Context<'_> {
+    /// An argument as a day, its time of day dropped, or `Err:502` outside
+    /// the years a spreadsheet counts.
+    fn day_at(&self, args: &[Expr], index: usize) -> Result<Result<f64, Error>, Unsupported> {
+        Ok(self
+            .number_at(args, index)?
+            .and_then(|day| within_dates(day.floor())))
+    }
+}
+
+/// A day, or `Err:502` where it falls outside the years from -32767 to
+/// 32767 that a spreadsheet counts.
+fn within_dates(day: f64) -> Result<f64, Error> {
+    if (serial(-32767, 1, 1)..=serial(32767, 12, 31)).contains(&day) {
+        Ok(day)
+    } else {
+        Err(Error::Argument)
     }
 }
 

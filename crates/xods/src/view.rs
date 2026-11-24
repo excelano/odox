@@ -540,6 +540,7 @@ impl View for SheetView {
             )
         })?;
         document.this_year = Some(odox_ui::today().0);
+        document.now = Some(odox_ui::now());
         let mut parts = vec![&document.document.content];
         if let Some(styles) = &document.document.styles_part {
             parts.push(styles);

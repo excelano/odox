@@ -584,8 +584,15 @@ the window reads the local clock before each change. IRR guesses by Newton's
 method from 0.1, as `LibreOffice` does, and answers `Err:523` where twenty
 guesses do not settle within 1e-7. TEXT shows a number in a format code of one
 section, digits, grouping, decimals, a percentage, dates and times, read into
-a data style and shown as a cell in that style would be; another code is
-outside the core. What they answer
+a data style and shown as a cell in that style would be; a code with several
+sections or runs of digits, digits beside a date, scaling, an exponent, a
+fraction, padding or a text placeholder is outside the core. SUMPRODUCT's
+arguments and the arrays MATCH and XLOOKUP search are worked out cell by cell,
+so `(A1:A4="a")*B1:B4` is four values. SEARCH reads its text as a pattern as
+the calculation settings say, as a criterion is read. OFFSET and INDIRECT
+answer `Err:502` past the last row or column, and a reference over more than a
+million cells is left outside the core; INDIRECT reads `Sheet!A1` as well as
+`Sheet.A1`. A day outside the years -32767 to 32767 is `Err:502`. What they answer
 is `LibreOffice`'s, measured on `corpus/libreoffice/formulas.ods`: a boolean is
 one or zero, `=` compares text with its case while a criterion ignores it, a
 date is days from 30 December 1899, a range where one value is wanted is its

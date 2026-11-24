@@ -28,7 +28,7 @@ impl Context<'_> {
                 })
             }
             "STDEV" => {
-                let found = tryv!(numbers(&all()?, Error::Value));
+                let found = tryv!(numbers(&all()?, Error::ArgumentKind));
                 if found.len() < 2 {
                     return Ok(Value::Error(Error::DivisionByZero));
                 }
@@ -41,14 +41,14 @@ impl Context<'_> {
             "RANK" => {
                 arity(args, 2, 3)?;
                 let x = tryv!(self.number_at(args, 0)?);
-                let list: Vec<f64> = self
-                    .arg(&args[1])?
-                    .cells()
-                    .filter_map(|value| match value {
-                        Value::Number(n) | Value::Date(n) => Some(*n),
-                        _ => None,
-                    })
-                    .collect();
+                let mut list = Vec::new();
+                for value in self.arg(&args[1])?.cells() {
+                    match value {
+                        Value::Number(n) | Value::Date(n) => list.push(*n),
+                        Value::Error(error) => return Ok(Value::Error(*error)),
+                        _ => {}
+                    }
+                }
                 let ascending = match args.get(2) {
                     Some(_) => tryv!(self.number_at(args, 2)?) != 0.0,
                     None => false,

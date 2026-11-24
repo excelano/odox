@@ -4,7 +4,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use super::{Context, arity, count_value, whole};
+use super::{Context, Matching, arity, count_value, pattern, whole};
 use crate::data_style::DataStyle;
 use crate::formula::{Error, Expr, Unsupported, Value};
 
@@ -35,38 +35,13 @@ impl Context<'_> {
                 arity(args, 1, 1)?;
                 match self.converted(self.scalar(&args[0])?) {
                     Value::Number(x) | Value::Date(x) => Value::Number(x),
+                    Value::Boolean(b) => Value::Boolean(b),
+                    Value::Empty => Value::Number(0.0),
                     Value::Error(error) => Value::Error(error),
-                    _ => Value::Error(Error::Argument),
+                    Value::Text(_) => Value::Error(Error::Argument),
                 }
             }
-            "FIND" | "SEARCH" => {
-                arity(args, 2, 3)?;
-                let wanted = tryv!(self.text_at(args, 0)?);
-                let within = tryv!(self.text_at(args, 1)?);
-                let start = match args.get(2) {
-                    Some(_) => tryv!(self.number_at(args, 2)?).trunc(),
-                    None => 1.0,
-                };
-                let chars: Vec<char> = within.chars().collect();
-                if start < 1.0 || whole(start) > chars.len().max(1) {
-                    return Ok(Value::Error(Error::Value));
-                }
-                let fold = |text: &str| -> Vec<char> {
-                    if name == "SEARCH" {
-                        text.to_lowercase().chars().collect()
-                    } else {
-                        text.chars().collect()
-                    }
-                };
-                let (haystack, needle) = (fold(&within), fold(&wanted));
-                let from = whole(start) - 1;
-                let found = (from..=haystack.len().saturating_sub(needle.len()))
-                    .find(|&at| haystack.get(at..at + needle.len()) == Some(&needle[..]));
-                match found {
-                    Some(at) if haystack.len() >= needle.len() => count_value(at + 1),
-                    _ => Value::Error(Error::Value),
-                }
-            }
+            "FIND" | "SEARCH" => self.find_text(name, args)?,
             "SUBSTITUTE" => {
                 arity(args, 3, 4)?;
                 let source = tryv!(self.text_at(args, 0)?);
@@ -110,6 +85,49 @@ impl Context<'_> {
                 Value::Text(out)
             }
             _ => return Err(Unsupported),
+        })
+    }
+
+    /// Where text is found in other text, from a place: by `FIND` with its
+    /// case, and by `SEARCH` without it and as the document's calculation
+    /// settings read a pattern.
+    fn find_text(&self, name: &str, args: &[Expr]) -> Result<Value, Unsupported> {
+        arity(args, 2, 3)?;
+        let wanted = tryv!(self.text_at(args, 0)?);
+        let within = tryv!(self.text_at(args, 1)?);
+        let start = match args.get(2) {
+            Some(_) => tryv!(self.number_at(args, 2)?).trunc(),
+            None => 1.0,
+        };
+        let chars: Vec<char> = within.chars().collect();
+        if start < 1.0 || whole(start) > chars.len().max(1) {
+            return Ok(Value::Error(Error::Value));
+        }
+        let from = whole(start) - 1;
+        if name == "SEARCH" {
+            let matching = Matching {
+                whole: false,
+                ..self.matching()
+            };
+            let rest: String = chars[from..].iter().collect();
+            let found = pattern(&wanted, matching)
+                .ok_or(Unsupported)?
+                .find(&rest)
+                .map(|m| from + rest[..m.start()].chars().count());
+            return Ok(match found {
+                Some(at) => count_value(at + 1),
+                None => Value::Error(Error::Value),
+            });
+        }
+        if wanted.is_empty() {
+            return Ok(Value::Error(Error::Value));
+        }
+        let needle: Vec<char> = wanted.chars().collect();
+        let found = (from..=chars.len().saturating_sub(needle.len()))
+            .find(|&at| chars.get(at..at + needle.len()) == Some(&needle[..]));
+        Ok(match found {
+            Some(at) if chars.len() >= needle.len() => count_value(at + 1),
+            _ => Value::Error(Error::Value),
         })
     }
 }

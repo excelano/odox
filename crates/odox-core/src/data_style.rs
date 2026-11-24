@@ -283,8 +283,13 @@ impl DataStyle {
     /// `0.0%` or `YYYY-MM-DD`, in one section: digits with grouping and
     /// decimals, a percentage, dates and times, and quoted or other literal
     /// text. `None` for anything else: several sections, an exponent, a
-    /// fraction or a colour.
+    /// fraction, a colour, more than one run of digits, digits beside a date,
+    /// scaling by a trailing comma, a text placeholder, padding or filling,
+    /// and no code at all.
     pub fn from_code(code: &str) -> Option<Self> {
+        if code.is_empty() {
+            return None;
+        }
         let mut parts: Vec<Part> = Vec::new();
         let mut kind = Kind::Number;
         let mut timed = false;
@@ -314,12 +319,15 @@ impl DataStyle {
                     at += 2;
                     continue;
                 }
-                ';' | 'E' | '[' | '?' => return None,
+                ';' | 'E' | '[' | '?' | '@' | '_' | '*' => return None,
                 '0' | '#' => {
                     let end = chars[at..]
                         .iter()
                         .position(|d| !matches!(d, '0' | '#' | ',' | '.'))
                         .map_or(chars.len(), |n| at + n);
+                    if numbered(&parts) || dated || timed || chars[end - 1] == ',' {
+                        return None;
+                    }
                     parts.push(digits_of(&chars[at..end].iter().collect::<String>()));
                     at = end;
                     continue;
@@ -328,6 +336,7 @@ impl DataStyle {
                     kind = Kind::Percentage;
                     literal(&mut parts, "%");
                 }
+                'Y' | 'D' | 'N' | 'H' | 'S' | 'M' if numbered(&parts) => return None,
                 'Y' | 'D' | 'N' | 'H' | 'S' => {
                     let part = date_letter(upper, run);
                     if matches!(part, Part::Hours { .. } | Part::Seconds { .. }) {
@@ -366,12 +375,19 @@ impl DataStyle {
                 1
             };
         }
-        if dated {
-            kind = Kind::Date;
+        let kind = if dated {
+            Kind::Date
         } else if timed {
-            kind = Kind::Time;
-        }
-        Some(Self {
+            Kind::Time
+        } else {
+            kind
+        };
+        Some(Self::of_parts(kind, parts))
+    }
+
+    /// A style of a kind with its parts and nothing else.
+    fn of_parts(kind: Kind, parts: Vec<Part>) -> Self {
+        Self {
             kind,
             parts,
             conditions: Vec::new(),
@@ -379,7 +395,7 @@ impl DataStyle {
             country: None,
             colour: None,
             elapsed: false,
-        })
+        }
     }
 
     /// The colour this style gives a value's text, from the section its
@@ -1422,4 +1438,9 @@ fn date_letter(letter: char, run: usize) -> Part {
             decimals: 0,
         },
     }
+}
+
+/// Whether a format code read so far has its digits already.
+fn numbered(parts: &[Part]) -> bool {
+    parts.iter().any(|part| matches!(part, Part::Number(..)))
 }

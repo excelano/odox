@@ -31,7 +31,7 @@ impl Context<'_> {
                     Some(_) => tryv!(self.number_at(args, 4)?) != 0.0,
                 };
                 if periods == 0.0 {
-                    return Ok(Value::Error(Error::Argument));
+                    return Ok(Value::Error(Error::Number));
                 }
                 Value::Number(if rate == 0.0 {
                     -(present + future) / periods
@@ -52,7 +52,12 @@ impl Context<'_> {
                     match self.arg(expr)? {
                         Arg::Scalar(value) => {
                             period += 1;
-                            sum += tryv!(self.number(&value)) / (1.0 + rate).powi(period);
+                            let n = match self.number(&value) {
+                                Ok(n) => n,
+                                Err(Error::Value) => return Ok(Value::Error(Error::ArgumentKind)),
+                                Err(error) => return Ok(Value::Error(error)),
+                            };
+                            sum += n / (1.0 + rate).powi(period);
                         }
                         range @ Arg::Range(_) => {
                             for value in range.cells() {
@@ -73,6 +78,9 @@ impl Context<'_> {
             "IRR" => {
                 arity(args, 1, 2)?;
                 let mut flows = Vec::new();
+                let Arg::Range(_) = self.arg(&args[0])? else {
+                    return Ok(Value::Error(Error::ArgumentKind));
+                };
                 for value in self.arg(&args[0])?.cells() {
                     match value {
                         Value::Number(n) | Value::Date(n) => flows.push(*n),

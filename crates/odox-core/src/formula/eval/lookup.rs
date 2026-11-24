@@ -20,6 +20,14 @@ enum Search {
     AtOrAbove,
 }
 
+/// The last row and column a sheet can have, counting from zero.
+const LAST_ROW: f64 = 1_048_575.0;
+const LAST_COLUMN: f64 = 16_383.0;
+
+/// The most cells a reference worked out by a function may cover before it
+/// is left to the application that wrote the document.
+const MOST_CELLS: f64 = 1_000_000.0;
+
 /// The functions this family works out.
 pub(super) const NAMES: &[&str] = &[
     "SUMIFS",
@@ -32,8 +40,6 @@ pub(super) const NAMES: &[&str] = &[
     "SUMPRODUCT",
     "OFFSET",
     "INDIRECT",
-    "COUNTIFS",
-    "SUMIFS",
 ];
 
 impl Context<'_> {
@@ -53,11 +59,57 @@ impl Context<'_> {
         })
     }
 
-    /// A range argument's cells, a value standing for a range of one.
+    /// An argument worked out cell by cell over the ranges in it, as an
+    /// array: `(A1:A4="a")*B1:B4` is four values. A value stands for an
+    /// array of one, and an operator joins two arrays cell by cell, or one
+    /// with each cell of the other; arrays of other shapes come to `#VALUE!`.
     fn cells_of(&self, expr: &Expr) -> Result<Vec<Vec<Value>>, Unsupported> {
-        Ok(match self.arg(expr)? {
-            Arg::Range(rows) => rows,
-            Arg::Scalar(value) => vec![vec![value]],
+        Ok(match expr {
+            Expr::Binary(op, left, right) => {
+                let (left, right) = (self.cells_of(left)?, self.cells_of(right)?);
+                let shape = |rows: &Vec<Vec<Value>>| (rows.len(), rows.first().map_or(0, Vec::len));
+                let (a, b) = (shape(&left), shape(&right));
+                let size = if a == (1, 1) { b } else { a };
+                if a != b && a != (1, 1) && b != (1, 1) {
+                    return Ok(vec![vec![Value::Error(Error::Value)]]);
+                }
+                let at = |rows: &Vec<Vec<Value>>, r: usize, c: usize| {
+                    if shape(rows) == (1, 1) {
+                        rows[0][0].clone()
+                    } else {
+                        rows[r][c].clone()
+                    }
+                };
+                (0..size.0)
+                    .map(|r| {
+                        (0..size.1)
+                            .map(|c| self.combine(*op, at(&left, r, c), at(&right, r, c)))
+                            .collect()
+                    })
+                    .collect()
+            }
+            Expr::Negate(inner) | Expr::Percent(inner) => {
+                let by = if matches!(expr, Expr::Negate(_)) {
+                    -1.0
+                } else {
+                    0.01
+                };
+                self.cells_of(inner)?
+                    .into_iter()
+                    .map(|row| {
+                        row.into_iter()
+                            .map(|value| match self.number(&value) {
+                                Ok(n) => Value::Number(n * by),
+                                Err(error) => Value::Error(error),
+                            })
+                            .collect()
+                    })
+                    .collect()
+            }
+            _ => match self.arg(expr)? {
+                Arg::Range(rows) => rows,
+                Arg::Scalar(value) => vec![vec![value]],
+            },
         })
     }
 
@@ -193,6 +245,10 @@ impl Context<'_> {
         };
         let looked = self.cells_of(&args[1])?;
         let returned = self.cells_of(&args[2])?;
+        let size = |rows: &Vec<Vec<Value>>| rows.len() * rows.first().map_or(0, Vec::len);
+        if size(&looked) != size(&returned) {
+            return Ok(Value::Error(Error::ArgumentKind));
+        }
         let Some(mut list) = line(&looked) else {
             return Ok(Value::Error(Error::Value));
         };
@@ -271,10 +327,11 @@ impl Context<'_> {
             let Arg::Range(rows) = self.arg(&pair[0])? else {
                 return Ok(Value::Error(Error::Value));
             };
-            tests.push((
-                rows,
-                Criterion::of(&self.scalar(&pair[1])?, self.matching()),
-            ));
+            let criterion = self.scalar(&pair[1])?;
+            if let Value::Error(error) = criterion {
+                return Ok(Value::Error(error));
+            }
+            tests.push((rows, Criterion::of(&criterion, self.matching())));
         }
         let shape = |rows: &Vec<Vec<Value>>| (rows.len(), rows.first().map_or(0, Vec::len));
         let wanted_shape = shape(&tests[0].0);
@@ -369,9 +426,17 @@ impl Context<'_> {
             return Ok(indirect(&written).ok_or(Error::Reference));
         }
         arity(args, 3, 5)?;
-        let Expr::Reference(base) = &args[0] else {
-            return Ok(Err(Error::Value));
+        let base = match &args[0] {
+            Expr::Reference(base) => base.clone(),
+            Expr::Call(name, inner) if super::is_reference_call(name) => {
+                match self.reference_call(name, inner)? {
+                    Ok(base) => base,
+                    Err(error) => return Ok(Err(error)),
+                }
+            }
+            _ => return Err(Unsupported),
         };
+        let base = &base;
         let mut moved = [0.0; 4];
         #[allow(clippy::cast_precision_loss)]
         for (at, slot) in moved.iter_mut().enumerate() {
@@ -396,8 +461,17 @@ impl Context<'_> {
             base.from.row as f64 + rows,
             base.from.column as f64 + columns,
         );
-        if row < 0.0 || column < 0.0 || height < 1.0 || width < 1.0 {
+        if row < 0.0
+            || column < 0.0
+            || height < 1.0
+            || width < 1.0
+            || row + height > LAST_ROW + 1.0
+            || column + width > LAST_COLUMN + 1.0
+        {
             return Ok(Err(Error::Argument));
+        }
+        if height * width > MOST_CELLS {
+            return Err(Unsupported);
         }
         let from = Address {
             row: whole(row),
@@ -427,6 +501,11 @@ fn line(rows: &[Vec<Value>]) -> Option<Vec<Value>> {
 
 /// A reference written as text, `$Sheet1.B2`, `Sheet1.B2:B4` or `B2`.
 fn indirect(written: &str) -> Option<Reference> {
+    let written = if written.contains('.') {
+        written.to_owned()
+    } else {
+        written.replacen('!', ".", 1)
+    };
     let ends: Vec<String> = written
         .split(':')
         .map(|end| {

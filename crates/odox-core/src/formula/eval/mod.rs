@@ -215,6 +215,22 @@ impl Context<'_> {
         }
     }
 
+    /// Two values an operator joins, each read as a number first where the
+    /// operator wants one.
+    fn combine(&self, op: Op, left: Value, right: Value) -> Value {
+        let (left, right) = match op {
+            Op::Join
+            | Op::Equal
+            | Op::NotEqual
+            | Op::Less
+            | Op::LessOrEqual
+            | Op::Greater
+            | Op::GreaterOrEqual => (left, right),
+            _ => (self.converted(left), self.converted(right)),
+        };
+        binary(op, &left, &right, self.cells.case_sensitive())
+    }
+
     fn arg(&self, expr: &Expr) -> Result<Arg, Unsupported> {
         match expr {
             Expr::Reference(reference) => Ok(Arg::Range(self.range(reference)?)),
@@ -269,18 +285,7 @@ impl Context<'_> {
             Expr::Negate(inner) => Value::Number(-tryv!(self.number(&self.scalar(inner)?))),
             Expr::Percent(inner) => Value::Number(tryv!(self.number(&self.scalar(inner)?)) / 100.0),
             Expr::Binary(op, left, right) => {
-                let (left, right) = (self.scalar(left)?, self.scalar(right)?);
-                let (left, right) = match op {
-                    Op::Join
-                    | Op::Equal
-                    | Op::NotEqual
-                    | Op::Less
-                    | Op::LessOrEqual
-                    | Op::Greater
-                    | Op::GreaterOrEqual => (left, right),
-                    _ => (self.converted(left), self.converted(right)),
-                };
-                binary(*op, &left, &right, self.cells.case_sensitive())
+                self.combine(*op, self.scalar(left)?, self.scalar(right)?)
             }
             Expr::Call(name, arguments) => self.call(name, arguments)?,
         })
