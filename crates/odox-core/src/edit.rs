@@ -33,7 +33,7 @@ use crate::xml::{Attribute, Element, Name, Node, Ns};
 
 pub use align::{alignment, set_alignment};
 pub(crate) use block::name_for;
-pub use block::{block_state, heading_level, set_heading, set_list};
+pub use block::{block_state, heading_level, set_heading, set_list, shift_heading};
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };
