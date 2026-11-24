@@ -286,14 +286,12 @@ arrow at a line break and a pilcrow after the last character, so nothing is
 laid out differently and the PDF, which lays out its own lines, never sees
 them. A slideshow and text read right to left in its visual order draw none.
 
-**A text document pages with buttons under it.** Page up and Page down move the
-view nine tenths of the window, so the line read last is still in sight, and
-gray out at the top and the bottom. The Page Up and Page Down keys do the same
-while no caret is taking them, and Home and End, with or without Ctrl, go to
-the top and the bottom of the document; with a caret they move it, as §11
-says.
+**A text document pages with its keys.** Page Up and Page Down move the view
+nine tenths of the window, so the line read last is still in sight, while no
+caret is taking them, and Home and End, with or without Ctrl, go to the top and
+the bottom of the document; with a caret they move it, as §11 says.
 
-Beside the buttons the bar counts the document's words and characters, and a
+The bar under the page counts the document's words and characters, and a
 selection's out of them. A word is a stretch between the Unicode word
 boundaries the caret moves by that holds a letter or a digit, counted one
 paragraph at a time; characters include spaces. That is not LibreOffice's

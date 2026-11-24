@@ -98,11 +98,9 @@ impl Scroll {
         });
     }
 
-    /// The Page up and Page down buttons under the page, beside how much text
-    /// there is, and the keys when `keys` says the caret is not the one taking
-    /// them.
+    /// How much text there is, under the page, and the paging keys when
+    /// `keys` says the caret is not the one taking them.
     fn paging(&mut self, ui: &mut Ui, keys: bool, counted: &Counted) {
-        let (up, down) = self.room();
         let mut moved = None;
         if keys {
             ui.input_mut(|input| {
@@ -123,34 +121,13 @@ impl Scroll {
             });
         }
         egui::Panel::bottom("pages").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                if ui
-                    .add_enabled(up, egui::Button::new(t("Page up")))
-                    .clicked()
-                {
-                    moved = Some(Move::Page { down: false });
-                }
-                if ui
-                    .add_enabled(down, egui::Button::new(t("Page down")))
-                    .clicked()
-                {
-                    moved = Some(Move::Page { down: true });
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    counted.show(ui);
-                });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                counted.show(ui);
             });
         });
         if let Some(moved) = moved {
             self.go(ui.ctx(), moved);
         }
-    }
-
-    /// Whether the view can move up, and whether it can move down.
-    fn room(&self) -> (bool, bool) {
-        self.shown.map_or((false, false), |shown| {
-            (shown.offset > 0.5, shown.offset < shown.bottom() - 0.5)
-        })
     }
 
     /// Move the view, settled on the next frame.
