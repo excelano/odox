@@ -157,6 +157,7 @@ fn drawings(
         zoom,
         palette,
     } = *drawn;
+    let (rows, columns) = (metrics.rows.len() - 1, metrics.columns.len() - 1);
     for drawing in document.drawings(index) {
         let (Some([x, y, ..]), Some((row, column, within))) = (
             document.drawing_place(sheet, &drawing),
@@ -164,6 +165,9 @@ fn drawings(
         ) else {
             continue;
         };
+        if !drawing.shown(true) || row >= rows || column >= columns {
+            continue;
+        }
         let within = vec2(within.0, within.1) * zoom;
         let corner = place.at(metrics, row, column) + within;
         let (width, height) = metrics.size();

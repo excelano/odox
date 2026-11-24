@@ -48,29 +48,67 @@ pub struct SheetDrawing<'a> {
     path: Vec<usize>,
 }
 
+/// A move smaller than this, in points, is the sum of the same sizes taken
+/// in another order, not a move.
+const NO_MOVE: f32 = 0.001;
+
 /// A place on a sheet in points, across and down.
 type Point = (f32, f32);
 
 /// Where a drawing's anchor cell and end cell stand.
 pub(super) type Corners = (Point, Option<Point>);
 
-/// The last column and row a sheet can have.
-const LAST_COLUMN: usize = 16_383;
-const LAST_ROW: usize = 1_048_575;
+/// Where a drawing is under its table, and the cell it is in, if any.
+pub(super) type Found = (Vec<usize>, Option<(usize, usize)>);
 
 /// The line, of those `size` measures from the first, that a distance from
 /// the first's start falls in, and how far into it: one taking no room is
-/// passed over.
-fn within(distance: f32, last: usize, size: impl Fn(usize) -> f32) -> (usize, f32) {
+/// passed over. Past the `written` lines every line is `usual`.
+fn within(distance: f32, written: usize, size: impl Fn(usize) -> f32, usual: f32) -> (usize, f32) {
     let mut start = 0.0;
-    for line in 0..last {
+    for line in 0..written {
         let next = start + size(line);
         if distance < next {
             return (line, distance - start);
         }
         start = next;
     }
-    (last, distance - start)
+    let past = (distance - start).max(0.0);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let lines = (past / usual).floor() as usize;
+    #[allow(clippy::cast_precision_loss)]
+    let into = past - lines as f32 * usual;
+    (written + lines, into)
+}
+
+impl SheetDrawing<'_> {
+    /// Whether it is shown on the screen, or with `screen` false in print,
+    /// by its `draw:display`, which `LibreOffice` also writes in its own
+    /// namespace: `always`, `none`, `printer` or `screen`.
+    pub fn shown(&self, screen: bool) -> bool {
+        let display = self
+            .element
+            .attrs
+            .iter()
+            .find(|attribute| attribute.name.local.as_ref() == "display")
+            .map(|attribute| attribute.value.as_str());
+        match display {
+            Some("none") => false,
+            Some("printer") => !screen,
+            Some("screen") => screen,
+            _ => true,
+        }
+    }
+
+    /// Whether it is placed by `svg:x` and `svg:y`, which a move rewrites:
+    /// a line, a connector and a dimension are placed by their ends, a group
+    /// by what it holds, and a turned shape by its `draw:transform`, and
+    /// those are left as written.
+    fn movable(&self) -> bool {
+        self.element.attr(&Ns::Svg, "x").is_some()
+            && self.element.attr(&Ns::Svg, "y").is_some()
+            && self.element.attr(&Ns::Draw, "transform").is_none()
+    }
 }
 
 /// A length attribute of a drawing in points, nought where it is missing.
@@ -85,78 +123,96 @@ impl SheetDocument {
     /// The drawings on a sheet, in the order the sheet has them: those
     /// anchored to the sheet, then those in cells, row by row.
     pub fn drawings(&self, sheet: usize) -> Vec<SheetDrawing<'_>> {
-        let mut found = Vec::new();
         let (Some(index), Some(table)) = (
             self.sheets.get(sheet),
             self.sheets.get(sheet).and_then(|index| self.table(index)),
         ) else {
-            return found;
+            return Vec::new();
         };
-        for (at, shapes) in table.elements_indexed() {
-            if !shapes.is(&Ns::Table, "shapes") {
-                continue;
-            }
-            for (inner, element) in shapes.elements_indexed() {
-                if element.name.ns == Ns::Draw {
-                    found.push(SheetDrawing {
+        let found = index.drawn.get_or_init(|| find_drawings(index, table));
+        found
+            .iter()
+            .filter_map(|(path, cell)| {
+                let element = table.at(path)?;
+                let (x, y) = (
+                    length(element, &Ns::Svg, "x"),
+                    length(element, &Ns::Svg, "y"),
+                );
+                let Some((row, column)) = *cell else {
+                    return Some(SheetDrawing {
                         element,
                         anchor: Anchor::Sheet,
-                        offset: (
-                            length(element, &Ns::Svg, "x"),
-                            length(element, &Ns::Svg, "y"),
-                        ),
-                        path: vec![at, inner],
+                        offset: (x, y),
+                        path: path.clone(),
                     });
-                }
-            }
-        }
-        for range in &index.rows {
-            let Some(row) = table.at(range.path.steps()) else {
-                continue;
-            };
-            let mut column = 0usize;
-            for (at, cell) in row.elements_indexed() {
-                if !cell.is(&Ns::Table, "table-cell") && !cell.is(&Ns::Table, "covered-table-cell")
-                {
-                    continue;
-                }
-                for (inner, element) in cell.elements_indexed() {
-                    if element.name.ns != Ns::Draw {
-                        continue;
-                    }
-                    let end = element
-                        .attr(&Ns::Table, "end-cell-address")
-                        .and_then(read_area)
-                        .map(|((row, column), _)| {
-                            (
-                                row,
-                                column,
-                                length(element, &Ns::Table, "end-x"),
-                                length(element, &Ns::Table, "end-y"),
-                            )
-                        });
-                    let (x, y) = self.origin(index, range.first, column);
-                    found.push(SheetDrawing {
-                        element,
-                        anchor: Anchor::Cell {
-                            row: range.first,
+                };
+                let end = element
+                    .attr(&Ns::Table, "end-cell-address")
+                    .and_then(read_area)
+                    .map(|((row, column), _)| {
+                        (
+                            row,
                             column,
-                            end,
-                        },
-                        offset: (
-                            length(element, &Ns::Svg, "x") - x,
-                            length(element, &Ns::Svg, "y") - y,
-                        ),
-                        path: [range.path.steps(), &[at, inner]].concat(),
+                            length(element, &Ns::Table, "end-x"),
+                            length(element, &Ns::Table, "end-y"),
+                        )
                     });
-                }
-                column += cell
-                    .attr_usize(&Ns::Table, "number-columns-repeated")
-                    .unwrap_or(1)
-                    .max(1);
+                let origin = self.origin(index, row, column);
+                Some(SheetDrawing {
+                    element,
+                    anchor: Anchor::Cell { row, column, end },
+                    offset: (x - origin.0, y - origin.1),
+                    path: path.clone(),
+                })
+            })
+            .collect()
+    }
+
+    /// How many rows and columns from the first the drawings on a sheet
+    /// reach, to the cells their far corners fall in.
+    pub fn drawings_reach(&self, sheet: &Sheet) -> (usize, usize) {
+        let Some(index) = self.sheets.iter().position(|s| std::ptr::eq(s, sheet)) else {
+            return (0, 0);
+        };
+        let written = sheet.rows.last().map_or(0, |r| r.first + r.count);
+        let width = |c: usize| {
+            if sheet.column_shown(c) {
+                sheet
+                    .column_width(c)
+                    .map_or(DEFAULT_COLUMN_WIDTH, Length::points)
+            } else {
+                0.0
             }
-        }
-        found
+        };
+        let height = |r: usize| {
+            if sheet.row_shown(r) {
+                self.row_height(sheet, r)
+                    .map_or(DEFAULT_ROW_HEIGHT, Length::points)
+            } else {
+                0.0
+            }
+        };
+        self.drawings(index)
+            .iter()
+            .filter_map(|drawing| self.drawing_place(sheet, drawing))
+            .fold((0, 0), |(rows, columns), [x, y, w, h]| {
+                let (column, _) = within(x + w, sheet.columns.len(), width, DEFAULT_COLUMN_WIDTH);
+                let (row, _) = within(y + h, written, height, DEFAULT_ROW_HEIGHT);
+                (rows.max(row + 1), columns.max(column + 1))
+            })
+    }
+
+    /// A drawing's path from the content root.
+    pub fn drawing_path(&self, sheet: usize, drawing: &SheetDrawing<'_>) -> Option<Vec<usize>> {
+        let content = &self.document.content;
+        let (body, element) = content
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "body"))?;
+        let (spreadsheet, _) = element
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "spreadsheet"))?;
+        let table = self.sheets.get(sheet)?.table;
+        Some([&[body, spreadsheet, table], drawing.path.as_slice()].concat())
     }
 
     /// Where a drawing stands on its sheet as `[x, y, width, height]` in points,
@@ -209,8 +265,9 @@ impl SheetDocument {
                         0.0
                     }
                 };
-                let (column, across) = within(x, LAST_COLUMN, width);
-                let (row, down) = within(y, LAST_ROW, height);
+                let (column, across) = within(x, sheet.columns.len(), width, DEFAULT_COLUMN_WIDTH);
+                let written = sheet.rows.last().map_or(0, |r| r.first + r.count);
+                let (row, down) = within(y, written, height, DEFAULT_ROW_HEIGHT);
                 Some((row, column, (across, down)))
             }
         }
@@ -261,6 +318,7 @@ impl SheetDocument {
         };
         self.drawings(sheet)
             .iter()
+            .filter(|drawing| drawing.movable())
             .filter_map(|drawing| match drawing.anchor {
                 Anchor::Sheet => None,
                 Anchor::Cell { row, column, end } => Some((
@@ -282,13 +340,20 @@ impl SheetDocument {
         let Some(index) = self.sheets.get(sheet) else {
             return Ok(());
         };
-        let moves: Vec<(Vec<usize>, Point, Point)> = self
-            .drawings(sheet)
+        let drawings = self.drawings(sheet);
+        let anchored: Vec<_> = drawings
             .iter()
+            .filter(|drawing| drawing.movable())
             .filter_map(|drawing| match drawing.anchor {
                 Anchor::Sheet => None,
                 Anchor::Cell { row, column, end } => Some((drawing, row, column, end)),
             })
+            .collect();
+        if anchored.len() != before.len() {
+            return Ok(());
+        }
+        let moves: Vec<(Vec<usize>, Point, Point)> = anchored
+            .into_iter()
             .zip(before)
             .map(|((drawing, row, column, end), (start, end_before))| {
                 let now = self.origin(index, row, column);
@@ -305,7 +370,11 @@ impl SheetDocument {
                 };
                 (drawing.path.clone(), moved, stretched)
             })
-            .filter(|(_, moved, stretched)| *moved != (0.0, 0.0) || *stretched != (0.0, 0.0))
+            .filter(|(_, moved, stretched)| {
+                [moved.0, moved.1, stretched.0, stretched.1]
+                    .iter()
+                    .any(|by| by.abs() > NO_MOVE)
+            })
             .collect();
         if moves.is_empty() {
             return Ok(());
@@ -319,19 +388,58 @@ impl SheetDocument {
                 .iter()
                 .zip([moved.0, moved.1, stretched.0, stretched.1])
             {
-                if by == 0.0 {
+                if by.abs() <= NO_MOVE {
                     continue;
                 }
                 let local = name.local.clone();
-                let written = element.attr(&Ns::Svg, &local).unwrap_or("0cm");
-                let unit = written
-                    .get(written.len().saturating_sub(2)..)
-                    .unwrap_or("cm");
+                let Some(written) = element.attr(&Ns::Svg, &local) else {
+                    continue;
+                };
+                let unit = Length::unit_of(written).to_owned();
                 let value = Length::parse(written).map_or(0.0, Length::points) + by;
-                element.set_attr(name.clone(), Length(value).write(unit));
+                element.set_attr(name.clone(), Length(value).write(&unit));
             }
         }
         self.reindex();
         Ok(())
     }
+}
+
+/// Where the drawings on a sheet are under its table: those in
+/// `table:shapes`, then those in cells, row by row, with each one's cell.
+pub(super) fn find_drawings(index: &Sheet, table: &Element) -> Vec<Found> {
+    let mut found = Vec::new();
+    for (at, shapes) in table.elements_indexed() {
+        if shapes.is(&Ns::Table, "shapes") {
+            for (inner, element) in shapes.elements_indexed() {
+                if element.name.ns == Ns::Draw {
+                    found.push((vec![at, inner], None));
+                }
+            }
+        }
+    }
+    for range in &index.rows {
+        let Some(row) = table.at(range.path.steps()) else {
+            continue;
+        };
+        let mut column = 0usize;
+        for (at, cell) in row.elements_indexed() {
+            if !cell.is(&Ns::Table, "table-cell") && !cell.is(&Ns::Table, "covered-table-cell") {
+                continue;
+            }
+            for (inner, element) in cell.elements_indexed() {
+                if element.name.ns == Ns::Draw {
+                    found.push((
+                        [range.path.steps(), &[at, inner]].concat(),
+                        Some((range.first, column)),
+                    ));
+                }
+            }
+            column += cell
+                .attr_usize(&Ns::Table, "number-columns-repeated")
+                .unwrap_or(1)
+                .max(1);
+        }
+    }
+    found
 }

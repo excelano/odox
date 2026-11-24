@@ -154,3 +154,104 @@ fn a_drawing_stands_in_a_cell_and_so_far_into_it() {
     assert_eq!((row, column), (0, 1));
     assert_eq!(cell("Hidden"), None);
 }
+
+/// The fixture with an element put into the cell that holds the picture.
+fn with_beside_picture(element: &str) -> SheetDocument {
+    let mut document = fixture();
+    let source = format!(
+        r#"<w xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:drawooo="http://openoffice.org/2010/draw">{element}</w>"#
+    );
+    let parsed = odox_core::xml::parse(source.as_bytes(), "test").expect("well formed");
+    fn put(element: &mut odox_core::Element, parsed: &odox_core::Element) -> bool {
+        if element
+            .elements()
+            .any(|e| e.attr(&odox_core::Ns::Draw, "name") == Some("Picture"))
+        {
+            element.children.extend(parsed.children.iter().cloned());
+            return true;
+        }
+        element.children.iter_mut().any(|child| match child {
+            odox_core::xml::Node::Element(child) => put(child, parsed),
+            _ => false,
+        })
+    }
+    assert!(put(&mut document.document.content, &parsed));
+    document.reindex();
+    document
+}
+
+#[test]
+fn a_line_or_a_group_is_left_as_written_when_rows_are_hidden() {
+    let mut document = with_beside_picture(
+        r#"<draw:line draw:name="Line" svg:x1="1cm" svg:y1="3cm" svg:x2="2cm" svg:y2="3.5cm"/><draw:g draw:name="Group"><draw:rect svg:x="1cm" svg:y="3cm" svg:width="1cm" svg:height="1cm"/></draw:g><draw:rect draw:name="Turned" draw:transform="rotate(1) translate(1cm 3cm)" svg:width="1cm" svg:height="1cm"/>"#,
+    );
+    let before: Vec<String> = document
+        .drawings(0)
+        .iter()
+        .filter(|d| {
+            matches!(
+                d.element.attr(&odox_core::Ns::Draw, "name"),
+                Some("Line" | "Group" | "Turned")
+            )
+        })
+        .map(|d| String::from_utf8(odox_core::xml::serialize(d.element)).expect("UTF-8"))
+        .collect();
+    assert_eq!(before.len(), 3);
+    document.set_rows_shown(0, 1..=1, false).expect("hidden");
+    let after: Vec<String> = document
+        .drawings(0)
+        .iter()
+        .filter(|d| {
+            matches!(
+                d.element.attr(&odox_core::Ns::Draw, "name"),
+                Some("Line" | "Group" | "Turned")
+            )
+        })
+        .map(|d| String::from_utf8(odox_core::xml::serialize(d.element)).expect("UTF-8"))
+        .collect();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn a_drawing_says_where_it_is_shown() {
+    let document = with_beside_picture(
+        r#"<draw:rect draw:name="Printed" drawooo:display="printer" svg:x="1cm" svg:y="3cm" svg:width="1cm" svg:height="1cm"/><draw:rect draw:name="Never" draw:display="none" svg:x="1cm" svg:y="3cm" svg:width="1cm" svg:height="1cm"/>"#,
+    );
+    let shown = |name: &str, screen: bool| {
+        document
+            .drawings(0)
+            .iter()
+            .find(|d| d.element.attr(&odox_core::Ns::Draw, "name") == Some(name))
+            .expect("the drawing")
+            .shown(screen)
+    };
+    assert!(!shown("Printed", true) && shown("Printed", false));
+    assert!(!shown("Never", true) && !shown("Never", false));
+    assert!(shown("Free", true) && shown("Free", false));
+}
+
+#[test]
+fn the_cells_drawings_reach_include_their_far_corners() {
+    let document = fixture();
+    let sheet = &document.sheets()[0];
+    let (rows, columns) = document.drawings_reach(sheet);
+    let free_right = inches(2.3622 + 0.7874);
+    let width = sheet.column_width(0).expect("a width").points();
+    assert!(columns as f32 * width >= free_right, "{columns}");
+    assert!(rows >= 7, "{rows}");
+}
+
+#[test]
+fn a_drawing_is_found_by_its_path_from_the_content_root() {
+    let document = fixture();
+    let drawings = document.drawings(0);
+    let picture = drawings
+        .iter()
+        .find(|d| d.element.attr(&odox_core::Ns::Draw, "name") == Some("Picture"))
+        .expect("the picture");
+    let path = document.drawing_path(0, picture).expect("a path");
+    assert!(std::ptr::eq(
+        document.document.content.at(&path).expect("there"),
+        picture.element
+    ));
+}

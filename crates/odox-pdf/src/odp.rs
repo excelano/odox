@@ -46,7 +46,7 @@ pub(crate) fn undescribed(presentation: &Presentation) -> Vec<Vec<usize>> {
     found
 }
 
-fn collect_undescribed(
+pub(crate) fn collect_undescribed(
     document: &Document,
     shape: &Element,
     path: Vec<usize>,
