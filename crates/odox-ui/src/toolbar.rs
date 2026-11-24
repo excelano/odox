@@ -4,10 +4,11 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Response, RichText, Ui, vec2};
-use egui_richedit::{Mark, Model, Property, Value};
+use egui_richedit::{Mark, Model, Property, Script, Value};
 use odox_core::TextAlign;
 use odox_core::edit::TableEdit;
 
+use crate::color_picker::{self, Kind};
 use crate::i18n::{fill, t};
 use crate::{Block, FlowModel, PageEditor, fonts};
 
@@ -40,6 +41,15 @@ pub fn label(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed
     pressed
 }
 
+/// Raised or lowered, or back on the line where the selection already is.
+fn toggled(editor: &PageEditor, model: &FlowModel<'_>, script: Script) -> Value {
+    if editor.value(model, Property::Script) == Some(Value::Script(script)) {
+        Value::Script(Script::Normal)
+    } else {
+        Value::Script(script)
+    }
+}
+
 /// The family and the size the selection has, blank where it differs; the
 /// marks, each lit where the whole selection has it; and the alignments, lit
 /// where every paragraph the selection runs over is aligned that way.
@@ -50,8 +60,21 @@ fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed
             pressed.value = stepped(editor.value(model, Property::Size).as_ref(), larger);
         }
     }
+    if editor.has_focus(ui.ctx()) {
+        for (key, script) in [(Key::P, Script::Super), (Key::B, Script::Sub)] {
+            if ui.input_mut(|input| input.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, key)) {
+                pressed.value = Some(toggled(editor, model, script));
+            }
+        }
+    }
     ui.separator();
     pressed.mark = mark_buttons(ui, editor, model);
+    if let Some(color) = color_picker::button(ui, Kind::Ink) {
+        pressed.value = Some(Value::Color(color));
+    }
+    if let Some(color) = color_picker::button(ui, Kind::Highlight) {
+        pressed.value = Some(Value::Highlight(color));
+    }
     ui.separator();
     let current = editor
         .selection()
@@ -344,6 +367,8 @@ pub enum Command {
     Align(TextAlign),
     /// A kind of paragraph.
     Block(Block),
+    /// Superscript or subscript, or back on the line.
+    Script(Script),
     /// Move the headings selected up the outline (below zero) or down it.
     Outline(i8),
     /// Ask how large a table to put in.
@@ -361,6 +386,7 @@ impl Command {
     pub fn value(self, editor: &PageEditor, model: &FlowModel<'_>) -> Option<Value> {
         match self {
             Self::Size(larger) => stepped(editor.value(model, Property::Size).as_ref(), larger),
+            Self::Script(script) => Some(toggled(editor, model, script)),
             _ => None,
         }
     }
@@ -398,6 +424,7 @@ pub struct MenuState {
     marks: Vec<Mark>,
     align: Option<TextAlign>,
     kinds: Vec<Block>,
+    script: Option<Script>,
 }
 
 impl MenuState {
@@ -419,6 +446,10 @@ impl MenuState {
                 .filter(|mark| editor.marked(model, *mark) == Some(true))
                 .collect(),
             align: model.alignment(selection),
+            script: match editor.value(model, Property::Script) {
+                Some(Value::Script(script)) => Some(script),
+                _ => None,
+            },
             kinds: if blocks {
                 every_block()
                     .filter(|block| model.is_block(selection, *block))
@@ -491,6 +522,22 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         }
         if ui.add_enabled(state.enabled, button).clicked() {
             chosen = Some(Command::Mark(mark));
+            ui.close();
+        }
+    }
+    for (script, name, key) in [
+        (Script::Super, t("Superscript"), Key::P),
+        (Script::Sub, t("Subscript"), Key::B),
+    ] {
+        let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+            Modifiers::COMMAND | Modifiers::SHIFT,
+            key,
+        ));
+        let button = egui::Button::new(name)
+            .selected(state.script == Some(script))
+            .shortcut_text(keys);
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Script(script));
             ui.close();
         }
     }

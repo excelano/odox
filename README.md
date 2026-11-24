@@ -105,7 +105,10 @@ and text copied from a browser or a word processor keeps the same pasted in. The
 list, type a size and press Enter or pick one beside it, or step the size with
 Ctrl+] and Ctrl+[. Ctrl+B, Ctrl+I and Ctrl+U, or the buttons after them, make the
 selection bold, italic or underlined, or what you type next when nothing is
-selected; strikethrough is a button. Next come the alignments, left,
+selected; strikethrough is a button. The font colour and highlight buttons
+give the colour they last gave, and their arrows open a palette; Ctrl+Shift+P
+and Ctrl+Shift+B, or Format > Superscript and Subscript, raise or lower the
+selection. Next come the alignments, left,
 centered, right and justified, for the paragraphs the selection runs over, in
 `xodt` and on a slide alike, and beside them buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or

@@ -37,7 +37,7 @@ pub use block::{block_state, heading_level, set_heading, set_list, shift_heading
 pub use figure::{
     Description, description, figures, is_figure, set_alternative_text, set_decorative,
 };
-pub use format::{Mark, Setting, TextProperty, format, marked, set_text, text_value};
+pub use format::{Mark, Script, Setting, TextProperty, format, marked, set_text, text_value};
 pub(crate) use format::{automatic_styles, element};
 pub use numbering::ListCounters;
 pub use picture::{NewPicture, insert_picture};

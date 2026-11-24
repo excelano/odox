@@ -756,7 +756,7 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
             .into_iter()
             .filter_map(|mark| self.pending_mark(mark).map(|on| (mark, on)))
             .collect();
-        let values: Vec<Value> = [Property::Family, Property::Size]
+        let values: Vec<Value> = Property::ALL
             .into_iter()
             .filter_map(|property| self.pending_value(property))
             .collect();
