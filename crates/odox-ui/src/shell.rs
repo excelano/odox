@@ -17,6 +17,7 @@ use crate::edit::{Caret, Editing};
 use crate::find::{Options, Replaced};
 use crate::find_bar::{FindBar, Replace, Step};
 use crate::i18n::{fill, t};
+use crate::recent::Recent;
 use crate::settings::Settings;
 
 /// What an application tells the shell about itself.
@@ -193,6 +194,7 @@ pub struct Shell<V: View> {
     show_side: bool,
     editing: Editing,
     settings: Settings,
+    recent: Recent,
     find: FindBar,
     /// Whether the window has been made to fill the screen for a slideshow.
     screen: Screen,
@@ -213,9 +215,10 @@ enum Screen {
 
 /// Something that would throw away unsaved changes, held until the person
 /// says whether to save them, discard them, or not do it after all.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Pending {
     AskForAFile,
+    Open(PathBuf),
     Reload,
     Close,
     Quit,
@@ -274,6 +277,7 @@ impl<V: View> Shell<V> {
     /// A window with nothing open.
     pub fn new(product: Product, view: V) -> Self {
         let show_side = view.side_at_start();
+        let recent = Recent::load(product.id);
         let zoom = Zoom::new(view.fits());
         Self {
             view,
@@ -286,6 +290,7 @@ impl<V: View> Shell<V> {
             show_side,
             editing: Editing::default(),
             settings: Settings::load(),
+            recent,
             find: FindBar::default(),
             screen: Screen::Window,
             pending: None,
@@ -303,6 +308,7 @@ impl<V: View> Shell<V> {
             Ok(bytes) => match self.view.open(ctx, &bytes, path) {
                 Ok(()) => {
                     self.path = Some(path.to_path_buf());
+                    self.recent.opened(path);
                     self.error = None;
                     self.settling = true;
                     self.editing.reset();
@@ -367,6 +373,16 @@ impl<V: View> Shell<V> {
     fn perform(&mut self, ctx: &egui::Context, action: Pending) {
         match action {
             Pending::AskForAFile => self.ask_for_a_file(ctx),
+            Pending::Open(path) => {
+                if self.recent.still_there(&path) {
+                    self.open(ctx, &path);
+                } else {
+                    self.error = Some(fill(
+                        t("{file} is no longer there."),
+                        &[("file", &name_of(&path))],
+                    ));
+                }
+            }
             Pending::Reload => {
                 if let Some(path) = self.path.clone() {
                     self.open(ctx, &path);
@@ -377,6 +393,41 @@ impl<V: View> Shell<V> {
                 self.closing = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
+        }
+    }
+
+    /// File > Open recent: the documents by name, each with its folder on
+    /// hover.
+    fn open_recent(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        if cfg!(target_os = "macos") {
+            return;
+        }
+        let mut picked = None;
+        let mut clear = false;
+        ui.add_enabled_ui(!self.recent.paths().is_empty(), |ui| {
+            ui.menu_button(t("Open recent"), |ui| {
+                for path in self.recent.paths() {
+                    let folder = path
+                        .parent()
+                        .map(|folder| folder.display().to_string())
+                        .unwrap_or_default();
+                    if ui.button(name_of(path)).on_hover_text(folder).clicked() {
+                        picked = Some(path.clone());
+                    }
+                }
+                ui.separator();
+                if ui.button(t("Clear the list")).clicked() {
+                    clear = true;
+                }
+            });
+        });
+        if clear {
+            ui.close();
+            self.recent.clear();
+        }
+        if let Some(path) = picked {
+            ui.close();
+            self.request(ctx, Pending::Open(path));
         }
     }
 
@@ -430,6 +481,7 @@ impl<V: View> Shell<V> {
             path.set_extension(self.product.extension);
         }
         if self.write_to(&path) {
+            self.recent.opened(&path);
             self.path = Some(path);
             true
         } else {
@@ -719,6 +771,7 @@ impl<V: View> Shell<V> {
                     ui.close();
                     self.request(ctx, Pending::AskForAFile);
                 }
+                self.open_recent(ui, ctx);
                 let open = self.view.is_open();
                 if ui
                     .add_enabled(self.path.is_some(), egui::Button::new(t("Reload")))

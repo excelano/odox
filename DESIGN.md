@@ -311,6 +311,13 @@ write it, offering "Untitled". On a slide being edited, an empty title or text
 placeholder says faintly what it is for, and a click anywhere on it puts the
 caret in it.
 
+**File > Open recent lists the last ten documents an application opened or
+saved**, newest first, kept one path to a line in `recent-<application>`
+beside `settings.toml`, so each application has its own. One that is gone when
+picked is dropped from the list and said to be gone. macOS has no such menu,
+because the sandbox refuses to read a path that was not picked in a panel in
+the same session, and a recorded path never was.
+
 ## §8 Language
 
 Every string a person reads lives in `odox-ui` and goes through `potext`'s `t`.

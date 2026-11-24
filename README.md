@@ -185,7 +185,8 @@ hold text and says how many it left, formulas and numbers among them.
 File > New, or Ctrl+N, starts a blank document of the application's kind, in a
 new window when one is already open: a page of the paper your country prints
 on, a workbook with one sheet, or a deck with one wide slide and a title to type
-into.
+into. File > Open recent lists the last ten documents that application opened
+or saved, except on macOS, where the sandbox does not let it reopen one.
 
 Each application opens one kind of file and says so when handed another, naming
 the sibling that reads it.
