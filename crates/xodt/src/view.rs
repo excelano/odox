@@ -534,7 +534,9 @@ impl View for TextView {
                 }
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 if region == Region::Body {
-                    break_keys(ui, &mut self.page, &mut model);
+                    if let Some(refused) = break_keys(ui, &mut self.page, &mut model) {
+                        self.notice = Some(Notice::Problem(refused));
+                    }
                 } else {
                     swallow_body_keys(ui);
                 }
@@ -843,7 +845,7 @@ impl TextView {
         if let Some(picture) = self.picture_wanted.take()
             && let Err(refused) = model.insert_picture(&mut self.page, package, &picture)
         {
-            self.notice = Some(Notice::Problem(refused.to_string()));
+            self.notice = Some(Notice::Problem(odox_ui::refusal::message(&refused)));
         }
         if let Some(problem) = self.link.act(
             ui,
@@ -906,7 +908,9 @@ impl TextView {
                 }
             }
             Ok(false) => {}
-            Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
+            Err(refused) => {
+                self.notice = Some(Notice::Problem(odox_ui::refusal::message(&refused)));
+            }
         }
     }
 
@@ -986,7 +990,9 @@ impl TextView {
                 editing.record_styles(content, styles, caret);
             }
             Ok(false) => {}
-            Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
+            Err(refused) => {
+                self.notice = Some(Notice::Problem(odox_ui::refusal::message(&refused)));
+            }
         }
     }
 
@@ -1006,6 +1012,20 @@ impl TextView {
     }
 }
 
+/// Put something in at the caret, answering why it could not be: no caret
+/// in the text, or what the document refused.
+fn at_caret(
+    page: &mut PageEditor,
+    put: impl FnOnce(&mut PageEditor) -> Result<(), odox_core::Refused>,
+) -> Option<String> {
+    if page.selection().is_none() {
+        return Some(odox_ui::refusal::no_caret());
+    }
+    put(page)
+        .err()
+        .map(|refused| odox_ui::refusal::message(&refused))
+}
+
 /// What the window says when a change to a table is refused.
 fn table_refused(refused: &odox_core::Refused) -> String {
     match refused {
@@ -1019,10 +1039,12 @@ fn table_refused(refused: &odox_core::Refused) -> String {
 
 /// Ctrl+Enter begins a page at the caret, and Backspace or Delete across the
 /// start of a paragraph a page break begins takes the break off before they
-/// would join anything, while the page has the keyboard.
-fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
+/// would join anything, while the page has the keyboard; Ctrl+Alt+C and
+/// Ctrl+Alt+F put a comment and a footnote at the caret. Answers why one of
+/// those could not be put in.
+fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) -> Option<String> {
     if !page.has_focus(ui.ctx()) {
-        return;
+        return None;
     }
     if ui.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)) {
         model.insert_page_break(page);
@@ -1032,11 +1054,15 @@ fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
             input.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::ALT, key)
         })
     };
+    let mut refused = None;
     if alt(egui::Key::C) {
-        let _ = model.add_comment(page);
+        refused = at_caret(page, |page| model.add_comment(page));
     }
     if alt(egui::Key::F) {
-        let _ = model.insert_note(page, odox_core::edit::NoteClass::Footnote);
+        refused = at_caret(page, |page| {
+            model.insert_note(page, odox_core::edit::NoteClass::Footnote)
+        })
+        .or(refused);
     }
     for (key, backspace) in [(egui::Key::Backspace, true), (egui::Key::Delete, false)] {
         if ui.input(|input| input.key_pressed(key) && input.modifiers.is_none())
@@ -1045,6 +1071,7 @@ fn break_keys(ui: &Ui, page: &mut PageEditor, model: &mut FlowModel<'_>) {
             ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key));
         }
     }
+    refused
 }
 
 /// Tab and Shift+Tab, while the page has the keyboard: at the start of a list
@@ -1172,11 +1199,15 @@ impl Wanted {
                 t("These columns cannot be resized: their widths are not stated, or together they are under a centimetre.").to_owned(),
             ));
         }
-        if let Some((paragraph, index, done)) = self.comment.take() {
-            let _ = model.note(&paragraph, index, &done);
+        if let Some((paragraph, index, done)) = self.comment.take()
+            && let Err(refused) = model.note(&paragraph, index, &done)
+        {
+            *notice = Some(Notice::Problem(odox_ui::refusal::message(&refused)));
         }
-        if let Some((note, done)) = self.note.take() {
-            let _ = model.note_body(&note, &done);
+        if let Some((note, done)) = self.note.take()
+            && let Err(refused) = model.note_body(&note, &done)
+        {
+            *notice = Some(Notice::Problem(odox_ui::refusal::message(&refused)));
         }
     }
 
@@ -1337,20 +1368,23 @@ fn changes_bar(ui: &mut Ui, content: &odox_core::Element, edit_mode: bool, wante
 }
 
 /// What the Format menu asked for at the caret: a restart or a continuation
-/// of a list's numbering, a comment, or a page break put in or taken out.
-fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Option<Command>) {
+/// of a list's numbering, a comment, a note, a field, or a page break put in
+/// or taken out. Answers why one could not be put in.
+fn caret_command(
+    page: &mut PageEditor,
+    model: &mut FlowModel<'_>,
+    command: Option<Command>,
+) -> Option<String> {
     match command {
         Some(Command::Numbering(restart)) => {
             model.numbering(page, restart);
         }
-        Some(Command::Comment) => {
-            let _ = model.add_comment(page);
-        }
+        Some(Command::Comment) => return at_caret(page, |page| model.add_comment(page)),
         Some(Command::Note(class)) => {
-            let _ = model.insert_note(page, class);
+            return at_caret(page, |page| model.insert_note(page, class));
         }
         Some(Command::Field(field)) => {
-            let _ = model.insert_field(page, field);
+            return at_caret(page, |page| model.insert_field(page, field));
         }
         Some(Command::PageBreak(true)) => {
             model.insert_page_break(page);
@@ -1360,6 +1394,7 @@ fn caret_command(page: &mut PageEditor, model: &mut FlowModel<'_>, command: Opti
         }
         _ => {}
     }
+    None
 }
 
 /// The toolbar over the page, and what it or the Format menu asked for: a
@@ -1412,7 +1447,7 @@ fn toolbar_commands(
     }) {
         model.apply_line_spacing(page, spacing);
     }
-    caret_command(page, model, command);
+    let refused = caret_command(page, model, command);
     if let Some(delta) = pressed.outline.or(match command {
         Some(Command::Outline(delta)) => Some(delta),
         _ => None,
@@ -1458,7 +1493,9 @@ fn toolbar_commands(
         picture: pressed.picture || command == Some(Command::InsertPicture),
         notice: changed
             .and_then(Result::err)
-            .map(|refused| Notice::Problem(table_refused(&refused))),
+            .map(|refused| table_refused(&refused))
+            .or(refused)
+            .map(Notice::Problem),
     }
 }
 
@@ -1552,5 +1589,46 @@ mod tests {
         paragraph.self_closing = false;
         view.band(false, false, &mut editing);
         assert_eq!(view.band_question, Some(false));
+    }
+
+    #[test]
+    fn a_comment_asked_for_with_no_caret_says_so() {
+        let mut document =
+            TextDocument::read(&odox_core::blank::text("en-US")).expect("a blank document");
+        let root = document.body_path().expect("a body");
+        let mut editing = Editing::default();
+        editing.reset();
+        let before = document.document.content.clone();
+        let odox_core::Document {
+            content, styles, ..
+        } = &mut document.document;
+        let mut model = odox_ui::FlowModel::new(content, styles, root, &mut editing);
+        let mut page = super::page_editor();
+        for command in [
+            odox_ui::toolbar::Command::Comment,
+            odox_ui::toolbar::Command::Note(odox_core::edit::NoteClass::Footnote),
+            odox_ui::toolbar::Command::Field(odox_core::edit::Field::PageNumber),
+        ] {
+            assert_eq!(
+                super::caret_command(&mut page, &mut model, Some(command)),
+                Some(odox_ui::refusal::no_caret())
+            );
+        }
+        drop(model);
+        assert!(document.document.content == before, "nothing was changed");
+    }
+
+    #[test]
+    fn a_refused_insert_says_why() {
+        let mut page = super::page_editor();
+        page.select(egui_richedit::Selection::caret(odox_ui::Caret::new(
+            vec![0],
+            0,
+        )));
+        assert_eq!(
+            super::at_caret(&mut page, |_| Err(odox_core::Refused::Namespace)),
+            Some(odox_ui::refusal::message(&odox_core::Refused::Namespace))
+        );
+        assert_eq!(super::at_caret(&mut page, |_| Ok(())), None);
     }
 }

@@ -214,6 +214,6 @@ fn refused_link(refused: &odox_core::Refused) -> String {
         odox_core::Refused::NotFound => {
             t("The text changed while the question was up. Ask again.").to_owned()
         }
-        other => other.to_string(),
+        other => crate::refusal::message(other),
     }
 }
