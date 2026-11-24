@@ -60,7 +60,8 @@ fn fixed_date_keeps_its_value() {
     let mut root = content(
         r#"<text:p><text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date> and <text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p>"#,
     );
-    assert!(follow_dates(&mut root, TODAY));
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(follow_dates(&mut root, TODAY, &styles));
     let out = written(&root);
     assert!(
         out.contains(
@@ -72,7 +73,10 @@ fn fixed_date_keeps_its_value() {
         out.contains(r#"<text:date text:date-value="2026-11-23">2026-11-23</text:date>"#),
         "{out}"
     );
-    assert!(!follow_dates(&mut root, TODAY), "nothing left to change");
+    assert!(
+        !follow_dates(&mut root, TODAY, &styles),
+        "nothing left to change"
+    );
 }
 
 #[test]
@@ -90,4 +94,33 @@ fn following_date_shows_today_without_changing_tree() {
     );
     assert_eq!(odox_core::doc::date_shown(dates[1], TODAY, &styles), None);
     assert!(root == before);
+}
+
+#[test]
+fn a_date_saved_today_keeps_its_time_and_one_from_another_day_its_style() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES} xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"><office:automatic-styles><number:date-style style:name="N30"><number:month/><number:text>/</number:text><number:day/><number:text>/</number:text><number:year/></number:date-style></office:automatic-styles><office:body><office:text><text:p><text:date style:data-style-name="N30" text:date-value="2026-11-23T10:00:00">11/23/26</text:date> <text:date style:data-style-name="N30" text:date-value="2020-01-02T10:00:00">1/2/20</text:date></text:p></office:text></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(follow_dates(&mut root, TODAY, &styles));
+    let out = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    assert!(
+        out.contains(r#"text:date-value="2026-11-23T10:00:00">11/23/26</text:date>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"text:date-value="2026-11-23">11/23/26</text:date>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_spreadsheets_dates_are_left_alone() {
+    let source = format!(
+        r#"<office:document-content {NAMESPACES}><office:body><office:spreadsheet><text:p><text:date text:date-value="2020-01-02">2020-01-02</text:date></text:p></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let mut root = xml::parse(source.as_bytes(), "test").expect("parsed");
+    let styles = odox_core::Styles::collect(Some(&root), None);
+    assert!(!follow_dates(&mut root, TODAY, &styles));
 }

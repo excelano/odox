@@ -281,7 +281,7 @@ pub struct Flow<'a> {
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
     /// Today, which a date that follows the day shows.
-    pub today: (i64, i64, i64),
+    today: (i64, i64, i64),
     /// The insertion the text being laid out is in, and its ink.
     inserting: std::cell::RefCell<Option<(String, Color32)>>,
     /// Where the flow is, as a path of child indices from the root, or from

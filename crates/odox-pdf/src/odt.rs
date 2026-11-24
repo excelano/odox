@@ -5,9 +5,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 
-use std::collections::HashMap;
-
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use odox_core::Length;
 use odox_core::doc::TextDocument;
@@ -27,13 +25,13 @@ impl std::error::Error for Refusal {}
 /// marked decorative, before the document can be exported.
 pub fn undescribed(document: &TextDocument) -> Vec<Vec<usize>> {
     let mut found = Vec::new();
-    model::undescribed(&blocks(document), &mut found);
+    model::undescribed(&blocks(document, None), &mut found);
     found
 }
 
-fn blocks(document: &TextDocument) -> Vec<Block> {
+fn blocks(document: &TextDocument, today: Option<(i64, i64, i64)>) -> Vec<Block> {
     match (document.body(), document.body_path()) {
-        (Some(body), Some(path)) => model::read_text(&document.document, body, path),
+        (Some(body), Some(path)) => model::read_text(&document.document, body, path, today),
         _ => Vec::new(),
     }
 }
@@ -66,28 +64,42 @@ fn lay_out(
     options: &Options,
     faces: &mut Faces,
 ) -> Result<crate::Laid, Refusal> {
-    let blocks = blocks(document);
+    let blocks = blocks(document, Some(options.today));
     let mut missing = Vec::new();
     model::undescribed(&blocks, &mut missing);
     if !missing.is_empty() {
         return Err(Refusal::Undescribed(missing));
     }
     let mut blocks = blocks;
-    if model::has_page_fields(&blocks) {
+    let fielded = model::has_page_fields(&blocks);
+    let mut filled_with = None;
+    for _ in 0..FILLS {
         let (laid, found) = lay_out_blocks(document, options, faces, &blocks)?;
-        model::fill_page_fields(&mut blocks, &found, laid.pages.len());
+        let now = (found, laid.pages.len());
+        if !fielded || filled_with.as_ref() == Some(&now) {
+            return Ok(laid);
+        }
+        model::fill_page_fields(&mut blocks, &now.0, now.1);
+        filled_with = Some(now);
     }
     lay_out_blocks(document, options, faces, &blocks).map(|(laid, _)| laid)
 }
 
-/// Lay blocks out on pages, answering also the page, from one, that each
-/// paragraph with page fields begins on.
+/// The page each page field is on, by its paragraph and its place there.
+type FieldPages = HashMap<(usize, usize), usize>;
+
+/// How many times at most a document's page fields are filled in and its
+/// pages laid out again, filling a number in moving the lines after it.
+const FILLS: usize = 4;
+
+/// Lay blocks out on pages, answering also the page, from one, that each page
+/// field is on.
 fn lay_out_blocks(
     document: &TextDocument,
     options: &Options,
     faces: &mut Faces,
     blocks: &[Block],
-) -> Result<(crate::Laid, HashMap<usize, usize>), Refusal> {
+) -> Result<(crate::Laid, FieldPages), Refusal> {
     let page = document.page_layout();
     let margin = |length: Option<Length>| length.map_or(0.0, Length::points);
     let (left, right) = (margin(page.margin.left), margin(page.margin.right));
@@ -127,8 +139,8 @@ fn lay_out_blocks(
         let mut page = Page::new(page_width, page_height);
         for (y, piece) in placed {
             let y = top + y;
-            if let Some(fielded) = piece.fielded {
-                found.entry(fielded).or_insert(index + 1);
+            for field in &piece.fields {
+                found.entry(*field).or_insert(index + 1);
             }
             if let Some((level, title)) = piece.heading {
                 headings.push((level, title, index, y));
@@ -553,7 +565,7 @@ mod tests {
         let note = r#"<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>Said in the note</text:p></text:note-body></text:note>"#;
         let body = holder.replace("NOTE", note);
         let wrapped = format!(
-            r#"<w xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{body}</w>"#
+            r#"<w xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">{body}</w>"#
         );
         let parsed = odox_core::xml::parse(wrapped.as_bytes(), "test").expect("well formed");
         let mut document =
@@ -682,5 +694,63 @@ mod tests {
         let count = pages.len();
         assert!(!pages[0].contains("of 1"), "{}", pages[0]);
         assert!(pages[0].contains(&format!("of {count}")));
+    }
+
+    fn filler(lines: usize) -> String {
+        "<text:p>Filler line</text:p>".repeat(lines)
+    }
+
+    #[test]
+    fn a_page_field_in_a_table_cell_shows_its_page() {
+        let cell = r#"<table:table><table:table-column/><table:table-row><table:table-cell><text:p>Cell page <text:page-number text:select-page="current">1</text:page-number></text:p></table:table-cell></table:table-row></table:table>"#;
+        let pages = page_texts(&with_note_in(&format!("{}{cell}", filler(120))));
+        let last = pages.len();
+        assert!(last >= 3);
+        assert!(
+            pages[last - 1].contains(&format!("Cell page {last}")),
+            "{}",
+            pages[last - 1]
+        );
+    }
+
+    #[test]
+    fn a_field_shows_the_page_it_is_on_not_where_its_paragraph_began() {
+        let long = format!(
+            "<text:p>{} END <text:page-number text:select-page=\"current\">1</text:page-number></text:p>",
+            "word ".repeat(900)
+        );
+        let pages = page_texts(&with_note_in(&format!("{}{long}", filler(40))));
+        let last = pages.len();
+        assert!(
+            pages[last - 1].contains(&format!("END {last}")),
+            "{}",
+            pages[last - 1]
+        );
+    }
+
+    #[test]
+    fn previous_page_and_roman_numerals_as_libreoffice_writes_them() {
+        let fields = r#"<text:p>Was <text:page-number text:select-page="previous">2</text:page-number> now <text:page-number style:num-format="I" text:select-page="current">2</text:page-number> after <text:page-number text:select-page="current" text:page-adjust="5">7</text:page-number>.</text:p>"#;
+        let pages = page_texts(&with_note_in(&format!("{}{fields}", filler(70))));
+        assert_eq!(pages.len(), 2, "two pages");
+        assert!(pages[1].contains("Was 1 now II after ."), "{}", pages[1]);
+    }
+
+    #[test]
+    fn an_empty_page_field_at_the_start_is_filled() {
+        let field = r#"<text:p><text:page-number text:select-page="current"/> leads</text:p>"#;
+        let pages = page_texts(&with_note_in(&format!("{}{field}", filler(70))));
+        assert!(pages[1].contains("2 leads"), "{}", pages[1]);
+    }
+
+    #[test]
+    fn a_following_date_in_the_body_shows_today() {
+        let date = r#"<text:p>On <text:date text:date-value="2020-01-02">2020-01-02</text:date> and <text:date text:date-value="2020-01-02" text:fixed="true">2020-01-02</text:date></text:p>"#;
+        let pages = page_texts(&with_note_in(date));
+        assert!(
+            pages[0].contains("On 2026-01-01 and 2020-01-02"),
+            "{}",
+            pages[0]
+        );
     }
 }

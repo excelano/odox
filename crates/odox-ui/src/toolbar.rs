@@ -640,8 +640,6 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
-/// What the Format menu puts in or takes out in a text document: a table and
-/// its rows and columns, a page break, a picture, and the page's setup.
 /// Format > Field: a date, fixed or following the day, the page number or
 /// the page count.
 fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
@@ -667,6 +665,8 @@ fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// What the Format menu puts in or takes out in a text document: a table and
+/// its rows and columns, a page break, a picture, and the page's setup.
 fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
     ui.add_enabled_ui(state.enabled, |ui| {

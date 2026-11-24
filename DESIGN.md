@@ -1110,14 +1110,18 @@ Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 `LibreOffice` writes one: a date as `text:date` with its `text:date-value`,
 `text:fixed="true"` where it keeps the day it was put in, a page number as
 `text:page-number text:select-page="current"` and a page count as
-`text:page-count`, each holding the value it shows. A field's value is not
-the paragraph's text, so text typed at its place goes in before it. The
+`text:page-count`, each holding 1 until the PDF fills it. A field's value is
+not the paragraph's text, so text typed at its place goes in before it. The
 window shades every field faintly, and draws a date that follows the day as
-today's, local, in its own data style, without changing the tree; saving
-writes today into each such date, as `LibreOffice` does. The PDF fills page
-numbers and page counts wherever they stand: a document whose paragraphs hold
-them is laid out once to find the page each lands on and how many pages there
-are, then again with those filled in, the headers and footers as before.
+today's, local, in its own data style, without changing the tree; saving a
+text document writes today into each such date that holds another day, in
+its data style, as `LibreOffice` does. The PDF fills page numbers and page
+counts in the body, in tables, lists, notes and text boxes: each line's
+fields are found on the page the line lands on, then filled in, and the
+pages laid out again, until the pages and the count stop moving or four times
+over. A page number moved by `text:select-page` and `text:page-adjust` off
+the document shows nothing, and `style:num-format` sets its numerals. A date
+that follows the day prints today.
 
 **A link is a `text:a`** with `xlink:type="simple"` and `xlink:href`
 (`edit/link.rs`), made over a range of one paragraph by cutting the paragraph
