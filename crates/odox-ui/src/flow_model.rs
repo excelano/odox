@@ -254,6 +254,54 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Move the list items a selection runs over a level in (`delta` above
+    /// zero) or out, as one step to undo: with a caret, only where it stands at
+    /// the start of an item. Answers whether it applied, which is when Tab is
+    /// the list's and not the text's.
+    pub fn list_level(&mut self, editor: &mut PageEditor, delta: i8) -> bool {
+        let Some(selection) = editor.selection().cloned() else {
+            return false;
+        };
+        let Some(paragraphs) = self.selected_paragraphs(&selection) else {
+            return false;
+        };
+        let listed = |paragraph: &Vec<usize>| {
+            let path = [self.root.as_slice(), paragraph].concat();
+            edit::block_state(self.content, &path, self.styles)
+                .1
+                .is_some()
+        };
+        let applies = if selection.is_caret() {
+            selection.focus.offset == 0 && listed(&selection.focus.paragraph)
+        } else {
+            paragraphs.len() > 1 && paragraphs.iter().all(listed)
+        };
+        if applies {
+            self.over_paragraphs(editor, |model, paragraphs| {
+                let paths: Vec<Vec<usize>> = paragraphs
+                    .iter()
+                    .map(|paragraph| [model.root.as_slice(), paragraph].concat())
+                    .collect();
+                edit::list_level(model.content, &paths, delta).ok()
+            });
+        }
+        applies
+    }
+
+    /// Start the numbering again at the item the selection begins in, or carry
+    /// its list's numbering on from the list before, as one step to undo.
+    /// Answers whether the document changed.
+    pub fn numbering(&mut self, editor: &mut PageEditor, restart: bool) -> bool {
+        self.over_paragraphs(editor, |model, paragraphs| {
+            let path = [model.root.as_slice(), paragraphs.first()?].concat();
+            if restart {
+                edit::restart_numbering(model.content, &path).ok()
+            } else {
+                edit::continue_numbering(model.content, &path).ok()
+            }
+        })
+    }
+
     /// Whether any paragraph a selection runs over is a heading.
     pub fn has_heading(&self, selection: &Selection<Vec<usize>>) -> bool {
         self.selected_paragraphs(selection)
@@ -1508,6 +1556,43 @@ mod tests {
             (level(&content, 0), level(&content, 1), level(&content, 2)),
             (Some(2), Some(3), None)
         );
+        let mut current = holding(&content);
+        let mut undone = 0;
+        while editing.undo(&mut current, None).is_some() {
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
+        assert_eq!(current.content, original);
+    }
+
+    #[test]
+    fn tab_at_an_items_start_nests_it_and_undo_restores_tree() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:list><text:list-item><text:p>One</text:p></text:list-item><text:list-item><text:p>Two</text:p></text:list-item></text:list></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let original = content.clone();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection::caret(Position::new(
+            vec![0, 1, 0],
+            1,
+        )));
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        assert!(!model.list_level(&mut editor, 1), "not at the item's start");
+        editor.select(egui_richedit::Selection::caret(Position::new(
+            vec![0, 1, 0],
+            0,
+        )));
+        assert!(model.list_level(&mut editor, 1));
+        let nested = content
+            .at(&[0, 0, 0, 0])
+            .and_then(|one| one.child(&Ns::Text, "list"))
+            .is_some();
+        assert!(nested, "Two went into One");
         let mut current = holding(&content);
         let mut undone = 0;
         while editing.undo(&mut current, None).is_some() {

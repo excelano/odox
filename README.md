@@ -116,7 +116,9 @@ third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, a heading of any level from 1
 to 10 under Format > Heading, and in `xodp` the marks. Alt+Shift+Left and
 Alt+Shift+Right move every heading the selection runs over a level up or down,
-as Format > Promote heading and Demote heading do. The
+as Format > Promote heading and Demote heading do. Tab and Shift+Tab at the
+start of a list item move it a level in or out, and Format > Lists restarts a
+numbered list at the caret's item or continues it from the list before. The
 Table button, or Format > Table, puts a table in after the caret's paragraph and
 puts in or takes out its rows and columns; Tab goes to the next cell, and in the
 last one adds a row. The Picture button, or Format > Insert a picture…, puts a

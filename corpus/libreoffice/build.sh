@@ -161,6 +161,10 @@ convert ods:calc8 parts.ods "OpenDocument Spreadsheet Flat XML" parts.fods
 convert ods:calc8 comments.ods "OpenDocument Spreadsheet Flat XML" comments.fods
 convert odt:writer8 tabs.odt "OpenDocument Text Flat XML" tabs.fodt
 
+# Lists: a numbered list with a nested one inside its second item, a list
+# that starts again at one, and a list that carries on from the one before.
+convert odt:writer8 lists.odt "OpenDocument Text Flat XML" lists.fodt
+
 # Text that reads right to left: Hebrew and Arabic in paragraphs that read
 # left to right, the same in paragraphs whose style says they read right to
 # left, with Latin words and numbers among them, and long enough to wrap.

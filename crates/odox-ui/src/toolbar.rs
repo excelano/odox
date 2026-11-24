@@ -369,6 +369,9 @@ pub enum Command {
     Block(Block),
     /// Superscript or subscript, or back on the line.
     Script(Script),
+    /// Start a numbered list again at the item, or carry it on from the list
+    /// before when not.
+    Numbering(bool),
     /// Move the headings selected up the outline (below zero) or down it.
     Outline(i8),
     /// Ask how large a table to put in.
@@ -491,6 +494,19 @@ fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     });
     offer(ui, Block::Bullets);
     offer(ui, Block::Numbers);
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Lists"), |ui| {
+            for (restart, name) in [
+                (true, t("Restart numbering")),
+                (false, t("Continue numbering")),
+            ] {
+                if ui.button(name).clicked() {
+                    chosen = Some(Command::Numbering(restart));
+                    ui.close();
+                }
+            }
+        });
+    });
     ui.separator();
     for (delta, name, key) in [
         (-1, t("Promote heading"), Key::ArrowLeft),

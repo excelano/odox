@@ -816,12 +816,19 @@ fn table_keys(
     let Some(forward) = tab else {
         return;
     };
-    let stepped = model.step_cell(page, forward);
-    if stepped != Ok(false) {
+    let taken = |ui: &Ui| {
         ui.input_mut(|input| {
             input.consume_key(egui::Modifiers::SHIFT, egui::Key::Tab);
             input.consume_key(egui::Modifiers::NONE, egui::Key::Tab);
         });
+    };
+    if model.list_level(page, if forward { 1 } else { -1 }) {
+        taken(ui);
+        return;
+    }
+    let stepped = model.step_cell(page, forward);
+    if stepped != Ok(false) {
+        taken(ui);
     }
     if let Err(refused) = stepped {
         *notice = Some(Notice::Problem(table_refused(&refused)));
@@ -873,6 +880,9 @@ fn toolbar_commands(
     }
     if let Some(block) = block {
         model.apply_block(page, block);
+    }
+    if let Some(Command::Numbering(restart)) = command {
+        model.numbering(page, restart);
     }
     if let Some(delta) = pressed.outline.or(match command {
         Some(Command::Outline(delta)) => Some(delta),
