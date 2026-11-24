@@ -391,11 +391,12 @@ struct Asked {
 
 /// Draw a red wave under each wrong word of a galley drawn at `origin`, and on
 /// a right click over one, offer what to put instead, or to take it as
-/// spelled. Answers the drawn characters to replace and what with, once
-/// chosen.
+/// spelled. `pointer` is where the click is in the galley's own place, which
+/// for a turned label is not where it is on the screen. Answers the drawn
+/// characters to replace and what with, once chosen.
 pub fn mark(
     ui: &mut egui::Ui,
-    response: &egui::Response,
+    (response, pointer): (&egui::Response, Option<egui::Pos2>),
     (galley, origin): (&egui::Galley, egui::Pos2),
     drawn: &str,
     wrong: &[(Range<usize>, String)],
@@ -412,7 +413,7 @@ pub fn mark(
     }
     let asked = response.id.with("spelling");
     if response.secondary_clicked()
-        && let Some(at) = response.interact_pointer_pos()
+        && let Some(at) = pointer
     {
         let index = galley.cursor_from_pos(at - origin).index.0;
         let chars: Vec<char> = drawn.chars().collect();
