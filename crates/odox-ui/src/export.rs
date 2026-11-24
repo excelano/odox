@@ -235,7 +235,12 @@ impl Export {
                 });
             return;
         }
-        let Some(Running { file, worker, .. }) = self.running.take() else {
+        let Some(Running {
+            file,
+            worker,
+            printing,
+        }) = self.running.take()
+        else {
             return;
         };
         self.notice = match worker.join() {
@@ -279,7 +284,9 @@ impl Export {
                 t("{file} could not be printed: {reason}"),
                 &[("file", &file), ("reason", &e.to_string())],
             ))),
-            Ok(Err(Failure::Refused(refusal))) => Some(Notice::Problem(refused(&refusal))),
+            Ok(Err(Failure::Refused(refusal))) => {
+                Some(Notice::Problem(refused(&refusal, printing)))
+            }
             Err(_) => Some(Notice::Problem(fill(
                 t("The export of {file} stopped before it was finished."),
                 &[("file", &file)],
@@ -379,8 +386,9 @@ fn body_index(content: &Element) -> Option<usize> {
         .map(|(index, _)| index)
 }
 
-/// What the person reads when an export is refused.
-fn refused(refusal: &Refusal) -> String {
+/// What the person reads when an export, or the export a print makes, is
+/// refused.
+fn refused(refusal: &Refusal, printing: bool) -> String {
     match refusal {
         Refusal::Undescribed(paths) => fill(
             t("{count} pictures still say nothing in place of what they show."),
@@ -394,6 +402,9 @@ fn refused(refusal: &Refusal) -> String {
             t("No font on this computer has the character {character}."),
             &[("character", &character.to_string())],
         ),
+        Refusal::Empty if printing => {
+            t("There is nothing to print: nothing in the document is shown.").to_owned()
+        }
         Refusal::Empty => {
             t("There is nothing to export: nothing in the document is shown.").to_owned()
         }
@@ -646,13 +657,20 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_document_printed_is_told_as_a_print() {
+        let told = refused(&Refusal::Empty, true);
+        assert!(told.contains("print"), "{told}");
+        assert!(!told.contains("export"), "{told}");
+    }
+
+    #[test]
     fn a_refusal_is_told_in_words_that_say_what_stopped_it() {
         let told = [
-            refused(&Refusal::Undescribed(vec![vec![0], vec![1]])),
-            refused(&Refusal::Font("Fancy Sans".to_owned())),
-            refused(&Refusal::Glyph('\u{1F600}')),
-            refused(&Refusal::Empty),
-            refused(&Refusal::Writer("no room".to_owned())),
+            refused(&Refusal::Undescribed(vec![vec![0], vec![1]]), false),
+            refused(&Refusal::Font("Fancy Sans".to_owned()), false),
+            refused(&Refusal::Glyph('\u{1F600}'), false),
+            refused(&Refusal::Empty, false),
+            refused(&Refusal::Writer("no room".to_owned()), false),
         ];
         assert!(told[0].starts_with('2'), "{}", told[0]);
         assert!(told[1].contains("Fancy Sans"));
