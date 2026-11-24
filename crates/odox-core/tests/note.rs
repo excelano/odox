@@ -103,3 +103,31 @@ fn notes_are_found_where_they_stand_and_one_is_deleted() {
     assert_eq!(citations(&root), ["f1"]);
     assert_eq!(text(root.at(&[0, 0, 0]).expect("it")), "Onetwo");
 }
+
+#[test]
+fn refuses_text_for_a_note_holding_more_than_paragraphs_and_changes_nothing() {
+    let mut root = content(
+        r#"<text:p>One<text:note text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>A</text:p><text:list><text:list-item><text:p>x</text:p></text:list-item></text:list><text:p>B</text:p></text:note-body></text:note></text:p>"#,
+    );
+    let before = root.clone();
+    assert_eq!(
+        set_note_text(&mut root, &[0, 0, 0, 1], "A2\nB"),
+        Err(odox_core::Refused::Structure)
+    );
+    assert!(root == before);
+}
+
+#[test]
+fn notes_in_tracked_deletions_are_not_counted() {
+    let mut root = content(&format!(
+        r#"<text:tracked-changes><text:changed-region text:id="ct1"><text:deletion><text:p>Gone{}</text:p></text:deletion></text:changed-region></text:tracked-changes><text:p>One{}</text:p>"#,
+        note("1", "footnote"),
+        note("2", "footnote")
+    ));
+    renumber_notes(&mut root);
+    let shown = root.at(&[0, 0, 1]).expect("the paragraph");
+    let citation = shown
+        .descendant(&Ns::Text, "note-citation")
+        .map(Element::plain_text);
+    assert_eq!(citation.as_deref(), Some("1"));
+}

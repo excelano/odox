@@ -96,6 +96,9 @@ pub fn renumber_notes(content: &mut Element) {
             let Node::Element(child) = child else {
                 continue;
             };
+            if child.is(&Ns::Text, "tracked-changes") {
+                continue;
+            }
             if child.is(&Ns::Text, "note") {
                 let class = usize::from(child.attr(&Ns::Text, "note-class") == Some("endnote"));
                 counts[class] += 1;
@@ -136,7 +139,8 @@ pub fn note_text(note: &Element) -> String {
 ///
 /// # Errors
 ///
-/// The path does not lead to a note.
+/// The path does not lead to a note, or the note holds more than paragraphs,
+/// a list or a table, whose place among them a text cannot keep.
 pub fn set_note_text(content: &mut Element, note: &[usize], text: &str) -> Result<(), Refused> {
     let element = content
         .at_mut(note)
@@ -150,6 +154,9 @@ pub fn set_note_text(content: &mut Element, note: &[usize], text: &str) -> Resul
             _ => None,
         })
         .ok_or(Refused::NotFound)?;
+    if body.elements().any(|e| !is_paragraph(e)) {
+        return Err(Refused::Structure);
+    }
     let mut model = body
         .elements()
         .find(|e| is_paragraph(e))

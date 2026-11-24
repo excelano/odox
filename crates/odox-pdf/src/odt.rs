@@ -31,7 +31,7 @@ pub fn undescribed(document: &TextDocument) -> Vec<Vec<usize>> {
 
 fn blocks(document: &TextDocument) -> Vec<Block> {
     match (document.body(), document.body_path()) {
-        (Some(body), Some(path)) => model::read(&document.document, body, path, None),
+        (Some(body), Some(path)) => model::read_text(&document.document, body, path),
         _ => Vec::new(),
     }
 }
@@ -224,9 +224,17 @@ impl Filling {
         } else {
             0.0
         };
-        if self.carried.is_empty() && self.y + self.foot_height() + ruled + note.height <= body {
+        let room = body - self.y - self.foot_height() - ruled;
+        if self.carried.is_empty() && note.height <= room {
             self.ruled = rule.height;
             self.foot.push(note);
+        } else if self.carried.is_empty() && self.foot.is_empty() && self.pieces.is_empty() {
+            // Taller than the foot of an empty page: what fits stays and the
+            // rest goes on to the next.
+            let (above, below) = layout::split(note, room.max(1.0));
+            self.ruled = rule.height;
+            self.foot.push(above);
+            self.carried.push_back(below);
         } else {
             self.carried.push_back(note);
         }
@@ -332,6 +340,22 @@ mod tests {
     fn a_footnote_takes_its_room_from_the_page() {
         let pages = paginate(vec![piece(60.0), cited(20.0, &[15.0])], 100.0, &rule());
         assert_eq!(heights(&pages), [vec![60.0], vec![20.0, RULE, 15.0]]);
+    }
+
+    #[test]
+    fn a_footnote_taller_than_the_foot_is_cut_and_never_carried_for_ever() {
+        let pages = paginate(vec![cited(10.0, &[95.0])], 100.0, &rule());
+        let notes: f32 = pages
+            .iter()
+            .flatten()
+            .filter(|(_, p)| p.height != RULE && p.height != 10.0)
+            .map(|(_, p)| p.height)
+            .sum();
+        assert!(pages.len() <= 3, "{} pages", pages.len());
+        assert!(
+            (notes - 95.0).abs() < 0.01,
+            "all of the note is placed: {notes}"
+        );
     }
 
     #[test]
@@ -499,5 +523,68 @@ mod tests {
             (end_page, end_y) > (body_page, body_y),
             "the endnote is after the body"
         );
+    }
+
+    fn with_note_in(holder: &str) -> TextDocument {
+        let note = r#"<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>Said in the note</text:p></text:note-body></text:note>"#;
+        let body = holder.replace("NOTE", note);
+        let wrapped = format!(
+            r#"<w xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{body}</w>"#
+        );
+        let parsed = odox_core::xml::parse(wrapped.as_bytes(), "test").expect("well formed");
+        let mut document =
+            TextDocument::read(&odox_core::blank::text("en-US")).expect("a blank document");
+        let path = document.body_path().expect("a body");
+        let body = document.document.content.at_mut(&path).expect("the body");
+        body.children = parsed.children;
+        document
+    }
+
+    fn laid_text(document: &TextDocument) -> String {
+        let options = Options {
+            title: "Untitled".to_owned(),
+            language: "en-US".to_owned(),
+            untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
+        };
+        let laid = lay_out(document, &options, &mut Faces::new()).expect("laid out");
+        fn texts(item: &layout::Item, into: &mut String) {
+            match item {
+                layout::Item::Text { text, .. } => into.push_str(text),
+                layout::Item::Clipped { item, .. } => texts(item, into),
+                _ => {}
+            }
+        }
+        let mut into = String::new();
+        for page in &laid.pages {
+            for (_, item) in &page.items {
+                texts(item, &mut into);
+            }
+        }
+        into
+    }
+
+    #[test]
+    fn footnotes_in_a_list_item_and_a_table_cell_are_printed() {
+        for holder in [
+            "<text:list><text:list-item><text:p>Item NOTE</text:p></text:list-item></text:list>",
+            "<table:table><table:table-column/><table:table-row><table:table-cell><text:p>Cell NOTE</text:p></table:table-cell></table:table-row></table:table>",
+        ] {
+            let text = laid_text(&with_note_in(holder));
+            assert!(text.contains("note"), "{holder}: {text}");
+        }
+    }
+
+    #[test]
+    fn a_figure_in_a_footnote_is_asked_about() {
+        let holder = r#"<text:p>Text<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p><draw:frame xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" svg:width="2cm" svg:height="2cm"><draw:image xlink:href="Pictures/none.png"/></draw:frame></text:p></text:note-body></text:note></text:p>"#;
+        let mut document = with_note_in(holder);
+        let png = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../packaging/icons/xodt-rounded-512.png"),
+        )
+        .expect("a picture");
+        document.document.package.set_part("Pictures/none.png", png);
+        assert_eq!(undescribed(&document).len(), 1);
     }
 }

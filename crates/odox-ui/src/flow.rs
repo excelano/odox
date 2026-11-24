@@ -633,7 +633,7 @@ impl Flow<'_> {
         } else {
             let over = self.marks
                 || element.descendant(&Ns::Office, "annotation").is_some()
-                || element.child(&Ns::Text, "note").is_some();
+                || element.descendant(&Ns::Text, "note").is_some();
             let kept =
                 (over && ui.is_rect_visible(rect)).then(|| (Arc::clone(&galley), map.clone()));
             self.written_order(ui, element, &response, (galley, map), origin, &base, edited);
@@ -1326,7 +1326,7 @@ impl Flow<'_> {
         if element.descendant(&Ns::Office, "annotation").is_some() {
             self.comments(ui, element, rect, (&galley, &map), origin);
         }
-        if element.child(&Ns::Text, "note").is_some() {
+        if element.descendant(&Ns::Text, "note").is_some() {
             self.notes(ui, element, (&galley, &map), origin);
         }
     }
@@ -1347,6 +1347,7 @@ impl Flow<'_> {
             .and_then(|page| page.selection())
             .filter(|selection| selection.focus.paragraph == self.path)
             .map(|selection| selection.focus.offset);
+        let mut before = (usize::MAX, 0);
         for (at, path) in edit::notes_in(paragraph) {
             let Some(note) = paragraph.at(&path) else {
                 continue;
@@ -1355,7 +1356,10 @@ impl Flow<'_> {
                 .child(&Ns::Text, "note-citation")
                 .map(Element::plain_text)
                 .unwrap_or_default();
-            let start = map.to_galley(at.min(map.model_len()));
+            // Citations at one place are drawn one after another there.
+            let shown_before = if before.0 == at { before.1 } else { 0 };
+            before = (at, shown_before + citation.chars().count());
+            let start = map.to_galley(at.min(map.model_len())) + shown_before;
             let place = |index: usize| {
                 galley
                     .pos_from_cursor(CCursor::new(index))

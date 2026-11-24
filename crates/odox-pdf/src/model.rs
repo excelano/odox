@@ -200,11 +200,30 @@ pub(crate) fn read(
     path: Vec<usize>,
     shape: Option<std::rc::Rc<Properties>>,
 ) -> Vec<Block> {
+    read_notes(document, root, path, shape, false)
+}
+
+/// [`read`] for a text document's body, whose footnotes go with the
+/// paragraphs that cite them, for the foot of their pages. Anywhere else, a
+/// slide's text, a header, a footnote is read as an endnote, since there is no
+/// page foot for it there.
+pub(crate) fn read_text(document: &Document, root: &Element, path: Vec<usize>) -> Vec<Block> {
+    read_notes(document, root, path, None, true)
+}
+
+fn read_notes(
+    document: &Document,
+    root: &Element,
+    path: Vec<usize>,
+    shape: Option<std::rc::Rc<Properties>>,
+    at_foot: bool,
+) -> Vec<Block> {
     let mut reader = Reader {
         document,
         path,
         shape,
         notes: Vec::new(),
+        at_foot,
     };
     let mut blocks = Vec::new();
     reader.blocks(root, &mut blocks, &mut ListCounters::default());
@@ -219,6 +238,9 @@ struct Reader<'a> {
     shape: Option<std::rc::Rc<Properties>>,
     /// The notes cited so far.
     notes: Vec<Note>,
+    /// Whether a footnote goes with the paragraph citing it, rather than to
+    /// the end with the endnotes.
+    at_foot: bool,
 }
 
 impl Reader<'_> {
@@ -293,7 +315,7 @@ impl Reader<'_> {
                 let note = self.note(&element);
                 self.path = outer;
                 match note {
-                    Some(note) if note.foot => footnotes.push(note),
+                    Some(note) if note.foot && self.at_foot => footnotes.push(note),
                     Some(note) => self.notes.push(note),
                     None => {}
                 }
@@ -778,6 +800,11 @@ pub(crate) fn undescribed(blocks: &[Block], into: &mut Vec<Vec<usize>>) {
             }
             Block::TextBox(text_box) => undescribed(&text_box.blocks, into),
             Block::Note(note) => undescribed(&note.blocks, into),
+            Block::Paragraph(paragraph) => {
+                for note in &paragraph.footnotes {
+                    undescribed(&note.blocks, into);
+                }
+            }
             _ => {}
         }
     }
