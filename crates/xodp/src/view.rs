@@ -34,9 +34,16 @@ fn slide_places(document: &Presentation) -> Vec<(String, String)> {
         .iter()
         .enumerate()
         .filter_map(|(at, slide)| {
-            slide
-                .name
-                .map(|name| (format!("{}. {name}", at + 1), format!("#{name}")))
+            let name = slide.name?;
+            let unnamed = name
+                .strip_prefix("page")
+                .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+            let shown = if unnamed {
+                fill(t("Slide {number}"), &[("number", &(at + 1).to_string())])
+            } else {
+                format!("{}. {name}", at + 1)
+            };
+            Some((shown, format!("#{name}")))
         })
         .collect()
 }

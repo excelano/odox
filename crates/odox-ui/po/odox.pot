@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 23:00-0600\n"
+"POT-Creation-Date: 2026-11-23 23:17-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -67,7 +67,7 @@ msgstr ""
 msgid "PDF/UA document"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:249
+#: crates/odox-ui/src/export.rs:249 crates/xodp/src/view.rs:42
 msgid "Slide {number}"
 msgstr ""
 
@@ -124,12 +124,12 @@ msgstr ""
 msgid "Mark the rest as decoration"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:387 crates/odox-ui/src/link_dialog.rs:114
+#: crates/odox-ui/src/export.rs:387 crates/odox-ui/src/link_dialog.rs:115
 #: crates/odox-ui/src/page_setup.rs:113
 #: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:590
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1289
 #: crates/xods/src/view.rs:1353 crates/xods/src/view.rs:1435
-#: crates/xods/src/view.rs:1652 crates/xodt/src/view.rs:657
+#: crates/xods/src/view.rs:1652 crates/xodt/src/view.rs:653
 msgid "Cancel"
 msgstr ""
 
@@ -211,42 +211,58 @@ msgid "File"
 msgstr ""
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:190
-#: crates/xods/src/view.rs:618 crates/xodt/src/view.rs:342
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:208
+#: crates/xods/src/view.rs:618 crates/xodt/src/view.rs:338
 msgid "{file} could not be opened: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:58
+#: crates/odox-ui/src/link_dialog.rs:59
 msgid "Edit link"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:60
+#: crates/odox-ui/src/link_dialog.rs:61
 msgid "Insert link"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:65
+#: crates/odox-ui/src/link_dialog.rs:66
 msgid "Text"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:68
+#: crates/odox-ui/src/link_dialog.rs:69
 msgid "Address"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:79
+#: crates/odox-ui/src/link_dialog.rs:80
 msgid "Place in the document"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:100
+#: crates/odox-ui/src/link_dialog.rs:101 crates/odox-ui/src/link_dialog.rs:209
 msgid "A link goes to a web page, a mail address or a place in the document."
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:107 crates/odox-ui/src/page_setup.rs:110
+#: crates/odox-ui/src/link_dialog.rs:108 crates/odox-ui/src/page_setup.rs:110
 #: crates/xods/src/view.rs:1286
 msgid "OK"
 msgstr ""
 
-#: crates/odox-ui/src/link_dialog.rs:119
+#: crates/odox-ui/src/link_dialog.rs:120
 msgid "Remove link"
+msgstr ""
+
+#: crates/odox-ui/src/link_dialog.rs:176
+msgid "Put the caret where the link goes."
+msgstr ""
+
+#: crates/odox-ui/src/link_dialog.rs:188
+msgid "A link is made within one paragraph."
+msgstr ""
+
+#: crates/odox-ui/src/link_dialog.rs:212
+msgid "A link cannot run into another link, and needs text to show."
+msgstr ""
+
+#: crates/odox-ui/src/link_dialog.rs:215
+msgid "The text changed while the question was up. Ask again."
 msgstr ""
 
 #: crates/odox-ui/src/marks.rs:29
@@ -330,7 +346,7 @@ msgstr ""
 msgid "Insert a picture"
 msgstr ""
 
-#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:652
+#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:648
 msgid "Insert"
 msgstr ""
 
@@ -518,7 +534,7 @@ msgstr ""
 msgid "Table"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:640
+#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:636
 msgid "Insert a table"
 msgstr ""
 
@@ -646,7 +662,7 @@ msgstr ""
 msgid "Insert page break"
 msgstr ""
 
-#: crates/odox-ui/src/toolbar.rs:700 crates/xodp/src/view.rs:327
+#: crates/odox-ui/src/toolbar.rs:700 crates/xodp/src/view.rs:345
 msgid "Comment"
 msgstr ""
 
@@ -698,63 +714,59 @@ msgstr ""
 msgid "OpenDocument Presentation"
 msgstr ""
 
-#: crates/xodp/src/view.rs:315 crates/xodt/src/view.rs:423
+#: crates/xodp/src/view.rs:333 crates/xodt/src/view.rs:419
 msgid "Format"
 msgstr ""
 
-#: crates/xodp/src/view.rs:325
+#: crates/xodp/src/view.rs:343
 msgid "Slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:335
+#: crates/xodp/src/view.rs:353
 msgid "New slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:336
+#: crates/xodp/src/view.rs:354
 msgid "Duplicate slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:337
+#: crates/xodp/src/view.rs:355
 msgid "Delete slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:339
+#: crates/xodp/src/view.rs:357
 msgid "Move slide earlier"
 msgstr ""
 
-#: crates/xodp/src/view.rs:344
+#: crates/xodp/src/view.rs:362
 msgid "Move slide later"
 msgstr ""
 
-#: crates/xodp/src/view.rs:444
+#: crates/xodp/src/view.rs:462
 msgid "This presentation has no slides."
 msgstr ""
 
-#: crates/xodp/src/view.rs:600
+#: crates/xodp/src/view.rs:618
 msgid "Slides"
 msgstr ""
 
-#: crates/xodp/src/view.rs:632
+#: crates/xodp/src/view.rs:650
 msgid "Show the speaker's notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:634
+#: crates/xodp/src/view.rs:652
 msgid "Start the slideshow"
 msgstr ""
 
-#: crates/xodp/src/view.rs:639
+#: crates/xodp/src/view.rs:657
 msgid "Start the slideshow from this slide"
 msgstr ""
 
-#: crates/xodp/src/view.rs:737 crates/xodt/src/view.rs:750
-msgid "A link is made within one paragraph."
-msgstr ""
-
-#: crates/xodp/src/view.rs:1252
+#: crates/xodp/src/view.rs:1220
 msgid "Notes"
 msgstr ""
 
-#: crates/xodp/src/view.rs:1262
+#: crates/xodp/src/view.rs:1230
 msgid "This slide has no notes."
 msgstr ""
 
@@ -1092,116 +1104,116 @@ msgstr ""
 msgid "OpenDocument Text"
 msgstr ""
 
-#: crates/xodt/src/view.rs:129
+#: crates/xodt/src/view.rs:128
 msgid "Page up"
 msgstr ""
 
-#: crates/xodt/src/view.rs:135
+#: crates/xodt/src/view.rs:134
 msgid "Page down"
 msgstr ""
 
-#: crates/xodt/src/view.rs:213
+#: crates/xodt/src/view.rs:212
 msgid "Words: {selected} of {total}"
 msgstr ""
 
-#: crates/xodt/src/view.rs:220
+#: crates/xodt/src/view.rs:219
 msgid "Characters: {selected} of {total}"
 msgstr ""
 
-#: crates/xodt/src/view.rs:229
+#: crates/xodt/src/view.rs:228
 msgid "Words: {words}"
 msgstr ""
 
-#: crates/xodt/src/view.rs:233
+#: crates/xodt/src/view.rs:232
 msgid "Characters: {characters}"
 msgstr ""
 
-#: crates/xodt/src/view.rs:478
+#: crates/xodt/src/view.rs:474
 msgid "This document has no text in it."
 msgstr ""
 
-#: crates/xodt/src/view.rs:581
+#: crates/xodt/src/view.rs:577
 msgid "Outline"
 msgstr ""
 
-#: crates/xodt/src/view.rs:590
+#: crates/xodt/src/view.rs:586
 msgid "(untitled)"
 msgstr ""
 
-#: crates/xodt/src/view.rs:622
+#: crates/xodt/src/view.rs:618
 msgid "Copy the document as text"
 msgstr ""
 
-#: crates/xodt/src/view.rs:643
+#: crates/xodt/src/view.rs:639
 msgid "Rows"
 msgstr ""
 
-#: crates/xodt/src/view.rs:646
+#: crates/xodt/src/view.rs:642
 msgid "Columns"
 msgstr ""
 
-#: crates/xodt/src/view.rs:855
+#: crates/xodt/src/view.rs:812
 msgid ""
 "This table has merged or repeated cells, so its rows and columns are left as "
 "they are."
 msgstr ""
 
-#: crates/xodt/src/view.rs:858
+#: crates/xodt/src/view.rs:815
 msgid "The table could not be changed here."
 msgstr ""
 
-#: crates/xodt/src/view.rs:935
+#: crates/xodt/src/view.rs:892
 msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
 
-#: crates/xodt/src/view.rs:995
+#: crates/xodt/src/view.rs:952
 msgid "This change cannot be accepted: it is no longer in the document."
 msgstr ""
 
-#: crates/xodt/src/view.rs:998
+#: crates/xodt/src/view.rs:955
 msgid ""
 "This change cannot be rejected: its marks in the text are missing or stand "
 "where its text cannot go back."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1007
+#: crates/xodt/src/view.rs:964
 msgid ""
 "These columns cannot be resized: their widths are not stated, or together "
 "they are under a centimetre."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1026
+#: crates/xodt/src/view.rs:983
 msgid "This document has tracked changes."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1028
+#: crates/xodt/src/view.rs:985
 msgid "Edits made here are not tracked."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1031
+#: crates/xodt/src/view.rs:988
 msgid "Accept all"
 msgstr ""
 
-#: crates/xodt/src/view.rs:1034
+#: crates/xodt/src/view.rs:991
 msgid "Reject all"
 msgstr ""
 
-#: crates/xodt/src/view.rs:1125
+#: crates/xodt/src/view.rs:1082
 msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1127
+#: crates/xodt/src/view.rs:1084
 msgid "These cells cannot be merged: the table has repeated rows or cells."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1132
+#: crates/xodt/src/view.rs:1089
 msgid "The caret is not in a table cell."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1134
+#: crates/xodt/src/view.rs:1091
 msgid "This cell cannot be split: the table has repeated rows or cells."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1140
+#: crates/xodt/src/view.rs:1097
 msgid "This table does not say how wide its columns are."
 msgstr ""

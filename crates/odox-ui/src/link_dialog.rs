@@ -165,13 +165,16 @@ impl LinkQuestion {
         places: impl FnOnce(&FlowModel<'m>) -> Vec<(String, String)>,
     ) -> Option<String> {
         let mut problem = None;
-        let ctrl_k = ui.input_mut(|i| {
-            i.consume_shortcut(&egui::KeyboardShortcut::new(
-                egui::Modifiers::COMMAND,
-                Key::K,
-            ))
-        });
-        if wanted || ctrl_k {
+        let ctrl_k = editor.has_focus(ui.ctx())
+            && ui.input_mut(|i| {
+                i.consume_shortcut(&egui::KeyboardShortcut::new(
+                    egui::Modifiers::COMMAND,
+                    Key::K,
+                ))
+            });
+        if (wanted || ctrl_k) && editor.selection().is_none() {
+            problem = Some(t("Put the caret where the link goes.").to_owned());
+        } else if wanted || ctrl_k {
             match model.link_here(editor) {
                 Some(here) => {
                     let dialog = LinkDialog::new(
@@ -192,9 +195,25 @@ impl LinkQuestion {
                 LinkAnswer::Cancel => Ok(()),
             };
             if let Err(refused) = done {
-                problem = Some(refused.to_string());
+                problem = Some(refused_link(&refused));
             }
         }
         problem
+    }
+}
+
+/// Why a link was not made, changed or taken off, in words.
+fn refused_link(refused: &odox_core::Refused) -> String {
+    match refused {
+        odox_core::Refused::Address => {
+            t("A link goes to a web page, a mail address or a place in the document.").to_owned()
+        }
+        odox_core::Refused::Structure => {
+            t("A link cannot run into another link, and needs text to show.").to_owned()
+        }
+        odox_core::Refused::NotFound => {
+            t("The text changed while the question was up. Ask again.").to_owned()
+        }
+        other => other.to_string(),
     }
 }

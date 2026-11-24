@@ -56,7 +56,7 @@ pub use figure::{
 pub use format::{Mark, Script, Setting, TextProperty, format, marked, set_text, text_value};
 pub(crate) use format::{automatic_styles, element};
 pub use indent::{LineSpacing, line_spacing, set_indent, set_line_spacing};
-pub use link::{followable, link_at, make_link, remove_link, set_link};
+pub use link::{difference, followable, link_at, make_link, remove_link, set_link};
 pub use list::{continue_numbering, list_level, restart_numbering};
 pub use note::{
     NoteClass, insert_note, note_text, notes_in, remove_note, renumber_notes, set_note_text,

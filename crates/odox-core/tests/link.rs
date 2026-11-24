@@ -146,3 +146,60 @@ fn the_link_at_a_place_is_found_with_its_path() {
         "at its end"
     );
 }
+
+#[test]
+fn making_a_link_leaves_the_spaces_beside_it_as_written() {
+    let mut root = content("<text:p>word more</text:p>");
+    make_link(&mut root, (&FIRST, 0), (&FIRST, 4), "https://example.com").expect("made");
+    let out = written(&root);
+    assert!(out.contains("</text:a> more</text:p>"), "{out}");
+}
+
+#[test]
+fn removing_a_link_in_a_span_leaves_the_span_as_written() {
+    let mut root = content(
+        r#"<text:p>See<text:span text:style-name="B"> big <text:a xlink:type="simple" xlink:href="https://a.example">here</text:a></text:span>.</text:p>"#,
+    );
+    remove_link(&mut root, &[0, 0, 0, 1, 1]).expect("removed");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"<text:span text:style-name="B"> big here</text:span>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_mark_just_after_the_range_stays_outside_the_link() {
+    let mut root = content(r#"<text:p>word<text:bookmark text:name="b"/> more</text:p>"#);
+    make_link(&mut root, (&FIRST, 0), (&FIRST, 4), "https://example.com").expect("made");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"</text:a><text:bookmark text:name="b"/>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn changing_part_of_a_links_text_keeps_the_rest_formatted() {
+    let mut root = content(
+        r#"<text:p><text:a xlink:type="simple" xlink:href="https://a.example"><text:span text:style-name="B">bold</text:span> plain</text:a></text:p>"#,
+    );
+    set_link(&mut root, &[0, 0, 0, 0], "https://a.example", "bold simple").expect("set");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"<text:span text:style-name="B">bold</text:span> simple</text:a>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn at_the_meeting_of_two_links_the_caret_is_in_the_second() {
+    let root = content(
+        r#"<text:p><text:a xlink:type="simple" xlink:href="https://a.example">AAA</text:a><text:a xlink:type="simple" xlink:href="https://b.example">BBB</text:a></text:p>"#,
+    );
+    let paragraph = root.at(&FIRST).expect("paragraph");
+    let (_, _, href) = odox_core::edit::link_at(paragraph, 3).expect("a link");
+    assert_eq!(href, "https://b.example");
+    let (_, _, href) = odox_core::edit::link_at(paragraph, 6).expect("a link");
+    assert_eq!(href, "https://b.example");
+}

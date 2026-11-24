@@ -5,7 +5,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use super::block::declares;
-use super::{Refused, is_paragraph, links, normalize, split, text};
+use super::{Refused, cut, is_paragraph, links, merge_text, text};
 use std::ops::Range;
 
 use crate::xml::{Element, Node, Ns};
@@ -66,30 +66,23 @@ pub fn make_link(
     link.set_attr(content.name_for(&Ns::Xlink, "type"), "simple");
     link.set_attr(content.name_for(&Ns::Xlink, "href"), href);
     let paragraph = content.at_mut(path).ok_or(Refused::NotFound)?;
-    let (mut head, rest) = split(paragraph, start);
-    let (middle, tail) = split(&rest, end - start);
+    let mut head = paragraph.clone();
+    cut(&mut head, start..length, |at| at > start);
+    let mut middle = paragraph.clone();
+    cut(&mut middle, end..length, |at| at >= end);
+    cut(&mut middle, 0..start, |at| at <= start);
+    let mut tail = paragraph.clone();
+    cut(&mut tail, 0..end, |at| at < end);
+    for part in [&mut head, &mut middle, &mut tail] {
+        merge_text(part);
+    }
     link.children = middle.children;
     link.self_closing = link.children.is_empty();
-    head.children.push(Node::Element(link));
-    head.children.extend(tail.children);
-    head.self_closing = false;
-    normalize(&mut head);
-    let at = head
-        .children
-        .iter()
-        .enumerate()
-        .position(|(index, child)| {
-            matches!(child, Node::Element(e) if e.is(&Ns::Text, "a"))
-                && text(&Element {
-                    children: head.children[..index].to_vec(),
-                    ..head.clone()
-                })
-                .chars()
-                .count()
-                    == start
-        })
-        .ok_or(Refused::NotFound)?;
-    *paragraph = head;
+    let at = head.children.len();
+    paragraph.children = head.children;
+    paragraph.children.push(Node::Element(link));
+    paragraph.children.extend(tail.children);
+    paragraph.self_closing = false;
     Ok([path, &[at]].concat())
 }
 
@@ -114,9 +107,9 @@ pub fn set_link(
         .filter(|e| e.is(&Ns::Text, "a"))
         .ok_or(Refused::NotFound)?;
     element.set_attr(name, href);
-    if text(element) != shown {
-        let length = text(element).chars().count();
-        super::replace(element, 0..length, shown);
+    let (from, to, with) = difference(&text(element), shown);
+    if from != to || !with.is_empty() {
+        super::replace(element, from..to, &with);
     }
     Ok(())
 }
@@ -137,7 +130,7 @@ pub fn remove_link(content: &mut Element, link: &[usize]) -> Result<(), Refused>
     }
     let inner = element.children.clone();
     parent.children.splice(index..=index, inner);
-    normalize(parent);
+    merge_text(parent);
     Ok(())
 }
 
@@ -145,12 +138,14 @@ pub fn remove_link(content: &mut Element, link: &[usize]) -> Result<(), Refused>
 /// inclusive: its path from the paragraph, the characters it covers and its
 /// address.
 pub fn link_at(paragraph: &Element, at: usize) -> Option<(Vec<usize>, Range<usize>, String)> {
+    type Found = (Vec<usize>, Range<usize>, String);
     fn walk(
         parent: &Element,
         start: &mut usize,
         at: usize,
         path: &mut Vec<usize>,
-    ) -> Option<(Vec<usize>, Range<usize>, String)> {
+        found: &mut Vec<Found>,
+    ) {
         for (index, child) in parent.children.iter().enumerate() {
             let Node::Element(element) = child else {
                 if let Node::Text(t) | Node::CData(t) = child {
@@ -165,12 +160,10 @@ pub fn link_at(paragraph: &Element, at: usize) -> Option<(Vec<usize>, Range<usiz
                 if (from..=*start).contains(&at)
                     && let Some(href) = element.attr(&Ns::Xlink, "href")
                 {
-                    return Some((path.clone(), from..*start, href.to_owned()));
+                    found.push((path.clone(), from..*start, href.to_owned()));
                 }
             } else if super::is_inline_container(element) {
-                if let Some(found) = walk(element, start, at, path) {
-                    return Some(found);
-                }
+                walk(element, start, at, path, found);
             } else {
                 *start += text(&Element {
                     children: vec![child.clone()],
@@ -181,7 +174,29 @@ pub fn link_at(paragraph: &Element, at: usize) -> Option<(Vec<usize>, Range<usiz
             }
             path.pop();
         }
-        None
     }
-    walk(paragraph, &mut 0, at, &mut Vec::new())
+    let mut found = Vec::new();
+    walk(paragraph, &mut 0, at, &mut Vec::new(), &mut found);
+    let inside = found.iter().position(|(_, range, _)| at < range.end);
+    let chosen = inside.or_else(|| (!found.is_empty()).then_some(0))?;
+    Some(found.swap_remove(chosen))
+}
+
+/// Where two texts differ: the characters of the first, from and to, that
+/// the second puts other text in place of, and that text. Characters both
+/// begin and end with are left out.
+pub fn difference(old: &str, new: &str) -> (usize, usize, String) {
+    let (old, new): (Vec<char>, Vec<char>) = (old.chars().collect(), new.chars().collect());
+    let before = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
+    let after = old[before..]
+        .iter()
+        .rev()
+        .zip(new[before..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    (
+        before,
+        old.len() - after,
+        new[before..new.len() - after].iter().collect(),
+    )
 }

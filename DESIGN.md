@@ -1116,9 +1116,14 @@ address, or a place in the document as `#name` or `#Heading|outline`; the
 links the windows follow are the same ones (`odox_ui::links`). Ctrl+K, or
 Format > Link…, asks for the text and the address, offering the document's
 headings and bookmarks in `xodt` and its slides in `xodp`; with the caret in a
-link the question changes it, new text taking the place of the old and text
-left as it was keeping its formatting, or takes it off, its text and
-formatting staying. Each is one step to undo.
+link the question changes it, only the characters that differ being replaced
+so the rest keeps its formatting, or takes it off, its text and formatting
+staying. A selection is changed as a link only where it lies inside one, and a
+caret where two links meet is in the second. The paragraph is cut without
+rewriting its whitespace, and a mark just after the range stays outside the
+link. Ctrl+K is the page's only while the caret is in it. An answer to a
+question whose text changed under it is refused rather than made somewhere
+else. Each is one step to undo.
 
 **A comment is an `office:annotation` where it is anchored** (`edit/annotation.rs`),
 with `dc:creator`, `dc:date` and its paragraphs, and one over a range closes

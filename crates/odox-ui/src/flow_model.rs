@@ -791,14 +791,18 @@ impl<'a> FlowModel<'a> {
     pub fn places(&self) -> Vec<(String, String)> {
         fn walk(element: &Element, into: &mut Vec<(String, String)>) {
             for child in element.elements() {
+                if child.is(&Ns::Text, "tracked-changes") {
+                    continue;
+                }
                 if child.is(&Ns::Text, "h") {
-                    let heading = edit::text(child);
+                    let heading = child.plain_text().trim().to_owned();
                     if !heading.trim().is_empty() {
                         into.push((heading.clone(), format!("#{heading}|outline")));
                     }
                 }
                 if (child.is(&Ns::Text, "bookmark") || child.is(&Ns::Text, "bookmark-start"))
                     && let Some(name) = child.attr(&Ns::Text, "name")
+                    && !name.starts_with("__")
                 {
                     into.push((name.to_owned(), format!("#{name}")));
                 }
@@ -825,7 +829,10 @@ impl<'a> FlowModel<'a> {
             .content
             .at(&[self.root.as_slice(), &paragraph].concat())?;
         let (a, b) = (selection.anchor.offset, selection.focus.offset);
-        if let Some((link, range, href)) = edit::link_at(element, b) {
+        let (low, high) = (a.min(b), a.max(b));
+        let in_link = edit::link_at(element, if low == high { b } else { low })
+            .filter(|(_, range, _)| range.start <= low && high <= range.end);
+        if let Some((link, range, href)) = in_link {
             let text = edit::text(element)
                 .chars()
                 .skip(range.start)
@@ -875,8 +882,25 @@ impl<'a> FlowModel<'a> {
         if text.is_empty() {
             return Err(Refused::Structure);
         }
-        let before = self.content.clone();
+        if here.link.is_some() && here.text == text && here.href == href {
+            return Ok(());
+        }
         let path = [self.root.as_slice(), &here.paragraph].concat();
+        let still = self
+            .content
+            .at(&path)
+            .map(|paragraph| {
+                edit::text(paragraph)
+                    .chars()
+                    .skip(here.range.start)
+                    .take(here.range.len())
+                    .collect::<String>()
+            })
+            .is_some_and(|there| there == here.text);
+        if !still {
+            return Err(Refused::NotFound);
+        }
+        let before = self.content.clone();
         let done = match &here.link {
             Some(link) => {
                 edit::set_link(self.content, &[path.as_slice(), link].concat(), href, text)
@@ -894,7 +918,7 @@ impl<'a> FlowModel<'a> {
             before,
             Some(Position::new(
                 [self.tag.as_slice(), &here.paragraph].concat(),
-                end,
+                here.range.start,
             )),
         );
         editor.select(Selection::caret(Position::new(here.paragraph.clone(), end)));
@@ -908,9 +932,11 @@ impl<'a> FlowModel<'a> {
         text: &str,
         href: &str,
     ) -> Result<Vec<usize>, Refused> {
-        if text != here.text {
+        let (from, to, with) = edit::difference(&here.text, text);
+        if from != to || !with.is_empty() {
             let paragraph = self.content.at_mut(path).ok_or(Refused::NotFound)?;
-            edit::replace(paragraph, here.range.clone(), text);
+            let start = here.range.start;
+            edit::replace(paragraph, start + from..start + to, &with);
         }
         let end = here.range.start + text.chars().count();
         edit::make_link(self.content, (path, here.range.start), (path, end), href)
@@ -926,6 +952,14 @@ impl<'a> FlowModel<'a> {
         let link = here.link.as_ref().ok_or(Refused::NotFound)?;
         let before = self.content.clone();
         let path = [self.root.as_slice(), &here.paragraph, link].concat();
+        if self
+            .content
+            .at(&path)
+            .and_then(|a| a.attr(&Ns::Xlink, "href"))
+            != Some(&here.href)
+        {
+            return Err(Refused::NotFound);
+        }
         if let Err(refused) = edit::remove_link(self.content, &path) {
             *self.content = before;
             return Err(refused);
@@ -2408,5 +2442,69 @@ mod tests {
                 .put_link(&mut editor, &here, "one", "file:///etc")
                 .is_err()
         );
+    }
+
+    fn linked() -> Element {
+        let mut content = content();
+        for (prefix, uri) in [
+            ("text", "urn:oasis:names:tc:opendocument:xmlns:text:1.0"),
+            ("xlink", "http://www.w3.org/1999/xlink"),
+        ] {
+            content.set_attr(odox_core::xml::Name::new("xmlns", prefix, Ns::Xmlns), uri);
+        }
+        let mut link = Element::new("text", "a", Ns::Text);
+        link.set_attr(
+            odox_core::xml::Name::new("xlink", "href", Ns::Xlink),
+            "https://a.example",
+        );
+        link.children = vec![Node::Text("here".to_owned())];
+        let paragraph = content.at_mut(&[0, 0, 0]).expect("the first paragraph");
+        paragraph.children = vec![
+            Node::Text("click ".to_owned()),
+            Node::Element(link),
+            Node::Text(" now".to_owned()),
+        ];
+        content
+    }
+
+    #[test]
+    fn a_selection_beside_a_link_is_a_new_link_not_that_one() {
+        let mut content = linked();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::page_editor();
+        for (anchor, focus) in [(0, 6), (14, 10)] {
+            editor.select(egui_richedit::Selection {
+                anchor: Position::new(vec![0], anchor),
+                focus: Position::new(vec![0], focus),
+            });
+            let here = model.link_here(&editor).expect("a selection");
+            assert!(here.link.is_none(), "{anchor}..{focus}: {here:?}");
+        }
+        editor.select(egui_richedit::Selection {
+            anchor: Position::new(vec![0], 7),
+            focus: Position::new(vec![0], 9),
+        });
+        assert!(model.link_here(&editor).expect("inside").link.is_some());
+    }
+
+    #[test]
+    fn a_question_left_behind_by_an_edit_is_refused() {
+        let mut content = linked();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection::caret(Position::new(vec![0], 8)));
+        let mut here = model.link_here(&editor).expect("in the link");
+        here.text = "elsewhere".to_owned();
+        assert!(
+            model
+                .put_link(&mut editor, &here, "there", "https://b.example")
+                .is_err()
+        );
+        assert_eq!(model.text(&vec![0]).as_deref(), Some("click here now"));
     }
 }
