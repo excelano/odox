@@ -235,10 +235,14 @@ enum Written {
     NotPermitted,
 }
 
-/// Whether a write was refused for want of permission, which another place
-/// chosen in the save dialog may be given.
+/// Whether a write was refused for want of permission, or by a file system
+/// mounted read-only, which another place chosen in the save dialog may be
+/// given.
 fn asks_another_place(error: &std::io::Error) -> bool {
-    error.kind() == std::io::ErrorKind::PermissionDenied
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+    )
 }
 
 /// How much of the screen the window has.
@@ -621,10 +625,11 @@ impl<V: View> Shell<V> {
     /// Answers whether it was written, which is what a pending action waits
     /// on: a save that failed is not a reason to go on and close the window.
     ///
-    /// A file the system does not let this write, a read-only one or, on
-    /// macOS, one the sandbox no longer has the person's choice of, as after
-    /// changes are recovered, is asked about in the save dialog: choosing it
-    /// there is that choice.
+    /// A file the system does not let this write, in a folder it may not
+    /// write to, on a file system mounted read-only or, on macOS, one the
+    /// sandbox no longer has the person's choice of, as after changes are
+    /// recovered, is asked about in the save dialog: choosing it there is
+    /// that choice.
     fn save(&mut self) -> bool {
         match self.path.clone() {
             Some(path) => match self.write_to(&path) {
@@ -1547,6 +1552,8 @@ mod tests {
             .expect("made writable again");
         std::fs::remove_dir_all(&directory).expect("tidy");
         assert!(super::asks_another_place(&refused));
+        let read_only = std::io::Error::from(std::io::ErrorKind::ReadOnlyFilesystem);
+        assert!(super::asks_another_place(&read_only));
         let missing = std::io::Error::from(std::io::ErrorKind::NotFound);
         assert!(!super::asks_another_place(&missing));
     }

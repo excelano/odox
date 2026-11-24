@@ -88,7 +88,7 @@ a line, for File > Open recent.
 The words added to the dictionary from the spell check, one to a line.
 .TP
 .I $XDG_DATA_HOME/odox/recovery/
-A copy of a document's unsaved changes, kept every minute while there are any
+A copy of a document's unsaved changes, kept at most once a minute after a change
 and taken away when they are saved or discarded; after a crash, the next window
 started without a file offers to open it.
 .TP

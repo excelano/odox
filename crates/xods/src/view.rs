@@ -3289,16 +3289,13 @@ fn blocked_notice(blocked: &Blocked) -> String {
 /// What the cell bar says about a cell that cannot be edited.
 fn notice(refused: &Refused) -> String {
     match refused {
-        Refused::Covered => t("This cell is covered by the one that spans it."),
-        // A cell is never a range and is not formatted here, so a refusal
-        // over structure or a namespace is not one a cell hears.
-        Refused::NotFound
-        | Refused::Structure
-        | Refused::Namespace
-        | Refused::LastOne
-        | Refused::Address => t("There is no cell there."),
+        Refused::Covered => t("This cell is covered by the one that spans it.").to_owned(),
+        Refused::NotFound => t("There is no cell there.").to_owned(),
+        Refused::Structure => {
+            t("A merged cell lies in the range, so it is left as it was.").to_owned()
+        }
+        other => odox_ui::refusal::message(other),
     }
-    .to_owned()
 }
 
 /// Count what a range shows, as far as the sheet has cells: a selection
@@ -3448,6 +3445,17 @@ fn matches_in(document: &SheetDocument, query: &str, options: Options) -> Vec<Ma
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_range_refused_for_a_merged_cell_says_so() {
+        use odox_core::Refused;
+        assert!(super::notice(&Refused::Structure).contains("merged"));
+        assert_eq!(
+            super::notice(&Refused::Namespace),
+            odox_ui::refusal::message(&Refused::Namespace)
+        );
+        assert_eq!(super::notice(&Refused::NotFound), "There is no cell there.");
+    }
+
     use super::*;
 
     fn opened() -> (SheetView, Editing) {
