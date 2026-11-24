@@ -312,6 +312,80 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Whether a page break begins the paragraph a selection ends in.
+    pub fn page_break_here(&self, selection: &Selection<Vec<usize>>) -> bool {
+        let path = [self.root.as_slice(), &selection.focus.paragraph].concat();
+        edit::page_break(self.content, &path, self.styles)
+    }
+
+    /// Begin a page at the caret, as Ctrl+Enter does: the paragraph split
+    /// there and the page begun at its second half, or at the paragraph where
+    /// the caret is at its start, as one step to undo with the caret at the
+    /// page's first character. Answers whether the document changed.
+    pub fn insert_page_break(&mut self, editor: &mut PageEditor) -> bool {
+        let Some(selection) = editor.selection().filter(|s| s.is_caret()).cloned() else {
+            return false;
+        };
+        let at = selection.focus;
+        let before = self.content.clone();
+        let count = self.content.children.len();
+        let path = [self.root.as_slice(), &at.paragraph].concat();
+        let Ok(begins) = edit::insert_page_break(self.content, &path, at.offset, self.styles)
+        else {
+            *self.content = before;
+            return false;
+        };
+        self.follow_styles(count);
+        let Some(page) = begins
+            .strip_prefix(self.root.as_slice())
+            .map(<[usize]>::to_vec)
+        else {
+            return false;
+        };
+        self.order = OnceCell::new();
+        self.editing.touch();
+        self.editing.record_snapshot(
+            before,
+            Some(Position::new(
+                [self.tag.as_slice(), &at.paragraph].concat(),
+                at.offset,
+            )),
+        );
+        editor.select(Selection::caret(Position::new(page, 0)));
+        true
+    }
+
+    /// Take the page break off the paragraph a selection ends in, as one step
+    /// to undo. Answers whether the document changed.
+    pub fn remove_page_break(&mut self, editor: &mut PageEditor) -> bool {
+        let Some(focus) = editor.selection().map(|s| s.focus.paragraph.clone()) else {
+            return false;
+        };
+        self.over_paragraphs(editor, |model, _| {
+            let before = model.content.children.len();
+            let path = [model.root.as_slice(), &focus].concat();
+            edit::remove_page_break(model.content, &path, model.styles).ok()?;
+            model.follow_styles(before);
+            Some(())
+        })
+    }
+
+    /// Whether replacing from one position to another with nothing is a
+    /// Backspace or a Delete across the start of a paragraph a page break
+    /// begins, which takes the break off before it joins anything.
+    fn joins_a_break(&self, from: &Position<Vec<usize>>, to: &Position<Vec<usize>>) -> bool {
+        to.offset == 0
+            && self.neighbour(&to.paragraph, -1).as_ref() == Some(&from.paragraph)
+            && self
+                .text(&from.paragraph)
+                .is_some_and(|text| text.chars().count() == from.offset)
+            && edit::page_break(
+                self.content,
+                &[self.root.as_slice(), &to.paragraph].concat(),
+                self.styles,
+            )
+    }
+
     /// Whether any paragraph a selection runs over is a heading.
     pub fn has_heading(&self, selection: &Selection<Vec<usize>>) -> bool {
         self.selected_paragraphs(selection)
@@ -1073,6 +1147,15 @@ impl Model for FlowModel<'_> {
             begins.offset,
         );
         let at = match edit {
+            Edit::Replace { from, to, text }
+                if text.is_empty() && self.joins_a_break(&from, &to) =>
+            {
+                let path = [self.root.as_slice(), &to.paragraph].concat();
+                let before = self.content.children.len();
+                let unbroken = edit::remove_page_break(self.content, &path, self.styles).ok();
+                self.follow_styles(before);
+                unbroken.map(|()| to)
+            }
             Edit::Replace { from, to, text } => self
                 .replace(&from, &to, text)
                 .map(|()| Position::new(from.paragraph, from.offset + text.chars().count())),
@@ -1674,5 +1757,62 @@ mod tests {
         let two = model.order()[1].clone();
         editor.select(egui_richedit::Selection::caret(Position::new(two, 0)));
         assert_eq!(model.list_level(&mut editor, 1), Ok(false));
+    }
+
+    #[test]
+    fn backspace_at_start_of_broken_paragraph_removes_break_first() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:automatic-styles><style:style style:name="P1" style:family="paragraph"><style:paragraph-properties fo:break-before="page"/></style:style></office:automatic-styles><office:body><office:text><text:p>One</text:p><text:p text:style-name="P1">Two</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![1, 0], &mut editing);
+        let at = model.apply(
+            Edit::Replace {
+                from: Position::new(vec![0], 3),
+                to: Position::new(vec![1], 0),
+                text: "",
+            },
+            true,
+        );
+        assert_eq!(at, Some(Position::new(vec![1], 0)), "the caret stays");
+        assert_eq!(model.text(&vec![1]).as_deref(), Some("Two"), "not joined");
+        assert!(!odox_core::edit::page_break(
+            model.content,
+            &[1, 0, 1],
+            model.styles
+        ));
+    }
+
+    #[test]
+    fn ctrl_enter_breaks_the_page_at_the_caret_and_undo_restores_tree() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:body><office:text><text:p>Before after</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let original = content.clone();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection::caret(Position::new(vec![0], 7)));
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        assert!(model.insert_page_break(&mut editor));
+        let caret = editor.selection().map(|s| s.focus.clone());
+        assert_eq!(model.text(&vec![1]).as_deref(), Some("after"));
+        assert_eq!(caret.as_ref().map(|c| c.offset), Some(0));
+        let page = caret.expect("a caret").paragraph;
+        assert!(model.page_break_here(&egui_richedit::Selection::caret(Position::new(page, 0))));
+        let mut current = holding(&content);
+        let mut undone = 0;
+        while editing.undo(&mut current, None).is_some() {
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
+        assert_eq!(current.content, original);
     }
 }

@@ -496,6 +496,13 @@ impl View for TextView {
                 } = &mut document.document;
                 let mut model = FlowModel::new(content, styles, root, editing);
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
+                if self.page.has_focus(ui.ctx())
+                    && ui.input_mut(|input| {
+                        input.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)
+                    })
+                {
+                    model.insert_page_break(&mut self.page);
+                }
                 self.page.input(ui, &mut model);
             }
             let Some(body) = document.body() else {
@@ -908,6 +915,15 @@ fn toolbar_commands(
     }
     if let Some(Command::Numbering(restart)) = command {
         model.numbering(page, restart);
+    }
+    match command {
+        Some(Command::PageBreak(true)) => {
+            model.insert_page_break(page);
+        }
+        Some(Command::PageBreak(false)) => {
+            model.remove_page_break(page);
+        }
+        _ => {}
     }
     if let Some(delta) = pressed.outline.or(match command {
         Some(Command::Outline(delta)) => Some(delta),

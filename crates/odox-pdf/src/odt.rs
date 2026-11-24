@@ -43,6 +43,27 @@ fn blocks(document: &TextDocument) -> Vec<Block> {
 /// A figure says nothing in place of its picture, a font or a character
 /// cannot be embedded, or the writer refused what it was given.
 pub fn export(document: &TextDocument, options: &Options) -> Result<Exported, Refusal> {
+    let mut faces = Faces::new();
+    let laid = lay_out(document, options, &mut faces)?;
+    crate::write(
+        laid,
+        faces,
+        &crate::About {
+            title: crate::title(&document.document, options),
+            language: crate::language(&document.document, "paragraph")
+                .unwrap_or_else(|| options.language.clone()),
+            creator: "Odox Text",
+        },
+    )
+}
+
+/// The document on pages, each item where it is drawn, and the headings the
+/// outline lists.
+fn lay_out(
+    document: &TextDocument,
+    options: &Options,
+    faces: &mut Faces,
+) -> Result<crate::Laid, Refusal> {
     let blocks = blocks(document);
     let mut missing = Vec::new();
     model::undescribed(&blocks, &mut missing);
@@ -64,8 +85,7 @@ pub fn export(document: &TextDocument, options: &Options) -> Result<Exported, Re
         today: options.today,
     };
 
-    let mut faces = Faces::new();
-    let mut layout = Layout::new(&mut faces, 0.0);
+    let mut layout = Layout::new(faces, 0.0);
     let bands = Bands::new(
         &mut layout,
         &document.document,
@@ -100,21 +120,11 @@ pub fn export(document: &TextDocument, options: &Options) -> Result<Exported, Re
         pages.push(page);
     }
     let tree = layout.tree;
-
-    crate::write(
-        crate::Laid {
-            pages,
-            tree,
-            headings,
-        },
-        faces,
-        &crate::About {
-            title,
-            language: crate::language(&document.document, "paragraph")
-                .unwrap_or_else(|| options.language.clone()),
-            creator: "Odox Text",
-        },
-    )
+    Ok(crate::Laid {
+        pages,
+        tree,
+        headings,
+    })
 }
 
 /// Fill pages with pieces, each placed at its top within the page's body.
@@ -242,5 +252,43 @@ mod tests {
         let total: f32 = heights(&pages).iter().flatten().sum();
         assert_eq!(pages.len(), 3);
         assert!((total - 250.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn pdf_starts_new_page_at_break() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/text.odt"),
+        )
+        .expect("the text fixture");
+        let mut document = TextDocument::read(&bytes).expect("it reads");
+        let options = Options {
+            title: "Untitled".to_owned(),
+            language: "en-US".to_owned(),
+            untitled_slide: "Slide {number}".to_owned(),
+            today: (2026, 1, 1),
+        };
+        let pages = |document: &TextDocument| {
+            lay_out(document, &options, &mut Faces::new())
+                .expect("laid out")
+                .pages
+                .len()
+        };
+        assert_eq!(pages(&document), 1);
+        let body = document.body_path().expect("a body");
+        let heading = document
+            .body()
+            .expect("a body")
+            .elements_indexed()
+            .filter(|(_, e)| e.is(&odox_core::Ns::Text, "h"))
+            .nth(1)
+            .map(|(index, _)| index)
+            .expect("a second heading");
+        let path = [body.as_slice(), &[heading]].concat();
+        let odox_core::Document {
+            content, styles, ..
+        } = &mut document.document;
+        odox_core::edit::insert_page_break(content, &path, 0, styles).expect("broken");
+        assert_eq!(pages(&document), 2);
     }
 }

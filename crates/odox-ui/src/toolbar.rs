@@ -421,6 +421,8 @@ pub enum Command {
     Indent(i8),
     /// A line spacing.
     LineSpacing(LineSpacing),
+    /// Begin a page at the caret, or take the break off its paragraph.
+    PageBreak(bool),
     /// Start a numbered list again at the item, or carry it on from the list
     /// before when not.
     Numbering(bool),
@@ -469,13 +471,21 @@ fn block_name(block: Block) -> String {
     }
 }
 
+/// What the caret's paragraph is in or begins with, for the menu items that
+/// apply only there.
+#[derive(Default)]
+struct Here {
+    table: bool,
+    page_break: bool,
+}
+
 /// What the Format menu draws itself from: what the page said the last time it
 /// was drawn, because a menu is drawn before the page is.
 #[derive(Default)]
 pub struct MenuState {
     enabled: bool,
     blocks: bool,
-    in_table: bool,
+    here: Here,
     marks: Vec<Mark>,
     align: Option<TextAlign>,
     kinds: Vec<Block>,
@@ -496,7 +506,10 @@ impl MenuState {
         Self {
             enabled: true,
             blocks,
-            in_table: blocks && model.in_table(selection),
+            here: Here {
+                table: blocks && model.in_table(selection),
+                page_break: blocks && model.page_break_here(selection),
+            },
             marks: Mark::ALL
                 .into_iter()
                 .filter(|mark| editor.marked(model, *mark) == Some(true))
@@ -613,6 +626,70 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// What the Format menu puts in or takes out in a text document: a table and
+/// its rows and columns, a page break, a picture, and the page's setup.
+fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Table"), |ui| {
+            if ui.button(t("Insert a table…")).clicked() {
+                chosen = Some(Command::InsertTable);
+                ui.close();
+            }
+            ui.separator();
+            for (edit, name) in [
+                (TableEdit::RowAbove, t("Insert row above")),
+                (TableEdit::RowBelow, t("Insert row below")),
+                (TableEdit::ColumnLeft, t("Insert column left")),
+                (TableEdit::ColumnRight, t("Insert column right")),
+                (TableEdit::DeleteRow, t("Delete row")),
+                (TableEdit::DeleteColumn, t("Delete column")),
+                (TableEdit::DeleteTable, t("Delete table")),
+            ] {
+                if matches!(edit, TableEdit::DeleteRow) {
+                    ui.separator();
+                }
+                if ui
+                    .add_enabled(state.here.table, egui::Button::new(name))
+                    .clicked()
+                {
+                    chosen = Some(Command::Table(edit));
+                    ui.close();
+                }
+            }
+        });
+    });
+    let keys = ui
+        .ctx()
+        .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Enter));
+    let insert = egui::Button::new(t("Insert page break")).shortcut_text(keys);
+    if ui.add_enabled(state.enabled, insert).clicked() {
+        chosen = Some(Command::PageBreak(true));
+        ui.close();
+    }
+    let remove = egui::Button::new(t("Remove page break"));
+    if ui.add_enabled(state.here.page_break, remove).clicked() {
+        chosen = Some(Command::PageBreak(false));
+        ui.close();
+    }
+    if ui
+        .add_enabled(state.enabled, egui::Button::new(t("Insert a picture…")))
+        .clicked()
+    {
+        chosen = Some(Command::InsertPicture);
+        ui.close();
+    }
+    ui.separator();
+    if ui
+        .add_enabled(state.enabled, egui::Button::new(t("Page setup…")))
+        .clicked()
+    {
+        chosen = Some(Command::PageSetup);
+        ui.close();
+    }
+    chosen
+}
+
 /// The Format menu's entries: the marks, each with its shortcut, a size larger
 /// and smaller, the alignments, and where the page has them the kinds of
 /// paragraph. Lit where the whole selection is one,
@@ -663,50 +740,7 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         ui.separator();
         chosen = blocks_menu(ui, state).or(chosen);
         ui.separator();
-        ui.add_enabled_ui(state.enabled, |ui| {
-            ui.menu_button(t("Table"), |ui| {
-                if ui.button(t("Insert a table…")).clicked() {
-                    chosen = Some(Command::InsertTable);
-                    ui.close();
-                }
-                ui.separator();
-                for (edit, name) in [
-                    (TableEdit::RowAbove, t("Insert row above")),
-                    (TableEdit::RowBelow, t("Insert row below")),
-                    (TableEdit::ColumnLeft, t("Insert column left")),
-                    (TableEdit::ColumnRight, t("Insert column right")),
-                    (TableEdit::DeleteRow, t("Delete row")),
-                    (TableEdit::DeleteColumn, t("Delete column")),
-                    (TableEdit::DeleteTable, t("Delete table")),
-                ] {
-                    if matches!(edit, TableEdit::DeleteRow) {
-                        ui.separator();
-                    }
-                    if ui
-                        .add_enabled(state.in_table, egui::Button::new(name))
-                        .clicked()
-                    {
-                        chosen = Some(Command::Table(edit));
-                        ui.close();
-                    }
-                }
-            });
-        });
-        if ui
-            .add_enabled(state.enabled, egui::Button::new(t("Insert a picture…")))
-            .clicked()
-        {
-            chosen = Some(Command::InsertPicture);
-            ui.close();
-        }
-        ui.separator();
-        if ui
-            .add_enabled(state.enabled, egui::Button::new(t("Page setup…")))
-            .clicked()
-        {
-            chosen = Some(Command::PageSetup);
-            ui.close();
-        }
+        chosen = insert_menu(ui, state).or(chosen);
     }
     chosen
 }
