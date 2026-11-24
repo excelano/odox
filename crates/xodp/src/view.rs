@@ -974,7 +974,11 @@ impl SlideView {
                     Length(height),
                 );
             }
-            Action::End => self.drag = None,
+            Action::End => {
+                if self.drag.take().is_some() {
+                    editing.touch();
+                }
+            }
         }
     }
 
@@ -1741,5 +1745,34 @@ mod tests {
             2,
         );
         assert_eq!((view.slide, view.show.step), (0, 0));
+    }
+
+    #[test]
+    fn a_finished_move_is_a_change_of_its_own() {
+        let mut view = open_deck();
+        let mut editing = Editing::default();
+        editing.reset();
+        let (shape, start) = {
+            let document = view.document.as_ref().expect("open");
+            let slide = &document.slides()[0];
+            slide
+                .shapes_indexed()
+                .find_map(|(index, shape)| super::box_of(shape).map(|start| (index, start)))
+                .expect("a shape with a box")
+        };
+        view.act(
+            Action::Begin(super::Drag {
+                shape,
+                from: super::pos2(0.0, 0.0),
+                grab: super::Grab::Whole,
+                start,
+            }),
+            1.0,
+            &mut editing,
+        );
+        let begun = editing.revision();
+        view.act(Action::Move(super::pos2(20.0, 10.0)), 1.0, &mut editing);
+        view.act(Action::End, 1.0, &mut editing);
+        assert_ne!(editing.revision(), begun);
     }
 }

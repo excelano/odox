@@ -29,10 +29,13 @@ impl Files {
         }
     }
 
-    /// Take the document's bytes and its note away, leaving the lock.
+    /// Take the document's bytes and its note away, and whatever half of
+    /// either a stop left behind, leaving the lock.
     fn clear(&self) {
-        let _ = std::fs::remove_file(&self.bytes);
-        let _ = std::fs::remove_file(&self.note);
+        for path in [&self.bytes, &self.note] {
+            let _ = std::fs::remove_file(path);
+            let _ = std::fs::remove_file(part_of(path));
+        }
     }
 }
 
@@ -73,9 +76,12 @@ impl Recovery {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |since| since.as_nanos());
-        let lock = directory.join(format!("{app}-{}-{stamp}.lock", std::process::id()));
-        let file = File::create(&lock)?;
+        let stem = format!("{app}-{}-{stamp}", std::process::id());
+        let lock = directory.join(format!("{stem}.lock"));
+        let new = directory.join(format!("{stem}.new"));
+        let file = File::create(&new)?;
         file.try_lock().map_err(std::io::Error::other)?;
+        std::fs::rename(&new, &lock)?;
         let files = std::sync::Arc::new(Files::of(lock));
         let (jobs, received) = channel::<Job>();
         let written = std::sync::Arc::clone(&files);
@@ -127,21 +133,47 @@ impl Recovery {
     /// The window is closing as it should: wait for the worker, and take the
     /// files away.
     pub fn finish(mut self) {
+        self.wait();
+        self.files.clear();
+        let _ = std::fs::remove_file(&self.files.lock);
+    }
+
+    /// The window is ending with its changes unsaved and unasked about, as a
+    /// logout ends it: wait for the worker and leave the copy, to be offered
+    /// when the application next starts.
+    pub fn leave(mut self) {
+        self.wait();
+    }
+
+    fn wait(&mut self) {
         self.jobs = None;
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
-        self.files.clear();
-        let _ = std::fs::remove_file(&self.files.lock);
     }
 }
 
-/// Write the bytes beside where they go and move them there, then the note,
-/// so that a window stopped halfway leaves the last whole copy.
+/// Where a file is written before it is moved into place.
+fn part_of(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".part");
+    PathBuf::from(name)
+}
+
+/// Write a file beside where it goes, onto the disk, and move it there, so
+/// that a stop at any point leaves the last whole copy.
+fn put(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let part = part_of(path);
+    let mut file = File::create(&part)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    std::fs::rename(&part, path)
+}
+
+/// Write the bytes, then the note.
 fn write(files: &Files, bytes: &[u8], original: Option<&Path>) -> std::io::Result<()> {
-    let part = files.bytes.with_extension("part");
-    std::fs::write(&part, bytes)?;
-    std::fs::rename(&part, &files.bytes)?;
+    put(&files.bytes, bytes)?;
     let saved = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
@@ -149,11 +181,13 @@ fn write(files: &Files, bytes: &[u8], original: Option<&Path>) -> std::io::Resul
     if let Some(original) = original {
         let _ = writeln!(note, "original = {}", original.display());
     }
-    std::fs::write(&files.note, note)
+    put(&files.note, note.as_bytes())
 }
 
-/// Changes a window that stopped without closing left behind.
+/// Changes a window that stopped without closing left behind, locked by
+/// this window while it offers them, so that no other offers them too.
 pub struct Orphan {
+    _lock: File,
     files: Files,
     /// The file the changes were made to, where it had one.
     pub original: Option<PathBuf>,
@@ -213,7 +247,6 @@ pub fn orphans_in(directory: &Path, app: &str) -> Vec<Orphan> {
         let files = Files::of(lock);
         let note = std::fs::read_to_string(&files.note).unwrap_or_default();
         if !files.bytes.exists() {
-            drop(file);
             files.clear();
             let _ = std::fs::remove_file(&files.lock);
             continue;
@@ -224,6 +257,7 @@ pub fn orphans_in(directory: &Path, app: &str) -> Vec<Orphan> {
                 .map(str::trim)
         };
         found.push(Orphan {
+            _lock: file,
             original: value("original").map(PathBuf::from),
             saved: value("saved").and_then(|s| s.parse().ok()).unwrap_or(0),
             files,
@@ -320,6 +354,43 @@ mod tests {
             Some(Path::new("/home/someone/letter.odt"))
         );
         assert!(found[0].saved >= before);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn an_orphan_offered_is_held_from_other_windows() {
+        let directory = scratch("offered");
+        let recovery = Recovery::start_in(&directory, "xodt").expect("started");
+        recovery.save(b"kept".to_vec(), None);
+        recovery.settle();
+        drop(recovery);
+        let offered = orphans_in(&directory, "xodt");
+        assert_eq!(offered.len(), 1);
+        assert!(orphans_in(&directory, "xodt").is_empty());
+        drop(offered);
+        assert_eq!(orphans_in(&directory, "xodt").len(), 1);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn leave_keeps_the_copy() {
+        let directory = scratch("leave");
+        let recovery = Recovery::start_in(&directory, "xodt").expect("started");
+        recovery.save(b"kept".to_vec(), None);
+        recovery.leave();
+        let found = orphans_in(&directory, "xodt");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].bytes().expect("read"), b"kept");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn clear_takes_a_part_left_behind() {
+        let directory = scratch("part");
+        let recovery = Recovery::start_in(&directory, "xodt").expect("started");
+        std::fs::write(super::part_of(&recovery.files.bytes), b"half").expect("written");
+        recovery.finish();
+        assert_eq!(std::fs::read_dir(&directory).expect("listed").count(), 0);
         let _ = std::fs::remove_dir_all(&directory);
     }
 }

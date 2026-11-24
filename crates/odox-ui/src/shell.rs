@@ -320,6 +320,11 @@ impl<V: View> Shell<V> {
         }
     }
 
+    /// Whether a document is open with changes no file holds.
+    fn unsaved(&self) -> bool {
+        self.view.is_open() && self.editing.modified()
+    }
+
     /// Whether a question is up that everything else waits on.
     fn asking(&self) -> bool {
         self.pending.is_some() || !self.orphans.is_empty()
@@ -331,7 +336,7 @@ impl<V: View> Shell<V> {
         let Some(recovery) = &self.recovery else {
             return;
         };
-        if !self.editing.modified() {
+        if !self.unsaved() {
             if self.kept.0.is_some() {
                 recovery.clear();
                 self.kept.0 = None;
@@ -357,8 +362,12 @@ impl<V: View> Shell<V> {
     }
 
     /// Offer the changes a window that stopped left behind: opened, they are
-    /// the file they were made to, unsaved.
+    /// the file they were made to, unsaved. A window that has a file of its
+    /// own lets them go, for the next window that starts with none.
     fn offer_orphan(&mut self, ctx: &egui::Context) {
+        if self.path.is_some() || self.unsaved() {
+            self.orphans.clear();
+        }
         let Some(orphan) = self.orphans.first() else {
             return;
         };
@@ -386,25 +395,33 @@ impl<V: View> Shell<V> {
             return;
         };
         let orphan = self.orphans.remove(0);
-        if open {
-            match orphan.bytes() {
-                Ok(bytes) => self.open_recovered(ctx, &bytes, orphan.original.clone()),
-                Err(e) => {
-                    self.error = Some(fill(
-                        t("{file} could not be read: {reason}"),
-                        &[("file", &file), ("reason", &e.to_string())],
-                    ));
-                    return;
-                }
-            }
-            // The rest wait for the next window, as this one now holds
-            // changes of its own.
-            self.orphans.clear();
+        if !open {
+            orphan.discard();
+            return;
         }
-        orphan.discard();
+        let opened = match orphan.bytes() {
+            Ok(bytes) => self.open_recovered(ctx, &bytes, orphan.original.clone()),
+            Err(e) => {
+                self.error = Some(fill(
+                    t("The changes to {file} could not be read: {reason}"),
+                    &[("file", &file), ("reason", &e.to_string())],
+                ));
+                false
+            }
+        };
+        if opened {
+            orphan.discard();
+        }
     }
 
-    fn open_recovered(&mut self, ctx: &egui::Context, bytes: &[u8], original: Option<PathBuf>) {
+    /// Open recovered bytes; answers whether they opened, as the copy is
+    /// kept for another time if not.
+    fn open_recovered(
+        &mut self,
+        ctx: &egui::Context,
+        bytes: &[u8],
+        original: Option<PathBuf>,
+    ) -> bool {
         let shown = original
             .clone()
             .unwrap_or_else(|| PathBuf::from(t("Untitled")));
@@ -421,8 +438,12 @@ impl<V: View> Shell<V> {
                     recovery.settle();
                     self.kept = (Some(self.editing.revision()), std::time::Instant::now());
                 }
+                true
             }
-            Err(message) => self.error = Some(message),
+            Err(message) => {
+                self.error = Some(message);
+                false
+            }
         }
     }
 
@@ -834,8 +855,22 @@ impl<V: View> eframe::App for Shell<V> {
         self.keep_changes(&ctx);
     }
 
+    /// A window that ends with changes nobody was asked about, as a logout
+    /// or Quit from the macOS menu ends it, leaves them to be offered again.
     fn on_exit(&mut self) {
-        if let Some(recovery) = self.recovery.take() {
+        let Some(recovery) = self.recovery.take() else {
+            return;
+        };
+        if self.unsaved() && !self.closing {
+            if let Some(bytes) = self
+                .view
+                .document_mut()
+                .and_then(|document| document.write_verified().ok())
+            {
+                recovery.save(bytes, self.path.as_deref());
+            }
+            recovery.leave();
+        } else {
             recovery.finish();
         }
     }
