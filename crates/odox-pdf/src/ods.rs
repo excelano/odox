@@ -440,7 +440,7 @@ impl Sheets<'_, '_, '_> {
         if cell.as_ref().is_some_and(|cell| cell.covered) {
             return Ok(Vec::new());
         }
-        let mut style = document.cell_style(sheet, cell.as_ref(), column);
+        let mut style = document.shown_style(sheet, cell.as_ref(), row, column);
         if let Some(colour) = document.value_colour(sheet, row, column) {
             std::rc::Rc::make_mut(&mut style).text.color = Some(colour);
         }

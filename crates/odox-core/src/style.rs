@@ -1397,6 +1397,30 @@ impl Styles {
         properties
     }
 
+    /// A style's properties with another's laid over them, as a conditional
+    /// format applies a style to a cell: what the applied style and those of
+    /// its ancestors the first does not share say, over the first.
+    pub fn resolve_over(&self, family: &Family, name: &str, over: &str) -> Rc<Properties> {
+        let key = (family.clone(), format!("{name}\u{0}{over}"));
+        if let Some(cached) = self.cache.borrow().get(&key) {
+            return Rc::clone(cached);
+        }
+        let mut properties = (*self.resolve(family, name)).clone();
+        let shared: Vec<String> = self
+            .chain(family, name)
+            .iter()
+            .map(|style| style.name.clone())
+            .collect();
+        for style in self.chain(family, over).into_iter().rev() {
+            if !shared.contains(&style.name) {
+                properties.apply(&style.element, &self.font_faces);
+            }
+        }
+        let properties = Rc::new(properties);
+        self.cache.borrow_mut().insert(key, Rc::clone(&properties));
+        properties
+    }
+
     /// The style and its ancestors, nearest first.
     ///
     /// A cycle in the chain — which no writer produces and a hand-edited file

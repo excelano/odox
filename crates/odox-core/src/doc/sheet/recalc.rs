@@ -183,7 +183,7 @@ impl SheetDocument {
         out
     }
 
-    fn sheet_index(&self, name: &str) -> Option<usize> {
+    pub(super) fn sheet_index(&self, name: &str) -> Option<usize> {
         self.sheets
             .iter()
             .position(|sheet| sheet.name == name)
@@ -327,7 +327,7 @@ impl Cells for Book<'_> {
 }
 
 /// What a cell holds, as a formula reads it.
-fn held(cell: &Cell<'_>) -> formula::Value {
+pub(super) fn held(cell: &Cell<'_>) -> formula::Value {
     if cell.covered {
         return formula::Value::Empty;
     }
