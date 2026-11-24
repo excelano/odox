@@ -304,6 +304,10 @@ while it is true the shell draws no menu, no panel and no bar, takes none of
 its keys, puts the window full screen and fills the central panel with black,
 and the view draws one slide as large as the screen allows, keeping its shape.
 It is the view's own mode, so the keys that move through a show are the view's.
+A show passes over the slides whose drawing-page style says
+`presentation:visibility="hidden"`, unless every slide does, and Shift+F5 on a
+hidden one starts at the next shown. A link to another slide of the deck goes
+to it.
 
 **A show reveals a slide's builds click by click** (`doc/anim.rs`). The
 slide's main sequence is read into steps: each effect that starts on a click

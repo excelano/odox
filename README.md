@@ -203,7 +203,8 @@ a drag on a corner resizes it, and a click on the text in one puts the caret
 there to type into it as in `xodt`, within that shape. The Slide menu, in edit mode, adds a slide after the one in view, with a title and a text frame where its master places them, duplicates the slide in view, deletes it (never the last one) or moves it a place earlier or later, each as one step to undo. F5 starts the slideshow
 at the first slide and Shift+F5 at the one in view: the slide fills the screen
 on black, Right, Down, Space, Enter or a click go forward, Left, Up, Backspace
-or a right click go back, and Escape ends it. A slide whose shapes or paragraphs
+or a right click go back, and Escape ends it. Slides the deck hides are passed
+over, and a link to another slide goes to it. A slide whose shapes or paragraphs
 appear or leave click by click takes those clicks before the next slide, each
 effect shown at its end with no motion, and going back into a slide shows it as
 its last click left it. Page Down and Page Up go a whole slide, and Home and End
