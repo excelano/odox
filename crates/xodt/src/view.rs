@@ -354,6 +354,7 @@ impl View for TextView {
         })?;
         self.pictures.clear();
         self.document = Some(document);
+        self.region = Region::Body;
         self.scroll_to = None;
         self.place = None;
         self.page.clear();
@@ -373,6 +374,7 @@ impl View for TextView {
 
     fn close(&mut self) {
         self.document = None;
+        self.region = Region::Body;
         self.export = Export::default();
         self.pictures.clear();
         self.page.clear();
@@ -398,13 +400,23 @@ impl View for TextView {
     }
 
     fn caret(&self) -> Option<Caret> {
-        self.page
-            .selection()
-            .map(|selection| selection.focus.clone())
+        let focus = self.page.selection()?.focus.clone();
+        Some(Caret::new(
+            [self.region.tag().as_slice(), &focus.paragraph].concat(),
+            focus.offset,
+        ))
     }
 
     fn restore_caret(&mut self, caret: Caret) {
-        self.page.select(Selection::caret(caret));
+        let (region, paragraph) = Region::of(&caret.paragraph);
+        if region != self.region {
+            self.region = region;
+            self.page.clear();
+        }
+        self.page.select(Selection::caret(Caret::new(
+            paragraph.to_vec(),
+            caret.offset,
+        )));
     }
 
     fn find(&mut self, query: &str, options: Options) -> usize {
@@ -501,8 +513,10 @@ impl View for TextView {
             && !self.export.asking()
             && (!edit_mode || self.page.selection().is_none());
         if let Some(body) = document.body() {
-            self.counted
-                .update(body, editing.revision(), self.page.selection());
+            let selection = (self.region == Region::Body)
+                .then(|| self.page.selection())
+                .flatten();
+            self.counted.update(body, editing.revision(), selection);
         }
         self.scroll.paging(ui, keys, &self.counted);
 
@@ -520,6 +534,8 @@ impl View for TextView {
                 tab_keys(ui, &mut self.page, &mut model, &mut self.notice);
                 if region == Region::Body {
                     break_keys(ui, &mut self.page, &mut model);
+                } else {
+                    swallow_body_keys(ui);
                 }
                 self.page.input(ui, &mut model);
             }
@@ -542,12 +558,16 @@ impl View for TextView {
                         ui.set_min_height(page_height * width / page);
                         let master = document.master_page();
                         let band = |footer: bool| {
-                            master.and_then(|m| {
-                                m.child(
-                                    &odox_core::Ns::Style,
-                                    if footer { "footer" } else { "header" },
-                                )
-                            })
+                            master
+                                .and_then(|m| {
+                                    m.child(
+                                        &odox_core::Ns::Style,
+                                        if footer { "footer" } else { "header" },
+                                    )
+                                })
+                                .filter(|b| {
+                                    b.attr(&odox_core::Ns::Style, "display") != Some("false")
+                                })
                         };
                         let active = edit_mode.then_some(self.region);
                         let mut wanted = None;
@@ -750,6 +770,15 @@ impl TextView {
     /// asked for: carried out here, or asked about first.
     fn edit_toolbar(&mut self, ui: &mut Ui, editing: &mut Editing, edit_mode: bool) {
         let command = if edit_mode { self.command.take() } else { None };
+        let body_only = matches!(
+            command,
+            Some(Command::Comment | Command::Note(_) | Command::PageBreak(_))
+        );
+        let command = if body_only && self.region != Region::Body {
+            None
+        } else {
+            command
+        };
         if let Some(Command::Band { footer, on }) = command {
             self.band(footer, on, editing);
         }
@@ -813,7 +842,9 @@ impl TextView {
         if asked.notice.is_some() {
             self.notice = asked.notice;
         }
-        self.menu = MenuState::of(&self.page, &model, true).with_bands(bands.0, bands.1);
+        self.menu = MenuState::of(&self.page, &model, true)
+            .with_bands(bands.0, bands.1)
+            .in_band(region != Region::Body);
         ui.separator();
     }
 
@@ -823,23 +854,23 @@ impl TextView {
         let Some(document) = &mut self.document else {
             return;
         };
-        let holds_text = document
+        let holds_anything = document
             .band_path(footer)
-            .and_then(|path| {
-                document
-                    .document
-                    .styles_part
-                    .as_ref()?
-                    .at(&path)
-                    .map(odox_core::Element::plain_text)
-            })
-            .is_some_and(|text| !text.trim().is_empty());
-        if !on && holds_text && self.band_question.is_none() {
+            .and_then(|path| document.document.styles_part.as_ref()?.at(&path).cloned())
+            .is_some_and(|band| {
+                let mut children = band.elements();
+                let empty_paragraph = children.next().is_some_and(|first| {
+                    first.is(&odox_core::Ns::Text, "p")
+                        && first.elements().next().is_none()
+                        && first.plain_text().trim().is_empty()
+                });
+                !(empty_paragraph && children.next().is_none())
+            });
+        if !on && holds_anything && self.band_question.is_none() {
             self.band_question = Some(footer);
             return;
         }
         self.band_question = None;
-        let content = document.document.content.clone();
         let styles = document.document.styles_part.clone();
         let changed = if footer {
             document.set_footer(on)
@@ -848,7 +879,7 @@ impl TextView {
         };
         match changed {
             Ok(true) => {
-                editing.record_styles(content, styles, None);
+                editing.record_styles_part(styles, odox_core::Kept::default(), None);
                 let removed = if footer {
                     Region::Footer
                 } else {
@@ -1136,6 +1167,31 @@ enum Region {
     Footer,
 }
 
+/// What an undo step's caret begins with in a header or a footer, which no
+/// path in the body does.
+const HEADER: usize = usize::MAX;
+const FOOTER: usize = usize::MAX - 1;
+
+impl Region {
+    /// What the carets an undo step remembers in this part begin with.
+    fn tag(self) -> Vec<usize> {
+        match self {
+            Self::Body => Vec::new(),
+            Self::Header => vec![HEADER],
+            Self::Footer => vec![FOOTER],
+        }
+    }
+
+    /// The part a remembered caret is in, and its path there.
+    fn of(path: &[usize]) -> (Self, &[usize]) {
+        match path.split_first() {
+            Some((&HEADER, rest)) => (Self::Header, rest),
+            Some((&FOOTER, rest)) => (Self::Footer, rest),
+            _ => (Self::Body, path),
+        }
+    }
+}
+
 /// Draw a page header or footer, with the page editor where it is being typed
 /// into; answers whether it was clicked into where it is not.
 fn band_drawn(
@@ -1177,6 +1233,19 @@ fn rule(ui: &mut Ui, palette: odox_ui::format::Palette) {
     );
 }
 
+/// In a header or footer, take the keys that put in a page break, a footnote
+/// or a comment, which belong to the body, so that they do nothing there
+/// rather than reach the find bar or split the paragraph.
+fn swallow_body_keys(ui: &Ui) {
+    ui.input_mut(|input| {
+        let command = egui::Modifiers::COMMAND;
+        let alt = egui::Modifiers::COMMAND | egui::Modifiers::ALT;
+        input.consume_key(command, egui::Key::Enter);
+        input.consume_key(alt, egui::Key::F);
+        input.consume_key(alt, egui::Key::C);
+    });
+}
+
 /// The model of a part of the page, with the package a picture put in it is
 /// kept in: the body in the content, a header or footer in the styles part.
 fn region_model<'d>(
@@ -1199,7 +1268,9 @@ fn region_model<'d>(
     let model = if region == Region::Body {
         FlowModel::new(content, styles, root, editing)
     } else {
-        FlowModel::new(styles_part.as_mut()?, styles, root, editing).in_styles_part()
+        FlowModel::new(styles_part.as_mut()?, styles, root, editing)
+            .in_styles_part()
+            .tagged(region.tag())
     };
     Some((model, package))
 }
@@ -1406,5 +1477,42 @@ mod tests {
         view.band(false, false, &mut editing);
         assert_eq!(view.band_question, None);
         assert!(!has_header(&view));
+    }
+
+    #[test]
+    fn a_remembered_caret_takes_the_page_to_its_part() {
+        use odox_ui::View;
+        let (mut view, _) = with_header("Words");
+        view.restore_caret(odox_ui::Caret::new(vec![super::HEADER, 0], 2));
+        assert_eq!(view.region, super::Region::Header);
+        let caret = view.caret().expect("a caret");
+        assert_eq!(caret.paragraph, vec![super::HEADER, 0]);
+        view.restore_caret(odox_ui::Caret::new(vec![3], 1));
+        assert_eq!(view.region, super::Region::Body);
+        assert_eq!(view.caret().expect("a caret").paragraph, vec![3]);
+    }
+
+    #[test]
+    fn a_header_with_a_picture_and_no_text_is_asked_about() {
+        let (mut view, mut editing) = with_header("");
+        let document = view.document.as_mut().expect("open");
+        let path = document.band_path(false).expect("a header");
+        let header = document
+            .document
+            .styles_part
+            .as_mut()
+            .and_then(|part| part.at_mut(&path))
+            .expect("the header");
+        let paragraph = header.child_mut(&Ns::Text, "p").expect("its paragraph");
+        paragraph
+            .children
+            .push(Node::Element(odox_core::Element::new(
+                "draw",
+                "frame",
+                Ns::Draw,
+            )));
+        paragraph.self_closing = false;
+        view.band(false, false, &mut editing);
+        assert_eq!(view.band_question, Some(false));
     }
 }

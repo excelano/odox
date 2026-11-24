@@ -514,6 +514,9 @@ pub struct MenuState {
     spacing: Option<LineSpacing>,
     /// Whether the page has a header, and a footer.
     bands: (bool, bool),
+    /// Whether the caret is in a page header or footer, where comments,
+    /// notes and page breaks have no place.
+    in_band: bool,
 }
 
 impl MenuState {
@@ -522,6 +525,13 @@ impl MenuState {
     #[must_use]
     pub fn with_bands(mut self, header: bool, footer: bool) -> Self {
         self.bands = (header, footer);
+        self
+    }
+
+    /// The same, saying whether the caret is in a header or footer.
+    #[must_use]
+    pub fn in_band(mut self, in_band: bool) -> Self {
+        self.in_band = in_band;
         self
     }
 
@@ -548,6 +558,7 @@ impl MenuState {
             align: model.alignment(selection),
             spacing: model.line_spacing(selection),
             bands: (false, false),
+            in_band: false,
             script: match editor.value(model, Property::Script) {
                 Some(Value::Script(script)) => Some(script),
                 _ => None,
@@ -658,6 +669,46 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// The Format menu's comment and notes, which belong to the body.
+fn notes_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::C,
+    ));
+    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
+    if ui
+        .add_enabled(state.enabled && !state.in_band, comment)
+        .clicked()
+    {
+        chosen = Some(Command::Comment);
+        ui.close();
+    }
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::F,
+    ));
+    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
+    if ui
+        .add_enabled(state.enabled && !state.in_band, footnote)
+        .clicked()
+    {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
+        ui.close();
+    }
+    if ui
+        .add_enabled(
+            state.enabled && !state.in_band,
+            egui::Button::new(t("Endnote")),
+        )
+        .clicked()
+    {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
+        ui.close();
+    }
+    chosen
+}
+
 /// Format > Field: a date, fixed or following the day, the page number or
 /// the page count.
 fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
@@ -734,35 +785,14 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         .ctx()
         .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Enter));
     let insert = egui::Button::new(t("Insert page break")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, insert).clicked() {
+    if ui
+        .add_enabled(state.enabled && !state.in_band, insert)
+        .clicked()
+    {
         chosen = Some(Command::PageBreak(true));
         ui.close();
     }
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::C,
-    ));
-    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, comment).clicked() {
-        chosen = Some(Command::Comment);
-        ui.close();
-    }
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::F,
-    ));
-    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, footnote).clicked() {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
-        ui.close();
-    }
-    if ui
-        .add_enabled(state.enabled, egui::Button::new(t("Endnote")))
-        .clicked()
-    {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
-        ui.close();
-    }
+    chosen = notes_menu(ui, state).or(chosen);
     chosen = field_menu(ui, state).or(chosen);
     let remove = egui::Button::new(t("Remove page break"));
     if ui.add_enabled(state.here.page_break, remove).clicked() {
