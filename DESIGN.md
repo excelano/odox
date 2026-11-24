@@ -732,6 +732,22 @@ table selects what the next cell holds and Shift+Tab the one before, row by
 row, and Tab in the last cell puts in a row and goes to its first. Each change
 is one step to undo.
 
+**Cells are merged and split, and columns resized, from the same submenu**
+(`edit/cells.rs`). Merge cells takes the rectangle from the cell the selection
+starts in to the one it ends in, and makes its top left cell span it with
+`table:number-columns-spanned` and `table:number-rows-spanned`, the paragraphs
+of the other cells after its own, empty cells adding none, and a
+`table:covered-table-cell` at every other place, as `LibreOffice` and xods write
+a merge. A rectangle that cuts across a cell merged already is refused, and the
+window says why. Split cell gives back an empty cell at every place the caret's
+cell covered. In edit mode an edge between two columns is dragged to resize the
+two beside it, the table keeping its width and neither column narrower than
+half a centimetre, and Equal column widths shares the table's width out evenly.
+A width is written as `style:column-width` and as `style:rel-column-width` in
+twentieths of a point; a table whose columns state no width is not resized.
+The window draws a merged cell in its first row, at the width of the columns
+it spans.
+
 The caret stands in the paragraph's flat text, and what is drawn is not that
 text character for character: a tab is drawn as spaces, a note as its
 citation, a field as its value. The renderer records each such piece as it

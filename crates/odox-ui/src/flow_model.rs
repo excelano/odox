@@ -645,6 +645,103 @@ impl<'a> FlowModel<'a> {
         })
     }
 
+    /// Merge the cells a selection runs over, from the cell it starts in to
+    /// the cell it ends in, as one step to undo, the caret going to the merged
+    /// cell's first paragraph.
+    ///
+    /// # Errors
+    ///
+    /// The selection's ends are not in one table, or the rectangle cuts across
+    /// a cell merged already.
+    pub fn merge_cells(&mut self, editor: &mut PageEditor) -> Result<(), Refused> {
+        let anchor = editor
+            .selection()
+            .map(|s| [self.root.as_slice(), &s.anchor.paragraph].concat())
+            .ok_or(Refused::NotFound)?;
+        self.structural(editor, |content, focus, _| {
+            let (Some(from), Some(to)) = (
+                edit::table_at(content, &anchor),
+                edit::table_at(content, focus),
+            ) else {
+                return Err(Refused::NotFound);
+            };
+            if from.table != to.table {
+                return Err(Refused::Structure);
+            }
+            let rows = from.row.min(to.row)..from.row.max(to.row) + 1;
+            let columns = from.column.min(to.column)..from.column.max(to.column) + 1;
+            edit::merge_cells(content, &from.table, rows, columns)
+        })
+    }
+
+    /// Split the merged cell the caret is in back into the cells it covers, as
+    /// one step to undo.
+    ///
+    /// # Errors
+    ///
+    /// The caret is not in a table, or the table has repeated rows or cells.
+    pub fn split_cell(&mut self, editor: &mut PageEditor) -> Result<(), Refused> {
+        self.structural(editor, |content, focus, _| {
+            let cell = (1..focus.len())
+                .rev()
+                .find(|&depth| {
+                    content
+                        .at(&focus[..depth])
+                        .is_some_and(|e| e.is(&Ns::Table, "table-cell"))
+                })
+                .map(|depth| focus[..depth].to_vec())
+                .ok_or(Refused::NotFound)?;
+            edit::split_cell(content, &cell)?;
+            Ok(focus.to_vec())
+        })
+    }
+
+    /// Make every column of the table the caret is in the same width, as one
+    /// step to undo.
+    ///
+    /// # Errors
+    ///
+    /// The caret is not in a table, or a column's width is not stated.
+    pub fn equal_widths(&mut self, editor: &mut PageEditor) -> Result<(), Refused> {
+        self.structural(editor, |content, focus, styles| {
+            let table = edit::table_at(content, focus)
+                .ok_or(Refused::NotFound)?
+                .table;
+            edit::equal_widths(content, &table, styles)?;
+            Ok(focus.to_vec())
+        })
+    }
+
+    /// Make a column of a table, by its path under the root the flow draws, a
+    /// width in points, as a dragged edge does, as one step to undo.
+    ///
+    /// # Errors
+    ///
+    /// As [`edit::set_column_width`].
+    pub fn set_column_width(
+        &mut self,
+        table: &[usize],
+        column: usize,
+        width: f32,
+    ) -> Result<(), Refused> {
+        let before = self.content.clone();
+        let children = self.content.children.len();
+        let path = [self.root.as_slice(), table].concat();
+        if let Err(refused) =
+            edit::set_column_width(self.content, &path, column, width, self.styles)
+        {
+            *self.content = before;
+            return Err(refused);
+        }
+        if *self.content == before {
+            return Ok(());
+        }
+        self.follow_styles(children);
+        self.editing.touch();
+        self.editing.record_step(before, Kept::default(), None);
+        Ok(())
+    }
+
     /// Tab and Shift+Tab in a table: select what the next cell or the one
     /// before holds, and past the last cell put in a row and go to its first.
     /// Answers whether the caret was in a table, and so whether the key was
@@ -1869,6 +1966,34 @@ mod tests {
         assert_eq!(caret.as_ref().map(|c| c.offset), Some(0));
         let page = caret.expect("a caret").paragraph;
         assert!(model.page_break_here(&egui_richedit::Selection::caret(Position::new(page, 0))));
+        let mut current = holding(&content);
+        let mut undone = 0;
+        while editing.undo(&mut current, None).is_some() {
+            undone += 1;
+        }
+        assert_eq!(undone, 1);
+        assert_eq!(current.content, original);
+    }
+
+    #[test]
+    fn merging_a_selection_of_cells_is_one_step_and_undo_restores_tree() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:text><table:table><table:table-column/><table:table-column/><table:table-row><table:table-cell><text:p>a</text:p></table:table-cell><table:table-cell><text:p>b</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell><text:p>c</text:p></table:table-cell><table:table-cell><text:p>d</text:p></table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let original = content.clone();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        editing.reset();
+        let mut editor = super::page_editor();
+        editor.select(egui_richedit::Selection {
+            anchor: Position::new(vec![0, 2, 0, 0], 0),
+            focus: Position::new(vec![0, 3, 1, 0], 1),
+        });
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        model.merge_cells(&mut editor).expect("merged");
+        assert_eq!(model.text(&vec![0, 2, 0, 3]).as_deref(), Some("d"));
         let mut current = holding(&content);
         let mut undone = 0;
         while editing.undo(&mut current, None).is_some() {
