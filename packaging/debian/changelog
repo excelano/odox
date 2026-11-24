@@ -1,3 +1,19 @@
+odox (0.19.1) unstable; urgency=low
+
+  * A shadow's outline no longer darkens a ring over its fill
+  * The default font colour, Dark Red 2, is in the colour palette
+  * Words added to the dictionary are taken in capitals and in other windows, and a failure to keep one is shown
+  * A link whose text carries a style of its own is drawn as a link
+  * The slideshow passes over hidden slides and follows links to other slides
+  * Shift+F5 starts the slideshow at the slide in view
+  * Promote and Demote heading are offered only when the selection is headings
+  * The Format menu fits a short window, with the text marks and alignment in submenus
+  * A document opened from Finder asks before replacing one with unsaved changes
+  * Quitting or opening from an empty window no longer asks to save an untitled document
+  * Renaming a sheet whose name has a space keeps its print and conditional-format ranges whole
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 24 Nov 2026 14:01:31 -0600
+
 odox (0.19.0) unstable; urgency=low
 
   * Refusals in a sheet say why, a read-only file system asks for another place, and the privacy and store text match what is written where
