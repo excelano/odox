@@ -139,7 +139,8 @@ A comment is marked in the margin, and its author, date and text show beside the
 mark under the pointer or when the caret reaches it; in edit mode its text is
 edited or deleted there, and Ctrl+Alt+C, or Format > Comment, puts a new one on
 the selection. In `xodp` a slide's comments are marked where they sit, and
-Slide > Comment adds one.
+Slide > Comment adds one, and Slide > Text box and Slide > Picture… put a text box or
+a picture on the slide.
 Ctrl+Enter begins a page at the caret, drawn as a dashed rule in the window and
 taking effect in the PDF; Backspace at its start, or Format > Remove page break,
 takes it out. The

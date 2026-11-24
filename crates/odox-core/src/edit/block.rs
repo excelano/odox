@@ -77,7 +77,7 @@ fn list_kind_of(content: &Element, path: &[usize], styles: &Styles) -> Option<Li
 }
 
 /// What the namespaces an edit writes in have to be declared.
-pub(super) fn declares(content: &Element, spaces: &[Ns]) -> Result<(), Refused> {
+pub(crate) fn declares(content: &Element, spaces: &[Ns]) -> Result<(), Refused> {
     spaces
         .iter()
         .all(|space| content.declares(space))
