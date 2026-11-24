@@ -933,9 +933,14 @@ impl Wanted {
         if let Some((id, accept)) = self.decision.take()
             && model.decide(page, id.as_deref(), accept).is_err()
         {
-            *notice = Some(Notice::Problem(
-                t("This change cannot be rejected: the text it took out has nowhere to go back to.").to_owned(),
-            ));
+            let said = if accept {
+                t("This change cannot be accepted: it is no longer in the document.")
+            } else {
+                t(
+                    "This change cannot be rejected: its marks in the text are missing or stand where its text cannot go back.",
+                )
+            };
+            *notice = Some(Notice::Problem(said.to_owned()));
         }
         if let Some((table, column, width)) = self.column.take()
             && model.set_column_width(&table, column, width).is_err()

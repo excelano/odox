@@ -129,12 +129,110 @@ fn document_is_unchanged_after_open() {
 }
 
 #[test]
-fn tracking_is_read_from_the_body() {
-    let source = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text text:track-changes="true"><text:p/></office:text></office:body></office:document-content>"#;
-    assert!(tracking(
-        &xml::parse(source.as_bytes(), "test").expect("parsed")
+fn tracking_is_read_from_the_tracked_changes_element() {
+    assert!(tracking(&fixture().document.content));
+    assert!(!tracking(&body("<text:p/>")));
+    assert!(!tracking(&body(
+        r#"<text:tracked-changes text:track-changes="false"/><text:p/>"#
+    )));
+}
+
+const NAMESPACES: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/""#;
+
+fn body(inner: &str) -> Element {
+    let source = format!(
+        "<office:document-content {NAMESPACES}><office:body><office:text>{inner}</office:text></office:body></office:document-content>"
+    );
+    xml::parse(source.as_bytes(), "test").expect("parsed")
+}
+
+fn region(id: &str, kind: &str, inner: &str) -> String {
+    format!(
+        r#"<text:changed-region text:id="{id}"><text:{kind}><office:change-info><dc:creator>A</dc:creator></office:change-info>{inner}</text:{kind}></text:changed-region>"#
+    )
+}
+
+fn written(content: &Element) -> String {
+    String::from_utf8(xml::serialize(content)).expect("UTF-8")
+}
+
+#[test]
+fn reject_deletion_holding_a_list_restores_the_list() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes>{}</text:tracked-changes><text:p>A<text:change text:change-id="d"/>B</text:p>"#,
+        region(
+            "d",
+            "deletion",
+            "<text:p>one</text:p><text:list><text:list-item><text:p>item</text:p></text:list-item></text:list><text:p>two</text:p>"
+        )
     ));
-    assert!(!tracking(&fixture().document.content));
+    reject(&mut root, "d").expect("rejected");
+    let out = written(&root);
+    assert!(out.contains("<text:p>Aone</text:p><text:list><text:list-item><text:p>item</text:p></text:list-item></text:list><text:p>twoB</text:p>"), "{out}");
+}
+
+#[test]
+fn reject_deletion_marked_between_paragraphs_restores_them_there() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes>{}</text:tracked-changes><text:p>A</text:p><text:change text:change-id="d"/><text:p>B</text:p>"#,
+        region("d", "deletion", "<text:p>gone</text:p>")
+    ));
+    reject(&mut root, "d").expect("rejected");
+    let out = written(&root);
+    assert!(
+        out.contains("<text:p>A</text:p><text:p>gone</text:p><text:p>B</text:p>"),
+        "{out}"
+    );
+}
+
+#[test]
+fn reject_insertion_without_its_end_is_refused_and_changes_nothing() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes>{}</text:tracked-changes><text:p>A<text:change-start text:change-id="i"/>new</text:p>"#,
+        region("i", "insertion", "")
+    ));
+    let before = root.clone();
+    assert!(reject(&mut root, "i").is_err());
+    assert!(root == before);
+}
+
+#[test]
+fn accepting_the_last_change_keeps_the_recording_switch() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes text:track-changes="true">{}</text:tracked-changes><text:p>A<text:change-start text:change-id="i"/>new<text:change-end text:change-id="i"/></text:p>"#,
+        region("i", "insertion", "")
+    ));
+    accept_all(&mut root).expect("accepted");
+    assert!(tracking(&root));
+}
+
+#[test]
+fn reject_deletion_keeps_its_last_paragraphs_kind() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes>{}</text:tracked-changes><text:p>A<text:change text:change-id="d"/>B</text:p>"#,
+        region(
+            "d",
+            "deletion",
+            r#"<text:p>x</text:p><text:h text:outline-level="1">Head</text:h>"#
+        )
+    ));
+    reject(&mut root, "d").expect("rejected");
+    let out = written(&root);
+    assert!(
+        out.contains(r#"<text:h text:outline-level="1">HeadB</text:h>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn rejecting_an_insertion_takes_the_changes_inside_it_too() {
+    let mut root = body(&format!(
+        r#"<text:tracked-changes>{}{}</text:tracked-changes><text:p>A<text:change-start text:change-id="i"/>new</text:p><text:p>mid<text:change text:change-id="d"/>dle</text:p><text:p>end<text:change-end text:change-id="i"/>B</text:p>"#,
+        region("i", "insertion", ""),
+        region("d", "deletion", "<text:p>gone</text:p>")
+    ));
+    reject(&mut root, "i").expect("rejected");
+    assert!(changes(&root).is_empty(), "{}", written(&root));
 }
 
 #[test]

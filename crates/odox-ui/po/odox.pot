@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 20:56-0600\n"
+"POT-Creation-Date: 2026-11-23 21:13-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -180,27 +180,27 @@ msgstr ""
 msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1443
+#: crates/odox-ui/src/flow.rs:1456
 msgid "Inserted"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1444
+#: crates/odox-ui/src/flow.rs:1457
 msgid "Deleted"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1445
+#: crates/odox-ui/src/flow.rs:1458
 msgid "Formatted"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1530
+#: crates/odox-ui/src/flow.rs:1543
 msgid "Endnote {number}"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1532
+#: crates/odox-ui/src/flow.rs:1545
 msgid "Footnote {number}"
 msgstr ""
 
-#: crates/odox-ui/src/flow.rs:1638
+#: crates/odox-ui/src/flow.rs:1658
 msgid "Page break"
 msgstr ""
 
@@ -1109,49 +1109,53 @@ msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
 
 #: crates/xodt/src/view.rs:937
-msgid ""
-"This change cannot be rejected: the text it took out has nowhere to go back "
-"to."
+msgid "This change cannot be accepted: it is no longer in the document."
 msgstr ""
 
-#: crates/xodt/src/view.rs:944
+#: crates/xodt/src/view.rs:939
+msgid ""
+"This change cannot be rejected: its marks in the text are missing or stand "
+"where its text cannot go back."
+msgstr ""
+
+#: crates/xodt/src/view.rs:947
 msgid ""
 "These columns cannot be resized: their widths are not stated, or together "
 "they are under a centimetre."
 msgstr ""
 
-#: crates/xodt/src/view.rs:963
+#: crates/xodt/src/view.rs:966
 msgid "This document has tracked changes."
 msgstr ""
 
-#: crates/xodt/src/view.rs:965
+#: crates/xodt/src/view.rs:968
 msgid "Edits made here are not tracked."
 msgstr ""
 
-#: crates/xodt/src/view.rs:968
+#: crates/xodt/src/view.rs:971
 msgid "Accept all"
 msgstr ""
 
-#: crates/xodt/src/view.rs:971
+#: crates/xodt/src/view.rs:974
 msgid "Reject all"
 msgstr ""
 
-#: crates/xodt/src/view.rs:1062
+#: crates/xodt/src/view.rs:1065
 msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1064
+#: crates/xodt/src/view.rs:1067
 msgid "These cells cannot be merged: the table has repeated rows or cells."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1069
+#: crates/xodt/src/view.rs:1072
 msgid "The caret is not in a table cell."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1071
+#: crates/xodt/src/view.rs:1074
 msgid "This cell cannot be split: the table has repeated rows or cells."
 msgstr ""
 
-#: crates/xodt/src/view.rs:1077
+#: crates/xodt/src/view.rs:1080
 msgid "This table does not say how wide its columns are."
 msgstr ""

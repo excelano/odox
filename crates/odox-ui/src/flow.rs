@@ -280,8 +280,8 @@ pub struct Flow<'a> {
     /// The document's tracked changes, each with its author's ink, read the
     /// first time a paragraph asks.
     tracked: std::cell::OnceCell<HashMap<String, (edit::Change, Color32)>>,
-    /// The ink of the insertion the text being laid out is in.
-    inserting: std::cell::Cell<Option<Color32>>,
+    /// The insertion the text being laid out is in, and its ink.
+    inserting: std::cell::RefCell<Option<(String, Color32)>>,
     /// Where the flow is, as a path of child indices from the root, or from
     /// wherever [`Self::start_at`] said the root sits.
     path: Vec<usize>,
@@ -315,7 +315,7 @@ impl<'a> Flow<'a> {
             marks: false,
             decided: None,
             tracked: std::cell::OnceCell::new(),
-            inserting: std::cell::Cell::new(None),
+            inserting: std::cell::RefCell::new(None),
             path: Vec::new(),
             detached: false,
         }
@@ -643,7 +643,7 @@ impl Flow<'_> {
             }
         } else {
             let over = self.marks
-                || !self.tracked().is_empty()
+                || holds_change_mark(element)
                 || element.descendant(&Ns::Office, "annotation").is_some()
                 || element.descendant(&Ns::Text, "note").is_some();
             let kept =
@@ -843,7 +843,11 @@ impl Flow<'_> {
             let same_length = shown.chars().count() == model_len;
             for (piece, drawn_small) in inherited.cased(shown) {
                 let plain = if drawn_small { &small } else { format };
-                let tinted = self.inserting.get().map(|ink| inserted(plain, ink));
+                let tinted = self
+                    .inserting
+                    .borrow()
+                    .as_ref()
+                    .map(|(_, ink)| inserted(plain, *ink));
                 let format = tinted.as_ref().unwrap_or(plain);
                 if !counted {
                     job.atom(&piece, 0, format.clone());
@@ -1377,10 +1381,14 @@ impl Flow<'_> {
             if let Some((change, ink)) = change()
                 && change.kind == edit::ChangeKind::Insertion
             {
-                self.inserting.set(Some(*ink));
+                *self.inserting.borrow_mut() = Some((change.id.clone(), *ink));
             }
         } else if element.is(&Ns::Text, "change-end") {
-            self.inserting.set(None);
+            let mut inserting = self.inserting.borrow_mut();
+            if inserting.as_ref().map(|(id, _)| id.as_str()) == element.attr(&Ns::Text, "change-id")
+            {
+                *inserting = None;
+            }
         } else if element.is(&Ns::Text, "change") {
             if let Some((change, ink)) = change()
                 && let Some(deleted) = &change.deleted
@@ -1463,7 +1471,7 @@ impl Flow<'_> {
                 header,
                 text: String::new(),
             };
-            let key = eframe::egui::Id::unique(("odox-change", id.clone()));
+            let key = eframe::egui::Id::unique(("odox-change", self.path.clone(), id.clone()));
             let wanted = ui.rect_contains_pointer(rect);
             if let Some(accept) = note_popup::change(ui, rect, key, &content, wanted, editable) {
                 self.decided = Some((id, accept));
@@ -1492,7 +1500,7 @@ impl Flow<'_> {
         if element.descendant(&Ns::Text, "note").is_some() {
             self.notes(ui, element, (&galley, &map), origin);
         }
-        if !self.tracked().is_empty() {
+        if holds_change_mark(element) {
             self.changes(ui, element, (&galley, &map), origin);
         }
     }
@@ -1623,6 +1631,13 @@ impl Flow<'_> {
             }
         }
     }
+}
+
+/// Whether a paragraph holds a tracked change's mark.
+fn holds_change_mark(paragraph: &Element) -> bool {
+    ["change", "change-start", "change-end"]
+        .into_iter()
+        .any(|local| paragraph.descendant(&Ns::Text, local).is_some())
 }
 
 /// A format tinted as inserted text: in its author's ink, underlined.

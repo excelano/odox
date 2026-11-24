@@ -851,8 +851,8 @@ impl<'a> FlowModel<'a> {
     }
 
     /// Accept or reject a tracked change, or every one when `id` is none, as
-    /// one step to undo. Where the paragraphs move, the caret is let go
-    /// rather than left in another paragraph.
+    /// one step to undo. The caret is let go, since the paragraphs it was
+    /// counted among may have moved.
     ///
     /// # Errors
     ///
@@ -864,8 +864,6 @@ impl<'a> FlowModel<'a> {
         accept: bool,
     ) -> Result<(), Refused> {
         let before = self.content.clone();
-        let blocks = |content: &Element, root: &[usize]| content.at(root).map(|e| e.children.len());
-        let had = blocks(self.content, &self.root);
         let changed = match (id, accept) {
             (Some(id), true) => edit::accept(self.content, id),
             (Some(id), false) => edit::reject(self.content, id),
@@ -876,9 +874,7 @@ impl<'a> FlowModel<'a> {
             *self.content = before;
             return Err(refused);
         }
-        if blocks(self.content, &self.root) != had {
-            editor.clear();
-        }
+        editor.clear();
         self.order = OnceCell::new();
         self.editing.touch();
         self.editing.record_snapshot(before, None);

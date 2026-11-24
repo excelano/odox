@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 20:56-0600\n"
+"POT-Creation-Date: 2026-11-23 21:13-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: none\n"
@@ -196,27 +196,27 @@ msgid "Text that reads right to left cannot be edited yet."
 msgstr ""
 "[Téxt thät réädš ríght tö léft cäññöt bé édítéd yét. ·····················]"
 
-#: crates/odox-ui/src/flow.rs:1443
+#: crates/odox-ui/src/flow.rs:1456
 msgid "Inserted"
 msgstr "[Îñšértéd ····]"
 
-#: crates/odox-ui/src/flow.rs:1444
+#: crates/odox-ui/src/flow.rs:1457
 msgid "Deleted"
 msgstr "[Délétéd ···]"
 
-#: crates/odox-ui/src/flow.rs:1445
+#: crates/odox-ui/src/flow.rs:1458
 msgid "Formatted"
 msgstr "[Förmättéd ····]"
 
-#: crates/odox-ui/src/flow.rs:1530
+#: crates/odox-ui/src/flow.rs:1543
 msgid "Endnote {number}"
 msgstr "[Éñdñöté {number} ·······]"
 
-#: crates/odox-ui/src/flow.rs:1532
+#: crates/odox-ui/src/flow.rs:1545
 msgid "Footnote {number}"
 msgstr "[Föötñöté {number} ·······]"
 
-#: crates/odox-ui/src/flow.rs:1638
+#: crates/odox-ui/src/flow.rs:1658
 msgid "Page break"
 msgstr "[Pägé bréäk ·····]"
 
@@ -1142,14 +1142,20 @@ msgstr ""
 "····························]"
 
 #: crates/xodt/src/view.rs:937
-msgid ""
-"This change cannot be rejected: the text it took out has nowhere to go back "
-"to."
+msgid "This change cannot be accepted: it is no longer in the document."
 msgstr ""
-"[Thíš chäñgé cäññöt bé réjéctéd: thé téxt ít töök öüt häš ñöwhéré tö gö bäck "
-"tö. ································]"
+"[Thíš chäñgé cäññöt bé äccéptéd: ít íš ñö löñgér íñ thé döcüméñt. "
+"··························]"
 
-#: crates/xodt/src/view.rs:944
+#: crates/xodt/src/view.rs:939
+msgid ""
+"This change cannot be rejected: its marks in the text are missing or stand "
+"where its text cannot go back."
+msgstr ""
+"[Thíš chäñgé cäññöt bé réjéctéd: ítš märkš íñ thé téxt äré míššíñg ör štäñd "
+"whéré ítš téxt cäññöt gö bäck. ···········································]"
+
+#: crates/xodt/src/view.rs:947
 msgid ""
 "These columns cannot be resized: their widths are not stated, or together "
 "they are under a centimetre."
@@ -1157,45 +1163,45 @@ msgstr ""
 "[Théšé cölümñš cäññöt bé réšízéd: théír wídthš äré ñöt štätéd, ör tögéthér "
 "théy äré üñdér ä céñtímétré. ·········································]"
 
-#: crates/xodt/src/view.rs:963
+#: crates/xodt/src/view.rs:966
 msgid "This document has tracked changes."
 msgstr "[Thíš döcüméñt häš träckéd chäñgéš. ··············]"
 
-#: crates/xodt/src/view.rs:965
+#: crates/xodt/src/view.rs:968
 msgid "Edits made here are not tracked."
 msgstr "[Édítš mädé héré äré ñöt träckéd. ·············]"
 
-#: crates/xodt/src/view.rs:968
+#: crates/xodt/src/view.rs:971
 msgid "Accept all"
 msgstr "[Åccépt äll ·····]"
 
-#: crates/xodt/src/view.rs:971
+#: crates/xodt/src/view.rs:974
 msgid "Reject all"
 msgstr "[Réjéct äll ·····]"
 
-#: crates/xodt/src/view.rs:1062
+#: crates/xodt/src/view.rs:1065
 msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 "[Séléct thé céllš tö mérgé, fröm öñé céll öf ä täblé tö äñöthér. "
 "··························]"
 
-#: crates/xodt/src/view.rs:1064
+#: crates/xodt/src/view.rs:1067
 msgid "These cells cannot be merged: the table has repeated rows or cells."
 msgstr ""
 "[Théšé céllš cäññöt bé mérgéd: thé täblé häš répéätéd röwš ör céllš. "
 "···························]"
 
-#: crates/xodt/src/view.rs:1069
+#: crates/xodt/src/view.rs:1072
 msgid "The caret is not in a table cell."
 msgstr "[Thé cärét íš ñöt íñ ä täblé céll. ··············]"
 
-#: crates/xodt/src/view.rs:1071
+#: crates/xodt/src/view.rs:1074
 msgid "This cell cannot be split: the table has repeated rows or cells."
 msgstr ""
 "[Thíš céll cäññöt bé šplít: thé täblé häš répéätéd röwš ör céllš. "
 "··························]"
 
-#: crates/xodt/src/view.rs:1077
+#: crates/xodt/src/view.rs:1080
 msgid "This table does not say how wide its columns are."
 msgstr ""
 "[Thíš täblé döéš ñöt šäy höw wídé ítš cölümñš äré. ····················]"

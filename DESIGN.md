@@ -989,12 +989,20 @@ draws an insertion underlined and a deletion struck through at its mark, both
 in an ink per author from a fixed set legible on either paper; the deleted text
 is drawn as an atom, so it is not edited and adds nothing to the paragraph's
 text. A bar over the page says the document has changes, and that edits made
-here are not tracked when the body asks for tracking. Accepting a change takes
-its marks and region out; rejecting an insertion takes out its text too, and
-rejecting a deletion puts its paragraphs back at the mark, the first's text
-there and, where there were more, the paragraph split around the rest.
-Rejecting a format change keeps the formatting, since ODF records no former
-one to go back to. Each is one step to undo. The PDF prints the accepted
+here are not tracked when the document asks for tracking: its
+`text:tracked-changes` has no `text:track-changes="false"`, true being the
+attribute's default, and `LibreOffice` leaving it out either way. Accepting a
+change takes its marks and region out, and the emptied list of regions too
+unless it carries attributes. Rejecting an insertion takes out its text too,
+with the records of any change marked inside it; rejecting a deletion puts
+what it took out back at its mark: one paragraph's text there, or else the
+paragraph split there, a first deleted paragraph's text ending the first half,
+a last one, in its own kind and style, beginning the second, and lists and
+tables between them, or the blocks themselves where the mark stands between
+blocks. An insertion without both its ends in paragraphs, or a deletion
+without its one mark, is refused with nothing changed. Rejecting a format
+change keeps the formatting, since ODF records no former one to go back to.
+Each is one step to undo, and lets go of the caret. The PDF prints the accepted
 state: inserted text, and no deleted text.
 
 **A footnote or an endnote is a `text:note` where it is cited**

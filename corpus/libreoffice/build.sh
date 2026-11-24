@@ -169,7 +169,7 @@ convert odt:writer8 lists.odt "OpenDocument Text Flat XML" lists.fodt
 convert odt:writer8 comments.odt "OpenDocument Text Flat XML" comments.fodt
 
 # Tracked changes: an insertion, a deletion, a deletion spanning two
-# paragraphs, and a format change, with changes recorded from here on.
+# paragraphs, and a format change.
 convert odt:writer8 tracked.odt "OpenDocument Text Flat XML" tracked.fodt
 convert odp:impress8 comments.odp "OpenDocument Presentation Flat XML" comments.fodp
 
