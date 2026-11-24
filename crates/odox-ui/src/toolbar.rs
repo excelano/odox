@@ -6,7 +6,7 @@
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Response, RichText, Ui, vec2};
 use egui_richedit::{Mark, Model, Property, Script, Value};
 use odox_core::TextAlign;
-use odox_core::edit::TableEdit;
+use odox_core::edit::{LineSpacing, TableEdit};
 
 use crate::color_picker::{self, Kind};
 use crate::i18n::{fill, t};
@@ -25,6 +25,10 @@ pub struct Pressed {
     pub block: Option<Block>,
     /// A heading's key to move it up the outline (below zero) or down it.
     pub outline: Option<i8>,
+    /// An indent button: a tab's width in, above zero, or out.
+    pub indent: Option<i8>,
+    /// A line spacing picked.
+    pub spacing: Option<LineSpacing>,
     /// The table button, which asks how many rows and columns.
     pub table: bool,
     /// The picture button, which asks for a file.
@@ -36,7 +40,7 @@ pub struct Pressed {
 pub fn label(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed {
     let mut pressed = Pressed::default();
     ui.add_enabled_ui(editor.selection().is_some(), |ui| {
-        ui.horizontal(|ui| text_buttons(ui, editor, model, &mut pressed));
+        ui.horizontal_wrapped(|ui| text_buttons(ui, editor, model, &mut pressed));
     });
     pressed
 }
@@ -86,6 +90,50 @@ fn text_buttons(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>, pressed
         {
             pressed.align = Some(align);
         }
+    }
+    ui.separator();
+    for (step, label, name) in [
+        (-1, "\u{21e4}", t("Decrease indent")),
+        (1, "\u{21e5}", t("Increase indent")),
+    ] {
+        if ui.button(label).on_hover_text(name).clicked() {
+            pressed.indent = Some(step);
+        }
+    }
+    let current = editor
+        .selection()
+        .and_then(|selection| model.line_spacing(selection));
+    egui::ComboBox::from_id_salt("line-spacing")
+        .width(48.0)
+        .selected_text(current.map_or("", spacing_label))
+        .show_ui(ui, |ui| {
+            for spacing in SPACINGS {
+                if ui
+                    .selectable_label(current == Some(spacing), spacing_label(spacing))
+                    .clicked()
+                {
+                    pressed.spacing = Some(spacing);
+                }
+            }
+        })
+        .response
+        .on_hover_text(t("Line spacing"));
+}
+
+/// The line spacings offered, closest first.
+const SPACINGS: [LineSpacing; 4] = [
+    LineSpacing::Single,
+    LineSpacing::OnePointOneFive,
+    LineSpacing::OnePointFive,
+    LineSpacing::Double,
+];
+
+fn spacing_label(spacing: LineSpacing) -> &'static str {
+    match spacing {
+        LineSpacing::Single => "1",
+        LineSpacing::OnePointOneFive => "1.15",
+        LineSpacing::OnePointFive => "1.5",
+        LineSpacing::Double => "2",
     }
 }
 
@@ -260,7 +308,7 @@ fn align_button(ui: &mut Ui, lit: bool, align: TextAlign) -> Response {
 pub fn text(ui: &mut Ui, editor: &PageEditor, model: &FlowModel<'_>) -> Pressed {
     let mut pressed = Pressed::default();
     ui.add_enabled_ui(editor.selection().is_some(), |ui| {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             text_buttons(ui, editor, model, &mut pressed);
             ui.separator();
             for (block, label) in [
@@ -369,6 +417,10 @@ pub enum Command {
     Block(Block),
     /// Superscript or subscript, or back on the line.
     Script(Script),
+    /// A tab's width in, above zero, or out.
+    Indent(i8),
+    /// A line spacing.
+    LineSpacing(LineSpacing),
     /// Start a numbered list again at the item, or carry it on from the list
     /// before when not.
     Numbering(bool),
@@ -428,6 +480,7 @@ pub struct MenuState {
     align: Option<TextAlign>,
     kinds: Vec<Block>,
     script: Option<Script>,
+    spacing: Option<LineSpacing>,
 }
 
 impl MenuState {
@@ -449,6 +502,7 @@ impl MenuState {
                 .filter(|mark| editor.marked(model, *mark) == Some(true))
                 .collect(),
             align: model.alignment(selection),
+            spacing: model.line_spacing(selection),
             script: match editor.value(model, Property::Script) {
                 Some(Value::Script(script)) => Some(script),
                 _ => None,
@@ -524,6 +578,41 @@ fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// The alignments, the indent steps and the line spacings in the Format menu.
+fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    for align in ALIGNMENTS {
+        let button = egui::Button::new(align_name(align)).selected(state.align == Some(align));
+        if ui.add_enabled(state.enabled, button).clicked() {
+            chosen = Some(Command::Align(align));
+            ui.close();
+        }
+    }
+    ui.separator();
+    for (step, name) in [(1, t("Increase indent")), (-1, t("Decrease indent"))] {
+        if ui
+            .add_enabled(state.enabled, egui::Button::new(name))
+            .clicked()
+        {
+            chosen = Some(Command::Indent(step));
+            ui.close();
+        }
+    }
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Line spacing"), |ui| {
+            for spacing in SPACINGS {
+                let button = egui::Button::new(spacing_label(spacing))
+                    .selected(state.spacing == Some(spacing));
+                if ui.add(button).clicked() {
+                    chosen = Some(Command::LineSpacing(spacing));
+                    ui.close();
+                }
+            }
+        });
+    });
+    chosen
+}
+
 /// The Format menu's entries: the marks, each with its shortcut, a size larger
 /// and smaller, the alignments, and where the page has them the kinds of
 /// paragraph. Lit where the whole selection is one,
@@ -569,13 +658,7 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         }
     }
     ui.separator();
-    for align in ALIGNMENTS {
-        let button = egui::Button::new(align_name(align)).selected(state.align == Some(align));
-        if ui.add_enabled(state.enabled, button).clicked() {
-            chosen = Some(Command::Align(align));
-            ui.close();
-        }
-    }
+    chosen = paragraph_menu(ui, state).or(chosen);
     if state.blocks {
         ui.separator();
         chosen = blocks_menu(ui, state).or(chosen);

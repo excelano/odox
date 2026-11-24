@@ -894,6 +894,18 @@ fn toolbar_commands(
     if let Some(block) = block {
         model.apply_block(page, block);
     }
+    if let Some(step) = pressed.indent.or(match command {
+        Some(Command::Indent(step)) => Some(step),
+        _ => None,
+    }) {
+        model.apply_indent(page, step);
+    }
+    if let Some(spacing) = pressed.spacing.or(match command {
+        Some(Command::LineSpacing(spacing)) => Some(spacing),
+        _ => None,
+    }) {
+        model.apply_line_spacing(page, spacing);
+    }
     if let Some(Command::Numbering(restart)) = command {
         model.numbering(page, restart);
     }
