@@ -22,6 +22,7 @@ mod block;
 mod figure;
 pub(crate) mod format;
 pub mod html;
+mod indent;
 mod list;
 mod numbering;
 mod picture;
@@ -40,6 +41,7 @@ pub use figure::{
 };
 pub use format::{Mark, Script, Setting, TextProperty, format, marked, set_text, text_value};
 pub(crate) use format::{automatic_styles, element};
+pub use indent::{LineSpacing, line_spacing, set_indent, set_line_spacing};
 pub use list::{continue_numbering, list_level, restart_numbering};
 pub use numbering::ListCounters;
 pub use picture::{NewPicture, insert_picture};

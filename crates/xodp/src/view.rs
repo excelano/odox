@@ -598,6 +598,18 @@ impl SlideView {
         }) {
             model.apply_alignment(&mut self.page_editor, align);
         }
+        if let Some(step) = pressed.indent.or(match command {
+            Some(Command::Indent(step)) => Some(step),
+            _ => None,
+        }) {
+            model.apply_indent(&mut self.page_editor, step);
+        }
+        if let Some(spacing) = pressed.spacing.or(match command {
+            Some(Command::LineSpacing(spacing)) => Some(spacing),
+            _ => None,
+        }) {
+            model.apply_line_spacing(&mut self.page_editor, spacing);
+        }
         self.menu = MenuState::of(&self.page_editor, &model, false);
         ui.separator();
         self.page_editor.input(ui, &mut model);

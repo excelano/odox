@@ -110,7 +110,8 @@ give the colour they last gave, and their arrows open a palette; Ctrl+Shift+P
 and Ctrl+Shift+B, or Format > Superscript and Subscript, raise or lower the
 selection. Next come the alignments, left,
 centered, right and justified, for the paragraphs the selection runs over, in
-`xodt` and on a slide alike, and beside them buttons that make the
+`xodt` and on a slide alike, then indent buttons that step the left indent by
+a tab's width, a line spacing list of 1, 1.15, 1.5 and 2, and buttons that make the
 paragraphs the selection runs over body text, a heading of the first, second or
 third level, a bulleted list or a numbered one, and pressing a lit one takes it
 off. The Format menu offers the same commands, a heading of any level from 1

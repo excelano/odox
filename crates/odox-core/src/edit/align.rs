@@ -70,6 +70,29 @@ pub fn set_alignment(
     align: TextAlign,
     styles: &mut Styles,
 ) -> Result<(), Refused> {
+    restyle_paragraphs(content, paths, styles, |content, path, styles| {
+        (alignment(content, path, styles) != align)
+            .then(|| vec![(Ns::Fo, "text-align", Some(written(align).to_owned()))])
+    })
+}
+
+/// A paragraph property to write, or to take out where it has no value.
+pub(super) type Property = (Ns, &'static str, Option<String>);
+
+/// Give paragraphs paragraph properties: each the attributes `wanted` answers
+/// for it, written into an automatic style as [`set_alignment`] writes an
+/// alignment, an attribute answered with no value taken out, and nothing
+/// where it answers `None`.
+///
+/// # Errors
+///
+/// As [`set_alignment`].
+pub(super) fn restyle_paragraphs(
+    content: &mut Element,
+    paths: &[Vec<usize>],
+    styles: &mut Styles,
+    wanted: impl Fn(&Element, &[usize], &Styles) -> Option<Vec<Property>>,
+) -> Result<(), Refused> {
     for path in paths {
         content
             .at(path)
@@ -81,14 +104,14 @@ pub fn set_alignment(
     let mut paths = paths.to_vec();
     for index in 0..paths.len() {
         let path = paths[index].clone();
-        if alignment(content, &path, styles) == align {
+        let Some(properties) = wanted(content, &path, styles) else {
             continue;
-        }
+        };
         let current = content
             .at(&path)
             .and_then(|paragraph| paragraph.attr(&Ns::Text, "style-name"))
             .map(ToOwned::to_owned);
-        let style = aligned(content, current.as_deref(), align);
+        let style = with_properties(content, current.as_deref(), &properties);
         let (name, minted) = name_for(content, styles, style, &Family::Paragraph, "P");
         if let Some(minted) = minted {
             let had = content.child(&Ns::Office, "automatic-styles").is_some();
@@ -111,10 +134,10 @@ pub fn set_alignment(
 }
 
 /// An unnamed automatic paragraph style saying what the style a paragraph
-/// names says, aligned: a copy of it where it is one of the document's own
-/// automatic styles, which cannot be inherited from, and otherwise one
-/// inheriting from it.
-fn aligned(content: &Element, current: Option<&str>, align: TextAlign) -> Element {
+/// names says, with paragraph properties set: a copy of it where it is one of
+/// the document's own automatic styles, which cannot be inherited from, and
+/// otherwise one inheriting from it.
+fn with_properties(content: &Element, current: Option<&str>, set: &[Property]) -> Element {
     let own = current.and_then(|name| {
         content
             .child(&Ns::Office, "automatic-styles")?
@@ -145,7 +168,13 @@ fn aligned(content: &Element, current: Option<&str>, align: TextAlign) -> Elemen
         0
     });
     if let Node::Element(properties) = &mut style.children[index] {
-        properties.set_attr(content.name_for(&Ns::Fo, "text-align"), written(align));
+        for (ns, local, value) in set {
+            if let Some(value) = value {
+                properties.set_attr(content.name_for(ns, local), value.as_str());
+            } else {
+                properties.remove_attr(ns, local);
+            }
+        }
     }
     style.self_closing = false;
     style

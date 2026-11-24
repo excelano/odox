@@ -17,7 +17,7 @@ use eframe::egui::Id;
 use egui_richedit::{
     Edit, Fragment, Mark, Model, Position, Property, RichEdit, Script, Selection, Value,
 };
-use odox_core::edit::{self, TableEdit, html, is_paragraph};
+use odox_core::edit::{self, LineSpacing, TableEdit, html, is_paragraph};
 use odox_core::{Element, Kept, ListKind, Ns, Package, Refused, Styles, TextAlign};
 
 use crate::Editing;
@@ -412,6 +412,49 @@ impl<'a> FlowModel<'a> {
             model.follow_styles(before);
             Some(())
         })
+    }
+
+    /// Move the paragraphs a selection runs over a tab's width in (`step`
+    /// above zero) or out, list items a level, as one step to undo. Answers
+    /// whether the document changed.
+    pub fn apply_indent(&mut self, editor: &mut PageEditor, step: i8) -> bool {
+        self.over_paragraphs(editor, |model, paragraphs| {
+            let before = model.content.children.len();
+            let paths: Vec<Vec<usize>> = paragraphs
+                .iter()
+                .map(|paragraph| [model.root.as_slice(), paragraph].concat())
+                .collect();
+            edit::set_indent(model.content, &paths, step, model.styles).ok()?;
+            model.follow_styles(before);
+            Some(())
+        })
+    }
+
+    /// Space the lines of the paragraphs a selection runs over, as one step to
+    /// undo. Answers whether the document changed.
+    pub fn apply_line_spacing(&mut self, editor: &mut PageEditor, spacing: LineSpacing) -> bool {
+        self.over_paragraphs(editor, |model, paragraphs| {
+            let before = model.content.children.len();
+            let paths: Vec<Vec<usize>> = paragraphs
+                .iter()
+                .map(|paragraph| [model.root.as_slice(), paragraph].concat())
+                .collect();
+            edit::set_line_spacing(model.content, &paths, spacing, model.styles).ok()?;
+            model.follow_styles(before);
+            Some(())
+        })
+    }
+
+    /// The line spacing every paragraph a selection runs over has, where they
+    /// all have the same one of those offered.
+    pub fn line_spacing(&self, selection: &Selection<Vec<usize>>) -> Option<LineSpacing> {
+        let paragraphs = self.selected_paragraphs(selection)?;
+        let mut spaced = paragraphs.iter().map(|paragraph| {
+            let path = [self.root.as_slice(), paragraph].concat();
+            edit::line_spacing(self.content, &path, self.styles)
+        });
+        let first = spaced.next()?;
+        spaced.all(|spacing| spacing == first).then_some(first)?
     }
 
     /// A change to the paragraphs a selection runs over that adds and removes
