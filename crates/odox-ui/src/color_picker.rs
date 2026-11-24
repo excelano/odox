@@ -19,9 +19,10 @@ pub enum Kind {
     Highlight,
 }
 
-/// `LibreOffice`'s standard palette, the greys, the lightest tints, the light
-/// tints and the full colours, twelve to a row.
-const PALETTE: [[u32; 12]; 4] = [
+/// Rows of `LibreOffice`'s standard palette, twelve to a row: the greys, the
+/// lightest tints, the light tints, the full colours and the second shades,
+/// which hold the default font colour.
+const PALETTE: [[u32; 12]; 5] = [
     [
         0x00_0000, 0x11_1111, 0x1c_1c1c, 0x33_3333, 0x66_6666, 0x80_8080, 0x99_9999, 0xb2_b2b2,
         0xcc_cccc, 0xdd_dddd, 0xee_eeee, 0xff_ffff,
@@ -37,6 +38,10 @@ const PALETTE: [[u32; 12]; 4] = [
     [
         0xff_ff00, 0xff_bf00, 0xff_8000, 0xff_4000, 0xff_0000, 0xbf_0041, 0x80_0080, 0x55_308d,
         0x2a_6099, 0x15_8466, 0x00_a933, 0x81_d41a,
+    ],
+    [
+        0xac_b20c, 0xb4_7804, 0xb8_5c00, 0xbe_480a, 0xc9_211e, 0x86_1141, 0x65_0953, 0x55_215b,
+        0x35_5269, 0x1e_6a39, 0x12_7622, 0x46_8a1a,
     ],
 ];
 
@@ -150,4 +155,22 @@ pub fn button(ui: &mut Ui, kind: Kind) -> Option<Option<[u8; 3]>> {
             .data_mut(|data| data.insert_temp(last_id(kind), color));
     }
     picked
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Kind, PALETTE, rgb};
+
+    #[test]
+    fn each_first_colour_can_be_picked_again() {
+        for kind in [Kind::Ink, Kind::Highlight] {
+            assert!(
+                PALETTE
+                    .iter()
+                    .flatten()
+                    .any(|&packed| rgb(packed) == kind.first()),
+                "{kind:?}"
+            );
+        }
+    }
 }
