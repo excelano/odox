@@ -18,13 +18,17 @@ fn corpus() -> TextDocument {
 
 /// An attribute of the body's page layout properties, as written.
 fn properties(document: &TextDocument, local: &str) -> Option<String> {
+    let layout = document
+        .master_page()?
+        .attr(&Ns::Style, "page-layout-name")?
+        .to_owned();
     let properties = document
         .document
         .styles_part
         .as_ref()?
         .child(&Ns::Office, "automatic-styles")?
         .elements()
-        .find(|e| e.attr(&Ns::Style, "name") == Some("Mpm1"))?
+        .find(|e| e.attr(&Ns::Style, "name") == Some(layout.as_str()))?
         .child(&Ns::Style, "page-layout-properties")?;
     properties
         .attr(&Ns::Fo, local)

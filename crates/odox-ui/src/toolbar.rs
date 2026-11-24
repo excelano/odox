@@ -435,6 +435,13 @@ pub enum Command {
     Link,
     /// Put a field in at the caret.
     Field(odox_core::edit::Field),
+    /// Give the page a header, or with `footer` a footer, or take it away.
+    Band {
+        /// The footer, not the header.
+        footer: bool,
+        /// Give it, not take it away.
+        on: bool,
+    },
     /// Put a footnote or an endnote at the caret.
     Note(odox_core::edit::NoteClass),
     /// Start a numbered list again at the item, or carry it on from the list
@@ -505,9 +512,29 @@ pub struct MenuState {
     kinds: Vec<Block>,
     script: Option<Script>,
     spacing: Option<LineSpacing>,
+    /// Whether the page has a header, and a footer.
+    bands: (bool, bool),
+    /// Whether the caret is in a page header or footer, where comments,
+    /// notes and page breaks have no place.
+    in_band: bool,
 }
 
 impl MenuState {
+    /// The same, saying whether the page has a header and a footer, which
+    /// Format > Header and Footer show.
+    #[must_use]
+    pub fn with_bands(mut self, header: bool, footer: bool) -> Self {
+        self.bands = (header, footer);
+        self
+    }
+
+    /// The same, saying whether the caret is in a header or footer.
+    #[must_use]
+    pub fn in_band(mut self, in_band: bool) -> Self {
+        self.in_band = in_band;
+        self
+    }
+
     /// The state of a page over a model. `blocks` says whether the page has
     /// kinds of paragraph to offer, which a slide's labels do not.
     pub fn of(editor: &PageEditor, model: &FlowModel<'_>, blocks: bool) -> Self {
@@ -530,6 +557,8 @@ impl MenuState {
                 .collect(),
             align: model.alignment(selection),
             spacing: model.line_spacing(selection),
+            bands: (false, false),
+            in_band: false,
             script: match editor.value(model, Property::Script) {
                 Some(Value::Script(script)) => Some(script),
                 _ => None,
@@ -640,6 +669,46 @@ fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     chosen
 }
 
+/// The Format menu's comment and notes, which belong to the body.
+fn notes_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::C,
+    ));
+    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
+    if ui
+        .add_enabled(state.enabled && !state.in_band, comment)
+        .clicked()
+    {
+        chosen = Some(Command::Comment);
+        ui.close();
+    }
+    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
+        Modifiers::COMMAND | Modifiers::ALT,
+        Key::F,
+    ));
+    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
+    if ui
+        .add_enabled(state.enabled && !state.in_band, footnote)
+        .clicked()
+    {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
+        ui.close();
+    }
+    if ui
+        .add_enabled(
+            state.enabled && !state.in_band,
+            egui::Button::new(t("Endnote")),
+        )
+        .clicked()
+    {
+        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
+        ui.close();
+    }
+    chosen
+}
+
 /// Format > Field: a date, fixed or following the day, the page number or
 /// the page count.
 fn field_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
@@ -716,35 +785,14 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
         .ctx()
         .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Enter));
     let insert = egui::Button::new(t("Insert page break")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, insert).clicked() {
+    if ui
+        .add_enabled(state.enabled && !state.in_band, insert)
+        .clicked()
+    {
         chosen = Some(Command::PageBreak(true));
         ui.close();
     }
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::C,
-    ));
-    let comment = egui::Button::new(t("Comment")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, comment).clicked() {
-        chosen = Some(Command::Comment);
-        ui.close();
-    }
-    let keys = ui.ctx().format_shortcut(&KeyboardShortcut::new(
-        Modifiers::COMMAND | Modifiers::ALT,
-        Key::F,
-    ));
-    let footnote = egui::Button::new(t("Footnote")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, footnote).clicked() {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Footnote));
-        ui.close();
-    }
-    if ui
-        .add_enabled(state.enabled, egui::Button::new(t("Endnote")))
-        .clicked()
-    {
-        chosen = Some(Command::Note(odox_core::edit::NoteClass::Endnote));
-        ui.close();
-    }
+    chosen = notes_menu(ui, state).or(chosen);
     chosen = field_menu(ui, state).or(chosen);
     let remove = egui::Button::new(t("Remove page break"));
     if ui.add_enabled(state.here.page_break, remove).clicked() {
@@ -765,6 +813,21 @@ fn insert_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     {
         chosen = Some(Command::PageSetup);
         ui.close();
+    }
+    band_menu(ui, state).or(chosen)
+}
+
+/// Format > Header and Format > Footer, lit where the page has one.
+fn band_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
+    for (footer, name, on) in [
+        (false, t("Header"), state.bands.0),
+        (true, t("Footer"), state.bands.1),
+    ] {
+        if ui.add(egui::Button::new(name).selected(on)).clicked() {
+            chosen = Some(Command::Band { footer, on: !on });
+            ui.close();
+        }
     }
     chosen
 }

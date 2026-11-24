@@ -753,4 +753,24 @@ mod tests {
             pages[0]
         );
     }
+
+    #[test]
+    fn a_header_turned_on_here_is_printed() {
+        let mut document = with_note_in("<text:p>Body text</text:p>");
+        document.set_header(true).expect("on");
+        let path = document.band_path(false).expect("a header");
+        let header = document
+            .document
+            .styles_part
+            .as_mut()
+            .and_then(|part| part.at_mut(&path))
+            .and_then(|header| header.child_mut(&odox_core::Ns::Text, "p"))
+            .expect("its paragraph");
+        header
+            .children
+            .push(odox_core::Node::Text("Header words".to_owned()));
+        header.self_closing = false;
+        let pages = page_texts(&document);
+        assert!(pages[0].contains("Header words"), "{}", pages[0]);
+    }
 }

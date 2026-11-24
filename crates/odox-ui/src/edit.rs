@@ -26,7 +26,8 @@ pub type Caret = Position<Vec<usize>>;
 
 /// A state of the content tree and where the caret was in it.
 struct Snapshot {
-    content: Element,
+    /// The content tree, where the edit changed it.
+    content: Option<Element>,
     parts: Kept,
     styles: StylesPart,
     caret: Option<Caret>,
@@ -99,7 +100,7 @@ impl Editing {
     /// the tree, as they stood before it.
     pub fn record_step(&mut self, content: Element, parts: Kept, caret: Option<Caret>) {
         self.push(Snapshot {
-            content,
+            content: Some(content),
             parts,
             styles: StylesPart::Untouched,
             caret,
@@ -115,8 +116,24 @@ impl Editing {
         caret: Option<Caret>,
     ) {
         self.push(Snapshot {
-            content,
+            content: Some(content),
             parts: Kept::default(),
+            styles: StylesPart::Was(styles),
+            caret,
+        });
+    }
+
+    /// The same for an edit to the styles part alone, such as typing in a
+    /// page header, with the package entries it is about to write.
+    pub fn record_styles_part(
+        &mut self,
+        styles: Option<Element>,
+        parts: Kept,
+        caret: Option<Caret>,
+    ) {
+        self.push(Snapshot {
+            content: None,
+            parts,
             styles: StylesPart::Was(styles),
             caret,
         });
@@ -175,7 +192,9 @@ impl Editing {
             }
         };
         let current = Snapshot {
-            content: std::mem::replace(&mut document.content, snapshot.content),
+            content: snapshot
+                .content
+                .map(|content| std::mem::replace(&mut document.content, content)),
             parts: document.package.restore(snapshot.parts),
             styles,
             caret,

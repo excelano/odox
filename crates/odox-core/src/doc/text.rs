@@ -244,14 +244,262 @@ impl TextDocument {
         Ok(changed)
     }
 
-    /// The document's first master page, which holds the body's page header
-    /// and footer.
+    /// The master page the body begins on, which holds its page header and
+    /// footer: the one its first paragraph's style names, or else the first.
     pub fn master_page(&self) -> Option<&Element> {
-        self.document
+        let path = self.master_path()?;
+        self.document.styles_part.as_ref()?.at(&path)
+    }
+
+    /// The master page the body's first paragraph or table names through its
+    /// style or the styles that style inherits from.
+    fn body_master_name(&self) -> Option<&str> {
+        let first = self
+            .body()?
+            .elements()
+            .find(|e| e.is(&Ns::Text, "p") || e.is(&Ns::Text, "h") || e.is(&Ns::Table, "table"))?;
+        let family = if first.is(&Ns::Table, "table") {
+            Family::Table
+        } else {
+            Family::Paragraph
+        };
+        let mut name = first.attr(
+            if family == Family::Table {
+                &Ns::Table
+            } else {
+                &Ns::Text
+            },
+            "style-name",
+        )?;
+        for _ in 0..32 {
+            let style = self.document.styles.style(&family, name)?;
+            if let Some(master) = style.element.attr(&Ns::Style, "master-page-name")
+                && !master.is_empty()
+            {
+                return Some(master);
+            }
+            name = style.parent.as_deref()?;
+        }
+        None
+    }
+
+    /// Give the body's pages a header, or take it away, leaving a first or
+    /// left page's own as it is. Answers whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// The document has no master page.
+    pub fn set_header(&mut self, on: bool) -> Result<bool, Refused> {
+        self.set_band("header", on)
+    }
+
+    /// The same for the footer.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_header`].
+    pub fn set_footer(&mut self, on: bool) -> Result<bool, Refused> {
+        self.set_band("footer", on)
+    }
+
+    fn set_band(&mut self, band: &str, on: bool) -> Result<bool, Refused> {
+        let master = self.master_path().ok_or(Refused::NotFound)?;
+        let style = if band == "header" { "Header" } else { "Footer" };
+        let has_style = self
+            .document
+            .styles
+            .style(&crate::Family::Paragraph, style)
+            .is_some();
+        let part = self
+            .document
+            .styles_part
+            .as_mut()
+            .ok_or(Refused::NotFound)?;
+        let names = (
+            part.name_for(&Ns::Style, band),
+            part.name_for(&Ns::Text, "p"),
+            part.name_for(&Ns::Text, "style-name"),
+        );
+        let element = part.at_mut(&master).ok_or(Refused::NotFound)?;
+        let found = element
+            .children
+            .iter()
+            .position(|node| matches!(node, Node::Element(e) if e.is(&Ns::Style, band)));
+        let hidden = found.is_some_and(|at| {
+            matches!(&element.children[at], Node::Element(e)
+                if e.attr(&Ns::Style, "display") == Some("false"))
+        });
+        match (found, on) {
+            (Some(at), true) if hidden => {
+                if let Node::Element(band) = &mut element.children[at] {
+                    band.remove_attr(&Ns::Style, "display");
+                }
+            }
+            (Some(_), true) | (None, false) => return Ok(false),
+            (Some(at), false) => {
+                element.children.remove(at);
+            }
+            (None, true) => {
+                let mut paragraph = Element::new("", "p", Ns::Text);
+                paragraph.name = names.1;
+                if has_style {
+                    paragraph.set_attr(names.2, style);
+                }
+                let mut new = Element::new("", band, Ns::Style);
+                new.name = names.0;
+                new.children = vec![Node::Element(paragraph)];
+                new.self_closing = false;
+                let before: &[&str] = if band == "header" {
+                    &[
+                        "header-left",
+                        "header-first",
+                        "footer",
+                        "footer-left",
+                        "footer-first",
+                    ]
+                } else {
+                    &["footer-left", "footer-first"]
+                };
+                let base = element
+                    .children
+                    .iter()
+                    .rposition(|node| {
+                        matches!(node, Node::Element(e)
+                            if e.is(&Ns::Office, "forms") || e.is(&Ns::Style, "style"))
+                    })
+                    .map_or(0, |last| last + 1);
+                let at = element
+                    .children
+                    .iter()
+                    .position(|node| {
+                        matches!(node, Node::Element(e)
+                            if e.name.ns == Ns::Style && before.contains(&e.name.local.as_ref()))
+                    })
+                    .or_else(|| {
+                        (band == "footer").then(|| {
+                            element
+                                .children
+                                .iter()
+                                .rposition(|node| {
+                                    matches!(node, Node::Element(e)
+                                        if e.name.ns == Ns::Style
+                                            && e.name.local.starts_with("header"))
+                                })
+                                .map_or(0, |last| last + 1)
+                        })
+                    })
+                    .unwrap_or(base)
+                    .max(base);
+                element.children.insert(at, Node::Element(new));
+                element.self_closing = false;
+            }
+        }
+        if on {
+            self.make_room(band);
+        }
+        if let Some(part) = &self.document.styles_part {
+            self.document.styles.reread(part);
+        }
+        Ok(true)
+    }
+
+    /// Give the body's page layout room for a header or footer, as
+    /// `LibreOffice` writes it, where the layout has none.
+    fn make_room(&mut self, band: &str) {
+        let Some(layout) = self
+            .master_page()
+            .and_then(|master| master.attr(&Ns::Style, "page-layout-name"))
+            .map(ToOwned::to_owned)
+        else {
+            return;
+        };
+        let Some(part) = self.document.styles_part.as_mut() else {
+            return;
+        };
+        let style = format!("{band}-style");
+        let spacing = if band == "header" {
+            "margin-bottom"
+        } else {
+            "margin-top"
+        };
+        let names = (
+            part.name_for(&Ns::Style, &style),
+            part.name_for(&Ns::Style, "header-footer-properties"),
+            part.name_for(&Ns::Fo, "min-height"),
+            part.name_for(&Ns::Fo, spacing),
+        );
+        let Some(page) = part
+            .child_mut(&Ns::Office, "automatic-styles")
+            .and_then(|styles| {
+                styles.children.iter_mut().find_map(|node| match node {
+                    Node::Element(e)
+                        if e.is(&Ns::Style, "page-layout")
+                            && e.attr(&Ns::Style, "name") == Some(layout.as_str()) =>
+                    {
+                        Some(e)
+                    }
+                    _ => None,
+                })
+            })
+        else {
+            return;
+        };
+        if page.child(&Ns::Style, &style).is_none() {
+            let mut element = Element::new("", &style, Ns::Style);
+            element.name = names.0.clone();
+            page.children.push(Node::Element(element));
+            page.self_closing = false;
+        }
+        let Some(holder) = page.child_mut(&Ns::Style, &style) else {
+            return;
+        };
+        if holder
+            .child(&Ns::Style, "header-footer-properties")
+            .is_none()
+        {
+            let mut properties = Element::new("", "header-footer-properties", Ns::Style);
+            properties.name = names.1;
+            properties.set_attr(names.2, "0cm");
+            properties.set_attr(names.3, "0.25cm");
+            holder.children.push(Node::Element(properties));
+            holder.self_closing = false;
+        }
+    }
+
+    /// Where the body's master page is in the styles part.
+    fn master_path(&self) -> Option<Vec<usize>> {
+        let part = self.document.styles_part.as_ref()?;
+        let (styles, element) = part
+            .elements_indexed()
+            .find(|(_, e)| e.is(&Ns::Office, "master-styles"))?;
+        let masters: Vec<(usize, &Element)> = element
+            .elements_indexed()
+            .filter(|(_, e)| e.is(&Ns::Style, "master-page"))
+            .collect();
+        let first = masters.first()?.0;
+        let named = self.body_master_name().and_then(|name| {
+            masters
+                .iter()
+                .find(|(_, e)| e.attr(&Ns::Style, "name") == Some(name))
+        });
+        Some(vec![styles, named.map_or(first, |(at, _)| *at)])
+    }
+
+    /// Where the body's page header, or with `footer` its footer, is in the
+    /// styles part, where it has one.
+    pub fn band_path(&self, footer: bool) -> Option<Vec<usize>> {
+        let master = self.master_path()?;
+        let local = if footer { "footer" } else { "header" };
+        let (at, _) = self
+            .document
             .styles_part
             .as_ref()?
-            .child(&Ns::Office, "master-styles")?
-            .child(&Ns::Style, "master-page")
+            .at(&master)?
+            .elements_indexed()
+            .find(|(_, e)| {
+                e.is(&Ns::Style, local) && e.attr(&Ns::Style, "display") != Some("false")
+            })?;
+        Some([master.as_slice(), &[at]].concat())
     }
 
     /// The width a line of body text may be: the page less its side margins.
