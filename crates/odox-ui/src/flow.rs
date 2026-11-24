@@ -732,7 +732,10 @@ impl Flow<'_> {
     }
 
     /// Under each word a dictionary for its language does not know, a red
-    /// wave; a replacement chosen from its menu is for the view to make.
+    /// wave; a replacement chosen from its menu is for the view to make. A
+    /// turned label's paragraphs are laid out where nothing is seen, so its
+    /// own response takes the right click, under the id of the paragraph the
+    /// pointer is over.
     fn spell(
         &mut self,
         ui: &mut Ui,
@@ -747,8 +750,20 @@ impl Flow<'_> {
         let spoken = self.spoken.borrow().clone();
         let drawn = galley.text();
         let wrong = crate::spell::wrong_in(drawn, &spoken, &map.atoms());
+        let turned = self.turned.as_ref().and_then(|turned| {
+            let pointer = turned.pointer.filter(|&at| response.rect.contains(at))?;
+            let mut moved = turned.response.clone();
+            moved.id = response.id;
+            moved.rect = response.rect;
+            moved.interact_rect = response.interact_rect;
+            Some((moved, Some(pointer)))
+        });
+        let clicked = match &turned {
+            Some((moved, pointer)) => (moved, *pointer),
+            None => (response, response.interact_pointer_pos()),
+        };
         if let Some((range, word)) =
-            crate::spell::mark(ui, response, (&galley, origin), drawn, &wrong, self.zoom)
+            crate::spell::mark(ui, clicked, (&galley, origin), drawn, &wrong, self.zoom)
         {
             let model = map.to_model(range.start)..map.to_model(range.end);
             if !model.is_empty() {
