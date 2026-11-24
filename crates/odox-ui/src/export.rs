@@ -97,12 +97,7 @@ impl Answer {
 impl Export {
     /// The File menu's item.
     pub fn menu(&mut self, ui: &mut Ui, source: Option<&Path>) {
-        if ui
-            .add_enabled(
-                self.running.is_none(),
-                egui::Button::new(t("Export as PDF/UA…")),
-            )
-            .clicked()
+        if crate::mnemonic::button(ui, self.running.is_none(), t("&Export as PDF/UA…")).clicked()
         {
             ui.close();
             self.requested = Some(Request {
@@ -110,10 +105,7 @@ impl Export {
                 printing: false,
             });
         }
-        if ui
-            .add_enabled(self.running.is_none(), egui::Button::new(t("Print…")))
-            .clicked()
-        {
+        if crate::mnemonic::button(ui, self.running.is_none(), t("&Print…")).clicked() {
             ui.close();
             self.print(source);
         }

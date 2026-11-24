@@ -18,6 +18,7 @@ use odox_core::{Document, Refused};
 use odox_ui::find::{Match, Options, Replaced, ranges, replace_ranges};
 use odox_ui::format::{self, DEFAULT_SIZE};
 use odox_ui::i18n::{fill, t};
+use odox_ui::mnemonic;
 use odox_ui::{Canvas, Editing, Export, Found, Notice, View, Zoom, fonts};
 
 use crate::access;
@@ -753,49 +754,55 @@ impl View for SheetView {
 
     fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
         let can = !editing.asking && self.editor.is_none() && !self.asking();
-        ui.menu_button(t("Sheet"), |ui| {
+        mnemonic::menu(ui, true, t("&Sheet"), |ui| {
             let entries = [
-                (t("Insert row above"), SheetCommand::RowAbove),
-                (t("Insert row below"), SheetCommand::RowBelow),
-                (t("Insert column left"), SheetCommand::ColumnLeft),
-                (t("Insert column right"), SheetCommand::ColumnRight),
-                (t("Delete row"), SheetCommand::DeleteRows),
-                (t("Delete column"), SheetCommand::DeleteColumns),
+                (t("Insert &row above"), SheetCommand::RowAbove),
+                (t("Insert row &below"), SheetCommand::RowBelow),
+                (t("&Insert column left"), SheetCommand::ColumnLeft),
+                (t("I&nsert column right"), SheetCommand::ColumnRight),
+                (t("D&elete row"), SheetCommand::DeleteRows),
+                (t("&Delete column"), SheetCommand::DeleteColumns),
             ];
             let shown = [
                 (t("Hide rows"), SheetCommand::HideRows),
-                (t("Show hidden rows"), SheetCommand::ShowRows),
-                (t("Hide columns"), SheetCommand::HideColumns),
-                (t("Show hidden columns"), SheetCommand::ShowColumns),
+                (t("&Show hidden rows"), SheetCommand::ShowRows),
+                (t("&Hide columns"), SheetCommand::HideColumns),
+                (t("Show hidden col&umns"), SheetCommand::ShowColumns),
             ];
             let merged = [
-                (t("Merge cells"), SheetCommand::Merge),
+                (t("Mer&ge cells"), SheetCommand::Merge),
                 (t("Unmerge cells"), SheetCommand::Unmerge),
             ];
             let fills = [
-                (t("Fill down"), SheetCommand::FillDown),
+                (t("Fill do&wn"), SheetCommand::FillDown),
                 (t("Fill right"), SheetCommand::FillRight),
-                (t("Format cells…"), SheetCommand::Format),
-                (t("Sort…"), SheetCommand::Sort),
-                (t("Comment…"), SheetCommand::Comment),
+                (t("&Format cells…"), SheetCommand::Format),
+                (t("S&ort…"), SheetCommand::Sort),
+                (t("&Comment…"), SheetCommand::Comment),
             ];
             for group in [&entries[..], &shown[..], &merged[..], &fills[..]] {
                 for &(name, command) in group {
-                    let mut button = egui::Button::new(name);
-                    if matches!(command, SheetCommand::FillDown) {
-                        button = button.shortcut_text(ui.ctx().format_shortcut(&FILL_DOWN));
-                    }
-                    if matches!(command, SheetCommand::Format) {
-                        button = button.shortcut_text(ui.ctx().format_shortcut(&FORMAT));
-                    }
-                    if ui.add_enabled(can, button).clicked() {
+                    let keys = match command {
+                        SheetCommand::FillDown => Some(ui.ctx().format_shortcut(&FILL_DOWN)),
+                        SheetCommand::Format => Some(ui.ctx().format_shortcut(&FORMAT)),
+                        _ => None,
+                    };
+                    if mnemonic::add(ui, can, name, |label| {
+                        let button = egui::Button::new(label);
+                        match keys {
+                            Some(keys) => button.shortcut_text(keys),
+                            None => button,
+                        }
+                    })
+                    .clicked()
+                    {
                         self.sheet_command = Some(command);
                         ui.close();
                     }
                 }
                 ui.separator();
             }
-            self.book_menu(ui, self.sheet, can);
+            self.book_menu(ui, self.sheet, can, true);
         });
     }
 
@@ -914,18 +921,15 @@ impl View for SheetView {
         };
         ui.separator();
         let label = if sheet.frozen == odox_core::doc::Frozen::default() {
-            t("Freeze rows and columns")
+            t("Freeze &rows and columns")
         } else {
-            t("Unfreeze rows and columns")
+            t("&Unfreeze rows and columns")
         };
-        if ui.button(label).clicked() {
+        if mnemonic::button(ui, true, label).clicked() {
             self.freeze_asked = true;
             ui.close();
         }
-        if ui
-            .button(t("Copy the sheet as tab-separated text"))
-            .clicked()
-        {
+        if mnemonic::button(ui, true, t("&Copy the sheet as tab-separated text")).clicked() {
             ui.ctx().copy_text(as_text(document, sheet));
             ui.close();
         }
@@ -1198,8 +1202,9 @@ impl SheetView {
     }
 
     /// The items that add, rename, delete and move a sheet, for the Sheet
-    /// menu and for a tab's own.
-    fn book_menu(&mut self, ui: &mut Ui, sheet: usize, can: bool) {
+    /// menu, with their letters, and for a tab's own, which is drawn after
+    /// the keys are read and so has none.
+    fn book_menu(&mut self, ui: &mut Ui, sheet: usize, can: bool, lettered: bool) {
         let Some(document) = &self.document else {
             return;
         };
@@ -1211,25 +1216,27 @@ impl SheetView {
             .map(|(index, _)| index)
             .collect();
         let entries = [
-            (t("Add a sheet"), BookCommand::Add, true),
-            (t("Rename the sheet…"), BookCommand::Rename, true),
-            (t("Delete the sheet"), BookCommand::Delete, shown.len() > 1),
+            (t("&Add a sheet"), BookCommand::Add, true),
+            (t("Rename &the sheet…"), BookCommand::Rename, true),
+            (t("De&lete the sheet"), BookCommand::Delete, shown.len() > 1),
             (
-                t("Move the sheet left"),
+                t("&Move the sheet left"),
                 BookCommand::Left,
                 shown.first().is_some_and(|&first| first < sheet),
             ),
             (
-                t("Move the sheet right"),
+                t("Mo&ve the sheet right"),
                 BookCommand::Right,
                 shown.last().is_some_and(|&last| last > sheet),
             ),
         ];
         for (name, command, possible) in entries {
-            if ui
-                .add_enabled(can && possible, egui::Button::new(name))
-                .clicked()
-            {
+            let chosen = if lettered {
+                mnemonic::button(ui, can && possible, name)
+            } else {
+                ui.add_enabled(can && possible, egui::Button::new(mnemonic::plain(name)))
+            };
+            if chosen.clicked() {
                 self.book_command = Some((command, sheet));
                 ui.close();
             }
@@ -1881,7 +1888,7 @@ impl SheetView {
                         if response.double_clicked() && can {
                             self.book_command = Some((BookCommand::Rename, index));
                         }
-                        response.context_menu(|ui| self.book_menu(ui, index, can));
+                        response.context_menu(|ui| self.book_menu(ui, index, can, false));
                     }
                 });
             });

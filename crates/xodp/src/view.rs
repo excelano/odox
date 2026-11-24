@@ -19,6 +19,7 @@ use odox_core::{Document, Element, Length, Ns, PageLayout};
 use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::link_dialog::LinkQuestion;
+use odox_ui::mnemonic;
 use odox_ui::note_popup::{self, NoteContent, NoteResponse};
 use odox_ui::picture_question::PictureQuestion;
 use odox_ui::refusal;
@@ -383,7 +384,7 @@ impl View for SlideView {
     }
 
     fn menus(&mut self, ui: &mut Ui, editing: &Editing) {
-        ui.menu_button(t("Format"), |ui| {
+        mnemonic::menu(ui, true, t("F&ormat"), |ui| {
             if let Some(command) = toolbar::menu(ui, &self.menu) {
                 self.command = Some(command);
             }
@@ -393,46 +394,37 @@ impl View for SlideView {
             .as_ref()
             .map_or(0, |document| document.slides().len());
         let can = editing.on && !editing.asking;
-        ui.menu_button(t("Slide"), |ui| {
-            if ui
-                .add_enabled(can, egui::Button::new(t("Comment")))
-                .clicked()
-            {
+        mnemonic::menu(ui, true, t("&Slide"), |ui| {
+            if mnemonic::button(ui, can, t("&Comment")).clicked() {
                 self.menu_asked = Some(MenuAsked::Comment);
                 ui.close();
             }
-            if ui
-                .add_enabled(can, egui::Button::new(t("Text box")))
-                .clicked()
-            {
+            if mnemonic::button(ui, can, t("&Text box")).clicked() {
                 self.placing = true;
                 ui.close();
             }
-            if ui
-                .add_enabled(can, egui::Button::new(t("Picture…")))
-                .clicked()
-            {
+            if mnemonic::button(ui, can, t("&Picture…")).clicked() {
                 self.menu_asked = Some(MenuAsked::Picture);
                 ui.close();
             }
             ui.separator();
             let entries = [
-                (t("New slide"), SlideCommand::Add, can),
-                (t("Duplicate slide"), SlideCommand::Duplicate, can),
-                (t("Delete slide"), SlideCommand::Delete, can && count > 1),
+                (t("&New slide"), SlideCommand::Add, can),
+                (t("&Duplicate slide"), SlideCommand::Duplicate, can),
+                (t("D&elete slide"), SlideCommand::Delete, can && count > 1),
                 (
-                    t("Move slide earlier"),
+                    t("Move &slide earlier"),
                     SlideCommand::Earlier,
                     can && self.slide > 0,
                 ),
                 (
-                    t("Move slide later"),
+                    t("&Move slide later"),
                     SlideCommand::Later,
                     can && self.slide + 1 < count,
                 ),
             ];
             for (name, command, enabled) in entries {
-                if ui.add_enabled(enabled, egui::Button::new(name)).clicked() {
+                if mnemonic::button(ui, enabled, name).clicked() {
                     self.slide_command = Some(command);
                     ui.close();
                 }
@@ -733,16 +725,13 @@ impl View for SlideView {
 
     fn view_menu(&mut self, ui: &mut Ui) {
         ui.separator();
-        ui.checkbox(&mut self.show_notes, t("Show the speaker's notes"));
+        mnemonic::checkbox(ui, &mut self.show_notes, t("Show the speaker's &notes"));
         ui.separator();
-        if ui.button(t("Start the slideshow")).clicked() {
+        if mnemonic::button(ui, true, t("Sta&rt the slideshow")).clicked() {
             self.start_show(0);
             ui.close();
         }
-        if ui
-            .button(t("Start the slideshow from this slide"))
-            .clicked()
-        {
+        if mnemonic::button(ui, true, t("Start &the slideshow from this slide")).clicked() {
             self.start_show(self.slide);
             ui.close();
         }

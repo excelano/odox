@@ -40,6 +40,7 @@ pub mod instance;
 pub mod link_dialog;
 pub mod links;
 pub mod marks;
+pub mod mnemonic;
 pub mod note_popup;
 /// Receiving a document from macOS, which does not arrive as an argument.
 #[cfg(target_os = "macos")]
