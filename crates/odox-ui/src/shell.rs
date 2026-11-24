@@ -838,7 +838,7 @@ impl<V: View> eframe::App for Shell<V> {
         // document instead of reopening it on every frame after.
         #[cfg(target_os = "macos")]
         if let Some(path) = crate::opened_document::taken() {
-            self.open(&ctx, &path);
+            self.request(&ctx, Pending::Open(path));
         }
 
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.window_title()));
