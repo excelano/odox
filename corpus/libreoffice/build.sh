@@ -150,6 +150,11 @@ convert odp:impress8 shadows.odp "OpenDocument Presentation Flat XML" shadows.fo
 # ranges or page styles.
 convert ods:calc8 export.ods "OpenDocument Spreadsheet Flat XML" export.fods
 convert ods:calc8 formats.ods "OpenDocument Spreadsheet Flat XML" formats.fods
+
+# Conditional formats: comparisons, a range, a formula relative to its base
+# cell, text tests, and one condition this does not read, which LibreOffice
+# writes both as calcext:conditional-formats and as style:map.
+convert ods:calc8 conditional.ods "OpenDocument Spreadsheet Flat XML" conditional.fods
 python3 src/codes.py "$out/codes.ods"
 printf '%s\n' codes.ods
 convert ods:calc8 formulas.ods "OpenDocument Spreadsheet Flat XML" formulas.fods

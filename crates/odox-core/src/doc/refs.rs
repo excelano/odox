@@ -89,9 +89,13 @@ struct Part {
 }
 
 fn column_index(letters: &str) -> usize {
-    letters.bytes().fold(0, |n, b| {
-        n * 26 + usize::from(b.to_ascii_uppercase() - b'A' + 1)
-    }) - 1
+    letters
+        .bytes()
+        .fold(0usize, |n, b| {
+            n.saturating_mul(26)
+                .saturating_add(usize::from(b.to_ascii_uppercase() - b'A' + 1))
+        })
+        .saturating_sub(1)
 }
 
 fn column_letters(mut index: usize) -> String {
@@ -104,6 +108,27 @@ fn column_letters(mut index: usize) -> String {
     }
     out.reverse();
     String::from_utf8(out).unwrap_or_default()
+}
+
+/// Split a list of ranges, `table:target-range-address`, at the spaces
+/// outside single quotes.
+pub(super) fn split_addresses(text: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut quoted = false;
+    let mut start = 0;
+    for (at, c) in text.char_indices() {
+        match c {
+            '\'' => quoted = !quoted,
+            ' ' if !quoted => {
+                parts.push(&text[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&text[start..]);
+    parts.retain(|part| !part.is_empty());
+    parts
 }
 
 /// Split `text` at the first `:` that is not inside single quotes.

@@ -160,7 +160,9 @@ spreadsheet application to work out. Sheet > Format cells…, or Ctrl+1, sets a
 number format, bold, italic and underline, a font color, a fill, alignment,
 wrapping and borders. Ctrl+D fills a selection down, and dragging the square
 at its corner carries a series on; Sheet > Sort… sorts a block by one of its
-columns, and Sheet > Comment… writes the picked cell's comment. Dragging, or Shift with the arrows,
+columns, and Sheet > Comment… writes the picked cell's comment. Conditional
+formats colour a cell while their condition holds, and follow its value as it
+changes. Dragging, or Shift with the arrows,
 selects a range; Ctrl+C and Ctrl+X take it as tab separated text, as the cells
 show it, and as a table for a word processor, Ctrl+V puts such text down from the picked cell, as the values typing
 would make, and Delete empties it. A paste that reaches a cell under a merge

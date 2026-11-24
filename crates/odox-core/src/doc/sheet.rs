@@ -11,6 +11,7 @@
 // Built with AI assistance (Claude, Anthropic)
 
 mod comment;
+mod conditional;
 mod fill;
 mod format;
 mod freeze;
@@ -82,6 +83,9 @@ pub struct Sheet {
     /// Where the `table:table` element sits among the body's children, so that
     /// the element can be reached again without holding a reference to it.
     table: usize,
+    /// The style each cell a conditional format holds for takes, by row and
+    /// column, worked out once after the index is built, when first asked.
+    conditional: std::cell::OnceCell<std::collections::HashMap<(usize, usize), String>>,
 }
 
 /// A column's own properties.
@@ -751,6 +755,14 @@ impl SheetDocument {
         Some((top..bottom + 1, left..right + 1))
     }
 
+    /// The style a conditional format gives a cell, where one of its
+    /// conditions holds.
+    pub fn conditional_style(&self, sheet: usize, row: usize, column: usize) -> Option<&str> {
+        self.conditions(sheet)?
+            .get(&(row, column))
+            .map(String::as_str)
+    }
+
     /// The resolved style of a cell: the style it names, or the one its column
     /// gives every cell that names none.
     pub fn cell_style(
@@ -759,13 +771,43 @@ impl SheetDocument {
         cell: Option<&Cell<'_>>,
         column: usize,
     ) -> std::rc::Rc<Properties> {
+        self.document
+            .styles
+            .resolve(&Family::TableCell, Self::style_name(sheet, cell, column))
+    }
+
+    /// A cell's style as it is shown: [`Self::cell_style`], with the style a
+    /// conditional format gives it laid over it while its condition holds.
+    pub fn shown_style(
+        &self,
+        sheet: &Sheet,
+        cell: Option<&Cell<'_>>,
+        row: usize,
+        column: usize,
+    ) -> std::rc::Rc<Properties> {
+        let name = Self::style_name(sheet, cell, column);
+        let applied = self
+            .sheets
+            .iter()
+            .position(|indexed| std::ptr::eq(indexed, sheet))
+            .and_then(|at| self.conditions(at))
+            .and_then(|applied| applied.get(&(row, column)));
+        match applied {
+            Some(applied) => self
+                .document
+                .styles
+                .resolve_over(&Family::TableCell, name, applied),
+            None => self.document.styles.resolve(&Family::TableCell, name),
+        }
+    }
+
+    fn style_name<'a>(sheet: &'a Sheet, cell: Option<&'a Cell<'_>>, column: usize) -> &'a str {
         let named = cell.and_then(Cell::style_name);
         let from_column = sheet
             .columns
             .get(column)
             .and_then(|c| c.default_cell_style.as_deref());
-        let name = named.or(from_column).unwrap_or("Default");
-        self.document.styles.resolve(&Family::TableCell, name)
+        named.or(from_column).unwrap_or("Default")
     }
 }
 
@@ -1272,6 +1314,7 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         frozen: Frozen::default(),
         rows: index.rows,
         table: position,
+        conditional: std::cell::OnceCell::new(),
     }
 }
 

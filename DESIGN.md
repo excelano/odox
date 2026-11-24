@@ -481,6 +481,27 @@ cell styles, and a formula moves as a copy does, its relative references going
 with it, as `LibreOffice` and Excel sort unless asked otherwise. A sort across a
 merged cell is refused. Each sort is one step to undo.
 
+**A conditional format is shown** (`sheet/conditional.rs`). A table's
+`calcext:conditional-formats` is read where it has one, and the `style:map`
+of its cells' styles otherwise, `LibreOffice` writing both. A cell a format
+covers takes the style of the first of its conditions that holds, laid over
+its own style for drawing and for the PDF (`shown_style`); its own style is
+what Format cells and the mark keys read and change. A condition compares the
+cell's value with `=`, `!=`, `<`, `>`, `<=` or `>=`, tests whether it lies
+between two values, inclusive, or outside them, tests its text without regard
+to case with `begins-with`, `ends-with`, `contains-text` or
+`not-contains-text`, or works out a formula whose relative references are
+moved from the condition's base cell to the cell; a condition of any other
+kind never holds. As `LibreOffice` compares (measured against its own
+colouring), an empty cell is nought against a number and no text against
+text, numbers that differ only by rounding are equal, and text against a
+number is unequal and in no order. A range is worked out cell by cell to its
+own edges, past the cells the sheet uses, unless it covers more than 100,000
+cells, when it stops at the last used row and column. Which style each cell
+takes is worked out once each time the sheet's index is built, on opening and
+after every edit and recalculation, the first time a cell asks, and kept until
+the next; an expression with no relative reference is read once.
+
 **A cell's comment is shown and written** (`sheet/comment.rs`). A commented
 cell has a small red corner; its comment, with who wrote it and on what day, is
 shown beside it while the pointer is over the cell, and beside the picked cell

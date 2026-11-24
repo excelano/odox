@@ -181,7 +181,7 @@ impl Paint<'_> {
         if cell.as_ref().is_some_and(|cell| cell.covered) {
             return;
         }
-        let style = document.cell_style(sheet, cell.as_ref(), column);
+        let style = document.shown_style(sheet, cell.as_ref(), row, column);
 
         // A merged cell is one cell over several columns and rows. Its fill,
         // its borders and its text all belong to the whole rectangle rather
@@ -2796,7 +2796,7 @@ fn widest(
             if text.is_empty() {
                 return None;
             }
-            let style = document.cell_style(sheet, Some(&cell), column);
+            let style = document.shown_style(sheet, Some(&cell), row, column);
             let format = format::text_format(&style.text, DEFAULT_SIZE, zoom, palette);
             let width = ui.fonts_mut(|fonts| {
                 text.lines()
