@@ -444,11 +444,11 @@ fn folders() -> Vec<PathBuf> {
         .and_then(|program| program.parent().map(Path::to_path_buf));
     if cfg!(target_os = "windows") {
         beside
-            .map(|folder| vec![folder.join("dictionaries")])
+            .map(|folder| bundled(&folder.join("dictionaries")))
             .unwrap_or_default()
     } else if cfg!(target_os = "macos") {
         beside
-            .map(|folder| vec![folder.join("../Resources/dictionaries")])
+            .map(|folder| bundled(&folder.join("../Resources/dictionaries")))
             .unwrap_or_default()
     } else {
         let data = match std::env::var_os("XDG_DATA_HOME") {
@@ -467,6 +467,24 @@ fn folders() -> Vec<PathBuf> {
         );
         folders
     }
+}
+
+/// The dictionaries that travel with the application: a folder of them, one
+/// folder for each language with its license files beside it.
+fn bundled(root: &Path) -> Vec<PathBuf> {
+    let mut languages: Vec<PathBuf> = std::fs::read_dir(root)
+        .map(|entries| {
+            entries
+                .flatten()
+                .map(|entry| entry.path())
+                .filter(|path| path.is_dir())
+                .collect()
+        })
+        .unwrap_or_default();
+    languages.sort();
+    std::iter::once(root.to_path_buf())
+        .chain(languages)
+        .collect()
 }
 
 /// The affix and word files for a language tag: `de_AT` for `de-AT`, then
@@ -715,5 +733,18 @@ mod tests {
         let (aff, _) = super::find(std::slice::from_ref(&folder), "de-DE").expect("found");
         assert!(aff.ends_with("de_DE_frami.aff"));
         std::fs::remove_dir_all(&folder).expect("removed");
+    }
+
+    #[test]
+    fn bundled_dictionaries_are_found_in_their_language_folders() {
+        let bundled =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../packaging/dictionaries");
+        let speller = Speller::new(super::bundled(&bundled), None);
+        assert!(speller.dictionary("en-US").is_some());
+        assert!(speller.dictionary("de-DE").is_some());
+        assert!(
+            speller.dictionary("de-AT").is_some(),
+            "the language's other country"
+        );
     }
 }
