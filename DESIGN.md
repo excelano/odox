@@ -952,10 +952,13 @@ mode and Ctrl+R reload. One pass over the selection is one undo step.
 The indent buttons after the alignments, and Format > Increase indent and
 Decrease indent, move `fo:margin-left` a tab's width in or out, the tab width
 being the default style's `style:tab-stop-distance` or 1.25 cm where it sets
-none, and never past the left margin; a paragraph in a list item moves a level
+none, and never so far out that a hanging first line would stand past the left
+margin; a paragraph in a list item moves a level
 in its list instead. The line spacing list and Format > Line spacing write
-`fo:line-height` as 100%, 115%, 150% or 200%, and show the one the selection
-has where it is one of those. Both work in a text document and in a slide's
+`fo:line-height` as 100%, 115%, 150% or 200%, taking out a
+`style:line-height-at-least` or `style:line-spacing` the style had, and show the
+one the selection has where it is one of those; spacing stated those other ways
+shows blank. Both work in a text document and in a slide's
 label, and the toolbar's row wraps where the window is too narrow for it.
 
 **A page is told to assistive technology a paragraph at a time.** Each paragraph

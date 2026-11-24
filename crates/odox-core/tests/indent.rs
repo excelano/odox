@@ -120,3 +120,65 @@ fn reads_back_current_spacing() {
         Some(LineSpacing::Double)
     );
 }
+
+#[test]
+fn refuses_before_moving_list_items_when_a_plain_paragraph_cannot_be_indented() {
+    let source = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:body><office:text><text:list><text:list-item><text:p>One</text:p></text:list-item><text:list-item><text:p>Two</text:p></text:list-item></text:list><text:p>Plain</text:p></office:text></office:body></office:document-content>"#;
+    let mut root = xml::parse(source.as_bytes(), "test").expect("a content root");
+    let before = root.clone();
+    let mut styles = Styles::collect(Some(&root), None);
+    let paths = [vec![0, 0, 0, 1, 0], vec![0, 0, 1]];
+    assert!(set_indent(&mut root, &paths, 1, &mut styles).is_err());
+    assert!(root == before, "nothing changed");
+}
+
+#[test]
+fn other_line_spacing_reads_as_none_and_is_replaced() {
+    let mut root = content(r#"<text:p text:style-name="P1">Text</text:p>"#);
+    let automatic = root.at_mut(&[0]).expect("automatic styles");
+    let style = xml::parse(
+        format!(r#"<style:style {NAMESPACES} style:name="P1" style:family="paragraph"><style:paragraph-properties style:line-height-at-least="1cm"/></style:style>"#).as_bytes(),
+        "test",
+    )
+    .expect("a style");
+    automatic.children.push(odox_core::Node::Element(style));
+    automatic.self_closing = false;
+    let mut styles = Styles::collect(Some(&root), None);
+    let path = vec![1, 0, 0];
+    assert_eq!(line_spacing(&root, &path, &styles), None);
+    set_line_spacing(
+        &mut root,
+        std::slice::from_ref(&path),
+        LineSpacing::Double,
+        &mut styles,
+    )
+    .expect("spaced");
+    let written = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    let name = root
+        .at(&path)
+        .and_then(|p| p.attr(&Ns::Text, "style-name"))
+        .expect("a style");
+    let own = written
+        .split(&format!(r#"style:name="{name}""#))
+        .nth(1)
+        .and_then(|rest| rest.split("</style:style>").next())
+        .expect("the new style");
+    assert!(own.contains(r#"fo:line-height="200%""#), "{own}");
+    assert!(!own.contains("line-height-at-least"), "{own}");
+    assert_eq!(
+        line_spacing(&root, &path, &styles),
+        Some(LineSpacing::Double)
+    );
+}
+
+#[test]
+fn outdent_keeps_a_hanging_first_line_inside_the_margin() {
+    let mut root = content(r#"<text:p text:style-name="Hanging">Text</text:p>"#);
+    let hanging = named(&format!(
+        r#"{ONE_CM_TABS}<style:style style:name="Hanging" style:family="paragraph"><style:paragraph-properties fo:margin-left="0.5cm" fo:text-indent="-0.5cm"/></style:style>"#
+    ));
+    let mut styles = Styles::collect(Some(&root), Some(&hanging));
+    let path = vec![1, 0, 0];
+    set_indent(&mut root, std::slice::from_ref(&path), -1, &mut styles).expect("out");
+    assert!((left(&root, &path, &styles) - cm(0.5)).abs() < 0.05);
+}

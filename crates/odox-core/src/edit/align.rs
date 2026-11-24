@@ -72,13 +72,17 @@ pub fn set_alignment(
 ) -> Result<(), Refused> {
     restyle_paragraphs(content, paths, styles, |content, path, styles| {
         (alignment(content, path, styles) != align)
-            .then(|| vec![(Ns::Fo, "text-align", written(align).to_owned())])
+            .then(|| vec![(Ns::Fo, "text-align", Some(written(align).to_owned()))])
     })
 }
 
+/// A paragraph property to write, or to take out where it has no value.
+pub(super) type Property = (Ns, &'static str, Option<String>);
+
 /// Give paragraphs paragraph properties: each the attributes `wanted` answers
 /// for it, written into an automatic style as [`set_alignment`] writes an
-/// alignment, or nothing where it answers `None`.
+/// alignment, an attribute answered with no value taken out, and nothing
+/// where it answers `None`.
 ///
 /// # Errors
 ///
@@ -87,7 +91,7 @@ pub(super) fn restyle_paragraphs(
     content: &mut Element,
     paths: &[Vec<usize>],
     styles: &mut Styles,
-    wanted: impl Fn(&Element, &[usize], &Styles) -> Option<Vec<(Ns, &'static str, String)>>,
+    wanted: impl Fn(&Element, &[usize], &Styles) -> Option<Vec<Property>>,
 ) -> Result<(), Refused> {
     for path in paths {
         content
@@ -133,11 +137,7 @@ pub(super) fn restyle_paragraphs(
 /// names says, with paragraph properties set: a copy of it where it is one of
 /// the document's own automatic styles, which cannot be inherited from, and
 /// otherwise one inheriting from it.
-fn with_properties(
-    content: &Element,
-    current: Option<&str>,
-    set: &[(Ns, &'static str, String)],
-) -> Element {
+fn with_properties(content: &Element, current: Option<&str>, set: &[Property]) -> Element {
     let own = current.and_then(|name| {
         content
             .child(&Ns::Office, "automatic-styles")?
@@ -169,7 +169,11 @@ fn with_properties(
     });
     if let Node::Element(properties) = &mut style.children[index] {
         for (ns, local, value) in set {
-            properties.set_attr(content.name_for(ns, local), value.as_str());
+            if let Some(value) = value {
+                properties.set_attr(content.name_for(ns, local), value.as_str());
+            } else {
+                properties.remove_attr(ns, local);
+            }
         }
     }
     style.self_closing = false;

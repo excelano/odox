@@ -377,6 +377,10 @@ pub struct ParagraphProperties {
     pub text_indent: Option<Length>,
     /// Line spacing, absolute or a proportion of the font size.
     pub line_height: Option<Measure>,
+    /// Whether the line spacing is stated some other way than a line height:
+    /// `style:line-height-at-least` or `style:line-spacing`, which are not
+    /// drawn.
+    pub other_line_height: Option<bool>,
     /// Fill behind the paragraph.
     pub background: Option<Color>,
     /// A break asked for before the paragraph.
@@ -1766,7 +1770,14 @@ impl ParagraphProperties {
         if let Some(indent) = p.attr(&Ns::Fo, "text-indent").and_then(Length::parse) {
             self.text_indent = Some(indent);
         }
+        if p.attr(&Ns::Style, "line-height-at-least").is_some()
+            || p.attr(&Ns::Style, "line-spacing").is_some()
+        {
+            self.line_height = None;
+            self.other_line_height = Some(true);
+        }
         if let Some(height) = p.attr(&Ns::Fo, "line-height") {
+            self.other_line_height = Some(false);
             self.line_height = Measure::parse(height);
         }
         if let Some(color) = p.attr(&Ns::Fo, "background-color") {
