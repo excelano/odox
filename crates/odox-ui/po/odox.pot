@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-24 01:18-0600\n"
+"POT-Creation-Date: 2026-11-24 01:40-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -35,117 +35,117 @@ msgstr ""
 msgid "None"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:101
+#: crates/odox-ui/src/export.rs:103
 msgid "Export as PDF/UA…"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:112
+#: crates/odox-ui/src/export.rs:114
 msgid "Print…"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:196
-msgid "The pictures could not be described: {reason}"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:225
-msgid "Preparing {file} to print…"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:227
-msgid "Exporting {file}…"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:247
-msgid "Sent {file} to be printed."
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:254
-msgid "Opened {file} in the viewer, to print from there."
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:258
-msgid "Exported {file} as PDF/UA."
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:262
-msgid "{family} may not be embedded, so {used} was used instead."
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:272 crates/odox-ui/src/shell.rs:664
-msgid "{file} could not be saved: {reason}"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:276
-msgid "{file} could not be printed: {reason}"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:281
-msgid "The export of {file} stopped before it was finished."
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:295
-msgid "PDF/UA document"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:319 crates/xodp/src/view.rs:43
-msgid "Slide {number}"
-msgstr ""
-
-#: crates/odox-ui/src/export.rs:357 crates/odox-ui/src/shell.rs:380
-#: crates/odox-ui/src/shell.rs:430 crates/odox-ui/src/shell.rs:498
-#: crates/odox-ui/src/shell.rs:625 crates/odox-ui/src/shell.rs:707
-#: crates/odox-ui/src/shell.rs:723
+#: crates/odox-ui/src/export.rs:168 crates/odox-ui/src/export.rs:371
+#: crates/odox-ui/src/shell.rs:380 crates/odox-ui/src/shell.rs:430
+#: crates/odox-ui/src/shell.rs:498 crates/odox-ui/src/shell.rs:625
+#: crates/odox-ui/src/shell.rs:707 crates/odox-ui/src/shell.rs:723
 msgid "Untitled"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:383
+#: crates/odox-ui/src/export.rs:210
+msgid "The pictures could not be described: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:239
+msgid "Printing {file}…"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:241
+msgid "Exporting {file}…"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:261
+msgid "Sent {file} to be printed."
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:268
+msgid "Opened {file} in the viewer, to print from there."
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:272
+msgid "Exported {file} as PDF/UA."
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:276
+msgid "{family} may not be embedded, so {used} was used instead."
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:286 crates/odox-ui/src/shell.rs:664
+msgid "{file} could not be saved: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:290
+msgid "{file} could not be printed: {reason}"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:295
+msgid "The export of {file} stopped before it was finished."
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:309
+msgid "PDF/UA document"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:333 crates/xodp/src/view.rs:43
+msgid "Slide {number}"
+msgstr ""
+
+#: crates/odox-ui/src/export.rs:397
 msgid "{count} pictures still say nothing in place of what they show."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:387
+#: crates/odox-ui/src/export.rs:401
 msgid "No font for {family} on this computer may be embedded in a PDF."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:391
+#: crates/odox-ui/src/export.rs:405
 msgid "No font on this computer has the character {character}."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:395
+#: crates/odox-ui/src/export.rs:409
 msgid "There is nothing to export: nothing in the document is shown."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:398
+#: crates/odox-ui/src/export.rs:412
 msgid "The PDF could not be written: {reason}"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:414
+#: crates/odox-ui/src/export.rs:428
 msgid "Describe the pictures"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:416
+#: crates/odox-ui/src/export.rs:430
 msgid ""
 "A PDF/UA file says what each picture shows to someone who cannot see it, or "
 "that it is decoration and shows nothing they need. These pictures say "
 "neither yet."
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:447 crates/odox-ui/src/picture_question.rs:71
+#: crates/odox-ui/src/export.rs:461 crates/odox-ui/src/picture_question.rs:71
 msgid "What the picture shows"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:450 crates/odox-ui/src/picture_question.rs:78
+#: crates/odox-ui/src/export.rs:464 crates/odox-ui/src/picture_question.rs:78
 msgid "Decoration only"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:461
+#: crates/odox-ui/src/export.rs:475
 msgid "Export"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:466
+#: crates/odox-ui/src/export.rs:480
 msgid "Mark the rest as decoration"
 msgstr ""
 
-#: crates/odox-ui/src/export.rs:473 crates/odox-ui/src/link_dialog.rs:115
+#: crates/odox-ui/src/export.rs:487 crates/odox-ui/src/link_dialog.rs:115
 #: crates/odox-ui/src/page_setup.rs:113
 #: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:737
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1293
@@ -370,6 +370,14 @@ msgstr ""
 
 #: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:750
 msgid "Insert"
+msgstr ""
+
+#: crates/odox-ui/src/print.rs:52
+msgid "no program here opens PDF files"
+msgstr ""
+
+#: crates/odox-ui/src/print.rs:209
+msgid "the print dialog did not print it"
 msgstr ""
 
 #: crates/odox-ui/src/shapes.rs:705

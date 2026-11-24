@@ -1358,12 +1358,16 @@ in `odox-pdf` that each kind of document implements with a layout of its own.
 and Ctrl+P make the same PDF on the export's thread, with `Options::printing`,
 which draws a picture that says nothing as decoration where the export would
 refuse it, so printing asks nothing. The PDF is written to a folder of the
-process's own in the temporary directory, under the document's name, and the
+process's own in the temporary directory, one for each print so a viewer still
+holding the last does not stand in the way, under the document's name, and the
 same thread hands it over. On Linux that is the desktop portal's `PreparePrint`,
 whose dialog chooses the printer and the settings, and then `Print` with the
 file's descriptor and the token the first answered; each answer is listened for
 at the request path its handle token makes before the call is put, so it cannot
-be missed. A dialog closed without printing says nothing. Where there is no
+be missed, and at the path the call answers where a portal gives another. The
+wait also ends when the portal's name loses its owner, and the PDF then goes to
+the viewer. A dialog closed without printing says nothing; a print the dialog
+failed is said. Where there is no
 session bus or no portal, and on Windows and macOS, the PDF is opened in the
 default viewer, `xdg-open`, `explorer.exe` or `NSWorkspace`, and printed from
 there.

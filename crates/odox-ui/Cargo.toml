@@ -33,6 +33,9 @@ arboard = { version = "3.7", default-features = false }
 # reasoning is in that repository, as duckling's copy also says.
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+# Waiting on the print portal's answer and on the portal going away at once,
+# which the blocking API cannot. Already in the tree under zbus.
+futures-lite = { version = "2", default-features = false, features = ["std"] }
 # Named for features only, which the workspace manifest gives; no code here
 # calls it.
 winit.workspace = true

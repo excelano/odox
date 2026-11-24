@@ -39,6 +39,8 @@ pub struct Export {
     /// What hands a PDF made to print over, where it is not the platform's
     /// own.
     hand_over: Option<HandOver>,
+    /// How many prints the window has made, which names each one's folder.
+    prints: u32,
 }
 
 /// An export on its own thread, and the file it is writing.
@@ -155,7 +157,15 @@ impl Export {
         {
             let stem = stem(source.as_deref());
             let hand_over = self.hand_over.unwrap_or(crate::print::hand_over);
-            self.start(document, temporary_pdf(&stem), stem, Some(hand_over));
+            self.prints += 1;
+            let pdf = temporary_pdf(&stem, self.prints);
+            self.start(document, pdf, stem, Some(hand_over));
+            if let Some(running) = &mut self.running {
+                running.file = source.as_deref().and_then(Path::file_name).map_or_else(
+                    || t("Untitled").to_owned(),
+                    |name| name.to_string_lossy().into_owned(),
+                );
+            }
         } else if let Some(Request { source, .. }) = requested {
             let content = &document.document().content;
             let body = body_index(content);
@@ -223,7 +233,7 @@ impl Export {
                         ui.horizontal(|ui| {
                             ui.spinner();
                             let doing = if running.printing {
-                                t("Preparing {file} to print…")
+                                t("Printing {file}…")
                             } else {
                                 t("Exporting {file}…")
                             };
@@ -764,6 +774,8 @@ mod tests {
             matches!(export.take_notice(), Some(Notice::Done(_))),
             "the print was handed over"
         );
-        let _ = std::fs::remove_file(temporary_pdf("export"));
+        let _ = std::fs::remove_dir_all(
+            std::env::temp_dir().join(format!("odox-print-{}", std::process::id())),
+        );
     }
 }
