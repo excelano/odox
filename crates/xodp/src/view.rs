@@ -20,6 +20,7 @@ use odox_ui::find::{Highlights, Match, Options, Replaced, in_paragraphs};
 use odox_ui::i18n::{fill, t};
 use odox_ui::link_dialog::LinkQuestion;
 use odox_ui::note_popup::{self, NoteContent, NoteResponse};
+use odox_ui::picture_question::PictureQuestion;
 use odox_ui::toolbar::{self, Command, MenuState};
 use odox_ui::{
     Canvas, Caret, Editing, Export, Flow, FlowModel, Found, Notice, PageEditor, Pictures, View,
@@ -71,9 +72,6 @@ pub struct SlideView {
     command: Option<Command>,
     /// What the Slide menu last chose.
     slide_command: Option<SlideCommand>,
-    /// Slide > Comment was chosen, and a comment is put on the slide on the
-    /// next frame.
-    comment_wanted: bool,
     /// A comment just put on the slide, whose box opens on the next frame.
     opened_note: Option<usize>,
     /// What was done in a slide comment's box, done on the next frame.
@@ -81,6 +79,16 @@ pub struct SlideView {
     export: Export,
     /// The link question.
     link: LinkQuestion,
+    /// What the Slide menu asked for that is done on the next frame: a
+    /// comment put on the slide, or a picture asked for.
+    menu_asked: Option<MenuAsked>,
+    /// Slide > Text box was chosen: the next drag on the slide draws the
+    /// box, or a click puts one there.
+    placing: bool,
+    /// Where a drag drawing a text box began, on screen.
+    place_from: Option<Pos2>,
+    /// What a chosen picture shows, while the question is up.
+    picture_question: Option<PictureQuestion>,
     notice: Option<Notice>,
 }
 
@@ -99,10 +107,13 @@ impl Default for SlideView {
             menu: MenuState::offering_blocks(false),
             command: None,
             slide_command: None,
-            comment_wanted: false,
             opened_note: None,
             note_wanted: None,
             link: LinkQuestion::default(),
+            menu_asked: None,
+            placing: false,
+            place_from: None,
+            picture_question: None,
             notice: None,
             export: Export::default(),
         }
@@ -189,12 +200,21 @@ struct Drag {
     start: Box,
 }
 
+/// What the Slide menu asked for, done on the next frame.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MenuAsked {
+    Comment,
+    Picture,
+}
+
 /// What the slide asked for this frame, applied once the document is free.
 enum Action {
     Pick(Option<usize>),
     Begin(Drag),
     Move(Pos2),
     End,
+    /// A text box to put on the slide, at a place and size in points.
+    Place((f32, f32, f32, f32)),
 }
 
 /// The size of a corner handle on screen, and how far from a corner a press
@@ -345,7 +365,21 @@ impl View for SlideView {
                 .add_enabled(can, egui::Button::new(t("Comment")))
                 .clicked()
             {
-                self.comment_wanted = true;
+                self.menu_asked = Some(MenuAsked::Comment);
+                ui.close();
+            }
+            if ui
+                .add_enabled(can, egui::Button::new(t("Text box")))
+                .clicked()
+            {
+                self.placing = true;
+                ui.close();
+            }
+            if ui
+                .add_enabled(can, egui::Button::new(t("Picture…")))
+                .clicked()
+            {
+                self.menu_asked = Some(MenuAsked::Picture);
                 ui.close();
             }
             ui.separator();
@@ -463,15 +497,19 @@ impl View for SlideView {
             });
             return;
         }
-        let asking = self.carry_export(ui.ctx(), editing) || self.link.is_up();
+        let asking = self.carry_export(ui.ctx(), editing)
+            || self.link.is_up()
+            || self.picture_question.is_some();
         self.link.ask(ui.ctx());
+        self.ask_picture(ui.ctx(), editing);
         if !asking && self.keys_before_drawing(ui, editing, count) {
             return;
         }
         if let Some(command) = self.slide_command.take() {
             self.change_slides(command, editing);
         }
-        if std::mem::take(&mut self.comment_wanted) {
+        if self.menu_asked == Some(MenuAsked::Comment) {
+            self.menu_asked = None;
             self.add_comment(editing);
         }
         if let Some((child, done)) = self.note_wanted.take() {
@@ -485,6 +523,8 @@ impl View for SlideView {
         let show_notes = self.show_notes;
         let edit_mode = editing.on && !editing.asking && !asking;
         let picked = self.picked;
+        let placing = self.placing;
+        let mut place_from = self.place_from;
         let dragging = self.drag.is_some();
         let mut action = None;
         let mut followed = None;
@@ -581,12 +621,15 @@ impl View for SlideView {
                     StrokeKind::Inside,
                 );
 
-                if edit_mode {
+                if edit_mode && placing {
+                    action = place(ui, &response, page, scale, &mut place_from);
+                } else if edit_mode {
                     action = interact(ui, &response, page, scale, slide, picked, dragging);
                 }
             });
         });
 
+        self.place_from = place_from;
         self.found.drawn();
         if noted.is_some() {
             self.note_wanted = noted;
@@ -738,9 +781,95 @@ impl SlideView {
         self.page_editor.input(ui, &mut model);
     }
 
+    /// Ask for a picture once Slide > Picture… is chosen, ask what it shows,
+    /// and put it on the slide, as one step to undo.
+    fn ask_picture(&mut self, ctx: &egui::Context, editing: &mut Editing) {
+        if self.menu_asked == Some(MenuAsked::Picture) {
+            self.menu_asked = None;
+            match PictureQuestion::choose(ctx, f32::MAX) {
+                Ok(question) => self.picture_question = question,
+                Err(problem) => self.notice = Some(Notice::Problem(problem)),
+            }
+        }
+        let Some(question) = &mut self.picture_question else {
+            return;
+        };
+        let answer = question.show(ctx);
+        if answer.is_none() {
+            return;
+        }
+        let Some(question) = self.picture_question.take() else {
+            return;
+        };
+        if answer != Some(true) {
+            return;
+        }
+        let picture = question.picture();
+        let Some(document) = &mut self.document else {
+            return;
+        };
+        let Some(position) = document.slides().get(self.slide).map(|s| s.position) else {
+            return;
+        };
+        let before = document.document.content.clone();
+        let name = document
+            .document
+            .package
+            .picture_name(&picture.bytes, picture.extension);
+        let parts = document
+            .document
+            .package
+            .keep(&[name.as_str(), "META-INF/manifest.xml"]);
+        let placed = document.insert_picture(
+            position,
+            &odox_core::doc::SlidePicture {
+                bytes: &picture.bytes,
+                media_type: picture.media_type,
+                extension: picture.extension,
+                size: picture.size,
+                description: picture.description.as_deref(),
+            },
+        );
+        match placed {
+            Ok(path) => {
+                editing.record_step(before, parts, None);
+                self.picked = path.last().copied();
+                ctx.request_repaint();
+            }
+            Err(refused) => {
+                document.document.content = before;
+                document.document.package.restore(parts);
+                self.notice = Some(Notice::Problem(refused.to_string()));
+            }
+        }
+    }
+
     /// Apply what the slide asked for.
     fn act(&mut self, action: Action, scale: f32, editing: &mut Editing) {
         match action {
+            Action::Place(rect) => {
+                self.placing = false;
+                self.place_from = None;
+                let Some(document) = &mut self.document else {
+                    return;
+                };
+                let Some(position) = document.slides().get(self.slide).map(|s| s.position) else {
+                    return;
+                };
+                let before = document.document.content.clone();
+                match document.insert_text_box(position, rect) {
+                    Ok(path) => {
+                        editing.record_snapshot(before, None);
+                        let shape = path.last().copied();
+                        self.picked = shape;
+                        if let Some(shape) = shape {
+                            self.page_editor
+                                .select(Selection::caret(Caret::new(vec![shape, 0, 0], 0)));
+                        }
+                    }
+                    Err(refused) => self.notice = Some(Notice::Problem(refused.to_string())),
+                }
+            }
             Action::Pick(shape) => {
                 self.picked = shape;
                 self.drag = None;
@@ -1197,6 +1326,54 @@ fn interact(
     None
 }
 
+/// While a text box is being placed: a drag draws its outline and makes it, a
+/// click makes one of ten centimetres by two where it was. Answers the box,
+/// in points on the slide.
+fn place(
+    ui: &Ui,
+    response: &egui::Response,
+    page: Rect,
+    scale: f32,
+    from: &mut Option<Pos2>,
+) -> Option<Action> {
+    let to_slide = |at: Pos2| ((at.x - page.min.x) / scale, (at.y - page.min.y) / scale);
+    if response.drag_started() {
+        *from = ui
+            .input(|input| input.pointer.press_origin())
+            .or_else(|| response.interact_pointer_pos());
+    }
+    if let (Some(start), Some(now)) = (*from, response.interact_pointer_pos())
+        && response.dragged()
+    {
+        ui.painter().rect_stroke(
+            Rect::from_two_pos(start, now),
+            0.0,
+            Stroke::new(1.0, ui.visuals().selection.stroke.color),
+            StrokeKind::Inside,
+        );
+    }
+    if response.drag_stopped()
+        && let (Some(start), Some(end)) = (from.take(), response.interact_pointer_pos())
+    {
+        let (a, b) = (to_slide(start), to_slide(end));
+        let (x, y) = (a.0.min(b.0), a.1.min(b.1));
+        let (width, height) = ((a.0 - b.0).abs(), (a.1 - b.1).abs());
+        if width > 4.0 && height > 4.0 {
+            return Some(Action::Place((x, y, width, height)));
+        }
+    }
+    if response.clicked()
+        && let Some(at) = response.interact_pointer_pos()
+    {
+        let (x, y) = to_slide(at);
+        return Some(Action::Place((x, y, CM * 10.0, CM * 2.0)));
+    }
+    None
+}
+
+/// A centimetre in points.
+const CM: f32 = 72.0 / 2.54;
+
 fn fit(space: Vec2, layout: &PageLayout) -> f32 {
     (space.x / layout.width.points())
         .min(space.y / layout.height.points())
@@ -1282,4 +1459,49 @@ fn first_line(text: &str) -> String {
         return format!("{short}\u{2026}");
     }
     line.to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Action, CM, Editing, Presentation, SlideView};
+
+    fn shapes(view: &SlideView) -> usize {
+        view.document
+            .as_ref()
+            .and_then(|document| {
+                document
+                    .slides()
+                    .get(view.slide)
+                    .map(|s| s.shapes().count())
+            })
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn undo_removes_inserted_shape() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/libreoffice/deck.odp"),
+        )
+        .expect("the deck");
+        let mut view = SlideView {
+            document: Some(Presentation::read(&bytes).expect("it reads")),
+            ..SlideView::default()
+        };
+        let mut editing = Editing::default();
+        editing.reset();
+        let before = shapes(&view);
+        view.placing = true;
+        view.act(
+            Action::Place((36.0, 36.0, CM * 10.0, CM * 2.0)),
+            1.0,
+            &mut editing,
+        );
+        assert_eq!(shapes(&view), before + 1);
+        assert!(!view.placing);
+        assert!(view.picked.is_some());
+        let document = view.document.as_mut().expect("open");
+        editing.undo(&mut document.document, None).expect("a step");
+        assert_eq!(shapes(&view), before);
+    }
 }

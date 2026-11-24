@@ -1106,6 +1106,16 @@ or the caret is at it; in edit mode the box edits the text, a line to a
 paragraph of the body in the style of its first, or deletes the note. Find's
 Ctrl+F and Ctrl+H do not take Ctrl+Alt+F or Ctrl+Alt+H.
 
+**A text box or a picture is put on a slide** (`doc/slides.rs`) from the
+Slide menu, as a `draw:frame` on the layout layer after the slide's shapes
+and before its notes and animations. Slide > Text box draws the next drag on
+the slide as the box, or puts one of ten centimetres by two at a click, with
+an empty paragraph the caret goes into. Slide > Picture… asks for the file and
+what it shows, as a text document's picture question does, keeps the picture
+in the package, and puts it at its own size, or smaller to fit the slide, in
+the slide's middle. Each is one step to undo, the picture's package entry with
+it.
+
 **A page's header and footer are edited where they are drawn.** The body's
 header and footer are the `style:header` and `style:footer`, not set
 `style:display="false"`, of the master page the body begins on: the one its

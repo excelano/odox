@@ -558,3 +558,142 @@ fn first_run_style(frame: &Element) -> Option<&str> {
         .then(|| first.attr(&Ns::Text, "style-name"))
         .flatten()
 }
+
+/// A picture to put on a slide.
+pub struct SlidePicture<'a> {
+    /// The file's bytes.
+    pub bytes: &'a [u8],
+    /// Its media type.
+    pub media_type: &'a str,
+    /// The extension its part is named with.
+    pub extension: &'a str,
+    /// How wide and how tall it is at its own size, in points.
+    pub size: (f32, f32),
+    /// What it shows, or `None` for a picture that is decoration only.
+    pub description: Option<&'a str>,
+}
+
+impl Presentation {
+    /// Put an empty text box on a slide at a place and size in points, and
+    /// answer its path.
+    ///
+    /// # Errors
+    ///
+    /// There is no such slide.
+    pub fn insert_text_box(
+        &mut self,
+        position: usize,
+        rect: (f32, f32, f32, f32),
+    ) -> Result<Vec<usize>, Refused> {
+        let content = &self.document.content;
+        let name = |ns: Ns, local: &str| content.name_for(&ns, local);
+        let mut paragraph = Element::new("", "p", Ns::Text);
+        paragraph.name = name(Ns::Text, "p");
+        let mut text_box = Element::new("", "text-box", Ns::Draw);
+        text_box.name = name(Ns::Draw, "text-box");
+        text_box.children = vec![Node::Element(paragraph)];
+        text_box.self_closing = false;
+        let frame = self.frame(rect, text_box);
+        self.put_on_slide(position, frame)
+    }
+
+    /// A `draw:frame` on the layout layer at a place and size in points,
+    /// holding one element.
+    fn frame(&self, (x, y, width, height): (f32, f32, f32, f32), inside: Element) -> Element {
+        let content = &self.document.content;
+        let mut frame = Element::new("", "frame", Ns::Draw);
+        frame.name = content.name_for(&Ns::Draw, "frame");
+        frame.set_attr(content.name_for(&Ns::Draw, "layer"), "layout");
+        for (local, points) in [("width", width), ("height", height), ("x", x), ("y", y)] {
+            frame.set_attr(
+                content.name_for(&Ns::Svg, local),
+                Length(points).write("cm"),
+            );
+        }
+        frame.children = vec![Node::Element(inside)];
+        frame.self_closing = false;
+        frame
+    }
+
+    /// Put a shape last on a slide, over the others, and answer its path.
+    fn put_on_slide(&mut self, position: usize, shape: Element) -> Result<Vec<usize>, Refused> {
+        let page = self.page_path(position).ok_or(Refused::NotFound)?;
+        let slide = self
+            .document
+            .content
+            .at_mut(&page)
+            .filter(|e| e.is(&Ns::Draw, "page"))
+            .ok_or(Refused::NotFound)?;
+        let at = slide
+            .children
+            .iter()
+            .position(|node| {
+                matches!(node, Node::Element(e)
+                    if e.is(&Ns::Presentation, "notes")
+                        || matches!(e.name.local.as_ref(), "par" | "seq" | "animations"))
+            })
+            .unwrap_or(slide.children.len());
+        slide.children.insert(at, Node::Element(shape));
+        slide.self_closing = false;
+        Ok([page.as_slice(), &[at]].concat())
+    }
+
+    /// Put a picture on a slide, kept in the package, at its own size or
+    /// made smaller to fit the slide, in its middle, and answer its path.
+    ///
+    /// # Errors
+    ///
+    /// There is no such slide.
+    pub fn insert_picture(
+        &mut self,
+        position: usize,
+        picture: &SlidePicture<'_>,
+    ) -> Result<Vec<usize>, Refused> {
+        let slide = self
+            .slides()
+            .into_iter()
+            .find(|slide| slide.position == position)
+            .ok_or(Refused::NotFound)?;
+        let layout = self.page_layout(&slide);
+        let (page_width, page_height) = (layout.width.points(), layout.height.points());
+        let (width, height) = picture.size;
+        let shrink = (page_width / width).min(page_height / height).min(1.0);
+        let (width, height) = (width * shrink, height * shrink);
+        let rect = (
+            (page_width - width) / 2.0,
+            (page_height - height) / 2.0,
+            width,
+            height,
+        );
+        let href =
+            self.document
+                .package
+                .add_picture(picture.bytes, picture.extension, picture.media_type);
+        let content = &self.document.content;
+        let mut image = Element::new("", "image", Ns::Draw);
+        image.name = content.name_for(&Ns::Draw, "image");
+        for (ns, local, value) in [
+            (Ns::Xlink, "href", href.as_str()),
+            (Ns::Xlink, "type", "simple"),
+            (Ns::Xlink, "show", "embed"),
+            (Ns::Xlink, "actuate", "onLoad"),
+            (Ns::Draw, "mime-type", picture.media_type),
+        ] {
+            image.set_attr(content.name_for(&ns, local), value);
+        }
+        let frame = self.frame(rect, image);
+        let path = self.put_on_slide(position, frame)?;
+        match picture.description {
+            Some(text) if !text.trim().is_empty() => {
+                crate::edit::set_alternative_text(&mut self.document.content, &path, text.trim())?;
+            }
+            Some(_) => {}
+            None => crate::edit::set_decorative(
+                &mut self.document.content,
+                &path,
+                &mut self.document.styles,
+            )?,
+        }
+        Ok(path)
+    }
+}

@@ -24,6 +24,7 @@ pub use sheet::{
     DEFAULT_ROW_HEIGHT, Frozen, Merged, Message, NumberFormat, Place, Recalculated, Restructure,
     Sheet, SheetDocument, SheetDrawing, Validation, Value, Verdict,
 };
+pub use slides::SlidePicture;
 pub use text::{PageSetup, TextDocument};
 
 use crate::xml::{Element, Name, Ns};

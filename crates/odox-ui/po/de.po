@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-23 23:49-0600\n"
+"POT-Creation-Date: 2026-11-24 00:11-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -69,7 +69,7 @@ msgstr "Der Export von {file} wurde abgebrochen, bevor er fertig war."
 msgid "PDF/UA document"
 msgstr "PDF/UA-Dokument"
 
-#: crates/odox-ui/src/export.rs:249 crates/xodp/src/view.rs:42
+#: crates/odox-ui/src/export.rs:249 crates/xodp/src/view.rs:43
 msgid "Slide {number}"
 msgstr "Folie {number}"
 
@@ -136,8 +136,8 @@ msgstr "Übrige als Schmuck markieren"
 #: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:591
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1289
 #: crates/xods/src/view.rs:1353 crates/xods/src/view.rs:1435
-#: crates/xods/src/view.rs:1652 crates/xodt/src/view.rs:730
-#: crates/xodt/src/view.rs:883
+#: crates/xods/src/view.rs:1652 crates/xodt/src/view.rs:751
+#: crates/xodt/src/view.rs:915
 msgid "Cancel"
 msgstr "Abbrechen"
 
@@ -223,7 +223,7 @@ msgid "File"
 msgstr "Datei"
 
 #: crates/odox-ui/src/i18n.rs:104 crates/odox-ui/src/i18n.rs:105
-#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:208
+#: crates/odox-ui/tests/german.rs:34 crates/xodp/src/view.rs:225
 #: crates/xods/src/view.rs:618 crates/xodt/src/view.rs:345
 msgid "{file} could not be opened: {reason}"
 msgstr "{file} konnte nicht geöffnet werden: {reason}"
@@ -363,7 +363,7 @@ msgstr "Diese Datei ist kein PNG- oder JPEG-Bild."
 msgid "Insert a picture"
 msgstr "Bild einfügen"
 
-#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:725
+#: crates/odox-ui/src/picture_question.rs:81 crates/xodt/src/view.rs:746
 msgid "Insert"
 msgstr "Einfügen"
 
@@ -511,15 +511,15 @@ msgstr "Ein Dokument öffnen …"
 msgid "Start a new one"
 msgstr "Ein neues beginnen"
 
-#: crates/odox-ui/src/toolbar.rs:96 crates/odox-ui/src/toolbar.rs:637
+#: crates/odox-ui/src/toolbar.rs:96 crates/odox-ui/src/toolbar.rs:648
 msgid "Decrease indent"
 msgstr "Einzug verkleinern"
 
-#: crates/odox-ui/src/toolbar.rs:97 crates/odox-ui/src/toolbar.rs:637
+#: crates/odox-ui/src/toolbar.rs:97 crates/odox-ui/src/toolbar.rs:648
 msgid "Increase indent"
 msgstr "Einzug vergrößern"
 
-#: crates/odox-ui/src/toolbar.rs:120 crates/odox-ui/src/toolbar.rs:647
+#: crates/odox-ui/src/toolbar.rs:120 crates/odox-ui/src/toolbar.rs:658
 msgid "Line spacing"
 msgstr "Zeilenabstand"
 
@@ -547,11 +547,11 @@ msgstr "Rechtsbündig"
 msgid "Justify"
 msgstr "Blocksatz"
 
-#: crates/odox-ui/src/toolbar.rs:346 crates/odox-ui/src/toolbar.rs:691
+#: crates/odox-ui/src/toolbar.rs:346 crates/odox-ui/src/toolbar.rs:742
 msgid "Table"
 msgstr "Tabelle"
 
-#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:713
+#: crates/odox-ui/src/toolbar.rs:347 crates/xodt/src/view.rs:734
 msgid "Insert a table"
 msgstr "Tabelle einfügen"
 
@@ -607,147 +607,147 @@ msgstr "Aufzählung"
 msgid "Numbered list"
 msgstr "Nummerierte Liste"
 
-#: crates/odox-ui/src/toolbar.rs:588
+#: crates/odox-ui/src/toolbar.rs:599
 msgid "Heading"
 msgstr "Überschrift"
 
-#: crates/odox-ui/src/toolbar.rs:597
+#: crates/odox-ui/src/toolbar.rs:608
 msgid "Lists"
 msgstr "Listen"
 
-#: crates/odox-ui/src/toolbar.rs:599
+#: crates/odox-ui/src/toolbar.rs:610
 msgid "Restart numbering"
 msgstr "Nummerierung neu beginnen"
 
-#: crates/odox-ui/src/toolbar.rs:600
+#: crates/odox-ui/src/toolbar.rs:611
 msgid "Continue numbering"
 msgstr "Nummerierung fortsetzen"
 
-#: crates/odox-ui/src/toolbar.rs:611
+#: crates/odox-ui/src/toolbar.rs:622
 msgid "Promote heading"
 msgstr "Überschrift höher stufen"
 
-#: crates/odox-ui/src/toolbar.rs:612
+#: crates/odox-ui/src/toolbar.rs:623
 msgid "Demote heading"
 msgstr "Überschrift tiefer stufen"
 
-#: crates/odox-ui/src/toolbar.rs:666
-msgid "Field"
-msgstr "Feld"
-
-#: crates/odox-ui/src/toolbar.rs:668 crates/xods/src/format.rs:168
-msgid "Date"
-msgstr "Datum"
-
-#: crates/odox-ui/src/toolbar.rs:671
-msgid "Date, fixed"
-msgstr "Datum, fest"
-
-#: crates/odox-ui/src/toolbar.rs:673
-msgid "Page number"
-msgstr "Seitennummer"
-
-#: crates/odox-ui/src/toolbar.rs:674
-msgid "Page count"
-msgstr "Seitenanzahl"
-
-#: crates/odox-ui/src/toolbar.rs:692
-msgid "Insert a table…"
-msgstr "Tabelle einfügen…"
-
-#: crates/odox-ui/src/toolbar.rs:698 crates/xods/src/view.rs:732
-msgid "Insert row above"
-msgstr "Zeile oberhalb einfügen"
-
-#: crates/odox-ui/src/toolbar.rs:699 crates/xods/src/view.rs:733
-msgid "Insert row below"
-msgstr "Zeile unterhalb einfügen"
-
-#: crates/odox-ui/src/toolbar.rs:700 crates/xods/src/view.rs:734
-msgid "Insert column left"
-msgstr "Spalte links einfügen"
-
-#: crates/odox-ui/src/toolbar.rs:701 crates/xods/src/view.rs:735
-msgid "Insert column right"
-msgstr "Spalte rechts einfügen"
-
-#: crates/odox-ui/src/toolbar.rs:702 crates/xods/src/view.rs:736
-msgid "Delete row"
-msgstr "Zeile löschen"
-
-#: crates/odox-ui/src/toolbar.rs:703 crates/xods/src/view.rs:737
-msgid "Delete column"
-msgstr "Spalte löschen"
-
-#: crates/odox-ui/src/toolbar.rs:704
-msgid "Delete table"
-msgstr "Tabelle löschen"
-
-#: crates/odox-ui/src/toolbar.rs:709 crates/xods/src/view.rs:746
-msgid "Merge cells"
-msgstr "Zellen verbinden"
-
-#: crates/odox-ui/src/toolbar.rs:710
-msgid "Split cell"
-msgstr "Zellen teilen"
-
-#: crates/odox-ui/src/toolbar.rs:711
-msgid "Equal column widths"
-msgstr "Spalten gleichmäßig verteilen"
-
-#: crates/odox-ui/src/toolbar.rs:736
-msgid "Insert page break"
-msgstr "Seitenumbruch einfügen"
-
-#: crates/odox-ui/src/toolbar.rs:745 crates/xodp/src/view.rs:345
+#: crates/odox-ui/src/toolbar.rs:679 crates/xodp/src/view.rs:362
 msgid "Comment"
 msgstr "Kommentar"
 
-#: crates/odox-ui/src/toolbar.rs:754
+#: crates/odox-ui/src/toolbar.rs:691
 msgid "Footnote"
 msgstr "Fußnote"
 
-#: crates/odox-ui/src/toolbar.rs:760
+#: crates/odox-ui/src/toolbar.rs:702
 msgid "Endnote"
 msgstr "Endnote"
 
-#: crates/odox-ui/src/toolbar.rs:767
+#: crates/odox-ui/src/toolbar.rs:717
+msgid "Field"
+msgstr "Feld"
+
+#: crates/odox-ui/src/toolbar.rs:719 crates/xods/src/format.rs:168
+msgid "Date"
+msgstr "Datum"
+
+#: crates/odox-ui/src/toolbar.rs:722
+msgid "Date, fixed"
+msgstr "Datum, fest"
+
+#: crates/odox-ui/src/toolbar.rs:724
+msgid "Page number"
+msgstr "Seitennummer"
+
+#: crates/odox-ui/src/toolbar.rs:725
+msgid "Page count"
+msgstr "Seitenanzahl"
+
+#: crates/odox-ui/src/toolbar.rs:743
+msgid "Insert a table…"
+msgstr "Tabelle einfügen…"
+
+#: crates/odox-ui/src/toolbar.rs:749 crates/xods/src/view.rs:732
+msgid "Insert row above"
+msgstr "Zeile oberhalb einfügen"
+
+#: crates/odox-ui/src/toolbar.rs:750 crates/xods/src/view.rs:733
+msgid "Insert row below"
+msgstr "Zeile unterhalb einfügen"
+
+#: crates/odox-ui/src/toolbar.rs:751 crates/xods/src/view.rs:734
+msgid "Insert column left"
+msgstr "Spalte links einfügen"
+
+#: crates/odox-ui/src/toolbar.rs:752 crates/xods/src/view.rs:735
+msgid "Insert column right"
+msgstr "Spalte rechts einfügen"
+
+#: crates/odox-ui/src/toolbar.rs:753 crates/xods/src/view.rs:736
+msgid "Delete row"
+msgstr "Zeile löschen"
+
+#: crates/odox-ui/src/toolbar.rs:754 crates/xods/src/view.rs:737
+msgid "Delete column"
+msgstr "Spalte löschen"
+
+#: crates/odox-ui/src/toolbar.rs:755
+msgid "Delete table"
+msgstr "Tabelle löschen"
+
+#: crates/odox-ui/src/toolbar.rs:760 crates/xods/src/view.rs:746
+msgid "Merge cells"
+msgstr "Zellen verbinden"
+
+#: crates/odox-ui/src/toolbar.rs:761
+msgid "Split cell"
+msgstr "Zellen teilen"
+
+#: crates/odox-ui/src/toolbar.rs:762
+msgid "Equal column widths"
+msgstr "Spalten gleichmäßig verteilen"
+
+#: crates/odox-ui/src/toolbar.rs:787
+msgid "Insert page break"
+msgstr "Seitenumbruch einfügen"
+
+#: crates/odox-ui/src/toolbar.rs:797
 msgid "Remove page break"
 msgstr "Seitenumbruch entfernen"
 
-#: crates/odox-ui/src/toolbar.rs:773
+#: crates/odox-ui/src/toolbar.rs:803
 msgid "Insert a picture…"
 msgstr "Bild einfügen…"
 
-#: crates/odox-ui/src/toolbar.rs:781
+#: crates/odox-ui/src/toolbar.rs:811
 msgid "Page setup…"
 msgstr "Seite einrichten…"
 
-#: crates/odox-ui/src/toolbar.rs:788
+#: crates/odox-ui/src/toolbar.rs:824
 msgid "Header"
 msgstr "Kopfzeile"
 
-#: crates/odox-ui/src/toolbar.rs:789
+#: crates/odox-ui/src/toolbar.rs:825
 msgid "Footer"
 msgstr "Fußzeile"
 
-#: crates/odox-ui/src/toolbar.rs:817
+#: crates/odox-ui/src/toolbar.rs:853
 msgid "Superscript"
 msgstr "Hochgestellt"
 
-#: crates/odox-ui/src/toolbar.rs:818
+#: crates/odox-ui/src/toolbar.rs:854
 msgid "Subscript"
 msgstr "Tiefgestellt"
 
-#: crates/odox-ui/src/toolbar.rs:834
+#: crates/odox-ui/src/toolbar.rs:870
 msgid "Larger"
 msgstr "Größer"
 
-#: crates/odox-ui/src/toolbar.rs:835
+#: crates/odox-ui/src/toolbar.rs:871
 msgid "Smaller"
 msgstr "Kleiner"
 
-#: crates/odox-ui/src/toolbar.rs:848
+#: crates/odox-ui/src/toolbar.rs:884
 msgid "Link…"
 msgstr "Link…"
 
@@ -759,59 +759,67 @@ msgstr "OpenDocument-Tabellendokument"
 msgid "OpenDocument Presentation"
 msgstr "OpenDocument-Präsentation"
 
-#: crates/xodp/src/view.rs:333 crates/xodt/src/view.rs:426
+#: crates/xodp/src/view.rs:350 crates/xodt/src/view.rs:438
 msgid "Format"
 msgstr "Format"
 
-#: crates/xodp/src/view.rs:343
+#: crates/xodp/src/view.rs:360
 msgid "Slide"
 msgstr "Folie"
 
-#: crates/xodp/src/view.rs:353
+#: crates/xodp/src/view.rs:369
+msgid "Text box"
+msgstr "Textfeld"
+
+#: crates/xodp/src/view.rs:376
+msgid "Picture…"
+msgstr "Bild…"
+
+#: crates/xodp/src/view.rs:384
 msgid "New slide"
 msgstr "Neue Folie"
 
-#: crates/xodp/src/view.rs:354
+#: crates/xodp/src/view.rs:385
 msgid "Duplicate slide"
 msgstr "Folie duplizieren"
 
-#: crates/xodp/src/view.rs:355
+#: crates/xodp/src/view.rs:386
 msgid "Delete slide"
 msgstr "Folie löschen"
 
-#: crates/xodp/src/view.rs:357
+#: crates/xodp/src/view.rs:388
 msgid "Move slide earlier"
 msgstr "Folie nach vorn"
 
-#: crates/xodp/src/view.rs:362
+#: crates/xodp/src/view.rs:393
 msgid "Move slide later"
 msgstr "Folie nach hinten"
 
-#: crates/xodp/src/view.rs:462
+#: crates/xodp/src/view.rs:493
 msgid "This presentation has no slides."
 msgstr "Diese Präsentation hat keine Folien."
 
-#: crates/xodp/src/view.rs:618
+#: crates/xodp/src/view.rs:657
 msgid "Slides"
 msgstr "Folien"
 
-#: crates/xodp/src/view.rs:650
+#: crates/xodp/src/view.rs:689
 msgid "Show the speaker's notes"
 msgstr "Referentennotizen anzeigen"
 
-#: crates/xodp/src/view.rs:652
+#: crates/xodp/src/view.rs:691
 msgid "Start the slideshow"
 msgstr "Bildschirmpräsentation starten"
 
-#: crates/xodp/src/view.rs:657
+#: crates/xodp/src/view.rs:696
 msgid "Start the slideshow from this slide"
 msgstr "Bildschirmpräsentation ab dieser Folie starten"
 
-#: crates/xodp/src/view.rs:1220
+#: crates/xodp/src/view.rs:1392
 msgid "Notes"
 msgstr "Notizen"
 
-#: crates/xodp/src/view.rs:1230
+#: crates/xodp/src/view.rs:1402
 msgid "This slide has no notes."
 msgstr "Diese Folie hat keine Notizen."
 
@@ -1176,43 +1184,43 @@ msgstr "Wörter: {words}"
 msgid "Characters: {characters}"
 msgstr "Zeichen: {characters}"
 
-#: crates/xodt/src/view.rs:483
+#: crates/xodt/src/view.rs:496
 msgid "This document has no text in it."
 msgstr "Dieses Dokument enthält keinen Text."
 
-#: crates/xodt/src/view.rs:654
+#: crates/xodt/src/view.rs:675
 msgid "Outline"
 msgstr "Gliederung"
 
-#: crates/xodt/src/view.rs:663
+#: crates/xodt/src/view.rs:684
 msgid "(untitled)"
 msgstr "(ohne Titel)"
 
-#: crates/xodt/src/view.rs:695
+#: crates/xodt/src/view.rs:716
 msgid "Copy the document as text"
 msgstr "Dokument als Text kopieren"
 
-#: crates/xodt/src/view.rs:716
+#: crates/xodt/src/view.rs:737
 msgid "Rows"
 msgstr "Zeilen"
 
-#: crates/xodt/src/view.rs:719
+#: crates/xodt/src/view.rs:740
 msgid "Columns"
 msgstr "Spalten"
 
-#: crates/xodt/src/view.rs:874
+#: crates/xodt/src/view.rs:906
 msgid "The footer holds text. Take it away with its text?"
 msgstr "Die Fußzeile enthält Text. Mit ihrem Text entfernen?"
 
-#: crates/xodt/src/view.rs:876
+#: crates/xodt/src/view.rs:908
 msgid "The header holds text. Take it away with its text?"
 msgstr "Die Kopfzeile enthält Text. Mit ihrem Text entfernen?"
 
-#: crates/xodt/src/view.rs:880
+#: crates/xodt/src/view.rs:912
 msgid "Take it away"
 msgstr "Entfernen"
 
-#: crates/xodt/src/view.rs:966
+#: crates/xodt/src/view.rs:998
 msgid ""
 "This table has merged or repeated cells, so its rows and columns are left as "
 "they are."
@@ -1220,24 +1228,24 @@ msgstr ""
 "Diese Tabelle hat verbundene oder wiederholte Zellen, daher bleiben ihre "
 "Zeilen und Spalten unverändert."
 
-#: crates/xodt/src/view.rs:969
+#: crates/xodt/src/view.rs:1001
 msgid "The table could not be changed here."
 msgstr "Die Tabelle konnte hier nicht geändert werden."
 
-#: crates/xodt/src/view.rs:1046
+#: crates/xodt/src/view.rs:1078
 msgid "This item cannot move out: the item it is in goes on after its list."
 msgstr ""
 "Dieser Eintrag kann nicht ausgerückt werden: Der Eintrag, in dem er steht, "
 "geht nach seiner Liste weiter."
 
 #
-#: crates/xodt/src/view.rs:1106
+#: crates/xodt/src/view.rs:1138
 msgid "This change cannot be accepted: it is no longer in the document."
 msgstr ""
 "Diese Änderung kann nicht angenommen werden: Sie ist nicht mehr im Dokument."
 
 #
-#: crates/xodt/src/view.rs:1109
+#: crates/xodt/src/view.rs:1141
 msgid ""
 "This change cannot be rejected: its marks in the text are missing or stand "
 "where its text cannot go back."
@@ -1245,7 +1253,7 @@ msgstr ""
 "Diese Änderung kann nicht abgelehnt werden: Ihre Markierungen im Text fehlen "
 "oder stehen dort, wohin ihr Text nicht zurückkehren kann."
 
-#: crates/xodt/src/view.rs:1118
+#: crates/xodt/src/view.rs:1150
 msgid ""
 "These columns cannot be resized: their widths are not stated, or together "
 "they are under a centimetre."
@@ -1254,46 +1262,46 @@ msgstr ""
 "nicht angegeben, oder sie sind zusammen schmaler als ein Zentimeter."
 
 #
-#: crates/xodt/src/view.rs:1213
+#: crates/xodt/src/view.rs:1285
 msgid "This document has tracked changes."
 msgstr "Dieses Dokument enthält nachverfolgte Änderungen."
 
-#: crates/xodt/src/view.rs:1215
+#: crates/xodt/src/view.rs:1287
 msgid "Edits made here are not tracked."
 msgstr "Hier vorgenommene Änderungen werden nicht nachverfolgt."
 
-#: crates/xodt/src/view.rs:1218
+#: crates/xodt/src/view.rs:1290
 msgid "Accept all"
 msgstr "Alle annehmen"
 
 #
-#: crates/xodt/src/view.rs:1221
+#: crates/xodt/src/view.rs:1293
 msgid "Reject all"
 msgstr "Alle ablehnen"
 
-#: crates/xodt/src/view.rs:1315
+#: crates/xodt/src/view.rs:1387
 msgid "Select the cells to merge, from one cell of a table to another."
 msgstr ""
 "Wählen Sie die zu verbindenden Zellen aus, von einer Zelle einer Tabelle bis "
 "zu einer anderen."
 
-#: crates/xodt/src/view.rs:1317
+#: crates/xodt/src/view.rs:1389
 msgid "These cells cannot be merged: the table has repeated rows or cells."
 msgstr ""
 "Diese Zellen können nicht verbunden werden: Die Tabelle hat wiederholte "
 "Zeilen oder Zellen."
 
-#: crates/xodt/src/view.rs:1322
+#: crates/xodt/src/view.rs:1394
 msgid "The caret is not in a table cell."
 msgstr "Die Einfügemarke steht in keiner Tabellenzelle."
 
-#: crates/xodt/src/view.rs:1324
+#: crates/xodt/src/view.rs:1396
 msgid "This cell cannot be split: the table has repeated rows or cells."
 msgstr ""
 "Diese Zelle kann nicht geteilt werden: Die Tabelle hat wiederholte Zeilen "
 "oder Zellen."
 
-#: crates/xodt/src/view.rs:1330
+#: crates/xodt/src/view.rs:1402
 msgid "This table does not say how wide its columns are."
 msgstr "Diese Tabelle gibt nicht an, wie breit ihre Spalten sind."
 
