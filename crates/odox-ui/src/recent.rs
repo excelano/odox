@@ -5,13 +5,19 @@
 // Built with AI assistance (Claude, Anthropic)
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 const KEPT: usize = 10;
 
 /// An application's list of recent documents, and the file it is kept in.
+///
+/// Every window of the application shares the file, so each change reads it
+/// again first and writes it whole, and the menu reads it again when it has
+/// changed since.
 pub struct Recent {
     file: Option<PathBuf>,
     paths: Vec<PathBuf>,
+    read_at: Option<SystemTime>,
 }
 
 impl Recent {
@@ -29,27 +35,25 @@ impl Recent {
     }
 
     fn at(file: Option<PathBuf>) -> Self {
-        let paths = file
-            .as_ref()
-            .and_then(|file| std::fs::read_to_string(file).ok())
-            .map(|text| {
-                text.lines()
-                    .filter(|line| !line.is_empty())
-                    .map(PathBuf::from)
-                    .take(KEPT)
-                    .collect()
-            })
-            .unwrap_or_default();
-        Self { file, paths }
+        let mut recent = Self {
+            file,
+            paths: Vec::new(),
+            read_at: None,
+        };
+        recent.read();
+        recent
     }
 
     /// A document was opened or saved. A path that cannot be written as one
     /// line of text is not kept.
     pub fn opened(&mut self, path: &Path) {
-        let path = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+        let path = std::fs::canonicalize(path)
+            .or_else(|_| std::path::absolute(path))
+            .unwrap_or_else(|_| path.to_path_buf());
         if path.to_str().is_none_or(|text| text.contains('\n')) {
             return;
         }
+        self.read();
         self.paths.retain(|kept| *kept != path);
         self.paths.insert(0, path);
         self.paths.truncate(KEPT);
@@ -63,6 +67,7 @@ impl Recent {
 
     /// Take a document off the list.
     pub fn forget(&mut self, path: &Path) {
+        self.read();
         self.paths.retain(|kept| kept != path);
         self.store();
     }
@@ -76,13 +81,41 @@ impl Recent {
         there
     }
 
+    /// Read the list again if another window of the application has changed
+    /// it since.
+    pub fn refresh(&mut self) {
+        if self.modified() != self.read_at {
+            self.read();
+        }
+    }
+
     /// Empty the list.
     pub fn clear(&mut self) {
         self.paths.clear();
         self.store();
     }
 
-    fn store(&self) {
+    fn modified(&self) -> Option<SystemTime> {
+        std::fs::metadata(self.file.as_ref()?).ok()?.modified().ok()
+    }
+
+    fn read(&mut self) {
+        self.read_at = self.modified();
+        self.paths = self
+            .file
+            .as_ref()
+            .and_then(|file| std::fs::read_to_string(file).ok())
+            .map(|text| {
+                text.lines()
+                    .filter(|line| !line.is_empty())
+                    .map(PathBuf::from)
+                    .take(KEPT)
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
+
+    fn store(&mut self) {
         let Some(file) = &self.file else {
             return;
         };
@@ -95,6 +128,7 @@ impl Recent {
             let _ = std::fs::create_dir_all(folder);
         }
         let _ = std::fs::write(file, text);
+        self.read_at = self.modified();
     }
 }
 
@@ -102,12 +136,27 @@ impl Recent {
 mod tests {
     use super::*;
 
-    fn folder(name: &str) -> PathBuf {
+    struct Folder(PathBuf);
+
+    impl std::ops::Deref for Folder {
+        type Target = Path;
+        fn deref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn folder(name: &str) -> Folder {
         let folder =
             std::env::temp_dir().join(format!("odox-recent-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).expect("a folder");
-        folder
+        Folder(std::fs::canonicalize(folder).expect("the folder's own path"))
     }
 
     fn document(folder: &Path, name: &str) -> PathBuf {
@@ -164,5 +213,41 @@ mod tests {
         assert_eq!(recent.paths(), &[] as &[PathBuf]);
         let nowhere = Recent::at(None);
         assert_eq!(nowhere.paths(), &[] as &[PathBuf]);
+    }
+
+    #[test]
+    fn two_windows_keep_each_others_documents() {
+        let folder = folder("two");
+        let file = folder.join("recent-xodt");
+        let (mut one, mut other) = (
+            Recent::at(Some(file.clone())),
+            Recent::at(Some(file.clone())),
+        );
+        let [a, b, c] = ["a.odt", "b.odt", "c.odt"].map(|name| document(&folder, name));
+        one.opened(&a);
+        other.opened(&b);
+        one.opened(&c);
+        assert_eq!(Recent::at(Some(file)).paths(), [c, b, a].as_slice());
+    }
+
+    #[test]
+    fn refresh_sees_another_windows_list() {
+        let folder = folder("refresh");
+        let file = folder.join("recent-xodt");
+        let (mut one, mut other) = (Recent::at(Some(file.clone())), Recent::at(Some(file)));
+        let b = document(&folder, "b.odt");
+        other.opened(&b);
+        one.refresh();
+        assert_eq!(one.paths(), [b].as_slice());
+    }
+
+    #[test]
+    fn a_path_through_dot_dot_is_kept_as_where_it_leads() {
+        let folder = folder("dots");
+        std::fs::create_dir_all(folder.join("sub")).expect("a folder");
+        let a = document(&folder, "a.odt");
+        let mut recent = Recent::at(Some(folder.join("recent-xodt")));
+        recent.opened(&folder.join("sub/../a.odt"));
+        assert_eq!(recent.paths(), [a].as_slice());
     }
 }

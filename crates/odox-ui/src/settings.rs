@@ -2,7 +2,8 @@
 //!
 //! The file is written only when a person changes a preference in the menu,
 //! so an installation nobody has configured has no file, and the privacy
-//! statement can say what is there and when. It is shared by the three
+//! statement can say what is there and when. The recent documents are kept
+//! beside it, in a file of their own ([`crate::recent`]). It is shared by the three
 //! applications, because a preference about editing is about the suite.
 //!
 //! The format is one `key = value` line per setting, which is also valid TOML,

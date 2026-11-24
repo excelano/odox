@@ -402,6 +402,7 @@ impl<V: View> Shell<V> {
         if cfg!(target_os = "macos") {
             return;
         }
+        self.recent.refresh();
         let mut picked = None;
         let mut clear = false;
         ui.add_enabled_ui(!self.recent.paths().is_empty(), |ui| {

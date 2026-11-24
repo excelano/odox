@@ -35,7 +35,10 @@ One settings file, `odox/settings.toml` under the platform's configuration
 directory (`$XDG_CONFIG_HOME` or `~/.config` on Linux, `Library/Application
 Support` on macOS, roaming `AppData` on Windows), written only when a person
 changes a preference in the menu, so an installation nobody has configured has
-no file. No cache, no recently-opened list, and no temporary copy of a document
+no file. On Linux and Windows, `odox/recent-xodt`, `recent-xods` and
+`recent-xodp` beside it hold the paths of the last ten documents each
+application opened or saved, for File > Open recent; macOS keeps none. No
+cache, and no temporary copy of a document
 beyond the `.part` file a save passes through. On macOS, File > New in a window
 that already holds a document leaves an empty marker file in the temporary
 directory, which the new instance deletes as it starts. Anything else a window

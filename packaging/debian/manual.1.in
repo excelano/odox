@@ -69,6 +69,10 @@ by hand.
 .I $XDG_CONFIG_HOME/odox/settings.toml
 The one preference, whether a document opens in edit mode, written only when it
 is changed in the menu.
+.TP
+.I $XDG_CONFIG_HOME/odox/recent-@APP@
+The paths of the last ten documents @APP@ opened or saved, newest first, one to
+a line, for File > Open recent.
 .I ~/.config
 where
 .B XDG_CONFIG_HOME
