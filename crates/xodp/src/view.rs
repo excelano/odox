@@ -1162,10 +1162,11 @@ impl SlideView {
 
     /// F5 starts the slideshow at the first slide and Shift+F5 at this one.
     fn start_keys(&mut self, ui: &Ui) {
-        let (from_start, from_here) = ui.input_mut(|input| {
+        let (from_here, from_start) = ui.input_mut(|input| {
+            let from_here = input.consume_key(egui::Modifiers::SHIFT, Key::F5);
             (
-                input.consume_key(egui::Modifiers::NONE, Key::F5),
-                input.consume_key(egui::Modifiers::SHIFT, Key::F5),
+                from_here,
+                !from_here && input.consume_key(egui::Modifiers::NONE, Key::F5),
             )
         });
         if from_start {
