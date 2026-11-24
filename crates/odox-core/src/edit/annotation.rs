@@ -101,12 +101,13 @@ impl Names {
     }
 }
 
-/// Give a comment its author, date and text, keeping anything else it holds.
+/// Give a comment its author, date and text, keeping anything else it holds
+/// where it stands. A line goes into the paragraph that held the line at its
+/// place, which is left as it was when the line is unchanged.
 fn write(note: &mut Element, names: &Names, text: &str, author: Option<&str>, date: &str) {
-    note.children.retain(|n| {
-        !matches!(n, Node::Element(e)
-            if e.is(&Ns::Dc, "creator") || e.is(&Ns::Dc, "date") || e.is(&Ns::Text, "p"))
-    });
+    note.children.retain(
+        |n| !matches!(n, Node::Element(e) if e.is(&Ns::Dc, "creator") || e.is(&Ns::Dc, "date")),
+    );
     let leaf = |name, text: &str| {
         let mut element = Element {
             name,
@@ -125,13 +126,41 @@ fn write(note: &mut Element, names: &Names, text: &str, author: Option<&str>, da
     }
     head.push(leaf(names.date.clone(), date));
     note.children.splice(0..0, head);
-    for line in text.split('\n') {
-        let mut written = leaf(names.paragraph.clone(), "");
-        if let Node::Element(p) = &mut written {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut paragraphs: Vec<usize> = note
+        .children
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| matches!(n, Node::Element(e) if e.is(&Ns::Text, "p")))
+        .map(|(index, _)| index)
+        .collect();
+    for &index in paragraphs.iter().skip(lines.len()).rev() {
+        note.children.remove(index);
+    }
+    paragraphs.truncate(lines.len());
+    for (&index, line) in paragraphs.iter().zip(&lines) {
+        if let Node::Element(p) = &mut note.children[index]
+            && p.plain_text() != *line
+        {
+            p.children.clear();
+            p.self_closing = true;
             super::replace(p, 0..0, line);
         }
-        note.children.push(written);
     }
+    let at = paragraphs
+        .last()
+        .map_or(note.children.len(), |index| index + 1);
+    let added: Vec<Node> = lines[paragraphs.len()..]
+        .iter()
+        .map(|line| {
+            let mut written = leaf(names.paragraph.clone(), "");
+            if let Node::Element(p) = &mut written {
+                super::replace(p, 0..0, line);
+            }
+            written
+        })
+        .collect();
+    note.children.splice(at..at, added);
     note.self_closing = false;
 }
 

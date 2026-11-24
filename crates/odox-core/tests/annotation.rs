@@ -260,3 +260,29 @@ fn a_heading_with_a_comment_reads_as_its_own_words() {
         "Introduction"
     );
 }
+
+#[test]
+fn editing_a_comment_keeps_its_list_where_it_stands() {
+    let mut root = content(
+        r#"<text:p>One<office:annotation xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:date>2026-11-01T10:00:00</dc:date><text:p text:style-name="P1">Before</text:p><text:list><text:list-item><text:p>item</text:p></text:list-item></text:list><text:p>After</text:p></office:annotation></text:p>"#,
+    );
+    set_annotation_text(
+        &mut root,
+        &PATH,
+        0,
+        "Before\nLater",
+        None,
+        "2026-11-24T10:00:00",
+    )
+    .expect("changed");
+    let written = String::from_utf8(xml::serialize(&root)).expect("UTF-8");
+    let before = written.find("Before").expect("the first line");
+    let list = written.find("<text:list>").expect("the list");
+    let later = written.find("Later").expect("the second line");
+    assert!(before < list && list < later, "{written}");
+    assert!(
+        written.contains(r#"<text:p text:style-name="P1">Before</text:p>"#),
+        "an unchanged line keeps its paragraph: {written}"
+    );
+    assert!(!written.contains("After"), "{written}");
+}
