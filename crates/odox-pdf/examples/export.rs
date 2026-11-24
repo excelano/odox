@@ -61,6 +61,7 @@ fn run(
                     i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
                 }),
         ),
+        printing: false,
     };
     document.export(&options)
 }

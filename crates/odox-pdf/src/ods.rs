@@ -68,7 +68,7 @@ pub(crate) fn undescribed(document: &SheetDocument) -> Vec<Vec<usize>> {
 /// Export a spreadsheet as PDF/UA-1.
 pub(crate) fn export(document: &SheetDocument, options: &Options) -> Result<Exported, Refusal> {
     let missing = undescribed(document);
-    if !missing.is_empty() {
+    if !missing.is_empty() && !options.printing {
         return Err(Refusal::Undescribed(missing));
     }
     let mut faces = Faces::new();
@@ -746,6 +746,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         }
     }
 

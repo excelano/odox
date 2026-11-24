@@ -62,6 +62,9 @@ pub struct Options {
     /// The date a slide's date that follows the clock shows, as year, month
     /// and day.
     pub today: (i64, i64, i64),
+    /// The PDF is made to be printed, not read: a picture that says nothing
+    /// in place of what it shows is drawn rather than refused.
+    pub printing: bool,
 }
 
 /// A finished export.

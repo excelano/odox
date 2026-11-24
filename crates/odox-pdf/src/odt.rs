@@ -67,7 +67,7 @@ fn lay_out(
     let blocks = blocks(document, Some(options.today));
     let mut missing = Vec::new();
     model::undescribed(&blocks, &mut missing);
-    if !missing.is_empty() {
+    if !missing.is_empty() && !options.printing {
         return Err(Refusal::Undescribed(missing));
     }
     let mut blocks = blocks;
@@ -479,6 +479,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         };
         let pages = |document: &TextDocument| {
             lay_out(document, &options, &mut Faces::new())
@@ -537,6 +538,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         };
         let laid = lay_out(&document, &options, &mut Faces::new()).expect("laid out");
         let found = |said: &str| {
@@ -582,6 +584,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         };
         let laid = lay_out(document, &options, &mut Faces::new()).expect("laid out");
         fn texts(item: &layout::Item, into: &mut String) {
@@ -644,6 +647,7 @@ mod tests {
             language: "en-US".to_owned(),
             untitled_slide: "Slide {number}".to_owned(),
             today: (2026, 1, 1),
+            printing: false,
         };
         let laid = lay_out(document, &options, &mut Faces::new()).expect("laid out");
         fn texts(item: &layout::Item, into: &mut String) {
