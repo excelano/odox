@@ -637,14 +637,18 @@ fn blocks_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// The alignments, the indent steps and the line spacings in the Format menu.
 fn paragraph_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
-    for align in ALIGNMENTS {
-        let button = egui::Button::new(align_name(align)).selected(state.align == Some(align));
-        if ui.add_enabled(state.enabled, button).clicked() {
-            chosen = Some(Command::Align(align));
-            ui.close();
-        }
-    }
-    ui.separator();
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Align"), |ui| {
+            for align in ALIGNMENTS {
+                let button =
+                    egui::Button::new(align_name(align)).selected(state.align == Some(align));
+                if ui.add(button).clicked() {
+                    chosen = Some(Command::Align(align));
+                    ui.close();
+                }
+            }
+        });
+    });
     for (step, name) in [(1, t("Increase indent")), (-1, t("Decrease indent"))] {
         if ui
             .add_enabled(state.enabled, egui::Button::new(name))
@@ -838,6 +842,31 @@ fn band_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
 /// and not live without a caret. Answers the command chosen.
 pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
     let mut chosen = None;
+    ui.add_enabled_ui(state.enabled, |ui| {
+        ui.menu_button(t("Text"), |ui| chosen = text_menu(ui, state));
+    });
+    ui.separator();
+    chosen = paragraph_menu(ui, state).or(chosen);
+    let keys = ui
+        .ctx()
+        .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::K));
+    let link = egui::Button::new(t("Link…")).shortcut_text(keys);
+    if ui.add_enabled(state.enabled, link).clicked() {
+        chosen = Some(Command::Link);
+        ui.close();
+    }
+    if state.blocks {
+        ui.separator();
+        chosen = blocks_menu(ui, state).or(chosen);
+        ui.separator();
+        chosen = insert_menu(ui, state).or(chosen);
+    }
+    chosen
+}
+
+/// Format > Text: the marks, raising and lowering, and the size.
+fn text_menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
+    let mut chosen = None;
     for mark in Mark::ALL {
         let (name, key) = mark_facts(mark);
         let mut button = egui::Button::new(name).selected(state.marks.contains(&mark));
@@ -875,22 +904,6 @@ pub fn menu(ui: &mut Ui, state: &MenuState) -> Option<Command> {
             chosen = Some(Command::Size(larger));
             ui.close();
         }
-    }
-    ui.separator();
-    chosen = paragraph_menu(ui, state).or(chosen);
-    let keys = ui
-        .ctx()
-        .format_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::K));
-    let link = egui::Button::new(t("Link…")).shortcut_text(keys);
-    if ui.add_enabled(state.enabled, link).clicked() {
-        chosen = Some(Command::Link);
-        ui.close();
-    }
-    if state.blocks {
-        ui.separator();
-        chosen = blocks_menu(ui, state).or(chosen);
-        ui.separator();
-        chosen = insert_menu(ui, state).or(chosen);
     }
     chosen
 }
