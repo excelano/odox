@@ -1219,7 +1219,9 @@ not the paragraph's text, so text typed at its place goes in before it. The
 window shades every field faintly, and draws a date that follows the day as
 today's, local, in its own data style, without changing the tree; saving a
 text document writes today into each such date that holds another day, in
-its data style, as `LibreOffice` does. The PDF fills page numbers and page
+its data style, as `LibreOffice` does, in the body and in the headers and
+footers, but not in a tracked deletion, which keeps the day it was deleted
+with. The PDF fills page numbers and page
 counts in the body, in tables, lists, notes and text boxes: each line's
 fields are found on the page the line lands on, then filled in, and the
 pages laid out again, until the pages and the count stop moving or four times
