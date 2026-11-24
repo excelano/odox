@@ -46,6 +46,9 @@ pub fn hand_over(pdf: &Path, title: &str) -> std::io::Result<Printed> {
     open_in_viewer(pdf).map(|()| Printed::Opened)
 }
 
+#[cfg(target_os = "linux")]
+pub use portal::attach;
+
 /// What a program that could not be started is told as.
 fn not_started(e: std::io::Error) -> std::io::Error {
     if e.kind() == std::io::ErrorKind::NotFound {
@@ -95,6 +98,7 @@ mod portal {
     use std::collections::HashMap;
     use std::os::fd::AsFd;
     use std::path::Path;
+    use std::sync::OnceLock;
 
     use futures_lite::StreamExt as _;
     use zbus::Connection;
@@ -109,6 +113,36 @@ mod portal {
     const REQUEST: &str = "org.freedesktop.portal.Request";
 
     type Results = HashMap<String, OwnedValue>;
+
+    /// The window's name to the portal, kept for the window's life: under
+    /// Wayland the name is good only while what exported it lives.
+    static WINDOW: OnceLock<Option<ashpd::WindowIdentifier>> = OnceLock::new();
+
+    /// Name the window to the portal, so that its print dialog opens over it.
+    pub fn attach(
+        window: &(
+             impl winit::raw_window_handle::HasWindowHandle + winit::raw_window_handle::HasDisplayHandle
+         ),
+    ) {
+        let Ok(handle) = window.window_handle() else {
+            return;
+        };
+        let display = window.display_handle().ok().map(|display| display.as_raw());
+        let identifier = zbus::block_on(ashpd::WindowIdentifier::from_raw_handle(
+            &handle.as_raw(),
+            display.as_ref(),
+        ));
+        let _ = WINDOW.set(identifier);
+    }
+
+    /// The window as the portal names it, or nothing where it was not named.
+    fn parent() -> String {
+        WINDOW
+            .get()
+            .and_then(Option::as_ref)
+            .map(ToString::to_string)
+            .unwrap_or_default()
+    }
 
     fn failed(said: &str) -> zbus::Error {
         zbus::Error::Failure(said.to_owned())
@@ -179,7 +213,7 @@ mod portal {
                 &connection,
                 &prepare,
                 "PreparePrint",
-                &("", title, &empty, &empty, &options),
+                &(parent().as_str(), title, &empty, &empty, &options),
             )
             .await?;
             if response != 0 {
@@ -199,7 +233,7 @@ mod portal {
                 &connection,
                 &send,
                 "Print",
-                &("", title, Fd::from(file.as_fd()), &options),
+                &(parent().as_str(), title, Fd::from(file.as_fd()), &options),
             )
             .await?;
             Ok(match response {

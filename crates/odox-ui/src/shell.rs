@@ -1476,6 +1476,8 @@ pub fn run<V: View + 'static>(
             // somewhere to wake.
             #[cfg(target_os = "macos")]
             crate::opened_document::wake_with(&cc.egui_ctx);
+            #[cfg(target_os = "linux")]
+            crate::print::attach(cc);
             let mut shell = Shell::new(product, build(&cc.egui_ctx));
             if asked_for_new {
                 shell.new_document(&cc.egui_ctx);
