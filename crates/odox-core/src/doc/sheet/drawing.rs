@@ -15,7 +15,6 @@
 use super::size::table_mut;
 use super::{DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT, Sheet, SheetDocument};
 use crate::doc::refs::read_area;
-use crate::edit::Refused;
 use crate::value::Length;
 use crate::xml::{Element, Ns};
 
@@ -331,14 +330,12 @@ impl SheetDocument {
 
     /// Move each drawing anchored to a cell of a sheet by as much as its
     /// anchor moved since [`Self::anchored`], and stretch one with an end
-    /// cell by as much again as the end cell moved past that.
-    pub(super) fn move_drawings(
-        &mut self,
-        sheet: usize,
-        before: &[Corners],
-    ) -> Result<(), Refused> {
+    /// cell by as much again as the end cell moved past that. A drawing
+    /// that cannot be reached again is left where it stands, so the change
+    /// to the rows or columns stands whole either way.
+    pub(super) fn move_drawings(&mut self, sheet: usize, before: &[Corners]) {
         let Some(index) = self.sheets.get(sheet) else {
-            return Ok(());
+            return;
         };
         let drawings = self.drawings(sheet);
         let anchored: Vec<_> = drawings
@@ -350,7 +347,7 @@ impl SheetDocument {
             })
             .collect();
         if anchored.len() != before.len() {
-            return Ok(());
+            return;
         }
         let moves: Vec<(Vec<usize>, Point, Point)> = anchored
             .into_iter()
@@ -377,13 +374,17 @@ impl SheetDocument {
             })
             .collect();
         if moves.is_empty() {
-            return Ok(());
+            return;
         }
         let table_at = index.table;
         let names = ["x", "y", "width", "height"].map(|local| self.document.name(&Ns::Svg, local));
-        let table = table_mut(&mut self.document, table_at)?;
+        let Ok(table) = table_mut(&mut self.document, table_at) else {
+            return;
+        };
         for (path, moved, stretched) in moves {
-            let element = table.at_mut(&path).ok_or(Refused::NotFound)?;
+            let Some(element) = table.at_mut(&path) else {
+                continue;
+            };
             for (name, by) in names
                 .iter()
                 .zip([moved.0, moved.1, stretched.0, stretched.1])
@@ -401,7 +402,6 @@ impl SheetDocument {
             }
         }
         self.reindex();
-        Ok(())
     }
 }
 

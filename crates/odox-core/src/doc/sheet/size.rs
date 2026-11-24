@@ -60,7 +60,8 @@ impl SheetDocument {
         let path = reach_column(table, column, &names)?;
         self.restyle(table_at, &path, Axis::Column, width)?;
         self.reindex();
-        self.move_drawings(sheet, &before)
+        self.move_drawings(sheet, &before);
+        Ok(())
     }
 
     /// Give a row a height, which a spreadsheet then keeps rather than
@@ -94,7 +95,8 @@ impl SheetDocument {
         let path = row_path(table, row).ok_or(Refused::NotFound)?;
         self.restyle(table_at, &path, Axis::Row, height)?;
         self.reindex();
-        self.move_drawings(sheet, &before)
+        self.move_drawings(sheet, &before);
+        Ok(())
     }
 
     /// Give the column or row at `path` under a table a style that is its
