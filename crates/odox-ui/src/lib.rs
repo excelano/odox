@@ -53,6 +53,7 @@ pub mod recovery;
 pub mod settings;
 pub mod shapes;
 pub mod shell;
+pub mod spell;
 pub mod system_theme;
 pub mod toolbar;
 

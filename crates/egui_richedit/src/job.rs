@@ -142,6 +142,11 @@ impl ParagraphJob {
         &self.job
     }
 
+    /// How many characters have been drawn so far.
+    pub fn drawn_len(&self) -> usize {
+        self.job.text.chars().count()
+    }
+
     /// Whether nothing has been drawn yet.
     pub fn is_empty(&self) -> bool {
         self.job.text.is_empty()

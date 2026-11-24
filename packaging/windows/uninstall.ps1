@@ -125,6 +125,8 @@ if (-not $KeepFiles -and (Test-Path -LiteralPath $Prefix)) {
     # Windows allows: a running PowerShell script is read once and not held open
     # the way a loaded executable is. The file goes, and the directory with it if
     # nothing else a person put there is left.
+    $dictionaries = Join-Path $Prefix 'dictionaries'
+    if (Test-Path -LiteralPath $dictionaries) { Remove-Item -LiteralPath $dictionaries -Recurse -Force }
     $self = Join-Path $Prefix 'uninstall.ps1'
     if (Test-Path -LiteralPath $self) { Remove-Item -LiteralPath $self -Force }
     if (-not (Get-ChildItem -LiteralPath $Prefix -Force)) {

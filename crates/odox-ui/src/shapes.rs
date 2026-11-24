@@ -70,6 +70,9 @@ pub struct Canvas<'a> {
     pub build: Option<(&'a odox_core::doc::Steps, usize)>,
     /// The paragraphs of the shape being drawn that its build has not shown.
     veiled: Vec<usize>,
+    /// A misspelled word in a label and what the spell check's menu puts in
+    /// its place, for the view to do.
+    pub corrected: Option<(Vec<usize>, std::ops::Range<usize>, String)>,
 }
 
 /// What is drawn inside a shape: its text, or the frame of a picture, and the
@@ -171,6 +174,7 @@ impl<'a> Canvas<'a> {
             marks: false,
             build: None,
             veiled: Vec::new(),
+            corrected: None,
         }
     }
 
@@ -812,6 +816,9 @@ impl Canvas<'_> {
             }
             if flow.followed.is_some() {
                 self.followed = flow.followed.take();
+            }
+            if flow.corrected.is_some() {
+                self.corrected = flow.corrected.take();
             }
         })
         .response

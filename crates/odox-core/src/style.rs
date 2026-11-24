@@ -290,6 +290,9 @@ pub struct TextProperties {
     /// Hidden, `text:display="none"`: text the author keeps in the document
     /// and out of print.
     pub hidden: Option<bool>,
+    /// The language the text is in, as a tag such as `en-US` or `de`, from
+    /// `fo:language` and `fo:country`; `zxx` is text in no language.
+    pub language: Option<String>,
 }
 
 /// A colour over a parent's: the one stated, none where none is stated, and
@@ -335,6 +338,7 @@ impl TextProperties {
             uppercase: self.uppercase.or(parent.uppercase),
             small_caps: self.small_caps.or(parent.small_caps),
             hidden: self.hidden.or(parent.hidden),
+            language: self.language.clone().or_else(|| parent.language.clone()),
         }
     }
 
@@ -1762,6 +1766,12 @@ impl TextProperties {
         }
         if let Some(variant) = p.attr(&Ns::Fo, "font-variant") {
             self.small_caps = Some(variant == "small-caps");
+        }
+        if let Some(language) = p.attr(&Ns::Fo, "language") {
+            self.language = Some(match p.attr(&Ns::Fo, "country") {
+                Some(country) if country != "none" => format!("{language}-{country}"),
+                _ => language.to_owned(),
+            });
         }
         if let Some(display) = p.attr(&Ns::Text, "display") {
             self.hidden = Some(display == "none");

@@ -1112,6 +1112,8 @@ struct Wanted {
     note: Option<(Vec<usize>, NoteResponse)>,
     /// A tracked change to accept or reject, or every one when the id is none.
     decision: Option<(Option<String>, bool)>,
+    /// A misspelled word and what the spell check's menu puts in its place.
+    correction: Option<(Vec<usize>, std::ops::Range<usize>, String)>,
 }
 
 impl Wanted {
@@ -1123,7 +1125,9 @@ impl Wanted {
         if let Some((id, accept)) = flow.decided.take() {
             self.decision = Some((Some(id), accept));
         }
-        self.column.is_some()
+        self.correction = flow.corrected.take().or(self.correction.take());
+        self.correction.is_some()
+            || self.column.is_some()
             || self.comment.is_some()
             || self.note.is_some()
             || self.decision.is_some()
@@ -1159,6 +1163,14 @@ impl Wanted {
         }
         if let Some((note, done)) = self.note.take() {
             let _ = model.note_body(&note, &done);
+        }
+        if let Some((paragraph, range, word)) = self.correction.take() {
+            let found = odox_ui::find::Match {
+                scope: 0,
+                paragraph,
+                range,
+            };
+            model.replace_matches(&[&found], &word, true);
         }
     }
 }
