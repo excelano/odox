@@ -117,6 +117,8 @@ enum Kind {
     Tab,
     /// `text:line-break`.
     LineBreak,
+    /// A field, one character whatever value it shows.
+    Field,
     /// An element that contributes nothing and is kept where it is.
     Marker,
 }
@@ -125,7 +127,7 @@ impl Kind {
     fn len(self) -> usize {
         match self {
             Self::Text(n) | Self::Spaces(n) => n,
-            Self::Tab | Self::LineBreak => 1,
+            Self::Tab | Self::LineBreak | Self::Field => 1,
             Self::Marker => 0,
         }
     }
@@ -154,16 +156,49 @@ fn is_inline_container(element: &Element) -> bool {
         )
 }
 
+/// What a field is in a paragraph's text: one character, whatever value it
+/// shows, so that the caret stands on either side of it.
+pub const FIELD: char = '\u{fffc}';
+
+/// Whether an element inside a paragraph is a field: a value the document
+/// fills in, such as a page number or a date, rather than characters of the
+/// paragraph's own or a mark that holds none.
+pub fn is_field(element: &Element) -> bool {
+    element.name.ns == Ns::Text
+        && matches!(
+            &*element.name.local,
+            "page-number"
+                | "page-count"
+                | "title"
+                | "subject"
+                | "author-name"
+                | "author-initials"
+                | "chapter"
+                | "file-name"
+                | "sheet-name"
+                | "date"
+                | "time"
+                | "creator"
+                | "description"
+                | "keywords"
+                | "sequence"
+                | "bookmark-ref"
+                | "sequence-ref"
+                | "reference-ref"
+                | "variable-get"
+                | "variable-set"
+                | "user-field-get"
+                | "placeholder"
+                | "conditional-text"
+                | "hidden-text"
+                | "text-input"
+                | "measure"
+        )
+}
+
 /// Whether an element is a paragraph or a heading: what an editor edits.
 pub fn is_paragraph(element: &Element) -> bool {
     element.is(&Ns::Text, "p") || element.is(&Ns::Text, "h")
-}
-
-/// Whether an element inside a paragraph holds characters of the paragraph's
-/// text, as a span or a link does, rather than being a mark or a field that
-/// contributes none of its own.
-pub fn holds_text(element: &Element) -> bool {
-    is_inline_container_name(element)
 }
 
 /// What a `text:ruby-text` is drawn as after the text it annotates: itself
@@ -337,6 +372,7 @@ fn collect(parent: &Element, path: &mut Vec<usize>, at: &mut usize, out: &mut Ve
             }
             Node::Element(e) if e.is(&Ns::Text, "tab") => Kind::Tab,
             Node::Element(e) if e.is(&Ns::Text, "line-break") => Kind::LineBreak,
+            Node::Element(e) if is_field(e) => Kind::Field,
             Node::Element(e) if is_inline_container(e) => {
                 path.push(index);
                 collect(e, path, at, out);
@@ -376,6 +412,7 @@ fn write_text(parent: &Element, out: &mut String) {
             }
             Node::Element(e) if e.is(&Ns::Text, "tab") => out.push('\t'),
             Node::Element(e) if e.is(&Ns::Text, "line-break") => out.push('\n'),
+            Node::Element(e) if is_field(e) => out.push(FIELD),
             Node::Element(e) if is_inline_container(e) => write_text(e, out),
             Node::Element(_) | Node::Comment(_) | Node::ProcessingInstruction(_) => {}
         }
@@ -384,7 +421,7 @@ fn write_text(parent: &Element, out: &mut String) {
 
 /// A paragraph cut down to a range of its text, as it is carried to be put
 /// back elsewhere: the paragraph's own style and kind, the text in the range
-/// with its spans and links, and nothing that names one place in a document
+/// with its spans, links and fields, and nothing that names one place in a document
 /// (an id, a bookmark, a frame, a note), which would then be there twice.
 pub fn slice(paragraph: &Element, range: Range<usize>) -> Element {
     let len = text(paragraph).chars().count();
@@ -401,11 +438,17 @@ fn is_id(attribute: &Attribute) -> bool {
         || attribute.name.local.as_ref() == "id" && attribute.name.prefix.as_deref() == Some("xml")
 }
 
-/// Drop from a paragraph's contents everything that is not text or whitespace
-/// or a span or link holding some, and the ids of those that stay.
+/// Drop from a paragraph's contents everything that is not text or whitespace,
+/// a field, or a span or link holding some, and the ids and names of those
+/// that stay.
 fn keep_text_only(element: &mut Element) {
     element.children.retain_mut(|child| match child {
         Node::Text(_) | Node::CData(_) => true,
+        Node::Element(e) if is_field(e) => {
+            e.attrs
+                .retain(|a| !is_id(a) && !a.name.is(&Ns::Text, "ref-name"));
+            true
+        }
         Node::Element(e)
             if e.is(&Ns::Text, "s") || e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") =>
         {
@@ -571,7 +614,9 @@ fn collect_links<'a>(
             Node::Element(e) if e.is(&Ns::Text, "s") => {
                 *at += e.attr_usize(&Ns::Text, "c").unwrap_or(1);
             }
-            Node::Element(e) if e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") => {
+            Node::Element(e)
+                if e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") || is_field(e) =>
+            {
                 *at += 1;
             }
             Node::Element(e) if is_inline_container(e) => {
@@ -599,6 +644,7 @@ fn collect_links<'a>(
 ///
 /// A range past the end of the text is clamped to it.
 pub fn replace(paragraph: &mut Element, range: Range<usize>, with: &str) {
+    let with = &with.replace(FIELD, "");
     let len = text(paragraph).chars().count();
     let start = range.start.min(len);
     let end = range.end.clamp(start, len);
@@ -664,6 +710,7 @@ pub fn join(first: &mut Element, second: Element) {
 /// it is a `text:line-break` the editor was shown and left alone.
 pub fn rewrite(paragraph: &Element, edited: &str) -> Vec<Element> {
     let before = text(paragraph);
+    let edited = &edited.replace(FIELD, "");
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = edited.chars().collect();
     let prefix = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
@@ -1022,7 +1069,7 @@ fn cut(paragraph: &mut Element, range: Range<usize>, drop_marker: impl Fn(usize)
         let overlaps = overlap_start < overlap_end;
         let remove = match segment.kind {
             Kind::Marker => drop_marker(segment.start),
-            Kind::Tab | Kind::LineBreak => overlaps,
+            Kind::Tab | Kind::LineBreak | Kind::Field => overlaps,
             Kind::Spaces(n) => {
                 if !overlaps {
                     continue;
@@ -1216,10 +1263,13 @@ fn normalize_in(parent: &mut Element, prefix: &str, previous_was_space: &mut boo
                 index += 1;
             }
             Node::Element(e) => {
-                // Whitespace elements are whitespace; a marker is nothing,
-                // and what came before it still stands.
+                // Whitespace elements are whitespace and a field is a
+                // character; a marker is nothing, and what came before it
+                // still stands.
                 if e.is(&Ns::Text, "s") || e.is(&Ns::Text, "tab") || e.is(&Ns::Text, "line-break") {
                     *previous_was_space = true;
+                } else if is_field(e) {
+                    *previous_was_space = false;
                 }
                 index += 1;
             }

@@ -988,8 +988,13 @@ and holds everything outside it equal.
 **A paragraph is edited through its flat text**, built from the tree and not
 from the renderer's layout: a `text:s` is its spaces, a `text:tab` a tab, a
 `text:line-break` a newline, a span's or a link's contents the paragraph's own
-characters, and everything else in the paragraph — a bookmark, a frame, a
-field, a note — contributes nothing and stays where it was. Replacing a range
+characters, a field one character, U+FFFC, whatever value it shows, and
+everything else in the paragraph — a bookmark, a frame, a note — contributes
+nothing and stays where it was. A field goes when a deletion covers its
+character, and text typed beside it goes on the side the caret is; the
+character itself is never written as text, a copy carries the field but its
+plain text leaves the character out, and the word count counts it as neither
+a word nor a character, and ends a word at it. Replacing a range
 deletes the characters from the nodes that hold them, puts the new text into
 the text node at the start of the range, then writes whitespace the way ODF
 requires. A split carries a zero-length element at the split point to the
@@ -1217,9 +1222,7 @@ paragraph; a first or left page's own header or footer is left as it is
 `LibreOffice` writes one: a date as `text:date` with its `text:date-value`,
 `text:fixed="true"` where it keeps the day it was put in, a page number as
 `text:page-number text:select-page="current"` and a page count as
-`text:page-count`, each holding 1 until the PDF fills it. A field's value is
-not the paragraph's text, so text typed at its place goes in before it. The
-window shades every field faintly, and draws a date that follows the day as
+`text:page-count`, each holding 1 until the PDF fills it. The window shades every field faintly, and draws a date that follows the day as
 today's, local, in its own data style, without changing the tree; saving a
 text document writes today into each such date that holds another day, in
 its data style, as `LibreOffice` does, in the body and in the headers and

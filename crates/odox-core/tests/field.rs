@@ -154,3 +154,95 @@ fn a_date_in_a_tracked_deletion_is_left_as_it_was_deleted() {
     let styles = odox_core::Styles::collect(Some(&root), None);
     assert!(!follow_dates(&mut root, None, TODAY, &styles));
 }
+
+#[test]
+fn text_typed_after_a_field_goes_after_it() {
+    let mut root = content("<text:p>of <text:page-count>4</text:page-count></text:p>");
+    let paragraph = root.at_mut(&FIRST).expect("the paragraph");
+    odox_core::edit::replace(paragraph, 4..4, " pages");
+    let out = written(&root);
+    assert!(
+        out.contains("<text:page-count>4</text:page-count> pages</text:p>"),
+        "{out}"
+    );
+}
+
+#[test]
+fn text_typed_before_a_field_goes_before_it() {
+    let mut root = content("<text:p>of <text:page-count>4</text:page-count> pages</text:p>");
+    let paragraph = root.at_mut(&FIRST).expect("the paragraph");
+    odox_core::edit::replace(paragraph, 3..3, "all ");
+    let out = written(&root);
+    assert!(
+        out.contains("of all <text:page-count>4</text:page-count>"),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_field_is_one_character_of_the_text_and_goes_when_it_is_deleted() {
+    let mut root = content("<text:p>of <text:page-count>4</text:page-count> pages</text:p>");
+    let paragraph = root.at_mut(&FIRST).expect("the paragraph");
+    assert_eq!(odox_core::edit::text(paragraph), "of \u{fffc} pages");
+    odox_core::edit::replace(paragraph, 3..4, "");
+    let out = written(&root);
+    assert!(!out.contains("page-count"), "{out}");
+    assert_eq!(
+        odox_core::edit::text(root.at(&FIRST).expect("the paragraph")),
+        "of  pages"
+    );
+}
+
+#[test]
+fn the_field_character_is_never_written_as_text() {
+    let mut root = content("<text:p>of </text:p>");
+    let paragraph = root.at_mut(&FIRST).expect("the paragraph");
+    odox_core::edit::replace(paragraph, 3..3, "a\u{fffc}b");
+    assert_eq!(odox_core::edit::text(paragraph), "of ab");
+}
+
+#[test]
+fn a_link_after_a_field_is_found_where_it_stands() {
+    let root = content(
+        r#"<text:p><text:page-count>4</text:page-count><text:a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://example.com">link</text:a></text:p>"#,
+    );
+    let paragraph = root.at(&FIRST).expect("the paragraph");
+    let links = odox_core::edit::links(paragraph);
+    assert_eq!(links[0].0, 1..5);
+    assert_eq!(
+        odox_core::edit::link_at(paragraph, 2).map(|(_, range, _)| range),
+        Some(1..5)
+    );
+}
+
+#[test]
+fn a_bookmark_still_takes_no_room() {
+    let root = content(r#"<text:p>a<text:bookmark text:name="b"/>c</text:p>"#);
+    assert_eq!(
+        odox_core::edit::text(root.at(&FIRST).expect("the paragraph")),
+        "ac"
+    );
+}
+
+#[test]
+fn a_field_cut_and_pasted_goes_with_the_text() {
+    let root = content(
+        r#"<text:p>Page <text:sequence text:ref-name="r1" text:name="Figure">3</text:sequence> end</text:p>"#,
+    );
+    let paragraph = root.at(&FIRST).expect("the paragraph");
+    let carried = odox_core::edit::slice(paragraph, 0..6);
+    let out = String::from_utf8(xml::serialize(&carried)).expect("UTF-8");
+    assert!(
+        out.contains(r#"<text:sequence text:name="Figure">3</text:sequence>"#),
+        "{out}"
+    );
+}
+
+#[test]
+fn a_rewrite_holding_the_field_character_keeps_its_lines() {
+    let root = content("<text:p>a<text:page-count>4</text:page-count>b</text:p>");
+    let paragraph = root.at(&FIRST).expect("the paragraph");
+    let lines = odox_core::edit::rewrite(paragraph, "Xa\u{fffc}b\nY");
+    let texts: Vec<String> = lines.iter().map(odox_core::edit::text).collect();
+    assert_eq!(texts, ["Xab", "Y"]);
+}

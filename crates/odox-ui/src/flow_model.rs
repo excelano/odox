@@ -941,6 +941,12 @@ impl<'a> FlowModel<'a> {
             return Err(Refused::NotFound);
         }
         let before = self.content.clone();
+        let length = |content: &Element| {
+            content
+                .at(&path)
+                .map_or(0, |p| edit::text(p).chars().count())
+        };
+        let was = length(self.content);
         let done = match &here.link {
             Some(link) => {
                 edit::set_link(self.content, &[path.as_slice(), link].concat(), href, text)
@@ -951,7 +957,7 @@ impl<'a> FlowModel<'a> {
             *self.content = before;
             return Err(refused);
         }
-        let end = here.range.start + text.chars().count();
+        let end = (here.range.end + length(self.content)).saturating_sub(was);
         self.order = OnceCell::new();
         self.editing.touch();
         self.record(
@@ -973,12 +979,13 @@ impl<'a> FlowModel<'a> {
         href: &str,
     ) -> Result<Vec<usize>, Refused> {
         let (from, to, with) = edit::difference(&here.text, text);
+        let paragraph = self.content.at_mut(path).ok_or(Refused::NotFound)?;
+        let was = edit::text(paragraph).chars().count();
         if from != to || !with.is_empty() {
-            let paragraph = self.content.at_mut(path).ok_or(Refused::NotFound)?;
             let start = here.range.start;
             edit::replace(paragraph, start + from..start + to, &with);
         }
-        let end = here.range.start + text.chars().count();
+        let end = (here.range.end + edit::text(paragraph).chars().count()).saturating_sub(was);
         edit::make_link(self.content, (path, here.range.start), (path, end), href)
     }
 
@@ -1052,7 +1059,8 @@ impl<'a> FlowModel<'a> {
         Ok(())
     }
 
-    /// Put a field in at the caret, as one step to undo, a date being today's.
+    /// Put a field in at the caret, as one step to undo, a date being today's,
+    /// and stand the caret after it.
     ///
     /// # Errors
     ///
@@ -1083,7 +1091,10 @@ impl<'a> FlowModel<'a> {
                 caret.offset,
             )),
         );
-        editor.select(Selection::caret(caret));
+        editor.select(Selection::caret(Position::new(
+            caret.paragraph,
+            caret.offset + 1,
+        )));
         Ok(())
     }
 
@@ -1984,6 +1995,48 @@ mod tests {
             "test",
         )
         .expect("a document")
+    }
+
+    #[test]
+    fn a_link_made_over_a_field_ends_where_its_text_does() {
+        let mut content = odox_core::xml::parse(
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text><text:p>ab<text:page-count>4</text:page-count>cd ef</text:p></office:text></office:body></office:document-content>"#,
+            "test",
+        )
+        .expect("a document");
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::PageEditor::new(eframe::egui::Id::unique("test"));
+        editor.select(egui_richedit::Selection {
+            anchor: Position::new(vec![0], 0),
+            focus: Position::new(vec![0], 5),
+        });
+        let here = model.link_here(&editor).expect("a selection");
+        model
+            .put_link(&mut editor, &here, "Ab\u{fffc}cD", "https://example.com")
+            .expect("linked");
+        let paragraph = content.at(&[0, 0, 0]).expect("the paragraph");
+        assert_eq!(odox_core::edit::text(paragraph), "AbcD ef");
+        assert_eq!(odox_core::edit::links(paragraph)[0].0, 0..4);
+    }
+
+    #[test]
+    fn the_caret_stands_after_a_field_put_in() {
+        let mut content = heading_document();
+        let mut styles = Styles::collect(Some(&content), None);
+        let mut editing = Editing::default();
+        let mut model = FlowModel::new(&mut content, &mut styles, vec![0, 0], &mut editing);
+        let mut editor = super::PageEditor::new(eframe::egui::Id::unique("test"));
+        editor.select(egui_richedit::Selection::caret(Position::new(vec![1], 1)));
+        model
+            .insert_field(&mut editor, odox_core::edit::Field::PageCount)
+            .expect("put in");
+        assert_eq!(
+            editor.selection().map(|s| s.focus.offset),
+            Some(2),
+            "after the field"
+        );
     }
 
     #[test]
