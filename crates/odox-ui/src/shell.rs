@@ -217,6 +217,8 @@ pub struct Shell<V: View> {
     /// Where the unsaved changes are kept while the window runs, where the
     /// platform's data directory could be had.
     recovery: Option<Recovery>,
+    /// Why recovery could not start, until it is said.
+    unkept: Option<String>,
     /// The revision last kept there, and when.
     kept: (Option<u64>, std::time::Instant),
     /// Changes windows that stopped left behind, offered one at a time.
@@ -318,7 +320,10 @@ impl<V: View> Shell<V> {
         let show_side = view.side_at_start();
         let recent = Recent::load(product.id);
         let zoom = Zoom::new(view.fits());
-        let recovery = Recovery::start(product.id).ok();
+        let (recovery, unkept) = match Recovery::start(product.id) {
+            Ok(recovery) => (Some(recovery), None),
+            Err(error) => (None, Some(not_kept(&error.to_string()))),
+        };
         let orphans = crate::recovery::orphans(product.id);
         Self {
             view,
@@ -337,6 +342,7 @@ impl<V: View> Shell<V> {
             pending: None,
             closing: false,
             recovery,
+            unkept,
             kept: (None, std::time::Instant::now()),
             orphans,
         }
@@ -377,8 +383,9 @@ impl<V: View> Shell<V> {
         let Some(document) = self.view.document_mut() else {
             return;
         };
-        if let Ok(bytes) = document.write_verified() {
-            recovery.save(bytes, self.path.as_deref());
+        match document.write_verified() {
+            Ok(bytes) => recovery.save(bytes, self.path.as_deref()),
+            Err(error) => self.error = Some(not_kept(&error.to_string())),
         }
         self.kept = (Some(revision), std::time::Instant::now());
     }
@@ -931,6 +938,12 @@ impl<V: View> Shell<V> {
                 t("A new window could not be opened: {reason}"),
                 &[("reason", &reason)],
             ));
+        }
+        if let Some(message) = self.unkept.take() {
+            self.error = Some(message);
+        }
+        if let Some(reason) = self.recovery.as_ref().and_then(Recovery::failure) {
+            self.error = Some(not_kept(&reason));
         }
         let speller = crate::spell::Speller::shared();
         if let Some(message) = speller.failure() {
@@ -1517,6 +1530,15 @@ fn window_icon(bytes: &'static [u8]) -> Option<egui::IconData> {
         height: image.height(),
         rgba: image.rgba_data().to_vec(),
     })
+}
+
+/// What a window says when its unsaved changes cannot be kept against its
+/// stopping.
+fn not_kept(reason: &str) -> String {
+    fill(
+        t("Unsaved changes cannot be kept in case the window stops: {reason}"),
+        &[("reason", reason)],
+    )
 }
 
 #[cfg(test)]

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: odox\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/odox/issues\n"
-"POT-Creation-Date: 2026-11-24 13:46-0600\n"
+"POT-Creation-Date: 2026-11-24 15:48-0600\n"
 "PO-Revision-Date: 2026-09-14 09:00-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -44,9 +44,9 @@ msgid "Print…"
 msgstr "Drucken …"
 
 #: crates/odox-ui/src/export.rs:165 crates/odox-ui/src/export.rs:368
-#: crates/odox-ui/src/shell.rs:399 crates/odox-ui/src/shell.rs:449
-#: crates/odox-ui/src/shell.rs:517 crates/odox-ui/src/shell.rs:654
-#: crates/odox-ui/src/shell.rs:742 crates/odox-ui/src/shell.rs:758
+#: crates/odox-ui/src/shell.rs:406 crates/odox-ui/src/shell.rs:456
+#: crates/odox-ui/src/shell.rs:524 crates/odox-ui/src/shell.rs:661
+#: crates/odox-ui/src/shell.rs:754 crates/odox-ui/src/shell.rs:770
 msgid "Untitled"
 msgstr "Ohne Titel"
 
@@ -80,7 +80,7 @@ msgstr ""
 "{family} darf nicht eingebettet werden, daher wurde stattdessen {used} "
 "verwendet."
 
-#: crates/odox-ui/src/export.rs:283 crates/odox-ui/src/shell.rs:695
+#: crates/odox-ui/src/export.rs:283 crates/odox-ui/src/shell.rs:707
 msgid "{file} could not be saved: {reason}"
 msgstr "{file} konnte nicht gespeichert werden: {reason}"
 
@@ -154,7 +154,7 @@ msgstr "Übrige als Schmuck markieren"
 
 #: crates/odox-ui/src/export.rs:484 crates/odox-ui/src/link_dialog.rs:115
 #: crates/odox-ui/src/page_setup.rs:113
-#: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:772
+#: crates/odox-ui/src/picture_question.rs:84 crates/odox-ui/src/shell.rs:784
 #: crates/xods/src/format.rs:151 crates/xods/src/view.rs:1319
 #: crates/xods/src/view.rs:1383 crates/xods/src/view.rs:1465
 #: crates/xods/src/view.rs:1682 crates/xodt/src/view.rs:745
@@ -190,7 +190,7 @@ msgstr "Keine Treffer"
 msgid "{current} of {count}"
 msgstr "{current} von {count}"
 
-#: crates/odox-ui/src/find_bar.rs:228 crates/odox-ui/src/shell.rs:1010
+#: crates/odox-ui/src/find_bar.rs:228 crates/odox-ui/src/shell.rs:1028
 msgid "Close"
 msgstr "Schließen"
 
@@ -239,7 +239,7 @@ msgid "Page break"
 msgstr "Seitenumbruch"
 
 #: crates/odox-ui/src/i18n.rs:97 crates/odox-ui/src/i18n.rs:101
-#: crates/odox-ui/src/shell.rs:991 crates/odox-ui/tests/german.rs:24
+#: crates/odox-ui/src/shell.rs:1009 crates/odox-ui/tests/german.rs:24
 msgid "File"
 msgstr "Datei"
 
@@ -308,8 +308,8 @@ msgstr ""
 msgid "Formatting marks"
 msgstr "Formatierungszeichen"
 
-#: crates/odox-ui/src/note_popup.rs:76 crates/odox-ui/src/shell.rs:766
-#: crates/odox-ui/src/shell.rs:1019 crates/xods/src/view.rs:1457
+#: crates/odox-ui/src/note_popup.rs:76 crates/odox-ui/src/shell.rs:778
+#: crates/odox-ui/src/shell.rs:1037 crates/xods/src/view.rs:1457
 msgid "Save"
 msgstr "Speichern"
 
@@ -436,155 +436,161 @@ msgstr "Klicken, um einen Titel hinzuzufügen"
 msgid "Click to add text"
 msgstr "Klicken, um Text hinzuzufügen"
 
-#: crates/odox-ui/src/shell.rs:403
+#: crates/odox-ui/src/shell.rs:410
 msgid "{app} stopped before {file} was saved. Open the changes it had?"
 msgstr ""
 "{app} wurde beendet, bevor {file} gespeichert war. Die Änderungen öffnen, "
 "die es enthielt?"
 
-#: crates/odox-ui/src/shell.rs:408
+#: crates/odox-ui/src/shell.rs:415
 msgid "Open"
 msgstr "Öffnen"
 
-#: crates/odox-ui/src/shell.rs:411 crates/odox-ui/src/shell.rs:769
+#: crates/odox-ui/src/shell.rs:418 crates/odox-ui/src/shell.rs:781
 msgid "Discard"
 msgstr "Verwerfen"
 
-#: crates/odox-ui/src/shell.rs:428
+#: crates/odox-ui/src/shell.rs:435
 msgid "The changes to {file} could not be read: {reason}"
 msgstr "Die Änderungen an {file} konnten nicht gelesen werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:497
+#: crates/odox-ui/src/shell.rs:504
 msgid "{file} could not be read: {reason}"
 msgstr "{file} konnte nicht gelesen werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:510 crates/odox-ui/src/shell.rs:926
+#: crates/odox-ui/src/shell.rs:517 crates/odox-ui/src/shell.rs:938
 msgid "A new window could not be opened: {reason}"
 msgstr "Ein neues Fenster konnte nicht geöffnet werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:552
+#: crates/odox-ui/src/shell.rs:559
 msgid "{file} is no longer there."
 msgstr "{file} ist nicht mehr vorhanden."
 
-#: crates/odox-ui/src/shell.rs:580
+#: crates/odox-ui/src/shell.rs:587
 msgid "Open recent"
 msgstr "Zuletzt verwendete Dokumente"
 
-#: crates/odox-ui/src/shell.rs:591
+#: crates/odox-ui/src/shell.rs:598
 msgid "Clear the list"
 msgstr "Liste löschen"
 
-#: crates/odox-ui/src/shell.rs:762
+#: crates/odox-ui/src/shell.rs:774
 msgid "Save changes to {file}?"
 msgstr "Änderungen an {file} speichern?"
 
-#: crates/odox-ui/src/shell.rs:763
+#: crates/odox-ui/src/shell.rs:775
 msgid "The document has changes that are not saved."
 msgstr "Das Dokument hat ungespeicherte Änderungen."
 
-#: crates/odox-ui/src/shell.rs:957 crates/odox-ui/src/shell.rs:967
+#: crates/odox-ui/src/shell.rs:975 crates/odox-ui/src/shell.rs:985
 msgid "Dismiss"
 msgstr "Ausblenden"
 
-#: crates/odox-ui/src/shell.rs:992
+#: crates/odox-ui/src/shell.rs:1010
 msgid "New"
 msgstr "Neu"
 
-#: crates/odox-ui/src/shell.rs:996 crates/odox-ui/tests/german.rs:25
+#: crates/odox-ui/src/shell.rs:1014 crates/odox-ui/tests/german.rs:25
 msgid "Open…"
 msgstr "Öffnen …"
 
-#: crates/odox-ui/src/shell.rs:1003 crates/odox-ui/tests/german.rs:26
+#: crates/odox-ui/src/shell.rs:1021 crates/odox-ui/tests/german.rs:26
 msgid "Reload"
 msgstr "Neu einlesen"
 
-#: crates/odox-ui/src/shell.rs:1026
+#: crates/odox-ui/src/shell.rs:1044
 msgid "Save as…"
 msgstr "Speichern unter …"
 
-#: crates/odox-ui/src/shell.rs:1036
+#: crates/odox-ui/src/shell.rs:1054
 msgid "Quit"
 msgstr "Beenden"
 
-#: crates/odox-ui/src/shell.rs:1041
+#: crates/odox-ui/src/shell.rs:1059
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: crates/odox-ui/src/shell.rs:1045
+#: crates/odox-ui/src/shell.rs:1063
 msgid "View"
 msgstr "Ansicht"
 
-#: crates/odox-ui/src/shell.rs:1046
+#: crates/odox-ui/src/shell.rs:1064
 msgid "Zoom in"
 msgstr "Vergrößern"
 
-#: crates/odox-ui/src/shell.rs:1049
+#: crates/odox-ui/src/shell.rs:1067
 msgid "Zoom out"
 msgstr "Verkleinern"
 
-#: crates/odox-ui/src/shell.rs:1052
+#: crates/odox-ui/src/shell.rs:1070
 msgid "Actual size"
 msgstr "Originalgröße"
 
-#: crates/odox-ui/src/shell.rs:1056
+#: crates/odox-ui/src/shell.rs:1074
 msgid "Fit to the window"
 msgstr "An das Fenster anpassen"
 
-#: crates/odox-ui/src/shell.rs:1060
+#: crates/odox-ui/src/shell.rs:1078
 msgid "Show the side panel"
 msgstr "Seitenleiste anzeigen"
 
-#: crates/odox-ui/src/shell.rs:1071
+#: crates/odox-ui/src/shell.rs:1089
 msgid "{percent}%"
 msgstr "{percent} %"
 
-#: crates/odox-ui/src/shell.rs:1074
+#: crates/odox-ui/src/shell.rs:1092
 msgid "Editing"
 msgstr "Bearbeitung"
 
-#: crates/odox-ui/src/shell.rs:1084
+#: crates/odox-ui/src/shell.rs:1102
 msgid "Undo"
 msgstr "Rückgängig"
 
-#: crates/odox-ui/src/shell.rs:1091
+#: crates/odox-ui/src/shell.rs:1109
 msgid "Redo"
 msgstr "Wiederholen"
 
-#: crates/odox-ui/src/shell.rs:1099
+#: crates/odox-ui/src/shell.rs:1117
 msgid "Find…"
 msgstr "Suchen …"
 
-#: crates/odox-ui/src/shell.rs:1108
+#: crates/odox-ui/src/shell.rs:1126
 msgid "Replace…"
 msgstr "Ersetzen …"
 
-#: crates/odox-ui/src/shell.rs:1116
+#: crates/odox-ui/src/shell.rs:1134
 msgid "Edit mode"
 msgstr "Bearbeitungsmodus"
 
-#: crates/odox-ui/src/shell.rs:1120
+#: crates/odox-ui/src/shell.rs:1138
 msgid "Open documents in edit mode"
 msgstr "Dokumente im Bearbeitungsmodus öffnen"
 
-#: crates/odox-ui/src/shell.rs:1126
+#: crates/odox-ui/src/shell.rs:1144
 msgid "The setting could not be saved: {reason}"
 msgstr "Die Einstellung konnte nicht gespeichert werden: {reason}"
 
-#: crates/odox-ui/src/shell.rs:1187
+#: crates/odox-ui/src/shell.rs:1205
 msgid "{replaced} replaced"
 msgstr "{replaced} ersetzt"
 
-#: crates/odox-ui/src/shell.rs:1190
+#: crates/odox-ui/src/shell.rs:1208
 msgid "{replaced} replaced, {skipped} left"
 msgstr "{replaced} ersetzt, {skipped} ausgelassen"
 
-#: crates/odox-ui/src/shell.rs:1221
+#: crates/odox-ui/src/shell.rs:1239
 msgid "Open a document…"
 msgstr "Ein Dokument öffnen …"
 
-#: crates/odox-ui/src/shell.rs:1225
+#: crates/odox-ui/src/shell.rs:1243
 msgid "Start a new one"
 msgstr "Ein neues beginnen"
+
+#: crates/odox-ui/src/shell.rs:1539
+msgid "Unsaved changes cannot be kept in case the window stops: {reason}"
+msgstr ""
+"Ungespeicherte Änderungen können nicht für den Fall aufbewahrt werden, dass "
+"das Fenster beendet wird: {reason}"
 
 #: crates/odox-ui/src/spell.rs:451
 msgid "Add to dictionary"

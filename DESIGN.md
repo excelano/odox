@@ -348,7 +348,10 @@ own, and the others wait for the next window. Copies that cannot be opened stay
 for another time. A window opened on a file lets them go for the next. A lock
 with no bytes beside it is tidied away unasked, and the lock itself is taken
 under another name and moved into place, so a window scanning never finds one
-still being made.
+still being made. The note names the original by the bytes, or on Windows the
+16-bit units, its path is made of, in hexadecimal, so any path comes back as it
+was. A window that cannot take its lock, or cannot write a copy, says so in its
+error line, once for each failure.
 
 **File > New, and Ctrl+N, starts a blank document** in a window that has none,
 and otherwise starts another copy of the application with `--new`, which opens
