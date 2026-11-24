@@ -39,8 +39,9 @@ pub struct Metrics {
 impl Metrics {
     /// Measure a sheet at a zoom.
     pub fn of(document: &SheetDocument, sheet: &Sheet, zoom: f32) -> Self {
-        let row_count = sheet.used_rows + MARGIN_CELLS;
-        let column_count = sheet.used_columns.max(1) + MARGIN_CELLS;
+        let (drawn_rows, drawn_columns) = document.drawings_reach(sheet);
+        let row_count = sheet.used_rows.max(drawn_rows) + MARGIN_CELLS;
+        let column_count = sheet.used_columns.max(drawn_columns).max(1) + MARGIN_CELLS;
 
         let mut rows = Vec::with_capacity(row_count + 1);
         let mut at = 0.0;

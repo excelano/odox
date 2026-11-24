@@ -46,7 +46,7 @@ pub(crate) fn undescribed(presentation: &Presentation) -> Vec<Vec<usize>> {
     found
 }
 
-fn collect_undescribed(
+pub(crate) fn collect_undescribed(
     document: &Document,
     shape: &Element,
     path: Vec<usize>,
@@ -320,12 +320,23 @@ fn style_of(document: &Document, shape: &Element) -> std::rc::Rc<Properties> {
     document.styles.resolve(&Family::Graphic, name)
 }
 
-/// A slide's shapes turned into what is drawn for them.
-struct Slides<'l, 'f, 'd> {
+/// A slide's shapes turned into what is drawn for them, and a sheet's.
+pub(crate) struct Slides<'l, 'f, 'd> {
     layout: &'l mut Layout<'f>,
     document: &'d Document,
     /// What a shadow is drawn with, while a shape's shadow is being drawn.
     casting: Option<std::rc::Rc<Properties>>,
+}
+
+impl<'l, 'f, 'd> Slides<'l, 'f, 'd> {
+    /// Shapes of a document laid out into a layout.
+    pub(crate) fn new(layout: &'l mut Layout<'f>, document: &'d Document) -> Self {
+        Self {
+            layout,
+            document,
+            casting: None,
+        }
+    }
 }
 
 impl Slides<'_, '_, '_> {
@@ -333,7 +344,7 @@ impl Slides<'_, '_, '_> {
     /// picture, in the order they are drawn. The first paragraph of a
     /// heading's label is the slide's title.
     #[allow(clippy::too_many_lines)]
-    fn shape(
+    pub(crate) fn shape(
         &mut self,
         shape: &Element,
         parent: NodeId,

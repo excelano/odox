@@ -54,12 +54,13 @@ impl SheetDocument {
         if !self.document.declares(&Ns::Style) {
             return Err(Refused::Namespace);
         }
+        let before = self.anchored(sheet);
         let names = CellNames::of(&self.document);
         let table = table_mut(&mut self.document, table_at)?;
         let path = reach_column(table, column, &names)?;
         self.restyle(table_at, &path, Axis::Column, width)?;
         self.reindex();
-        Ok(())
+        self.move_drawings(sheet, &before)
     }
 
     /// Give a row a height, which a spreadsheet then keeps rather than
@@ -84,6 +85,7 @@ impl SheetDocument {
         if !self.document.declares(&Ns::Style) {
             return Err(Refused::Namespace);
         }
+        let before = self.anchored(sheet);
         let names = CellNames::of(&self.document);
         let table = table_mut(&mut self.document, table_at)?;
         reach_row(table, range.as_ref(), row, rows_written, &names)?;
@@ -92,7 +94,7 @@ impl SheetDocument {
         let path = row_path(table, row).ok_or(Refused::NotFound)?;
         self.restyle(table_at, &path, Axis::Row, height)?;
         self.reindex();
-        Ok(())
+        self.move_drawings(sheet, &before)
     }
 
     /// Give the column or row at `path` under a table a style that is its

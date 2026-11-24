@@ -12,6 +12,7 @@
 
 mod comment;
 mod conditional;
+mod drawing;
 mod fill;
 mod format;
 mod freeze;
@@ -23,6 +24,7 @@ mod sheets;
 mod size;
 mod sort;
 pub use comment::Comment;
+pub use drawing::{Anchor, SheetDrawing};
 pub use fill::Block;
 pub use format::{Borders, CellFormat, NumberFormat};
 pub use freeze::Frozen;
@@ -86,6 +88,9 @@ pub struct Sheet {
     /// The style each cell a conditional format holds for takes, by row and
     /// column, worked out once after the index is built, when first asked.
     conditional: std::cell::OnceCell<std::collections::HashMap<(usize, usize), String>>,
+    /// Where the sheet's drawings are, found once after the index is built,
+    /// when first asked.
+    drawn: std::cell::OnceCell<Vec<drawing::Found>>,
 }
 
 /// A column's own properties.
@@ -1315,6 +1320,7 @@ fn index_sheet(document: &Document, table: &Element, position: usize) -> Sheet {
         rows: index.rows,
         table: position,
         conditional: std::cell::OnceCell::new(),
+        drawn: std::cell::OnceCell::new(),
     }
 }
 

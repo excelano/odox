@@ -31,6 +31,7 @@ use crate::bands::{Bands, Regions};
 use crate::fonts::Faces;
 use crate::layout::{Item, Layout};
 use crate::model::{self, Block, Paragraph};
+use crate::odp::{self, Slides};
 use crate::tags::NodeId;
 use crate::text;
 use crate::{Exported, Laid, Options, Page, Refusal};
@@ -44,14 +45,32 @@ const HEADING_GAP: f32 = 6.0;
 /// The smallest a fitted sheet is drawn, as a share of its size.
 const SMALLEST: f32 = 0.1;
 
-/// A spreadsheet's cells are not pictures: the window draws none of the
-/// pictures and charts a sheet can hold, and neither does the export.
-pub(crate) fn undescribed(_: &SheetDocument) -> Vec<Vec<usize>> {
-    Vec::new()
+/// The pictures on the sheets that are printed which say nothing in place of
+/// their picture, as paths from the content root.
+pub(crate) fn undescribed(document: &SheetDocument) -> Vec<Vec<usize>> {
+    let mut found = Vec::new();
+    for (index, sheet) in document.sheets().iter().enumerate() {
+        if !sheet.visible {
+            continue;
+        }
+        for drawing in document.drawings(index) {
+            if !drawing.shown(false) || document.drawing_place(sheet, &drawing).is_none() {
+                continue;
+            }
+            if let Some(path) = document.drawing_path(index, &drawing) {
+                odp::collect_undescribed(&document.document, drawing.element, path, &mut found);
+            }
+        }
+    }
+    found
 }
 
 /// Export a spreadsheet as PDF/UA-1.
 pub(crate) fn export(document: &SheetDocument, options: &Options) -> Result<Exported, Refusal> {
+    let missing = undescribed(document);
+    if !missing.is_empty() {
+        return Err(Refusal::Undescribed(missing));
+    }
     let mut faces = Faces::new();
     let laid = lay_out(document, options, &mut faces)?;
     crate::write(
@@ -223,7 +242,11 @@ impl Sheets<'_, '_, '_> {
         // A print range goes no further than the cells in use: one written as
         // whole columns, which is how Excel writes a print area, reaches the
         // last row a sheet can have.
-        let used = (0..sheet.used_rows, 0..sheet.used_columns);
+        let reach = document.drawings_reach(sheet);
+        let used = (
+            0..sheet.used_rows.max(reach.0),
+            0..sheet.used_columns.max(reach.1),
+        );
         let (row_range, column_range) = match document.print_range(sheet) {
             Some((rows, columns)) => (
                 rows.start..rows.end.min(used.0.end),
@@ -387,6 +410,55 @@ impl Sheets<'_, '_, '_> {
                 pages[on]
                     .items
                     .extend(items.into_iter().map(|item| (top, item)));
+            }
+        }
+
+        if let Some(index) = document
+            .sheets()
+            .iter()
+            .position(|s| std::ptr::eq(s, sheet))
+        {
+            let group = self.layout.tree.group(Some(section), Tag::Div);
+            for drawing in document.drawings(index) {
+                let (Some([x, y, ..]), Some((row, column, within))) = (
+                    document.drawing_place(sheet, &drawing),
+                    document.drawing_cell(sheet, &drawing),
+                ) else {
+                    continue;
+                };
+                if !drawing.shown(false) {
+                    continue;
+                }
+                let (Some(at), Some(column_index)) = (
+                    rows.iter().position(|&r| r == row),
+                    columns.iter().position(|&c| c == column),
+                ) else {
+                    continue;
+                };
+                let corner = (
+                    left + (column_at[column_index] + within.0) * share,
+                    band_top(row_band[at]) + (row_at[at] + within.1) * share,
+                );
+                let items = Slides::new(self.layout, &document.document).shape(
+                    drawing.element,
+                    group,
+                    false,
+                )?;
+                let on = page_of(row_band[at], column_band[column_index]);
+                drawn[on] = true;
+                pages[on].items.push((
+                    top,
+                    Item::Clipped {
+                        rect: clip(column_index),
+                        item: Box::new(Item::Turned {
+                            origin: (corner.0 - x * share, corner.1 - y * share),
+                            across: (share, 0.0),
+                            down: (0.0, share),
+                            size: (1.0, 1.0),
+                            items,
+                        }),
+                    },
+                ));
             }
         }
 
@@ -815,5 +887,56 @@ mod tests {
         assert_eq!(bands(&[40.0, 40.0, 40.0], 100.0, 100.0), [0..2, 2..3]);
         assert_eq!(bands(&[40.0, 40.0, 40.0], 50.0, 100.0), [0..1, 1..3]);
         assert_eq!(bands(&[250.0, 10.0], 100.0, 100.0), [0..1, 1..2]);
+    }
+
+    /// What a page carries onto it, inside the clip each is cut to.
+    fn carried(page: &Page) -> Vec<&Vec<Item>> {
+        page.items
+            .iter()
+            .filter_map(|(_, item)| match item {
+                Item::Clipped { item, .. } => match item.as_ref() {
+                    Item::Turned { items, .. } => Some(items),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_sheets_drawings_are_printed_over_its_cells_and_a_hidden_ones_are_not() {
+        let mut faces = Faces::new();
+        let laid = lay_out(&corpus("drawings.ods"), &options(), &mut faces).expect("laid out");
+        let carried = carried(&laid.pages[0]);
+        assert_eq!(carried.len(), 4);
+        let free = carried.iter().any(|items| {
+            items
+                .iter()
+                .any(|inner| matches!(inner, Item::Text { text, .. } if text.contains("Free")))
+        });
+        assert!(free);
+    }
+
+    #[test]
+    fn a_picture_on_a_sheet_that_says_nothing_is_asked_about() {
+        let mut document = corpus("drawings.ods");
+        assert!(undescribed(&document).is_empty());
+        fn untitle(element: &mut odox_core::Element) {
+            element.children.retain(
+                |node| !matches!(node, odox_core::xml::Node::Element(e) if e.is(&odox_core::Ns::Svg, "title")),
+            );
+            for child in &mut element.children {
+                if let odox_core::xml::Node::Element(child) = child {
+                    untitle(child);
+                }
+            }
+        }
+        untitle(&mut document.document.content);
+        document.reindex();
+        assert_eq!(undescribed(&document).len(), 1);
+        assert!(matches!(
+            export(&document, &options()),
+            Err(Refusal::Undescribed(_))
+        ));
     }
 }
