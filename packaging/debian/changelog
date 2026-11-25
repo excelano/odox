@@ -1,3 +1,16 @@
+odox (0.20.0) unstable; urgency=low
+
+  * A field cut from a header and pasted into the body stays a field
+  * INDEX, MATCH, HLOOKUP and seconds in TEXT and cells answer as LibreOffice does
+  * The cell editor's spelling menu builds against the new pointer argument
+  * A misspelled word on a turned label offers its corrections
+  * The print dialog opens over the window it prints from
+  * Printing a document with nothing to print says so as a print
+  * Menu letters stay out of modal questions, the find bar and submenus without letters
+  * Menus open and choose from the keyboard by their underlined letters
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 24 Nov 2026 18:45:40 -0600
+
 odox (0.19.2) unstable; urgency=low
 
   * A field travels with cut and paste, and links and pastes count it right
