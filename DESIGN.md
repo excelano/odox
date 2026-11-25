@@ -1337,10 +1337,11 @@ text box, named for its cell.
 **A copy keeps its formatting, in the window and out of it.** The editor puts
 the selection on the clipboard as text and as HTML, and keeps beside them a
 `Fragment` its model made: the covered paragraphs cut to the range, each with its
-own style and kind, and the spans and links in it, without the ids, bookmarks,
-frames and notes that name one place in a document and would then be there
-twice. A paste of exactly the text it put on the clipboard is a paste of the
-fragment. Any other paste, from another window or another program, looks for
+own style and kind, and the spans, links and fields in it, without the ids,
+bookmarks, frames and notes that name one place in a document and would then be
+there twice. A paste of exactly the text it put on the clipboard is a paste of
+the fragment, wherever the caret has gone since, a header or footer and the
+body included. Any other paste, from another window or another program, looks for
 HTML beside the text and reads the part of it that every program writes
 (`odox_core::edit::html`): paragraphs, headings of six levels, the items of
 bulleted and numbered lists, line breaks, and bold, italic, underline and

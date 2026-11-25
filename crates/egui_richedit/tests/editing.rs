@@ -869,6 +869,27 @@ fn a_paste_of_what_was_copied_keeps_its_formatting_and_any_other_text_does_not()
 }
 
 #[test]
+fn a_copy_outlives_the_caret_being_taken_away() {
+    let mut h = Harness::new(&["Hello world"]);
+    h.editor.select(Selection {
+        anchor: Position::new(0, 6),
+        focus: Position::new(0, 11),
+    });
+    h.keys(&[command(Key::B)]);
+    let copied = h
+        .frame(vec![Event::Copy])
+        .expect("it went on the clipboard");
+    h.editor.clear();
+    h.caret(0, 0);
+    h.frame(vec![Event::Paste(copied)]);
+    assert_eq!(
+        h.model.bold_text(0),
+        "worldworld",
+        "pasted with its formatting"
+    );
+}
+
+#[test]
 fn a_cut_can_be_pasted_back_with_its_formatting() {
     let mut h = Harness::new(&["ab cd"]);
     h.editor.select(Selection {
