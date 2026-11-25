@@ -15,22 +15,22 @@
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
 
-version = "0.19.2"
+version = "0.20.0"
 
 [products.xodt.locales.en-us]
-whats-new = "A fix release. Text typed right after a field, such as a page count, goes after it, the arrows step over a field as one character, and a field moves with cut and paste. A date that follows the day is saved as today in headers and footers too, and editing a comment that holds a list keeps the list in its place. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
+whats-new = "Every menu is reached from the keyboard: Alt and a menu's underlined letter opens it, and an entry's underlined letter chooses it. A field cut from a header and pasted into the body stays a field. On Linux the print dialog opens over the window, and a document with nothing to print says so."
 
 [products.xodt.locales.de-de]
-whats-new = "Eine Korrekturversion. Direkt nach einem Feld wie der Seitenanzahl getippter Text steht hinter dem Feld, die Pfeiltasten überspringen ein Feld als ein Zeichen, und ein Feld wandert mit Ausschneiden und Einfügen. Ein mitlaufendes Datum wird auch in Kopf- und Fußzeilen als heutiges gespeichert, und beim Bearbeiten eines Kommentars mit einer Liste bleibt die Liste an ihrem Platz. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
+whats-new = "Jedes Menü ist mit der Tastatur erreichbar: Alt und der unterstrichene Buchstabe öffnen ein Menü, und der unterstrichene Buchstabe eines Eintrags wählt ihn. Ein aus der Kopfzeile ausgeschnittenes und in den Text eingefügtes Feld bleibt ein Feld. Unter Linux öffnet sich der Druckdialog über dem Fenster, und ein Dokument ohne druckbaren Inhalt sagt das."
 
 [products.xods.locales.en-us]
-whats-new = "A fix release. Resizing a row or a column always leaves a step to undo. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
+whats-new = "Every menu is reached from the keyboard: Alt and a menu's underlined letter opens it, and an entry's underlined letter chooses it. INDEX with no column, MATCH and HLOOKUP over a range holding an error, and seconds in a time and in TEXT now answer as LibreOffice does. On Linux the print dialog opens over the window, and a document with nothing to print says so."
 
 [products.xods.locales.de-de]
-whats-new = "Eine Korrekturversion. Das Ändern der Größe einer Zeile oder Spalte lässt sich immer rückgängig machen. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
+whats-new = "Jedes Menü ist mit der Tastatur erreichbar: Alt und der unterstrichene Buchstabe öffnen ein Menü, und der unterstrichene Buchstabe eines Eintrags wählt ihn. INDEX ohne Spalte, MATCH und HLOOKUP über einen Bereich mit einem Fehler sowie Sekunden in einer Uhrzeit und in TEXT ergeben jetzt dasselbe wie in LibreOffice. Unter Linux öffnet sich der Druckdialog über dem Fenster, und ein Dokument ohne druckbaren Inhalt sagt das."
 
 [products.xodp.locales.en-us]
-whats-new = "A fix release. Text typed right after a field in a label goes after it. Unsaved changes kept against a crash return to the right file whatever its name holds, and a window that cannot keep them now says so."
+whats-new = "Every menu is reached from the keyboard: Alt and a menu's underlined letter opens it, and an entry's underlined letter chooses it. A misspelled word on a turned label offers its corrections on a right click. On Linux the print dialog opens over the window, and a document with nothing to print says so."
 
 [products.xodp.locales.de-de]
-whats-new = "Eine Korrekturversion. Direkt nach einem Feld in einer Beschriftung getippter Text steht hinter dem Feld. Gegen einen Absturz aufbewahrte ungespeicherte Änderungen kehren zur richtigen Datei zurück, was ihr Name auch enthält, und ein Fenster, das sie nicht aufbewahren kann, sagt das jetzt."
+whats-new = "Jedes Menü ist mit der Tastatur erreichbar: Alt und der unterstrichene Buchstabe öffnen ein Menü, und der unterstrichene Buchstabe eines Eintrags wählt ihn. Ein falsch geschriebenes Wort in einer gedrehten Beschriftung bietet mit einem Rechtsklick seine Korrekturen an. Unter Linux öffnet sich der Druckdialog über dem Fenster, und ein Dokument ohne druckbaren Inhalt sagt das."
