@@ -114,13 +114,15 @@ impl Context<'_> {
     }
 
     /// The row of a sorted or unsorted table whose first cell is a value,
-    /// and that row's cell in a column; `#N/A` where none is.
+    /// and that row's cell in a column; `#N/A` where none is. A sorted search
+    /// ends at an error where `errors_end`, as `LibreOffice`'s `HLOOKUP` does
+    /// and its `VLOOKUP` does not.
     pub(super) fn vertical(
         &self,
         wanted: &Value,
         rows: &[Vec<Value>],
         column: usize,
-        sorted: bool,
+        (sorted, errors_end): (bool, bool),
     ) -> Value {
         let first: Vec<Value> = rows.iter().map(|row| row[0].clone()).collect();
         let how = if sorted {
@@ -128,14 +130,14 @@ impl Context<'_> {
         } else {
             Search::Exact
         };
-        match self.find(wanted, &first, how) {
+        match self.find(wanted, &first, how, errors_end) {
             Some(at) => rows[at][column].clone(),
             None => Value::Error(Error::NotAvailable),
         }
     }
 
     /// Where a value is in a list.
-    fn find(&self, wanted: &Value, list: &[Value], how: Search) -> Option<usize> {
+    fn find(&self, wanted: &Value, list: &[Value], how: Search, errors_end: bool) -> Option<usize> {
         match how {
             Search::Exact => {
                 let exact = Criterion::lookup(wanted, self.matching());
@@ -155,6 +157,9 @@ impl Context<'_> {
                 };
                 let mut found = None;
                 for (at, cell) in list.iter().enumerate() {
+                    if errors_end && matches!(cell, Value::Error(_)) {
+                        break;
+                    }
                     if !same_kind(cell, wanted) {
                         continue;
                     }
@@ -189,7 +194,7 @@ impl Context<'_> {
         let columns: Vec<Vec<Value>> = (0..width)
             .map(|c| rows.iter().map(|row| row[c].clone()).collect())
             .collect();
-        Ok(self.vertical(&wanted, &columns, whole(row) - 1, sorted))
+        Ok(self.vertical(&wanted, &columns, whole(row) - 1, (sorted, true)))
     }
 
     fn position(&self, args: &[Expr]) -> Result<Value, Unsupported> {
@@ -213,7 +218,7 @@ impl Context<'_> {
         } else {
             Search::Exact
         };
-        Ok(match self.find(&wanted, &list, how) {
+        Ok(match self.find(&wanted, &list, how, true) {
             Some(at) => count_value(at + 1),
             None => Value::Error(Error::NotAvailable),
         })
@@ -256,7 +261,7 @@ impl Context<'_> {
             list.reverse();
         }
         let found = self
-            .find(&wanted, &list, Search::Exact)
+            .find(&wanted, &list, Search::Exact, false)
             .map(|at| if backwards { list.len() - 1 - at } else { at });
         let Some(at) = found else {
             return Ok(match given(3) {
@@ -291,6 +296,17 @@ impl Context<'_> {
         let (row, column) = match second {
             Some(column) => (first, column),
             None if rows.len() == 1 && width > 1 => (1.0, first),
+            None if width > 1 => {
+                let Expr::Reference(reference) = &args[0] else {
+                    return Err(Unsupported);
+                };
+                let (from, to) = (reference.from.column, reference.to.column);
+                if !(from..=to).contains(&self.at.column) {
+                    return Ok(Value::Error(Error::Value));
+                }
+                #[allow(clippy::cast_precision_loss)]
+                (first, (self.at.column - from + 1) as f64)
+            }
             None => (first, 1.0),
         };
         if row < 1.0 || column < 1.0 {

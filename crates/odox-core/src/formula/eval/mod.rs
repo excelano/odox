@@ -615,7 +615,7 @@ impl Context<'_> {
                     Some(expr) => tryv!(truth(&self.scalar(expr)?)),
                     None => true,
                 };
-                self.vertical(&wanted, &rows, column, sorted)
+                self.vertical(&wanted, &rows, column, (sorted, false))
             }
             "SUMIF" | "COUNTIF" | "AVERAGEIF" => {
                 count(2, if name == "COUNTIF" { 2 } else { 3 })?;

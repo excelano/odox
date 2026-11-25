@@ -703,7 +703,14 @@ a data style and shown as a cell in that style would be; a code with several
 sections or runs of digits, digits beside a date, scaling, an exponent, a
 fraction, padding or a text placeholder is outside the core. SUMPRODUCT's
 arguments and the arrays MATCH and XLOOKUP search are worked out cell by cell,
-so `(A1:A4="a")*B1:B4` is four values. SEARCH reads its text as a pattern as
+so `(A1:A4="a")*B1:B4` is four values. INDEX given a row and no column over
+a range of several columns takes the formula's own column, and is `#VALUE!`
+where that column is outside the range. A sorted MATCH, either way, and a
+sorted HLOOKUP end their search at the first error in what they search, while
+a sorted VLOOKUP passes over one, as `LibreOffice`'s do. A time of day is shown
+with its whole seconds cut and its decimals of a second rounded unless that
+makes a whole second, and an elapsed duration is rounded, in a cell and in
+TEXT alike. SEARCH reads its text as a pattern as
 the calculation settings say, as a criterion is read. OFFSET and INDIRECT
 answer `Err:502` past the last row or column, and a reference over more than a
 million cells is left outside the core; INDIRECT reads `Sheet!A1` as well as

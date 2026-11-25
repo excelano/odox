@@ -870,16 +870,34 @@ impl Moment {
     }
 
     /// A count of days from 30 December 1899 as a date and time of day, or,
-    /// as a `duration`, as the hours, minutes and seconds it comes to, rounded
-    /// to `places` decimals of a second; `None` for a date no calendar here
-    /// reaches.
+    /// as a `duration`, as the hours, minutes and seconds it comes to, as
+    /// `LibreOffice` shows them: a duration rounded to `places` decimals of a
+    /// second; a time of day with its whole seconds cut, not rounded, once the
+    /// last bits of binary are taken off, and its decimals rounded where that
+    /// does not make a whole second and cut where it would. `None` for a date
+    /// no calendar here reaches.
     fn of_serial(serial: f64, duration: bool, places: u32) -> Option<Self> {
         if !serial.is_finite() || !(-12_000_000.0..=2_958_466.0).contains(&serial) {
             return None;
         }
         let scale = 10_i64.pow(places);
-        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-        let units = (serial * 86_400.0 * scale as f64).round() as i64;
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
+            clippy::cast_sign_loss
+        )]
+        let units = if duration {
+            (serial * 86_400.0 * scale as f64).round() as i64
+        } else {
+            let seconds = crate::formula::approx(serial * 86_400.0);
+            let whole = seconds.floor();
+            let fraction = (seconds - whole) * scale as f64;
+            let subsecond = match fraction.round() as i64 {
+                rounded if rounded < scale => rounded,
+                _ => fraction.floor() as i64,
+            };
+            whole as i64 * scale + subsecond
+        };
         let subsecond = units.unsigned_abs() % scale.unsigned_abs();
         let total = units.signum() * (units.abs() / scale);
         let (days, of_day) = (total.div_euclid(86_400), total.rem_euclid(86_400));
@@ -1443,4 +1461,47 @@ fn date_letter(letter: char, run: usize) -> Part {
 /// Whether a format code read so far has its digits already.
 fn numbered(parts: &[Part]) -> bool {
     parts.iter().any(|part| matches!(part, Part::Number(..)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DataStyle;
+    use crate::doc::Value;
+
+    fn shown(code: &str, days: f64) -> String {
+        DataStyle::from_code(code)
+            .unwrap_or_else(|| panic!("no style for {code}"))
+            .format(&Value::Number(days), |_| None)
+            .expect("shown")
+    }
+
+    /// Seconds with decimals, which a style in the document says and a
+    /// format code here cannot.
+    fn seconds_with(places: u32, days: f64) -> String {
+        let source = format!(
+            r#"<number:time-style xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="N1"><number:seconds number:style="long" number:decimal-places="{places}"/></number:time-style>"#
+        );
+        let element = crate::xml::parse(source.as_bytes(), "test").expect("parsed");
+        DataStyle::read(&element)
+            .expect("a style")
+            .format(&Value::Number(days), |_| None)
+            .expect("shown")
+    }
+
+    #[test]
+    fn a_clock_cuts_its_seconds_where_libreoffice_does() {
+        for (days, code, libreoffice) in [
+            (0.000_011_574, "s", "0"),
+            (2.6 / 86_400.0, "s", "2"),
+            (59.9 / 86_400.0, "mm:ss", "00:59"),
+            (0.999_999_99, "hh:mm:ss", "23:59:59"),
+            (0.7, "hh:mm:ss", "16:48:00"),
+            (0.5, "hh:mm:ss", "12:00:00"),
+            (1.0 / 3.0, "hh:mm:ss", "08:00:00"),
+        ] {
+            assert_eq!(shown(code, days), libreoffice, "{days} as {code}");
+        }
+        assert_eq!(seconds_with(2, 1.4999 / 86_400.0), "01.50");
+        assert_eq!(seconds_with(1, 1.99 / 86_400.0), "01.9");
+    }
 }
