@@ -199,14 +199,14 @@ impl<P: Clone + Eq + std::hash::Hash + std::fmt::Debug> RichEdit<P> {
         self.owed = Owed::FocusAndReveal;
     }
 
-    /// Take the caret away.
+    /// Take the caret away. The last copy stays, to be pasted wherever the
+    /// caret goes next while the clipboard still holds its text.
     pub fn clear(&mut self) {
         self.selection = None;
         self.group = None;
         self.column = None;
         self.dragging = false;
         self.pending = None;
-        self.clip = None;
     }
 
     /// The document was changed or replaced by something other than this
