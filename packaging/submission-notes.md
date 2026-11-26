@@ -46,7 +46,8 @@ The same for all three products.
                               repository carries the license
     Privacy policy            https://excelano.com/legal/#odox
     App Privacy (Apple)       Data Not Collected
-    Price                     free
+    Price                     USD 0.99 on the Mac App Store; free on the
+                              Microsoft Store
 
 ## Screenshots
 

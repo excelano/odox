@@ -83,7 +83,7 @@ It is one of three, beside Odox Grid for spreadsheets and Odox Deck for presenta
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
+Written in Rust and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Text&channel=Mac%20App%20Store"
@@ -142,7 +142,7 @@ Odox Text ist eines von dreien, neben Odox Grid für Tabellendokumente und Odox 
 
 Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
-In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+In Rust geschrieben und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Text&channel=Mac%20App%20Store"
@@ -237,7 +237,7 @@ It is one of three, beside Odox Text for text documents and Odox Deck for presen
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
+Written in Rust and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Grid&channel=Mac%20App%20Store"
@@ -298,7 +298,7 @@ Odox Grid ist eines von dreien, neben Odox Text für Textdokumente und Odox Deck
 
 Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
-In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+In Rust geschrieben und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Grid&channel=Mac%20App%20Store"
@@ -393,7 +393,7 @@ It is one of three, beside Odox Text for text documents and Odox Grid for spread
 
 What an editor has to do and most do not is keep the whole document. Every element, attribute and piece of whitespace in your file survives being read, including the ones Odox has never heard of, and what you did not touch is written back as it was read, element for element: a moved shape is four attributes changed, in the unit the document wrote them in, and nothing else. Before a save, what is about to be written is read back and compared with the document in the window, and a difference refuses the save rather than writing a document that would not come back the same.
 
-Written in Rust, free, and open source under the MIT license, at https://github.com/excelano/odox.
+Written in Rust and open source under the MIT license, at https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Deck&channel=Mac%20App%20Store"
@@ -454,7 +454,7 @@ Odox Deck ist eines von dreien, neben Odox Text für Textdokumente und Odox Grid
 
 Was ein Editor tun muss und die meisten nicht tun: das ganze Dokument behalten. Jedes Element, jedes Attribut und jeder Leerraum Ihrer Datei übersteht das Einlesen, auch das, wovon Odox noch nie gehört hat, und was Sie nicht angefasst haben, wird so zurückgeschrieben, wie es gelesen wurde, Element für Element. Vor dem Speichern wird das, was geschrieben werden soll, zurückgelesen und mit dem Dokument im Fenster verglichen, und ein Unterschied verweigert das Speichern, statt ein Dokument zu schreiben, das nicht so zurückkäme.
 
-In Rust geschrieben, frei und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
+In Rust geschrieben und quelloffen unter der MIT-Lizenz, unter https://github.com/excelano/odox.
 """
 website = "https://excelano.com/odox/"
 support = "https://excelano.com/support/?app=Odox%20Deck&channel=Mac%20App%20Store"
