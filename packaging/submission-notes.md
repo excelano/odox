@@ -41,7 +41,7 @@ that product. 500 characters, newlines counted.
 The same for all three products.
 
     Category                  Productivity
-    Copyright and trademark   Excelano LLC
+    Copyright and trademark   David M. Anderson
     Additional license terms  blank; the applications are MIT and the
                               repository carries the license
     Privacy policy            https://excelano.com/legal/#odox
